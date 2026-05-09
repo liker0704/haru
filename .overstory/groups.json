@@ -1726,5 +1726,18 @@
 		"status": "active",
 		"createdAt": "2026-04-09T09:22:10.918Z",
 		"completedAt": null
+	},
+	{
+		"id": "group-1fc82c90",
+		"name": "rebrand-hana-v2-batch1",
+		"memberIssueIds": [
+			"overstory-11c8",
+			"overstory-bd36",
+			"overstory-6c86",
+			"overstory-05f2"
+		],
+		"status": "active",
+		"createdAt": "2026-05-09T21:12:40.929Z",
+		"completedAt": null
 	}
 ]
