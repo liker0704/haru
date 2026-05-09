@@ -48,6 +48,12 @@ export interface EngineDeps {
 	/** Optional mail store for handlers that need inbox/outbox inspection
 	 * (e.g. execute-phase check-remaining disambiguates lead waiting state). */
 	mailStore?: import("../mail/store.ts").MailStore;
+	/** Optional overstory directory — needed by handlers that spawn role agents
+	 * (e.g. plan-phase ensure-architect). */
+	overstoryDir?: string;
+	/** Optional project root — needed by handlers that spawn role agents
+	 * (e.g. plan-phase ensure-architect). */
+	projectRoot?: string;
 }
 
 export interface EngineStatus {
@@ -252,6 +258,8 @@ export function buildLifecycleHandlers(
 		missionStore: deps.missionStore,
 		sessionStore: deps.sessionStore,
 		mailStore: deps.mailStore,
+		overstoryDir: deps.overstoryDir,
+		projectRoot: deps.projectRoot,
 	};
 	const phaseHandlers: HandlerRegistry = {};
 	for (const [key, cell] of Object.entries(PHASE_CELL_REGISTRY)) {
@@ -281,6 +289,7 @@ export function buildLifecycleGraph(mission: Mission): MissionGraph {
 		missionId: mission.id,
 		artifactRoot: mission.artifactRoot ?? "",
 		projectRoot: "",
+		tier,
 	};
 
 	// Filter nodes to only include phases in this tier

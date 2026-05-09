@@ -311,6 +311,8 @@ async function processMission(mission: Mission, opts: MissionTickOpts): Promise<
 		sendMail,
 		sessionStore: opts.sessionStore,
 		mailStore: opts.mailStore ?? undefined,
+		overstoryDir: opts.overstoryDir,
+		projectRoot: opts.projectRoot,
 	};
 	const tickGraph = buildLifecycleGraph(mission);
 	const tickHandlers = buildLifecycleHandlers(engineDeps, tier);

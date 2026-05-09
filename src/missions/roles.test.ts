@@ -12,9 +12,14 @@ import type {
 	StartPersistentAgentResult,
 } from "../agents/persistent-root.ts";
 import { AgentError } from "../errors.ts";
-import type { AgentSession } from "../types.ts";
+import type { AgentSession, Mission } from "../types.ts";
 import type { MissionRoleDeps } from "./roles.ts";
-import { startExecutionDirector, startMissionAnalyst, stopMissionRole } from "./roles.ts";
+import {
+	ensureArchitect,
+	startExecutionDirector,
+	startMissionAnalyst,
+	stopMissionRole,
+} from "./roles.ts";
 
 // === Shared mock builders ===
 
@@ -380,5 +385,191 @@ describe("stopMissionRole", () => {
 		);
 
 		expect(capturedName).toBe("execution-director");
+	});
+});
+
+// === ensureArchitect ===
+
+function makeMission(overrides?: Partial<Mission>): Mission {
+	return {
+		id: "m-arch-001",
+		slug: "arch-test",
+		objective: "test mission",
+		runId: "run-arch",
+		state: "active",
+		phase: "plan",
+		firstFreezeAt: null,
+		pendingUserInput: false,
+		pendingInputKind: null,
+		pendingInputThreadId: null,
+		reopenCount: 0,
+		artifactRoot: null,
+		pausedWorkstreamIds: [],
+		analystSessionId: null,
+		executionDirectorSessionId: null,
+		coordinatorSessionId: null,
+		architectSessionId: null,
+		pausedLeadNames: [],
+		pauseReason: null,
+		currentNode: null,
+		startedAt: null,
+		completedAt: null,
+		createdAt: "",
+		updatedAt: "",
+		learningsExtracted: false,
+		hasEmittedWsProducerWrite: false,
+		tier: "full",
+		...overrides,
+	};
+}
+
+function makeArchitectStoreSpy(): {
+	store: {
+		getById: (id: string) => { id: string } | null;
+		bindSessions: (id: string, sessions: { architectSessionId?: string }) => void;
+		close: () => void;
+	};
+	calls: Array<{ id: string; sessions: Record<string, string | undefined> }>;
+} {
+	const calls: Array<{ id: string; sessions: Record<string, string | undefined> }> = [];
+	const store = {
+		getById: (id: string) => ({ id }),
+		bindSessions: (id: string, sessions: { architectSessionId?: string }) => {
+			calls.push({ id, sessions });
+		},
+		close: () => {},
+	};
+	return { store, calls };
+}
+
+describe("ensureArchitect", () => {
+	test("first call (no architectSessionId) spawns architect and binds sessionId", async () => {
+		const mission = makeMission({ architectSessionId: null });
+		const { store, calls } = makeArchitectStoreSpy();
+
+		let materializeCalled = false;
+		let drainCalled = false;
+		let startCaptured: StartPersistentAgentOpts | undefined;
+
+		const deps: MissionRoleDeps = {
+			startAgent: async (opts) => {
+				startCaptured = opts;
+				return makeStartResult("architect-arch-test");
+			},
+			createStore: () => store as never,
+			materializePrompt: async () => {
+				materializeCalled = true;
+				return { promptPath: "/fake/prompt.md", contextPath: "/fake/ctx.md" };
+			},
+			drainInbox: () => {
+				drainCalled = true;
+			},
+		};
+
+		await ensureArchitect(mission, "/proj/.overstory", "/proj", deps);
+
+		expect(materializeCalled).toBe(true);
+		expect(drainCalled).toBe(true);
+		expect(startCaptured?.capability).toBe("architect");
+		expect(startCaptured?.agentName).toBe("architect-arch-test");
+		expect(startCaptured?.appendSystemPromptFile).toBe("/fake/prompt.md");
+		expect(calls).toHaveLength(1);
+		expect(calls[0]?.id).toBe("m-arch-001");
+		expect(calls[0]?.sessions.architectSessionId).toBe("session-architect-arch-test");
+	});
+
+	test("second call (architect bound and alive) is a no-op — does not spawn", async () => {
+		const mission = makeMission({ architectSessionId: "session-architect-arch-test" });
+		const { store, calls } = makeArchitectStoreSpy();
+
+		let startCalled = false;
+		let materializeCalled = false;
+
+		const deps: MissionRoleDeps = {
+			startAgent: async () => {
+				startCalled = true;
+				return makeStartResult("architect-arch-test");
+			},
+			createStore: () => store as never,
+			isRoleSessionAlive: () => true,
+			materializePrompt: async () => {
+				materializeCalled = true;
+				return { promptPath: "", contextPath: "" };
+			},
+			drainInbox: () => {},
+		};
+
+		await ensureArchitect(mission, "/proj/.overstory", "/proj", deps);
+
+		expect(startCalled).toBe(false);
+		expect(materializeCalled).toBe(false);
+		expect(calls).toHaveLength(0);
+	});
+
+	test("architect bound but dead: respawns and rebinds", async () => {
+		const mission = makeMission({ architectSessionId: "session-stale" });
+		const { store, calls } = makeArchitectStoreSpy();
+
+		let startCalled = false;
+
+		const deps: MissionRoleDeps = {
+			startAgent: async () => {
+				startCalled = true;
+				return makeStartResult("architect-arch-test");
+			},
+			createStore: () => store as never,
+			isRoleSessionAlive: () => false,
+			materializePrompt: async () => ({ promptPath: "", contextPath: "" }),
+			drainInbox: () => {},
+		};
+
+		await ensureArchitect(mission, "/proj/.overstory", "/proj", deps);
+
+		expect(startCalled).toBe(true);
+		expect(calls).toHaveLength(1);
+		expect(calls[0]?.sessions.architectSessionId).toBe("session-architect-arch-test");
+	});
+
+	test("startArchitectRole failure propagates (no partial state)", async () => {
+		const mission = makeMission({ architectSessionId: null });
+		const { store, calls } = makeArchitectStoreSpy();
+
+		const deps: MissionRoleDeps = {
+			startAgent: async () => {
+				throw new Error("spawn failed");
+			},
+			createStore: () => store as never,
+			materializePrompt: async () => ({ promptPath: "", contextPath: "" }),
+			drainInbox: () => {},
+		};
+
+		await expect(ensureArchitect(mission, "/proj/.overstory", "/proj", deps)).rejects.toThrow(
+			"spawn failed",
+		);
+
+		// No bindSessions write happened — startArchitectRole runs bindSessions
+		// only after startAgent succeeds.
+		expect(calls).toHaveLength(0);
+	});
+
+	test("uses unscoped 'architect' name when mission has no slug", async () => {
+		const mission = makeMission({ slug: "", architectSessionId: null });
+		const { store } = makeArchitectStoreSpy();
+
+		let startCaptured: StartPersistentAgentOpts | undefined;
+
+		const deps: MissionRoleDeps = {
+			startAgent: async (opts) => {
+				startCaptured = opts;
+				return makeStartResult("architect");
+			},
+			createStore: () => store as never,
+			materializePrompt: async () => ({ promptPath: "", contextPath: "" }),
+			drainInbox: () => {},
+		};
+
+		await ensureArchitect(mission, "/proj/.overstory", "/proj", deps);
+
+		expect(startCaptured?.agentName).toBe("architect");
 	});
 });

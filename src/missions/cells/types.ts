@@ -3,7 +3,13 @@
  */
 
 import type { SessionStore } from "../../sessions/store.ts";
-import type { CheckpointStore, MissionGraph, MissionStore, PlanReviewTier } from "../../types.ts";
+import type {
+	CheckpointStore,
+	MissionGraph,
+	MissionStore,
+	MissionTier,
+	PlanReviewTier,
+} from "../../types.ts";
 import type { HandlerRegistry } from "../types.ts";
 
 // === Review cell types (plan-review, architecture-review) ===
@@ -32,6 +38,9 @@ export interface PhaseCellConfig {
 	missionId: string;
 	artifactRoot: string;
 	projectRoot: string;
+	/** Mission tier — controls tier-conditional subgraph routing
+	 *  (e.g. plan-phase skips architect-design for `planned`). */
+	tier?: MissionTier;
 }
 
 export interface PhaseCellDeps {
@@ -41,6 +50,12 @@ export interface PhaseCellDeps {
 	sessionStore?: SessionStore;
 	/** Optional: needed by check-remaining handler to disambiguate "waiting" lead state. */
 	mailStore?: import("../../mail/store.ts").MailStore;
+	/** Absolute path to the .overstory directory — needed by handlers that
+	 *  spawn role agents (e.g. plan-phase ensure-architect). */
+	overstoryDir?: string;
+	/** Absolute path to the project root — needed by handlers that spawn
+	 *  role agents (e.g. plan-phase ensure-architect). */
+	projectRoot?: string;
 }
 
 export interface PhaseCellDefinition {

@@ -69,6 +69,23 @@ export interface MissionRoleDeps {
 		},
 	) => Promise<StopPersistentAgentResult>;
 	createStore?: (dbPath: string) => MissionStore;
+	/** Override prompt materialization — used by ensureArchitect tests to
+	 *  avoid real filesystem writes. */
+	materializePrompt?: (opts: {
+		overstoryDir: string;
+		agentName: string;
+		capability: string;
+		roleLabel: string;
+		mission: Mission;
+		siblingNames?: Record<string, string>;
+	}) => Promise<{ promptPath: string; contextPath: string }>;
+	/** Override inbox drain — used by ensureArchitect tests to avoid real
+	 *  mail-store mutation. */
+	drainInbox?: (overstoryDir: string, agentName: string) => void;
+	/** Override session liveness check — used by ensureArchitect tests to
+	 *  avoid real session-store I/O. Returns true when the named role agent
+	 *  is alive (not completed/zombie). */
+	isRoleSessionAlive?: (overstoryDir: string, agentName: string) => boolean;
 }
 
 // === Role Lifecycle ===
@@ -175,6 +192,83 @@ export async function ensureMissionAnalyst(
 			contextPath: analystPrompt.contextPath,
 		}),
 	});
+}
+
+/**
+ * Ensure the architect role is running and bound to the mission.
+ *
+ * Idempotent: if `architectSessionId` is already bound and the session is
+ * alive (not completed/zombie), returns immediately without spawning. Otherwise
+ * spawns a new architect via `startArchitectRole`, which writes
+ * `architectSessionId` via `MissionStore.bindSessions`.
+ *
+ * Errors from `startArchitectRole` propagate — callers should not silently
+ * swallow them, since a missing architect causes the architect-design gate to
+ * stall indefinitely.
+ */
+export async function ensureArchitect(
+	mission: Mission,
+	overstoryDir: string,
+	projectRoot: string,
+	_deps?: MissionRoleDeps,
+): Promise<void> {
+	const architectName = mission.slug ? `architect-${mission.slug}` : "architect";
+
+	if (mission.architectSessionId) {
+		// Architect already bound — check if alive
+		if (_deps?.isRoleSessionAlive) {
+			if (_deps.isRoleSessionAlive(overstoryDir, architectName)) {
+				return;
+			}
+		} else {
+			const { openSessionStore } = await import("../sessions/compat.ts");
+			const { store: sessionStore } = openSessionStore(overstoryDir);
+			try {
+				const session = sessionStore.getByName(architectName);
+				if (session && session.state !== "completed" && session.state !== "zombie") {
+					return; // Architect is alive
+				}
+			} finally {
+				sessionStore.close();
+			}
+		}
+	}
+
+	// Spawn architect
+	const coordAgentName = mission.slug ? `coordinator-${mission.slug}` : "coordinator";
+
+	const materialize = _deps?.materializePrompt ?? materializeMissionRolePrompt;
+	const drain = _deps?.drainInbox ?? drainAgentInbox;
+
+	const architectPrompt = await materialize({
+		overstoryDir,
+		agentName: architectName,
+		capability: "architect",
+		roleLabel: "Architect",
+		mission,
+		siblingNames: {
+			"Coordinator agent": coordAgentName,
+		},
+	});
+	drain(overstoryDir, architectName);
+
+	await startArchitectRole(
+		{
+			missionId: mission.id,
+			missionSlug: mission.slug,
+			agentName: architectName,
+			projectRoot,
+			overstoryDir,
+			existingRunId: mission.runId ?? "",
+			appendSystemPromptFile: architectPrompt.promptPath,
+			beacon: buildMissionRoleBeacon({
+				agentName: architectName,
+				missionId: mission.id,
+				contextPath: architectPrompt.contextPath,
+			}),
+		},
+		_deps,
+	);
 }
 
 /**
