@@ -275,6 +275,12 @@ The engine operates in two modes:
 
 **Recovery mode** (agent dead): `evaluateHealth()` marks the agent as zombie. The engine diagnoses the cause and responds: wait for rate-limited agents, respawn after context overflow or crash (up to max retries), suspend the mission and notify the operator if the circuit breaker trips.
 
+**DAG state transitions via `transitionMissionViaEngine()`**: Mission state changes (stop, complete, suspend, resume, handoff) are routed through `transitionMissionViaEngine()` in `src/missions/engine-wiring.ts` rather than mutating `mission.state` directly. The function loads the mission, resolves any subgraph node back to its parent `phase:active` lifecycle node (lifecycle triggers only have edges from parent nodes), builds a tier-appropriate lifecycle graph, and calls `engine.forceAdvance(trigger)`. This keeps every state change flowing through the same DAG topology that drives normal phase progression, so checkpoints and transition history stay consistent across operator actions and engine-driven advances.
+
+**Gate-state reset on loop-back**: When a subgraph edge loops back to a previously-resolved gate (for example `check-remaining --more_ws--> dispatch-ready` and then back to `await-ws-completion`), the tick calls `missionStore.resetGateState(missionId, destinationNodeId)` on the destination. Without the reset, the destination gate's stale `resolved_at` would filter out fresh mail/events as already-processed, and the loop body would never re-fire. With the reset, each loop iteration sees a clean gate state while the original `entered_at` is preserved by `INSERT OR IGNORE` for ceiling tracking.
+
+**`onTimeout` routing on ceiling breach**: When the absolute grace ceiling (`max_total_wait_ms`) expires, the engine no longer unconditionally suspends the mission. If the current graph node declares an `onTimeout` edge, the tick fires a `timeout` trigger and routes the mission along that edge (recording `engine_gate_timeout_routed` to the event store). Suspension is now the fallback for nodes that do not declare a timeout edge. Suspended missions also await `stopMissionRunDescendants()` with a 10-second budget so the next tick observes terminated descendants rather than zombies still sending mail.
+
 ## 7. Merge Flow
 
 `ov merge` turns worker branches back into canonical history.

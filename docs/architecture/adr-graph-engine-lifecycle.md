@@ -1,6 +1,6 @@
 # ADR: Graph Execution Engine as Mission Lifecycle Controller
 
-**Status**: Accepted
+**Status**: Accepted (with post-ADR extensions documented inline — see "Post-ADR Extensions" section below)
 
 **Date**: 2026-04-04
 
@@ -194,13 +194,17 @@ understand:active.subgraph:
                                                    |--frozen--> [frozen] --answer--> [evaluate]
 
 plan:active.subgraph:
-  [dispatch-planning] --> [await-plan] --> [check-tdd]
-                                              |--tdd_required--> [architect-design] --> [review]
-                                              |--no_tdd--> [review]
+  [dispatch-planning] --> [await-plan] --> [architect-design] --> [review]
   [review] = plan-review cell subgraph (existing)
   [review] --approved--> [await-handoff]
   [review] --stuck--> [review-stuck] --resolved--> [review]
   [await-handoff] --> terminal
+
+  Note: architect-design always runs in Full tier; the check-tdd branching node
+  was removed (commit 282744a7). TDD-awareness now lives in the gate evaluator
+  evaluateArchitectDesign() (src/watchdog/gate-evaluators.ts:170-249), which
+  calls isTddActive() to adapt artifact requirements (architecture.md alone vs.
+  architecture.md + test-plan.yaml).
 
 execute:active.subgraph:
   [ensure-ed] --> [dispatch-ready] --> [await-ws-completion]
@@ -697,13 +701,13 @@ These events are queryable via `ov trace` and visible in `ov dashboard`.
   activity: analyst children (scouts) active --> extend grace
   --plan_written-->
 
-[check-tdd]
-  handler: any workstream has tddMode !== "skip"?
-  --tdd_required--> [architect-design]
-  --no_tdd--> [review]
-
 [architect-design]  gate: async, graceMs: 300_000
-  check: architect_ready mail received + architecture.md + test-plan.yaml exist
+  Architect-design always runs in Full tier — no upstream check-tdd branch.
+  TDD-awareness is encoded inside the gate evaluator evaluateArchitectDesign()
+  (src/watchdog/gate-evaluators.ts:170-249) via isTddActive():
+    - TDD active   --> require architecture.md + test-plan.yaml
+    - TDD inactive --> require architecture.md only
+  check: architect_ready mail received + required artifacts exist
   activity: architect children (scouts) active --> extend grace
   nudge: coordinator ("spawn architect") or architect ("send architect_ready")
   --architect_ready--> [review]
@@ -833,7 +837,7 @@ The graph engine handles missions at three tiers, each running a different subse
 
 ### Tier Definitions
 
-`TIER_PHASES` in `src/missions/engine-wiring.ts:75-79` maps each tier to its active phases:
+`TIER_PHASES` in `src/missions/engine-wiring.ts:78-82` maps each tier to its active phases:
 
 | Tier | Active phases |
 |---|---|
@@ -869,7 +873,9 @@ Edges:
 
 ### Engine Wiring
 
-`CELL_REGISTRY` in `src/missions/engine-wiring.ts` maps `"execute-phase"` to either the standard execute-phase subgraph or `execute-direct-phase.ts`, selected based on `mission.tier`. The `startLifecycleEngine()` function wires the correct cell into `buildLifecycleGraph()` before handing the graph to the engine.
+`CELL_REGISTRY` in `src/missions/engine-wiring.ts:62-65` is the **review-cell** registry only — it maps `"plan-review"` and `"architecture-review"` to their respective `ReviewCellDefinition`s and is consumed by `startCellEngine()`/`advanceCellGate()`.
+
+Phase cells (understand, plan, execute, done) live in a separate registry: `PHASE_CELL_REGISTRY` (`src/missions/engine-wiring.ts:68-73`). Tier-aware execute-phase selection happens via inline substitution inside `buildLifecycleGraph()` (`engine-wiring.ts:296-299`): when `tier === "direct"` and the node's phase is `"execute"`, the standard `executePhaseCell` is replaced with `executeDirectPhaseCell` before the subgraph is attached to the lifecycle node. `buildLifecycleHandlers()` performs the matching swap on the handler side (`engine-wiring.ts:259-265`).
 
 ---
 
@@ -1048,6 +1054,44 @@ Estimated overhead: 5-15ms per active mission per tick. With 1-2 active missions
 ## Implementation Status
 
 All 12 design decisions documented in this ADR have been verified as implemented and operational (audit 2026-04-04). The graph engine runs as the always-on mission lifecycle controller in production across all mission tiers.
+
+---
+
+## Post-ADR Extensions
+
+These extensions were added after the original ADR was accepted. They are operational in the current code and are documented here so this ADR remains an accurate reference for the live system.
+
+### 1. Legacy WS-completion opt-out (`OVERSTORY_LEGACY_WS_COMPLETION`)
+
+`evaluateWsCompletion()` (`src/watchdog/gate-evaluators.ts:282-291`) checks the `OVERSTORY_LEGACY_WS_COMPLETION=true` env var. When set, the gate keeps the pre-SSOT behavior — advancing on the first `merged` mail received by the execution-director. This is a kill-switch for sites that need to roll back from the SSOT path during incident response. Default (env unset) follows the SSOT path described next.
+
+### 2. SSOT path via `missionStore.areAllWorkstreamsDone()`
+
+The default `evaluateWsCompletion()` path (`gate-evaluators.ts:293-320`, since commit 3279fc25) is the single source of truth: it loads the planned workstream IDs from `workstreams.json`, then queries the `workstream_status` SQLite table via `missionStore.areAllWorkstreamsDone(missionId, plannedIds)`. The gate fires only when *all* planned workstreams have reached `completed` status. This eliminates the false-positive seen in the legacy mail-only path where a single `merged` mail advanced the gate even with sibling workstreams still active.
+
+### 3. Sticky-flag fallback `hasEmittedWsProducerWrite`
+
+For pre-migration missions whose `workstream_status` rows were not backfilled by migration v8, `evaluateWsCompletion()` (`gate-evaluators.ts:326-338`) consults the per-mission sticky flag `mission.hasEmittedWsProducerWrite`. If the flag is false (the SSOT producer has *never* fired for this mission) and a `merged` mail exists, the gate honors the legacy advance once and tags the trigger body with `[ws_status_not_populated]` so audit trails show the fallback fired. Once the producer fires once, the flag flips permanently and this fallback is disabled.
+
+### 4. Gate-state reset on loop-back
+
+`runMissionTick()` (`src/watchdog/mission-tick.ts:405-406`, commit 3279fc25) calls `missionStore.resetGateState(missionId, advanceEdge.to)` whenever a subgraph edge loops back to a previously-resolved gate (e.g., `check-remaining --more_ws--> dispatch-ready` re-entering `await-ws-completion` afterwards). Without this reset, the destination gate's stale `resolved_at` would filter out fresh mail/events and the loop body would never re-fire.
+
+### 5. Loop-back-aware mail filtering (`gateFilterTime`)
+
+When evaluating a gate, `mission-tick.ts:374-378` computes `gateFilterTime = gateState.resolved_at ?? gateState.entered_at`. On first entry `resolved_at` is null so the original `entered_at` is used. On loop-back, `INSERT OR IGNORE` preserves the original `entered_at` but `resolved_at` reflects the last fire — using it as the filter baseline ensures gate evaluators only see mail/events newer than the last resolution, preventing already-processed messages from re-triggering the gate.
+
+### 6. `onTimeout` edge routing
+
+When the absolute ceiling expires (`elapsed > gateState.max_total_wait_ms`), `mission-tick.ts:433-476` no longer unconditionally suspends the mission. If the current graph node declares `currentGraphNode?.onTimeout`, the tick fires a `timeout` trigger instead — calling `missionStore.resolveGate(missionId, nodeId, "timeout")`, advancing along the timeout edge (subgraph or top-level), and emitting `engine_gate_timeout_routed` to the event store. Suspension remains the fallback only for nodes with no `onTimeout` edge.
+
+### 7. Awaited descendant-stop with 10s budget on suspend
+
+When the ceiling-breach branch *does* suspend a mission (no `onTimeout` edge), `mission-tick.ts:481-509` awaits `stopMissionRunDescendants()` with a 10-second `Promise.race` budget. This guarantees that the next watchdog tick observes terminated descendants rather than zombies still sending mail. The spawn guard in `src/agents/spawn.ts` prevents new agents from being spawned for a suspended mission while the stop is in flight.
+
+### 8. `transitionMissionViaEngine()` for DAG state transitions
+
+`transitionMissionViaEngine()` (`src/missions/engine-wiring.ts:339-384`, commit 282744a7) routes mission state transitions (stop, complete, suspend, resume, handoff) through the engine instead of mutating mission state directly. It loads the mission, resolves subgraph nodes back to their parent `phase:active` lifecycle node (since lifecycle triggers only have edges from parent nodes), builds a tier-appropriate lifecycle graph and handlers, and calls `engine.forceAdvance(trigger)`. Every state change therefore flows through the same DAG topology that drives normal phase progression, keeping checkpoints and transition history consistent.
 
 ---
 
