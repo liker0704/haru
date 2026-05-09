@@ -4,37 +4,74 @@ How overstory uses canopy for agent prompt management: inheritance chains, share
 
 ## Prompt Inheritance Tree
 
+The full inheritance chain across all 32 hand-maintained agent definitions in
+`agents/*.md`. Children inherit every section from their parents and may
+override individual sections.
+
 ```
 base-agent                          (root — universal principles)
 │
-├── leaf-worker                     (single-worker constraints)
-│   ├── builder                     (implementation specialist)
-│   ├── merger                      (branch merge specialist)
-│   └── read-only-worker            (read-only restriction layer)
-│       ├── scout                   (exploration, no writes)
-│       └── reviewer                (validation, no writes)
+├── Workers (leaf nodes — cannot spawn sub-agents)
+│   ├── leaf-worker                 (single-worker constraints)
+│   │   ├── builder                 (implementation specialist)
+│   │   ├── merger                  (branch merge specialist)
+│   │   ├── tester                  (test authoring + verification)
+│   │   └── read-only-worker        (read-only restriction layer)
+│   │       ├── scout               (exploration, no writes)
+│   │       └── reviewer            (validation, no writes)
+│   │
+│   ├── lead                        (team lead — workers spawn sub-workers)
+│   └── lead-mission                (mission-aware lead variant)
 │
-├── coordinator-base                (leadership/orchestration)
-│   ├── lead                        (team lead, spawns sub-workers)
-│   ├── orchestrator                (multi-repo coordinator)
-│   ├── supervisor                  (per-project supervisor) [DEPRECATED]
-│   └── coordinator-agent           (top-level coordinator)
+├── Orchestrators (non-mission)
+│   ├── coordinator-base            (leadership/orchestration shared)
+│   │   ├── coordinator             (top-level coordinator)
+│   │   └── orchestrator            (multi-repo coordinator)
+│   └── monitor                     (Tier 2 fleet patrol)
 │
-└── monitor                         (Tier 2 fleet patrol)
+├── Orchestrators (mission lifecycle)
+│   ├── coordinator-mission         (mission coordinator base)
+│   │   ├── coordinator-mission-assess     (assess phase)
+│   │   ├── coordinator-mission-direct     (direct execution variant)
+│   │   ├── coordinator-mission-planned    (plan-then-execute variant)
+│   │   └── coordinator-mission-full       (full lifecycle variant)
+│   ├── mission-analyst             (mission analysis worker)
+│   ├── mission-analyst-planned     (planned-mission analysis variant)
+│   └── execution-director          (execution-phase director)
+│
+├── Architects
+│   ├── architect                   (architecture proposals)
+│   ├── architecture-review-lead    (review session lead)
+│   └── architecture-sync           (architecture/code sync worker)
+│
+├── Plan critics (review a proposed plan from one angle)
+│   ├── plan-review-lead            (orchestrates the critic panel)
+│   ├── plan-architecture-critic
+│   ├── plan-devil-advocate
+│   ├── plan-performance-critic
+│   ├── plan-second-opinion
+│   ├── plan-security-critic
+│   └── plan-simulator              (executes a dry-run of the plan)
+│
+└── Research
+    ├── research-lead               (research session orchestrator)
+    └── researcher                  (research worker)
 ```
 
-### Profile / Delivery Prompts (separate chain)
+### Profiles / Mandates (mixed into overlays via `--profile`)
+
+These prompts are not full agent definitions; they're injected into the overlay
+at spawn time as `{{PROFILE_INSTRUCTIONS}}` (see overlay variables below):
 
 ```
-ov-delivery                         (base delivery guidance)
-├── ov-architecture                 (architecture-focused sessions)
-├── ov-co-creation                  (collaborative sessions)
-├── ov-discovery                    (brownfield codebase discovery)
-├── ov-research                     (research-oriented sessions)
-└── ov-red-hat                      (adversarial/risk analysis)
+shared-mandate                      (shared cross-agent mandate text)
+ov-co-creation                      (collaborative co-creation profile)
 ```
 
-### Standalone Utility Prompts (no inheritance)
+### Canopy-managed standalone prompts (no inheritance, no `agents/*.md`)
+
+These are operator-invoked prompts rendered directly via `cn render`. They are
+maintained inside `.canopy/prompts.jsonl` rather than `agents/*.md`:
 
 ```
 prioritize                          (issue prioritization)
@@ -231,6 +268,7 @@ How canopy prompts are assembled and delivered to an agent:
 | `.canopy/prompts.jsonl` | All prompt versions (source of truth) |
 | `.canopy/schemas.jsonl` | Validation schemas for prompt sections |
 | `src/canopy/client.ts` | Canopy CLI wrapper (render, validate, list, show) |
+| `src/canopy/types.ts` | Domain types for canopy prompts and render results |
 | `src/agents/overlay.ts` | Overlay generation with variable substitution |
 | `src/commands/sling.ts` | Profile rendering during agent spawn (lines ~790-804) |
 | `templates/overlay.md.tmpl` | Overlay template with all placeholders |

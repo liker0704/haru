@@ -126,8 +126,17 @@ export type AssertionKind =
 	| "max_stall_rate"
 	| "max_cost"
 	| "max_duration_ms"
-	| "custom";
+	| "custom"
+	| "before"
+	| "after"
+	| "within"
+	| "event_count"
+	| "success_ratio"
+	| "percentile_bound"
+	| "max_retry_frequency";
 ```
+
+### Metric-based assertions
 
 | Kind | Expected type | Metric compared | Pass condition |
 |------|---------------|-----------------|----------------|
@@ -139,6 +148,99 @@ export type AssertionKind =
 | `max_cost` | `number` (USD) | `metrics.estimatedCostUsd` | `actual <= expected` |
 | `max_duration_ms` | `number` (ms) | `metrics.durationMs` | `actual <= expected` |
 | `custom` | `string` | -- | Always passes (LLM judge not yet implemented) |
+
+### Temporal and event-based assertions
+
+These assertion kinds operate on the full event timeline (collected from
+`events.db` after the run) using `EventSelector` fields (`eventA`, `eventB`,
+`selector`, `windowMs`).
+
+| Kind | Description |
+|------|-------------|
+| `before` | Asserts that an event matching `eventA` occurs strictly before any event matching `eventB`. |
+| `after` | Asserts that an event matching `eventA` occurs strictly after any event matching `eventB`. |
+| `within` | Asserts that the gap between matching `eventA` and `eventB` is at most `windowMs` milliseconds. |
+| `event_count` | Counts events matching `selector` and compares the count against `expected`. |
+| `success_ratio` | Pass-ratio assertion (used primarily by probabilistic runs); compares observed ratio against `expected`. |
+| `percentile_bound` | For a numeric `metric` and a `percentile`, asserts that the percentile value is within `expected`. |
+| `max_retry_frequency` | Caps how often retry-flavored events appear within the timeline; fails when retries exceed the threshold. |
+
+`EventSelector` matches events by `eventType`, optional `agentName`, and an
+optional `dataMatch` substring on the event payload.
+
+---
+
+## 5b. Probabilistic Eval Runs
+
+**Source:** [`src/eval/probabilistic.ts`](../src/eval/probabilistic.ts),
+[`src/eval/stochastic.ts`](../src/eval/stochastic.ts)
+
+A probabilistic run executes the same scenario multiple times and aggregates
+results. This is useful for flaky-by-design behavior (rate-limit swaps,
+non-deterministic dispatch ordering) where a single trial is not a meaningful
+signal.
+
+A scenario opts into probabilistic mode by adding a `trials` block to its
+`scenario.yaml`:
+
+```yaml
+trials:
+  count: 20
+  maxConcurrent: 4
+```
+
+### Types
+
+```typescript
+export interface ProbabilisticConfig {
+	count: number;            // Number of trials to run
+	maxConcurrent?: number;   // Max concurrent trials (default: 1, sequential)
+}
+
+export interface TrialResult {
+	trialIndex: number;       // 0-based trial index
+	evalResult: EvalResult;   // Full single-run result
+}
+
+export interface AggregateStats {
+	trialCount: number;
+	passCount: number;
+	failCount: number;
+	successRatio: number;
+	timeoutCount: number;
+	// Per-metric: mean, median, min, max, p5, p95, stddev
+	metrics: Record<string, MetricAggregate>;
+}
+
+export interface StochasticAssertionResult {
+	kind: string;
+	label: string;
+	passed: boolean;
+	actual: number;
+	expected: number;
+	message: string;
+}
+
+export interface ProbabilisticEvalResult {
+	runId: string;
+	scenarioName: string;
+	scenarioPath: string;
+	startedAt: string;
+	completedAt: string;
+	totalDurationMs: number;
+	config: ProbabilisticConfig;
+	trials: TrialResult[];
+	aggregateStats: AggregateStats;
+	stochasticAssertions: StochasticAssertionResult[];
+	passed: boolean;          // True iff all stochastic assertions passed
+}
+```
+
+`src/eval/probabilistic.ts` orchestrates the trial loop (with bounded
+concurrency) and aggregates per-trial `EvalResult`s into `AggregateStats`.
+`src/eval/stochastic.ts` evaluates threshold assertions (`success_ratio`,
+`percentile_bound`, `max_retry_frequency`, etc.) against the aggregate
+statistics.
 
 ---
 
@@ -243,6 +345,12 @@ After each run, artifacts are written to:
 
 The `summary.json` file is the canonical artifact -- `ov eval show` and
 `ov eval compare` both read from it.
+
+Human-readable rendering of these artifacts (tables, deltas, summaries
+printed by `ov eval show`, `ov eval list`, and `ov eval compare`) is handled
+by [`src/eval/report.ts`](../src/eval/report.ts). The store
+([`src/eval/store.ts`](../src/eval/store.ts)) is responsible for writing the
+artifact files; `report.ts` formats them for the terminal.
 
 ---
 

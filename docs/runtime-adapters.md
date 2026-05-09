@@ -1,7 +1,7 @@
 # Runtime Adapters
 
 This document is the contributor guide for Overstory's runtime adapter system.
-It covers the `AgentRuntime` interface, the four built-in adapters, the registry
+It covers the `AgentRuntime` interface, the nine built-in adapters, the registry
 pattern, and a step-by-step walkthrough for adding a new runtime.
 
 For design rationale and the coupling inventory, see [runtime-abstraction.md](runtime-abstraction.md).
@@ -23,20 +23,32 @@ Orchestrator / Lead Agent
 |  (src/runtimes/types.ts)  |
 +---------------------------+
         |
-        +--- ClaudeRuntime  (src/runtimes/claude.ts)
+        +--- ClaudeRuntime   (src/runtimes/claude.ts)
         |     claude --model ... --permission-mode ...
         |
-        +--- CodexRuntime   (src/runtimes/codex.ts)
+        +--- CodexRuntime    (src/runtimes/codex.ts)
         |     codex exec --full-auto --json ...
         |
-        +--- PiRuntime      (src/runtimes/pi.ts)
+        +--- PiRuntime       (src/runtimes/pi.ts)
         |     pi --model <provider>/<model> ...
         |
-        +--- CopilotRuntime (src/runtimes/copilot.ts)
+        +--- CopilotRuntime  (src/runtimes/copilot.ts)
         |     copilot --model ... --allow-all-tools
         |
-        +--- CursorRuntime  (src/runtimes/cursor.ts)
-              agent --model ... --yolo
+        +--- CursorRuntime   (src/runtimes/cursor.ts)
+        |     agent --model ... --yolo
+        |
+        +--- GeminiRuntime   (src/runtimes/gemini.ts)
+        |     gemini -m ... --approval-mode yolo
+        |
+        +--- SaplingRuntime  (src/runtimes/sapling.ts)
+        |     sp ... (headless, NDJSON over stdout)
+        |
+        +--- OpenCodeRuntime (src/runtimes/opencode.ts)
+        |     opencode -m ... [--session <id>]
+        |
+        +--- QwenRuntime     (src/runtimes/qwen.ts)
+              qwen --model ... --yolo
 ```
 
 The orchestrator resolves an adapter via `getRuntime()` from
@@ -53,6 +65,7 @@ never imported or called elsewhere.
 ```typescript
 export interface AgentRuntime {
   id: string;
+  readonly stability: "stable" | "beta" | "experimental";
   readonly instructionPath: string;
 
   buildSpawnCommand(opts: SpawnOpts): string;
@@ -64,12 +77,50 @@ export interface AgentRuntime {
   ): Promise<void>;
   detectReady(paneContent: string): ReadyState;
   parseTranscript(path: string): Promise<TranscriptSummary | null>;
+  getTranscriptDir(projectRoot: string): string | null;
   buildEnv(model: ResolvedModel): Record<string, string>;
 
+  // Optional capabilities — runtimes opt in by implementing them.
   requiresBeaconVerification?(): boolean;
   connect?(process: RpcProcessHandle): RuntimeConnection;
+  readonly headless?: boolean;
+  buildDirectSpawn?(opts: DirectSpawnOpts): string[];
+  parseEvents?(stream: ReadableStream<Uint8Array>): AsyncIterable<AgentEvent>;
+  detectRateLimit?(paneContent: string): RateLimitState;
+  discoverSessionId?(worktreePath: string, spawnedAfter: number): Promise<string | null>;
+  extractConversation?(worktreePath: string, sessionId: string, maxTurns: number): Promise<string>;
+  queryHeadroom?(): Promise<HeadroomSnapshot>;
 }
 ```
+
+**`stability`** declares how mature the adapter is. The registry surfaces this
+to `ov sling` so users can be warned when picking an experimental runtime.
+Values: `"stable"` (Claude, Codex, Pi), `"beta"`, `"experimental"` (Gemini,
+OpenCode, Qwen).
+
+**`getTranscriptDir(projectRoot)`** returns the absolute directory containing
+session transcript files, or `null` when the runtime has no on-disk transcripts.
+Used by cost reporting and inspection commands.
+
+**Optional methods.** A runtime omits anything it does not support. The
+orchestrator probes for each method (`if (runtime.connect) ...`) and falls back
+to tmux-based behavior when absent.
+
+- `headless` — when `true`, the orchestrator skips tmux and uses
+  `buildDirectSpawn()` + `Bun.spawn()` to run the agent as a subprocess.
+- `buildDirectSpawn(opts)` — returns argv for `Bun.spawn()`. Headless-only.
+- `parseEvents(stream)` — async iterator over typed `AgentEvent`s parsed from
+  NDJSON stdout. Headless-only.
+- `detectRateLimit(paneContent)` — extracts a rate-limit snapshot from TUI
+  output (e.g. Claude Code's "5-hour limit reached" banner).
+- `discoverSessionId(worktreePath, spawnedAfter)` — returns the runtime's
+  native session ID after spawn, used to wire transcript readers and
+  `--resume` flags to the right session.
+- `extractConversation(worktreePath, sessionId, maxTurns)` — tail-reads the
+  transcript and returns the last N turns as markdown for handoff between
+  agents during swap.
+- `queryHeadroom()` — returns a quota/headroom snapshot from the provider
+  API for adaptive parallelism.
 
 ### Properties
 
@@ -92,6 +143,10 @@ were deployed.
 | Pi | `.claude/CLAUDE.md` |
 | Copilot | `.github/copilot-instructions.md` |
 | Cursor | `.cursor/rules/overstory.md` |
+| Gemini | `GEMINI.md` |
+| Sapling | `SAPLING.md` |
+| OpenCode | `AGENTS.md` |
+| Qwen | `AGENTS.md` (configured via `.qwen/settings.json` `context.fileName`) |
 
 Pi reads `.claude/CLAUDE.md` natively, so it shares the same path as Claude Code.
 
@@ -116,7 +171,10 @@ not embedded in the returned command string.
 | `appendSystemPrompt` | `string?` | System prompt suffix appended after base instructions |
 | `appendSystemPromptFile` | `string?` | Path to a file whose contents are appended as system prompt (avoids tmux command length limits) |
 | `cwd` | `string` | Working directory for the spawned process |
+| `sharedWritableDirs` | `string[]?` | Additional directories the runtime may need to write outside `cwd` (e.g. shared run state) |
 | `env` | `Record<string, string>` | Additional environment variables |
+| `sessionId` | `string?` | Force a specific session ID at spawn (Claude Code `--session-id`) |
+| `resumeSessionId` | `string?` | Resume an existing session by ID instead of starting fresh (e.g. Claude Code `--resume`, Qwen `--resume`) |
 
 **Example outputs by adapter:**
 
@@ -452,6 +510,90 @@ A TUI runtime for the Cursor CLI (`agent` binary).
 
 ---
 
+### Gemini (`src/runtimes/gemini.ts`, `src/runtimes/gemini-guards.ts`)
+
+A TUI runtime for Google's `gemini` CLI (Gemini Code Assist).
+
+**Key characteristics:**
+- `id = "gemini"`, `instructionPath = "GEMINI.md"`, `stability = "experimental"`
+- Spawn command: `gemini -m <model> [--approval-mode yolo] [--sandbox]`
+- `permissionMode: "bypass"` maps to `--approval-mode yolo`; `"ask"` adds no flag
+- `appendSystemPrompt` is silently ignored — the `gemini` CLI has no equivalent;
+  role definitions are deployed via `GEMINI.md`
+- Hooks: Gemini CLI v0.26.0+ supports BeforeTool / AfterTool hooks via
+  `.gemini/settings.json`. Generated by `generateGeminiHooks()` in
+  `gemini-guards.ts` and shared with the Qwen adapter
+- Sandbox: `--sandbox` flag uses Seatbelt on macOS and container isolation on
+  Linux; defense-in-depth alongside the hook guards
+- Transcripts: `--output-format stream-json` produces NDJSON
+
+---
+
+### Sapling (`src/runtimes/sapling.ts`)
+
+A headless runtime for the `sp` CLI (Sapling). The primary adapter that
+exercises overstory's headless code paths (no tmux, NDJSON over stdout, RPC
+follow-ups via `RuntimeConnection`).
+
+**Key characteristics:**
+- `id = "sapling"`, `instructionPath = "SAPLING.md"`, `stability = "stable"`
+- `headless = true` — orchestrator uses `buildDirectSpawn()` with `Bun.spawn()`,
+  bypassing tmux entirely
+- Implements `parseEvents()` (NDJSON → typed `AgentEvent` stream) and
+  `connect()` for in-process RPC follow-ups; the connection is registered
+  via `setConnection()` in `src/runtimes/connections.ts`
+- `detectReady()` always returns `{ phase: "ready" }` (no TUI to detect)
+- `requiresBeaconVerification()` returns `false` — there is no tmux send-key
+  startup race
+- Guards: writes `.sapling/guards.json` from the shared constants in
+  `src/agents/guard-rules.ts`. Sapling reads this file natively to enforce
+  per-tool blocking; coordination capabilities get git add/commit whitelisted
+  for metadata sync
+- Model alias fallback: bare aliases (`sonnet`, `opus`, `haiku`) are resolved
+  against `ANTHROPIC_DEFAULT_*_MODEL` env vars first, then a built-in fallback
+  map of dated model IDs
+
+---
+
+### OpenCode (`src/runtimes/opencode.ts`)
+
+A TUI runtime for SST's `opencode` CLI, with optional headless mode via
+`opencode run`.
+
+**Key characteristics:**
+- `id = "opencode"`, `instructionPath = "AGENTS.md"`, `stability = "experimental"`
+- Spawn command: `opencode -m <provider/model> [--session <id>]`. Anthropic
+  short aliases (`sonnet`, `opus`, `haiku`) are dropped — OpenCode requires
+  fully-qualified `provider/model` strings
+- Resume: implements `discoverSessionId()` by querying the OpenCode SQLite
+  store at `~/.local/share/opencode/opencode.db` for sessions created after a
+  spawn timestamp; supports `--session <id>` and `--continue`
+- No hooks deployment — OpenCode has a plugin system, not a Claude Code-style
+  hook mechanism. The `AGENTS.md` overlay carries the per-task contract;
+  guard constants in `guard-rules.ts` are reused for documentation only
+- Implements `detectRateLimit()` for OpenCode's TUI rate-limit banners
+
+---
+
+### Qwen (`src/runtimes/qwen.ts`)
+
+A TUI runtime for Alibaba's `qwen` CLI, a fork of Gemini CLI.
+
+**Key characteristics:**
+- `id = "qwen"`, `instructionPath = "AGENTS.md"`, `stability = "experimental"`
+- Spawn command: `qwen --model <model> [--yolo] [--resume <id>]`. Anthropic
+  aliases are skipped (Qwen has no Claude alias parser)
+- `permissionMode: "bypass"` maps to `--yolo` (full auto-approve)
+- Hooks: Qwen Code v0.12.0+ supports the Gemini-style hook format via
+  `.qwen/settings.json`. The adapter reuses `generateGeminiHooks()` from
+  `gemini-guards.ts` with `QWEN_HOOK_CONFIG`
+- Instruction file: AGENTS.md, configured via `.qwen/settings.json`'s
+  `context.fileName` setting
+- Resume: `--resume <sessionId>` or `--continue` (latest)
+- Implements `detectRateLimit()` for Qwen's rate-limit banners
+
+---
+
 ## 4. The Registry Pattern
 
 **Source:** [`src/runtimes/registry.ts`](../src/runtimes/registry.ts)
@@ -461,15 +603,28 @@ imports concrete adapter classes.
 
 ```typescript
 const runtimes = new Map<string, () => AgentRuntime>([
-  ["claude",  () => new ClaudeRuntime()],
-  ["codex",   () => new CodexRuntime()],
-  ["pi",      () => new PiRuntime()],
-  ["copilot", () => new CopilotRuntime()],
-  ["cursor",  () => new CursorRuntime()],
+  ["claude",   () => new ClaudeRuntime()],
+  ["codex",    () => new CodexRuntime()],
+  ["pi",       () => new PiRuntime()],
+  ["copilot",  () => new CopilotRuntime()],
+  ["cursor",   () => new CursorRuntime()],
+  ["gemini",   () => new GeminiRuntime()],
+  ["sapling",  () => new SaplingRuntime()],
+  ["opencode", () => new OpenCodeRuntime()],
+  ["qwen",     () => new QwenRuntime()],
 ]);
 
-export function getRuntime(name?: string, config?: OverstoryConfig): AgentRuntime {
-  const runtimeName = name ?? config?.runtime?.default ?? "claude";
+export function getRuntime(
+  name?: string,
+  config?: OverstoryConfig,
+  capability?: string,
+): AgentRuntime {
+  const capabilityRuntime =
+    capability && config?.runtime?.capabilities
+      ? config.runtime.capabilities[capability]
+      : undefined;
+  const runtimeName =
+    name ?? capabilityRuntime ?? config?.runtime?.default ?? "claude";
 
   // Pi runtime needs config for model alias expansion.
   if (runtimeName === "pi") {
@@ -489,8 +644,29 @@ export function getRuntime(name?: string, config?: OverstoryConfig): AgentRuntim
 **Resolution order:**
 
 1. Explicit `name` argument (e.g. from `ov sling --runtime codex`)
-2. `config.runtime.default` (project-level default in `.overstory/config.yaml`)
-3. `"claude"` (hardcoded fallback)
+2. `config.runtime.capabilities[capability]` (per-capability override; see below)
+3. `config.runtime.default` (project-level default in `.overstory/config.yaml`)
+4. `"claude"` (hardcoded fallback)
+
+### Per-capability runtime routing
+
+Projects can route different agent capabilities to different runtimes via
+`config.runtime.capabilities` in `.overstory/config.yaml`:
+
+```yaml
+runtime:
+  default: claude
+  capabilities:
+    scout: codex          # cheap read-only exploration on Codex
+    builder: claude       # implementation on Claude Code
+    reviewer: gemini      # second-opinion reviews on Gemini
+    merger: sapling       # headless merges
+```
+
+The `capability` argument is the third parameter to `getRuntime()`
+(`src/runtimes/registry.ts:70-79`). Callers pass the agent's capability when
+spawning so the registry can pick the right runtime for that role. An explicit
+`--runtime` flag at spawn time still wins.
 
 **Pi special case:** Pi is the only adapter that accepts config at construction
 time (`PiRuntimeConfig` for model alias expansion). The registry handles this by
@@ -535,6 +711,7 @@ import type {
 
 export class MyRuntime implements AgentRuntime {
   readonly id = "myruntime";
+  readonly stability = "experimental" as const; // promote to "beta"/"stable" once validated
   readonly instructionPath = "INSTRUCTIONS.md"; // where your runtime reads instructions
 
   buildSpawnCommand(opts: SpawnOpts): string {
@@ -615,6 +792,11 @@ const runtimes = new Map<string, () => AgentRuntime>([
   ["codex",      () => new CodexRuntime()],
   ["pi",         () => new PiRuntime()],
   ["copilot",    () => new CopilotRuntime()],
+  ["cursor",     () => new CursorRuntime()],
+  ["gemini",     () => new GeminiRuntime()],
+  ["sapling",    () => new SaplingRuntime()],
+  ["opencode",   () => new OpenCodeRuntime()],
+  ["qwen",       () => new QwenRuntime()],
   ["myruntime",  () => new MyRuntime()],   // add this line
 ]);
 ```

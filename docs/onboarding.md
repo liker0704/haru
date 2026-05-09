@@ -59,8 +59,13 @@ ov sling <task-id> \
   --spec path/to/spec.md \    # task spec file
   --files src/foo.ts \        # files the agent owns (comma-separated)
   --parent coordinator \      # parent agent name
-  --depth 2                   # hierarchy depth (default max: 2)
+  --depth 2 \                 # hierarchy depth (default max: 2)
+  --runtime claude \          # runtime adapter (claude, codex, gemini, etc.)
+  --tdd-mode light \          # TDD mode: skip|light|full
+  --profile ov-co-creation    # apply named profile (e.g., human-in-the-loop)
 ```
+
+See `ov sling --help` for the full flag list.
 
 ---
 
@@ -156,10 +161,21 @@ Merges are handled sequentially by the coordinator to avoid conflicts. Agents ne
 | `ov mission artifacts` | Show mission artifacts |
 | `ov mission bundle` | Bundle mission data |
 | `ov mission extract-learnings` | Extract learnings from mission |
-| `ov mission holdout` | Mission holdout management |
+| `ov mission holdout` | Trigger holdout validation manually |
 | `ov mission refresh-briefs` | Refresh workstream briefs |
 | `ov mission update` | Update mission parameters |
 | `ov mission stop` | Stop a running mission |
+| `ov mission tier set <tier>` | Set mission complexity tier (direct, planned, full) |
+| `ov mission tier show` | Show the current mission tier |
+| `ov mission workstream-complete <ws-id>` | Operator escape hatch for marking a workstream complete |
+
+---
+
+### Persistent Orchestration
+
+| Command | Purpose |
+|---------|---------|
+| `ov coordinator start|stop|status|send|ask|output|check-complete` | Non-mission persistent orchestrator (direct tier fast path) |
 
 ---
 
@@ -406,9 +422,17 @@ Manages workstream dispatch during the `execute` phase of a `full` tier mission.
 
 ---
 
+### Profile: `ov-co-creation`
+
+A human-in-the-loop workflow profile that pauses an agent at explicit decision gates rather than fully autonomous execution. Within an approved plan the agent acts immediately on routine choices (naming, file organization, test strategy); at architectural forks, design choices, or scope boundaries it stops and emits a `decision_gate` mail with options and a recommendation, then waits for the operator's reply.
+
+Spawn via `ov sling <task-id> --profile ov-co-creation`. The base profile lives at `agents/ov-co-creation.md` — it overlays on top of the underlying agent capability (builder, lead, etc.) rather than replacing it.
+
+---
+
 ## Agent Tool/Model Reference
 
-All 27 agent specializations registered in `buildAgentManifest()` (`src/commands/init.ts`):
+All 28 agent specializations registered in `buildAgentManifest()` (`src/commands/init.ts`):
 
 | Agent | Model | Tools | Can Spawn | Constraints |
 |-------|-------|-------|-----------|-------------|
@@ -516,7 +540,36 @@ ov mission output          # artifacts produced so far
 - Recovers dead agents (restarts if tmux session is gone)
 - Advances phase transitions without manual intervention
 
+The watchdog runs the mission graph engine (`src/missions/engine.ts`) each tick, evaluating gate conditions tracked in the `mission_gate_state` table.
+
 Run `ov watch` in a background terminal for any long-running mission. Without it, phases require manual nudging.
+
+---
+
+## More CLI Commands
+
+Additional commands not covered above. Run `ov <command> --help` for full options.
+
+| Command | Purpose |
+|---------|---------|
+| `ov supervisor start|stop|status` | [DEPRECATED] Per-project supervisor — use `ov sling --capability lead` instead |
+| `ov discover` | Brownfield codebase discovery via scout swarm |
+| `ov research start|stop|status|list|output` | Deep research sessions |
+| `ov run list|show|complete` | Manage runs |
+| `ov review sessions|session|handoffs|specs|stale` | Deterministic quality review |
+| `ov eval run|show|list|compare` | Scenario-based orchestration evaluation |
+| `ov snapshot` | Capture swarm state for recovery |
+| `ov recover` | Restore from snapshot bundle |
+| `ov workflow import|sync` | Import and sync workflows from task directory |
+| `ov group create|status|add|remove|list` | Batch coordination |
+| `ov compact [domain]` | Compact mulch expertise records |
+| `ov clean` | Wipe runtime state (`--all`, `--mail`, `--sessions`, etc.) |
+| `ov spec write <task-id>` | Write task specification |
+| `ov context generate|show|invalidate` | Manage project context cache |
+| `ov completions` | Shell completions |
+| `ov log <event>` | Log hook event (tool-start, tool-end, session-end) |
+| `ov ecosystem` | Show os-eco tool versions and health |
+| `ov prime` | Load orchestrator/agent context |
 
 ---
 

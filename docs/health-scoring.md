@@ -36,13 +36,16 @@ ov health              # Verify the score improved
 export function collectSignals(params: CollectSignalsParams): HealthSignals
 ```
 
-Signals are gathered from three sources:
+Signals are gathered from six sources:
 
 | Source | Signals |
 |--------|---------|
 | `sessions.db` (SessionStore) | `totalActiveSessions`, `stalledSessions`, `zombieSessions`, `bootingSessions`, `workingSessions`, `runtimeSwapCount` |
 | `metrics.db` (MetricsStore) | `totalSessionsRecorded`, `completedSessionsRecorded`, `mergeSuccessCount`, `mergeTotalCount`, `averageDurationMs`, `costPerCompletedTask` |
 | DoctorChecks (optional) | `doctorFailCount`, `doctorWarnCount` |
+| [`src/resilience/store`](../src/resilience/store.ts) | `openBreakerCount`, `activeRetryCount`, `recentRerouteCount` |
+| [`src/headroom/store`](../src/headroom/store.ts) | `lowestHeadroomPercent`, `criticalHeadroomCount` |
+| [`src/missions/store`](../src/missions/store.ts) | `activeMissionCount`, `architectureMdExists`, `testPlanExists`, `holdoutChecksFailed` |
 
 Three computed rates are derived:
 
@@ -59,23 +62,48 @@ return zero-value defaults so the scorer always produces a result.
 
 ```typescript
 export interface HealthSignals {
+	// Current session state (from SessionStore)
 	totalActiveSessions: number;
 	stalledSessions: number;
 	zombieSessions: number;
 	bootingSessions: number;
 	workingSessions: number;
 	runtimeSwapCount: number;
+
+	// Historical metrics (from MetricsStore)
 	totalSessionsRecorded: number;
 	completedSessionsRecorded: number;
 	mergeSuccessCount: number;
 	mergeTotalCount: number;
 	averageDurationMs: number;
 	costPerCompletedTask: number | null;
+
+	// Doctor diagnostics
 	doctorFailCount: number;
 	doctorWarnCount: number;
+
+	// Computed rates
 	completionRate: number;
 	stalledRate: number;
 	mergeSuccessRate: number;
+
+	// Resilience state (from src/resilience/store)
+	openBreakerCount: number;
+	activeRetryCount: number;
+	recentRerouteCount: number;
+
+	// Headroom / quota state (from src/headroom/store)
+	lowestHeadroomPercent: number | null;
+	criticalHeadroomCount: number;
+
+	// Mission state (from src/missions/store)
+	activeMissionCount: number;
+
+	// Architecture quality (only populated when active mission exists)
+	architectureMdExists: boolean;
+	testPlanExists: boolean;
+	holdoutChecksFailed: number;
+
 	collectedAt: string;
 }
 ```
@@ -92,16 +120,17 @@ export function computeScore(signals: HealthSignals): HealthScore
 
 ### Factor Weights
 
-Six factors, each scored 0--100, combined via fixed weights that sum to 1.0:
+Seven factors, each scored 0--100, combined via fixed weights that sum to 1.0:
 
 | Factor | Weight | Description | Scoring formula |
 |--------|--------|-------------|-----------------|
-| `completion_rate` | 0.25 | % of recorded sessions that completed | `round(completionRate * 100)` |
-| `stalled_rate` | 0.20 | % of active sessions stalled (inverted) | `round((1 - stalledRate * 2) * 100)` |
-| `zombie_count` | 0.15 | Raw zombie count (penalized on a curve) | 0 = 100, 1 = 70, 2 = 40, 3+ = 0 |
-| `doctor_failures` | 0.20 | Doctor check failures and warnings | `100 - failures*15 - warnings*5` |
+| `completion_rate` | 0.20 | % of recorded sessions that completed | `round(completionRate * 100)` |
+| `stalled_rate` | 0.18 | % of active sessions stalled (inverted) | `round((1 - stalledRate * 2) * 100)` |
+| `zombie_count` | 0.13 | Raw zombie count (penalized on a curve) | 0 = 100, 1 = 70, 2 = 40, 3+ = 0 |
+| `doctor_failures` | 0.18 | Doctor check failures and warnings | `100 - failures*15 - warnings*5` |
 | `merge_quality` | 0.10 | % of merges that resolved cleanly | `round(mergeSuccessRate * 100)` |
-| `runtime_stability` | 0.10 | Runtime swap rate (inverted) | `round((1 - swapRate/0.25) * 100)` |
+| `runtime_stability` | 0.08 | Runtime swap rate (inverted) | `round((1 - swapRate/0.25) * 100)` |
+| `resilience` | 0.13 | Circuit breaker and retry health | Penalises open breakers, active retries, and recent reroutes |
 
 ### Overall Score
 
@@ -192,6 +221,23 @@ export interface HealthRecommendation {
 
 Each recommendation includes a concrete `action` (command to run or config
 change) and a `verificationStep` to confirm the improvement worked.
+
+### Pluggable Recommendation Sources
+
+Beyond the score-driven rules, the recommendation engine accepts pluggable
+`RecommendationSource` implementations that surface scoped recommendations
+from other subsystems:
+
+- [`src/health/eval-source.ts`](../src/health/eval-source.ts) -- emits
+  recommendations derived from the most recent eval runs (failed assertions,
+  regressions, repeated timeouts).
+- [`src/health/review-source.ts`](../src/health/review-source.ts) -- emits
+  recommendations derived from the review contour (stale reviews, low-scoring
+  artifacts in `.overstory/reviews.db`).
+
+Both sources implement the `RecommendationSource` interface from
+`src/health/types.ts` and are aggregated alongside the rule-based engine when
+selecting the top recommendation.
 
 ---
 

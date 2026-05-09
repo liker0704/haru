@@ -57,15 +57,22 @@ export const KNOWN_FIELDS = {
 		"version", "project", "agents", "worktrees", "taskTracker",
 		"mulch", "merge", "providers", "watchdog", "models",
 		"logging", "coordinator", "rateLimit", "runtime",
+		"mission", "mail", "resilience", "compat", "headroom",
+		"reminders", "research", "observability", "healthPolicy",
+		"context",
 	]),
 	project: new Set(["name", "root", "canonicalBranch", "qualityGates"]),
 	agents: new Set([
 		"manifestPath", "baseDir", "maxConcurrent", "staggerDelayMs",
-		"maxDepth", "maxSessionsPerRun", "maxAgentsPerLead",
+		"maxDepth", "maxSessionsPerRun", "maxAgentsPerLead", "adaptive",
 	]),
-	// ... (one set per config section)
+	// ... (one set per config section — see src/config-schema.ts for the full list)
 } as const;
 ```
+
+The `root` set above is the canonical 24-key list. For the full set of
+nested sections (`agentsAdaptive`, `qualityGateItem`, etc.), refer to
+[`src/config-schema.ts`](../src/config-schema.ts) directly.
 
 Dynamic-key sections (`providers`, `models`, `runtime.capabilities`,
 `runtime.pi.modelMap`) allow arbitrary string keys. Their value shapes are

@@ -77,7 +77,7 @@ export function computeOverallScore(dimensions: DimensionScore[]): number {
 **Source:** [`src/review/types.ts`](../src/review/types.ts)
 
 ```typescript
-export type ReviewSubjectType = "session" | "handoff" | "spec";
+export type ReviewSubjectType = "session" | "handoff" | "spec" | "mission";
 ```
 
 | Type | Artifact reviewed | Data sources |
@@ -85,6 +85,7 @@ export type ReviewSubjectType = "session" | "handoff" | "spec";
 | `session` | A completed agent session | SessionStore, EventStore, MailStore, checkpoint files |
 | `handoff` | A session handoff record | Checkpoint files (`checkpoint.json`) |
 | `spec` | A task specification file | Spec markdown files in `.overstory/specs/` |
+| `mission` | A completed mission run | MissionStore, EventStore, narrative + bundle artifacts |
 
 ---
 
@@ -182,6 +183,39 @@ Dimension scoring:
 | `correctness-confidence` | References `.ts` or `.js` files | 80 if present, 40 otherwise |
 | `coordination-fit` | Dependencies section present | 100 if present, 40 otherwise |
 
+### Mission Analyzer
+
+**Source:** [`src/review/analyzers/mission.ts`](../src/review/analyzers/mission.ts)
+
+Input:
+
+```typescript
+export interface MissionReviewInput {
+	mission: Mission;
+	eventCount: number;
+	errorCount: number;
+	agentCount: number;
+	completedSessionCount: number;
+	totalSessionCount: number;
+	hasBundleExport: boolean;
+	artifactFileCount: number;
+	metricsCount: number;
+	narrativeEntryCount: number;
+	durationMs: number;
+}
+```
+
+Dimension scoring:
+
+| Dimension | Signals used | Scoring logic |
+|-----------|-------------|---------------|
+| `clarity` | Objective length > 10, slug matches `^[a-z0-9-]+$` | `scorePresence(present, 2)` |
+| `actionability` | Mission state is terminal, `artifactRoot` set, materialized artifacts (>= 4) | `scorePresence(present, 3)` |
+| `completeness` | Events present, sessions present, phase `done`, narrative entries, artifacts | `scorePresence(present, N)` over all expected facets |
+| `signal-to-noise` | Useful events vs error count; bundle export presence | Penalises high error rate and missing bundle |
+| `correctness-confidence` | Completed/total session ratio, no fatal errors | Derived from session completion ratio |
+| `coordination-fit` | Multi-agent participation (`agentCount > 1`), narrative continuity | `scorePresence(present, 2)` |
+
 ---
 
 ## 5. Scoring Helpers
@@ -242,6 +276,16 @@ export const WATCHED_SURFACES: Record<ReviewSubjectType, string[]> = {
 		"src/commands/spec.ts", "agents/lead.md",
 		"templates/overlay.md.tmpl",
 	],
+	mission: [
+		"src/commands/mission.ts",
+		"src/missions/store.ts",
+		"src/missions/context.ts",
+		"src/missions/bundle.ts",
+		"src/missions/events.ts",
+		"src/missions/narrative.ts",
+		"src/missions/review.ts",
+		"src/review/analyzers/mission.ts",
+	],
 };
 ```
 
@@ -286,7 +330,7 @@ busy timeout for concurrent agent access.
 ```sql
 CREATE TABLE IF NOT EXISTS reviews (
   id TEXT PRIMARY KEY,
-  subject_type TEXT NOT NULL CHECK(subject_type IN ('session','handoff','spec')),
+  subject_type TEXT NOT NULL CHECK(subject_type IN ('session','handoff','spec','mission')),
   subject_id TEXT NOT NULL,
   timestamp TEXT NOT NULL,
   dimensions TEXT NOT NULL,      -- JSON array of DimensionScore
@@ -322,6 +366,17 @@ export interface ReviewStore {
 	close(): void;
 }
 ```
+
+### Batched review execution
+
+**Source:** [`src/review/batching.ts`](../src/review/batching.ts)
+
+Bulk review commands (`ov review sessions`, `ov review handoffs`,
+`ov review specs`) drive analyzers through the batching helper in
+`src/review/batching.ts`. It iterates candidates, gathers per-subject input
+signals, dispatches to the appropriate analyzer, and persists each
+`InsertReviewRecord` via `ReviewStore.insert`. This module is also where
+mission reviews are batched alongside the other subject types.
 
 ---
 

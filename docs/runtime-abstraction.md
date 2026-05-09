@@ -1,5 +1,10 @@
 # Runtime Abstraction: Multi-Provider Agent Support
 
+> **Status: Implemented** — This is the design rationale document. The
+> abstraction is fully realized in `src/runtimes/` (9 adapters: claude, codex,
+> pi, copilot, cursor, gemini, sapling, opencode, qwen). For the contributor
+> guide, see [runtime-adapters.md](runtime-adapters.md).
+
 > Design document for decoupling Overstory from Claude Code and enabling
 > alternative coding agent runtimes (Codex, Pi, OpenCode, Cline, others).
 
@@ -41,12 +46,22 @@ Full coupling inventory with exact line numbers is in the appendix.
 
 ## The Interface
 
+The shape below mirrors the live source in
+[`src/runtimes/types.ts`](../src/runtimes/types.ts). Required surface plus the
+optional capabilities runtimes opt into:
+
 ```typescript
 // src/runtimes/types.ts
 
 interface AgentRuntime {
   /** Unique runtime identifier */
   id: string;
+
+  /** Stability level: "stable" | "beta" | "experimental" */
+  readonly stability: "stable" | "beta" | "experimental";
+
+  /** Relative path to the instruction file within a worktree */
+  readonly instructionPath: string;
 
   /** Build the shell command to spawn an interactive agent in tmux */
   buildSpawnCommand(opts: SpawnOpts): string;
@@ -57,7 +72,7 @@ interface AgentRuntime {
   /** Deploy per-agent instructions + guards to a worktree */
   deployConfig(
     worktreePath: string,
-    overlay: OverlayContent,
+    overlay: OverlayContent | undefined,
     hooks: HooksDef
   ): Promise<void>;
 
@@ -67,8 +82,26 @@ interface AgentRuntime {
   /** Parse a session transcript into normalized token usage */
   parseTranscript(path: string): Promise<TranscriptSummary | null>;
 
+  /** Directory containing session transcripts, or null if unsupported */
+  getTranscriptDir(projectRoot: string): string | null;
+
   /** Runtime-specific env vars for model/provider routing */
   buildEnv(model: ResolvedModel): Record<string, string>;
+
+  // Optional capabilities — runtimes opt in.
+  requiresBeaconVerification?(): boolean;
+  connect?(process: RpcProcessHandle): RuntimeConnection;
+  readonly headless?: boolean;
+  buildDirectSpawn?(opts: DirectSpawnOpts): string[];
+  parseEvents?(stream: ReadableStream<Uint8Array>): AsyncIterable<AgentEvent>;
+  detectRateLimit?(paneContent: string): RateLimitState;
+  discoverSessionId?(worktreePath: string, spawnedAfter: number): Promise<string | null>;
+  extractConversation?(
+    worktreePath: string,
+    sessionId: string,
+    maxTurns: number,
+  ): Promise<string>;
+  queryHeadroom?(): Promise<HeadroomSnapshot>;
 }
 
 type ReadyState =
@@ -81,10 +114,36 @@ interface SpawnOpts {
   permissionMode: "bypass" | "ask";
   systemPrompt?: string;
   appendSystemPrompt?: string;
+  appendSystemPromptFile?: string;
   cwd: string;
+  /** Additional directories the runtime may need to write outside cwd */
+  sharedWritableDirs?: string[];
   env: Record<string, string>;
+  /** Force a specific session ID at spawn (Claude Code --session-id) */
+  sessionId?: string;
+  /** Resume an existing session by ID instead of starting fresh */
+  resumeSessionId?: string;
+}
+
+interface ResolvedModel {
+  model: string;
+  /** Provider env vars merged into the spawn environment */
+  env?: Record<string, string>;
 }
 ```
+
+Active RPC connections (Sapling today, Pi in the future) are tracked in
+[`src/runtimes/connections.ts`](../src/runtimes/connections.ts), which
+implements the module-level connection registry: `getConnection(agentName)`,
+`setConnection(agentName, conn)`, `removeConnection(agentName)`. The orchestrator
+uses this registry to deliver mail via `RuntimeConnection.followUp()` instead of
+tmux send-keys when a runtime declares `connect()`.
+
+Per-capability runtime routing is handled by `getRuntime()` in
+[`src/runtimes/registry.ts`](../src/runtimes/registry.ts) (lines 75–79).
+The third argument is the agent's `capability`, which the registry looks up in
+`config.runtime.capabilities` before falling back to `runtime.default`. This lets
+projects route, e.g., scouts to Codex and builders to Claude in one swarm.
 
 ### Config Surface
 
@@ -758,59 +817,62 @@ change.
 
 ---
 
-## Implementation Phases
+## Implementation Phases (Completed)
+
+The phased rollout described below is **done**. Each phase shipped and the
+abstraction now powers nine adapters in production.
 
 ### Phase 0: Extract the Interface
 
-**Scope:** 3–4 new files, modify 4 existing files. Zero behavior change.
-
-1. Create `src/runtimes/types.ts` with the `AgentRuntime` interface
-2. Create `src/runtimes/claude.ts` wrapping all current Claude Code behavior
-3. Create `src/runtimes/registry.ts` to resolve runtime by name from config
-4. Update `sling.ts`, `coordinator.ts`, `supervisor.ts` (deprecated), `monitor.ts` to call
-   `runtime.buildSpawnCommand()` instead of hardcoding `claude ...`
-5. Update `hooks-deployer.ts` to be called via `runtime.deployConfig()`
-6. Update `worktree/tmux.ts` to call `runtime.detectReady()` instead of
-   hardcoded string checks
-
-After this phase, `ov sling --runtime claude` produces identical behavior to
-today. The abstraction exists but only one implementation does.
+**Result:** `src/runtimes/types.ts` defines the contract; `src/runtimes/claude.ts`
+wraps all original Claude Code behavior; `src/runtimes/registry.ts` resolves
+runtimes by name. Spawn callsites (`sling.ts`, `coordinator.ts`, `monitor.ts`)
+go through `runtime.buildSpawnCommand()`. `hooks-deployer.ts` is invoked via
+`runtime.deployConfig()`. `worktree/tmux.ts` calls `runtime.detectReady()`
+instead of hardcoded string checks.
 
 ### Phase 1: Headless Print Abstraction
 
-**Scope:** 1 new file, modify 2 existing files.
-
-1. Abstract `claude --print -p <prompt>` in `merge/resolver.ts` and
-   `watchdog/triage.ts` to use `runtime.buildPrintCommand()`
-2. Add `runtime.printCommand` config field
-3. This alone enables using any model for merge conflict resolution and
-   failure triage — no full agent lifecycle needed
+**Result:** `merge/resolver.ts` and `watchdog/triage.ts` call
+`runtime.buildPrintCommand()` for headless one-shot AI calls. The
+`runtime.printCommand` config field selects which runtime handles merge
+conflict resolution and failure triage independently of the spawn runtime.
 
 ### Phase 2: Codex Adapter
 
-**Scope:** 1–2 new files.
-
-1. Create `src/runtimes/codex.ts`
-2. Handle NDJSON stdout capture for event logging
-3. Handle AGENTS.md instruction delivery
-4. Test with a real Codex agent in a worktree
-5. Add `--runtime codex` flag to `ov sling`
+**Result:** `src/runtimes/codex.ts` ships with NDJSON stdout capture, AGENTS.md
+instruction delivery, OS-sandbox integration, and `--runtime codex` support on
+`ov sling`.
 
 ### Phase 3: Pi Adapter
 
-**Scope:** 1–2 new files.
+**Result:** `src/runtimes/pi.ts` plus `src/runtimes/pi-guards.ts` for the
+TypeScript guard extension. Mail delivery via RPC `followUp` is wired through
+the connection registry in `src/runtimes/connections.ts` (Sapling is the first
+runtime exercising this end-to-end; Pi shares the same machinery).
 
-1. Create `src/runtimes/pi.ts`
-2. Implement RPC client wrapper for agent lifecycle control
-3. Deploy guard extension instead of hooks
-4. Test mail delivery via RPC `followUp`
+### Additional Adapters Beyond the Original Plan
 
-### Phase 4: ACP Generic Adapter (When Ready)
+The interface scaled cleanly to four more adapters not in the original plan:
 
-**Scope:** 1 file.
+- **Gemini** (`src/runtimes/gemini.ts`, `gemini-guards.ts`) — Google's `gemini`
+  CLI. TUI runtime with Gemini CLI v0.26.0+ hook support via
+  `.gemini/settings.json`.
+- **Sapling** (`src/runtimes/sapling.ts`) — `sp` CLI as the primary headless
+  runtime. Implements `headless`, `buildDirectSpawn()`, `parseEvents()`, and
+  `connect()` to drive the orchestrator's headless code paths.
+- **OpenCode** (`src/runtimes/opencode.ts`) — SST OpenCode. Implements
+  `discoverSessionId()` against the OpenCode SQLite store and supports both
+  TUI and `opencode run` headless modes.
+- **Qwen** (`src/runtimes/qwen.ts`) — Alibaba's `qwen` CLI (Gemini fork).
+  Reuses `generateGeminiHooks()` with `QWEN_HOOK_CONFIG` from
+  `gemini-guards.ts`.
 
-1. Create `src/runtimes/acp.ts` with the factory function
-2. Register OpenCode, Cline, or any future ACP runtime via config
+### Phase 4: ACP Generic Adapter (Future)
+
+ACP remains a future option: a single `src/runtimes/acp.ts` factory could
+register any ACP-compliant runtime (OpenCode, Cline, etc.) once the protocol
+stabilizes. The `AgentRuntime` interface is unchanged by ACP adoption.
 
 ---
 
