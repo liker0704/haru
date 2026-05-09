@@ -115,6 +115,9 @@ Every command supports `--json` where noted. Global flags: `-q`/`--quiet`, `--ti
 | `ov mail list` | List messages with filters (`--from`, `--to`, `--unread`) |
 | `ov mail read <id>` | Mark message as read |
 | `ov mail reply <id>` | Reply in same thread (`--body`) |
+| `ov mail purge` | Purge old messages (`--older-than`, `--read-only`, `--dry-run`) |
+| `ov mail dlq` | List or inspect dead-letter queue messages |
+| `ov mail retry <id>` | Retry a dead-lettered message |
 | `ov nudge <agent> [message]` | Send a text nudge to an agent (`--from`, `--force`, `--json`) |
 
 ### Task Groups
@@ -124,6 +127,7 @@ Every command supports `--json` where noted. Global flags: `-q`/`--quiet`, `--ti
 | `ov group create <name>` | Create a task group for batch tracking |
 | `ov group status <name>` | Show group progress |
 | `ov group add <name> <issue-id>` | Add issue to group |
+| `ov group remove <name> <issue-id>` | Remove issue from group |
 | `ov group list` | List all groups |
 
 ### Merge
@@ -151,6 +155,12 @@ Every command supports `--json` where noted. Global flags: `-q`/`--quiet`, `--ti
 | `ov mission workstream-complete <ws-id>` | Manually mark a workstream as completed |
 | `ov mission refresh-briefs` | Refresh workstream briefs after scope change |
 | `ov mission bundle` | Export mission result bundle |
+| `ov mission update` | Update mission objective or metadata |
+| `ov mission extract-learnings` | Extract reusable learnings from a completed mission |
+| `ov mission artifacts` | List artifacts produced during a mission |
+| `ov mission tier set` | Set the active tier for a mission |
+| `ov mission tier show` | Show current tier for a mission |
+| `ov mission holdout` | Run holdout validation against the mission |
 
 ### Configuration
 
@@ -273,7 +283,7 @@ overstory/
     config.ts                     Config loader + validation
     errors.ts                     Custom error types
     json.ts                       Standardized JSON envelope helpers
-    commands/                     One file per CLI subcommand (36 commands)
+    commands/                     One file per CLI subcommand (58 commands)
       agents.ts                   Agent discovery and querying
       coordinator.ts              Persistent orchestrator lifecycle
       supervisor.ts               Team lead management [DEPRECATED]
@@ -331,7 +341,7 @@ overstory/
     tracker/                      Pluggable task tracker (beads + seeds backends)
     mulch/                        mulch client (programmatic API + CLI wrapper)
     e2e/                          End-to-end lifecycle tests
-  agents/                         Base agent definitions (.md, 9 roles) + skill definitions
+  agents/                         Base agent definitions (.md, 32 roles) + skill definitions
   templates/                      Templates for overlays and hooks
 ```
 

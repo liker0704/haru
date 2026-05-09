@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-05-09
+
+### Fixed
+
+- **Dispatch-planning gate subject match tightened + DB handle hoisted in merge-all** (#202, 713e0741) — eliminates false matches in plan-phase gate evaluation and prevents repeated DB opens during merge-all loops
+- **Direct-tier merge-all infinite loop + gate-state reset on loop-back** (#201, 3279fc25) — engine no longer spins on direct-tier merges; gate state correctly resets when phases loop back
+- **Plan-phase dispatch-planning gate false-suspend** (#200, 92771fa5) — agents are no longer suspended prematurely during dispatch-planning
+- **Full BUG-C fix: spawn guard + awaited stop on suspend** (#199, da31bbe8) — spawn races eliminated and `stop` is now awaited so suspend completes deterministically
+- **Done-phase summary nudge specifies exact artifact path** (#198, 62ea8501) — agents receive the precise artifact path when nudged in the done phase
+- **`check-remaining` treats waiting leads as done + resets gate state on loop-back** (fb1aef75) — prevents the engine from waiting forever on lead agents that are already idle
+
+### Changed
+
+- **Workstream SSOT activation** — `workstreamId` now threaded from spec metadata into the merge queue; merge-queue/workstream coupling refactored to a single source of truth (1c20f005, 282744a7, a118dd92)
+- **Mission slug rename + ceiling escalation + SSOT scaffolding** (#194, 4cd0e10b) — groundwork for stable mission identifiers and tier-ceiling escalation behavior
+
 ## [0.9.1] - 2026-03-12
 
 ### Changed

@@ -67,13 +67,13 @@ Purpose-built messaging via `bun:sqlite` in `.overstory/mail.db`. WAL mode for c
 
 ```
 src/
-  index.ts                        # CLI entry point (Commander.js, 56 commands)
+  index.ts                        # CLI entry point (Commander.js, 58 commands)
   types.ts                        # Barrel re-export of domain types
   config.ts, config-types.ts, config-yaml.ts, config-schema.ts, config-migrate.ts, config-validate.ts
   errors.ts, json.ts
-  commands/                       # CLI wiring — one file per subcommand (56 files)
+  commands/                       # CLI wiring — one file per subcommand (58 files)
   agents/                         # Agent lifecycle: manifest, overlay, identity, spawn, hooks, checkpoint
-  missions/                       # Mission orchestration: lifecycle, messaging, render, roles, graph, workstreams (24 modules)
+  missions/                       # Mission orchestration: lifecycle, messaging, render, roles, graph, workstreams (40+ modules)
   mail/                           # Messaging: store, client, broadcast, nudge, identity
   sessions/                       # Session + run state (SQLite)
   events/                         # Tool event store + tailer
@@ -95,7 +95,7 @@ src/
   eval/                           # Scenario-based orchestration evaluation
   doctor/                         # Modular health check system (11 categories)
   insights/                       # Session insight analyzer
-agents/                           # Base agent definitions (.md): scout, builder, reviewer, merger, lead, coordinator, monitor
+agents/                           # 32 agent definitions (.md) including: scout, builder, reviewer, merger, lead, coordinator, monitor, architect, tester, researcher, mission-analyst, execution-director, plan-review-lead, plan critics (architecture/security/performance/devil-advocate), and more
 templates/                        # overlay.md.tmpl, CLAUDE.md.tmpl, hooks.json.tmpl
 evals/                            # Built-in eval scenarios
 ```
@@ -148,7 +148,7 @@ ov agents                 Discover available agent definitions
 ```
 ov coordinator start|stop|status|send|ask|output|check-complete
 ov supervisor start|stop|status   [DEPRECATED] Per-project supervisor (use ov sling --capability lead)
-ov mission start|stop|pause|resume|complete|answer|list|show|status|output|graph|update|handoff|refresh-briefs|bundle|extract-learnings|artifacts
+ov mission start|stop|pause|resume|complete|answer|list|show|status|output|graph|update|handoff|refresh-briefs|bundle|extract-learnings|artifacts|tier set|tier show|holdout|workstream-complete
 ov discover               Brownfield codebase discovery via scout swarm
 ov monitor start|stop|status   Tier 2 continuous fleet patrol
 ov research start|stop|status|list|output   Deep research sessions

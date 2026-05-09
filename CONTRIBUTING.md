@@ -57,9 +57,9 @@ Overstory is a strict TypeScript project that runs directly on Bun (no build ste
 - `useConst` is enforced -- use `const` unless reassignment is needed
 - `noNonNullAssertion` is a warning -- avoid `!` postfix, check for null/undefined instead
 
-### Zero Runtime Dependencies
+### Minimal Runtime Dependencies
 
-This is a hard rule. Use only Bun built-in APIs:
+Minimal runtime dependencies — only `chalk`, `commander`, `@os-eco/mulch-cli`; no new npm runtime deps without strong justification. Prefer Bun built-in APIs:
 
 - `bun:sqlite` for databases
 - `Bun.spawn` for subprocesses
@@ -141,6 +141,8 @@ docs: update CLI reference with new nudge flags
 ```
 
 Prefix with `fix:`, `feat:`, or `docs:` when the category is clear. Plain descriptive messages are also fine.
+
+Prefer conventional-commit scope syntax for changes targeting a specific subsystem: `fix(engine): ...`, `feat(merge): ...`, `fix(missions,watchdog): ...`. See the project's `git log` for examples (e.g. `fix(engine,merge): tighten dispatch-planning subject match`).
 
 ## Pull Request Expectations
 

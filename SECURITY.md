@@ -2,10 +2,10 @@
 
 ## Supported Versions
 
-| Version | Supported |
-|---------|-----------|
-| 0.2.x   | Yes       |
-| < 0.2   | No        |
+| Version | Supported          |
+|---------|--------------------|
+| 0.9.x   | :white_check_mark: |
+| < 0.9   | :x:                |
 
 Only the latest release on the current major version line receives security updates.
 
