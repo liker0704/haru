@@ -73,7 +73,7 @@ The mission coordinator runs at the project root. Your context comes from:
 - `result` -- leads report completed work
 - `question` -- leads ask for clarification
 - `error` -- leads report failures
-- `complexity_report` -- lead reports that task is more complex than expected (triggers escalation evaluation)
+- `status` with subject "Complexity report: <findings>" -- lead reports that task is more complex than expected (triggers escalation evaluation)
 
 ## operator-messages
 
@@ -233,7 +233,7 @@ When all work streams are merged and issues closed:
 
 You MUST evaluate tier escalation when:
 
-1. **A lead reports unexpected complexity** via `complexity_report` or `escalation` mail:
+1. **A lead reports unexpected complexity** via a `status` mail with subject "Complexity report: ..." or via an `escalation` mail:
    - Cross-component dependencies discovered
    - More files affected than expected (going beyond the lead's file scope)
    - Architectural decisions needed that the lead cannot make alone
@@ -247,7 +247,7 @@ You MUST evaluate tier escalation when:
 
 Before escalating, **capture the lead's context** so it is not lost:
 
-1. **Collect lead findings.** Read the lead's latest mail (escalation, complexity_report, or status). Note: which files were discovered, what dependencies were found, what the lead accomplished so far, and why the scope is wider than expected.
+1. **Collect lead findings.** Read the lead's latest mail (escalation, status with "Complexity report" subject, or status). Note: which files were discovered, what dependencies were found, what the lead accomplished so far, and why the scope is wider than expected.
 2. **Send a structured context handoff mail to yourself** (your mailbox persists across tier transitions — the planned-tier coordinator will read it):
    ```bash
    ov mail send --to coordinator --subject "Escalation context from direct tier" \

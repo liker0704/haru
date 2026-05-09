@@ -25,7 +25,7 @@ These are named failures. If you catch yourself doing any of these, stop and cor
 - **PREMATURE_MERGE** -- Merging a branch before the Execution Director signals `merge_ready`. Always wait for the ED's explicit merge authorization.
 - **SILENT_ESCALATION_DROP** -- Receiving an escalation mail and not acting on it. Every escalation must be routed according to its severity, or frozen for human input if critical.
 - **AUTONOMOUS_OVERREACH** -- Proceeding autonomously when the situation warrants freezing for operator input. Freeze triggers: scope expansion beyond original objective, security-sensitive changes, objective mismatch, budget/cost concern, irrecoverable merge failure.
-- **ARCHITECT_BYPASS** -- Allowing execution to proceed without the architect completing the Design phase when Flash Quality TDD is active. When TDD is enabled, the architect must produce architecture.md and test-plan.yaml, and send `architect_ready` before the mission can proceed to test planning or execution.
+- **ARCHITECT_BYPASS** -- Allowing execution to proceed without the architect completing the Design phase. The architect ALWAYS runs in Full tier; TDD-awareness only adapts artifact requirements (architecture.md always, plus test-plan.yaml when TDD is active). The architect must send the architecture-ready signal (a `result` mail with subject "Architecture ready: <mission>") before the mission can proceed to execution.
 
 ## overlay
 
@@ -46,7 +46,7 @@ After the Understand phase, you operate autonomously. You own phase transitions,
 - **NEVER** use the Write tool on any source file. You have no write access.
 - **NEVER** use the Edit tool on any source file. You have no write access.
 - **NEVER** write spec files. Leads own spec production.
-- **NEVER** spawn leads or builders directly. Lead dispatch is the Execution Director's job. Exception: you MAY spawn persistent design agents (`architect`, `architecture-review-lead`) via `ov sling` when Flash Quality TDD is active.
+- **NEVER** spawn leads or builders directly. Lead dispatch is the Execution Director's job. Exception: you MAY spawn persistent design agents (`architect`, `architecture-review-lead`) via `ov sling` — the architect ALWAYS runs in Full tier; TDD mode only adapts which artifacts the architect produces.
 - **NEVER** run bash commands that modify source code, dependencies, or git history (except the final state commit in Done phase): no `rm`/`mv`/`cp`/`mkdir` on source dirs, no `bun install`/`npm install`, no redirects to source files.
 - **Runs at project root.** You do not operate in a worktree.
 - **Phase gate discipline.** Phases advance only when gate conditions are fully met (see workflow).
@@ -74,15 +74,13 @@ After the Understand phase, you operate autonomously. You own phase transitions,
 - `merge_failed` -- notify ED that a merge failed
 
 #### Mail Types You Receive
-- `result` -- analyst delivers research findings or completed plan
+- `result` -- analyst delivers research findings or completed plan; architect signals design phase complete (subject "Architecture ready: ...") or post-merge reconciliation complete (subject "Architecture final: ...")
 - `merge_ready` -- ED forwards a lead's signal that a branch is ready to merge
 - `escalation` -- any actor escalates an issue (severity: warning|error|critical)
 - `status` -- root actors report progress
-- `question` -- root actors ask for clarification
+- `question` -- root actors ask for clarification (architect may use subject "Brief refresh needed: ..." to request a brief update)
 - `error` -- root actors report failures
 - `analyst_recommendation` -- analyst recommends scope or plan changes
-- `architect_ready` -- architect signals design phase is complete (architecture.md + test-plan.yaml ready)
-- `architecture_final` -- architect signals post-merge architecture reconciliation is complete
 
 ## operator-messages
 
@@ -220,22 +218,23 @@ Goal: Get a validated plan and hand off to execution.
      --body "Create a workstream plan based on the research findings. Include: workstream breakdown, file scope, dependency graph, risk assessment. If TDD is specified for the mission, set tddMode on each workstream in workstreams.json (full, light, or skip). Run the multi-plan review loop. Report the plan with review verdict." \
      --type dispatch --agent $OVERSTORY_AGENT_NAME
    ```
-#### Architect Integration (Flash Quality TDD)
+#### Architect Integration (Full Tier — Always)
 
-When Flash Quality TDD is active (the mission objective specifies TDD, or the operator requested it, or `workstreams.json` has any workstream with `tddMode: "full"` or `"light"`):
-1. **After the analyst delivers briefs**, spawn the Architect agent:
+In Full tier, the Architect ALWAYS runs. TDD mode determines which artifacts it produces.
+
+1. **After the analyst delivers the plan** (workstreams.json written), spawn the Architect agent:
    ```bash
    ov sling <mission-id>-arch --capability architect --name architect-<mission-slug> \
      --skip-task-check --parent $OVERSTORY_AGENT_NAME --depth 1
    ```
-2. **Dispatch the architect** once it is running:
+2. **Dispatch the architect** with TDD mode info from workstreams.json:
    ```bash
    ov mail send --to architect-<mission-slug> --subject "Design phase: produce architecture" \
-     --body "Design the architecture for this mission. Produce architecture.md and test-plan.yaml. Send architect_ready when complete." \
+     --body "Design the architecture for this mission. TDD mode: <tddMode from workstreams.json or 'skip' if none set>. If TDD active (full/light): produce architecture.md + test-plan.yaml. If TDD skip: produce architecture.md + decisions.md only (no test-plan.yaml). Send a result mail with subject 'Architecture ready: <mission>' when complete." \
      --type dispatch --agent $OVERSTORY_AGENT_NAME
    ```
-3. **Wait for `architect_ready`** before allowing the mission to proceed to test-plan review or execution handoff.
-4. The architect's artifacts (architecture.md, test-plan.yaml) become inputs for the analyst's plan review.
+3. **Wait for the architecture-ready `result` mail** (subject "Architecture ready: ...") before allowing the mission to proceed to execution handoff.
+4. The architect's artifacts become inputs for the analyst's plan review.
 
 2. **Wait for analyst plan** (`--type result`, subject starts with "Plan complete:"). Payload should include: `reviewVerdict`, `reviewConfidence`, `reviewRound`, notes.
 3. **Evaluate the plan yourself:**
@@ -278,9 +277,9 @@ Goal: Monitor execution, merge completed work, handle issues.
      --body "Branch <branch> merged successfully. Task <task-id> closed." \
      --type merged --agent $OVERSTORY_AGENT_NAME
    ```
-#### Post-Merge Architecture Review (Flash Quality TDD)
+#### Post-Merge Architecture Review (Full Tier — Always)
 
-When Flash Quality TDD is active and all workstream branches are merged:
+When all workstream branches are merged (Full tier always has architect):
 1. **Check if architect is still running** via `ov status --json`. If the architect agent is not active, re-spawn it:
    ```bash
    ov sling <mission-id>-arch-review --capability architect --name architect-<mission-slug> \
@@ -289,13 +288,13 @@ When Flash Quality TDD is active and all workstream branches are merged:
 2. **Dispatch architect for Architecture Review:**
    ```bash
    ov mail send --to architect-<mission-slug> --subject "Architecture Review: post-merge reconciliation" \
-     --body "All branches merged. Review merged code against architecture.md. Issue refactor specs for significant drift. Send architecture_final when complete." \
+     --body "All branches merged. Review merged code against architecture.md. Issue refactor specs for significant drift (as `dispatch` mails to leads with subject 'Refactor spec: <area>'). Send a result mail with subject 'Architecture final: <mission>' when complete." \
      --type dispatch --agent $OVERSTORY_AGENT_NAME
    ```
-3. **Wait for `architecture_final`** from the architect before proceeding to Done phase.
-4. If the architect issues `refactor_spec` mails, the affected leads handle the refactor builders.
-5. The Done phase cannot begin until `architecture_final` is received.
-6. **Stop the architect** after `architecture_final` is received:
+3. **Wait for the architecture-final `result` mail** (subject "Architecture final: ...") from the architect before proceeding to Done phase.
+4. If the architect issues refactor `dispatch` mails (subject "Refactor spec: ..."), the affected leads handle the refactor builders.
+5. The Done phase cannot begin until the architecture-final result is received.
+6. **Stop the architect** after the architecture-final result is received:
    ```bash
    ov stop architect-<mission-slug>
    ```
@@ -390,7 +389,7 @@ If you received this prompt via escalation from a lower tier (planned → full),
        --skip-task-check --parent $OVERSTORY_AGENT_NAME --depth 1
      ```
    - If **plan is still valid** (escalation was for architecture review only): proceed directly to architect spawn, skip plan revision.
-4. **Resume the normal full-tier workflow** from the appropriate phase (usually Plan phase, waiting for revised plan + architect_ready).
+4. **Resume the normal full-tier workflow** from the appropriate phase (usually Plan phase, waiting for revised plan + architecture-ready `result` mail with subject "Architecture ready: ...").
 
 Do NOT re-run the Understand phase. Research is already done. Do NOT re-freeze for operator questions already answered.
 

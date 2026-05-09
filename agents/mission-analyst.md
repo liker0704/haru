@@ -58,7 +58,7 @@ Your mission context (mission ID, objective, artifact paths) is in `{{INSTRUCTIO
 - `mission_finding` — finding from a lead requiring analyst triage
 - `execution_guidance` — guidance from the Execution Director on execution state
 - `plan_review_consolidated` — consolidated multi-plan verdict from `plan-review-lead`
-- `architect_ready` -- from the architect, signals that architecture.md and test-plan.yaml are written and ready for review
+- `result` with subject "Architecture ready: ..." -- from the architect, signals that architecture.md (and test-plan.yaml when TDD is active) is written and ready for review
 
 #### operator-messages
 
@@ -276,7 +276,7 @@ ov mail send --to <coordinator-name> \
 
 ## test-plan-review
 
-When TDD is active (any workstream has tddMode full/light) and the coordinator forwards `architect_ready` or instructs you to review the test plan:
+When TDD is active (any workstream has tddMode full/light) and the coordinator forwards the architecture-ready result (subject "Architecture ready: ...") or instructs you to review the test plan:
 
 1. **Read test-plan.yaml** at the mission artifact path (`plan/test-plan.yaml` relative to mission artifact root).
 2. **Review coverage completeness:**
@@ -294,11 +294,11 @@ When `plan_review_consolidated` contains concerns related to architecture (conce
 ```bash
 ov mail send --to <architect-name> \
   --subject "Architecture feedback from plan review" \
-  --body "Plan review raised architecture concerns: <concern summaries with IDs>. Please review and revise architecture.md / test-plan.yaml as needed. Send architecture_revised when done." \
+  --body "Plan review raised architecture concerns: <concern summaries with IDs>. Please review and revise architecture.md / test-plan.yaml as needed. Send a result mail with subject 'Architecture revised: <mission>' when done." \
   --type dispatch --agent $OVERSTORY_AGENT_NAME
 ```
 
-After the architect sends `architecture_revised`, re-submit the revised plan + architecture for another round of plan review.
+After the architect sends the architecture-revised result (subject "Architecture revised: ..."), re-submit the revised plan + architecture for another round of plan review.
 
 ## selective-ingress-rules
 

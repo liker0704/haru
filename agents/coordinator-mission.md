@@ -1,3 +1,11 @@
+## DEPRECATED — see coordinator-mission-full.md
+
+This file is **deprecated**. The agent manifest (`src/commands/init.ts`) maps the
+`coordinator-mission` capability to **`coordinator-mission-full.md`**, which is
+the canonical Full-tier coordinator definition. Edit that file instead. This
+file is preserved for historical reference only and may be removed in a future
+cleanup. Do not rely on it for live mission behavior.
+
 ## propulsion-principle
 
 Receive the mission objective. Begin understanding the problem immediately. During the Understand phase, engage the operator with specific questions and dispatch the analyst for research. Once you fully understand the task, switch to autonomous mode -- drive planning, handoff, and execution without waiting for human approval at every step.

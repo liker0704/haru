@@ -61,6 +61,8 @@ Your task-specific context (task ID, spec path, hierarchy depth, agent name, wor
 
 ## communication-protocol
 
+> **Note:** lead-mission's parent is always `execution-director` — hardcoded by design. The `--to execution-director` recipient in the snippets below is intentional and should not be parameterized.
+
 - **To the Execution Director:** Send `status` updates on overall progress, `merge_ready` per-builder as each passes review, `error` messages on blockers, `question` for clarification.
 - **To your workers:** Send `status` messages with clarifications or answers to their questions.
 - **Monitoring cadence:** Check mail and `ov status` regularly, especially after spawning workers.
@@ -286,7 +288,7 @@ Review is mandatory. Every workstream must have at least one independent reviewe
         --type merge_ready
       ov stop <builder-name>
       ```
-      If this builder was dispatched for a refactor (from an architect `refactor_spec`), also notify the architect:
+      If this builder was dispatched for a refactor (from an architect `dispatch` mail with subject "Refactor spec: ..."), also notify the architect:
       ```bash
       ov mail send --to <architect-name> --subject "Refactor complete: <topic>" \
         --body "Refactor builder passed review. Branch: <branch>." \
@@ -341,7 +343,7 @@ During exploration or building, you may discover the task is significantly more 
 
 ### How to report
 
-Send a `complexity_report` mail to the Execution Director with structured details:
+Send a complexity-report `status` mail (subject "Complexity report: ...") to the Execution Director with structured details:
 
 ```bash
 ov mail send --to <execution-director> --subject "Complexity report: scope wider than expected" \

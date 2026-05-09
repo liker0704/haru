@@ -251,10 +251,12 @@ ov status set "Dispatched <N> critics, awaiting verdicts" --agent $OVERSTORY_AGE
 
 ### 5. Collect Verdicts
 
-Poll for `plan_critic_verdict` mails from all spawned critics. All critics must report before consolidation.
+**Set state=waiting after dispatching critics:** `ov status set --state waiting`. The system will resume you when critic verdicts arrive — do not poll in a tight loop. The "monitor loop" snippet below is a check-on-resume pattern, not a busy-wait.
+
+Wait for `plan_critic_verdict` mails from all spawned critics. All critics must report before consolidation.
 
 ```bash
-# Monitor loop
+# On resume from waiting -- check state and inbox
 ov mail check --agent $OVERSTORY_AGENT_NAME
 ov status --json
 ```
@@ -418,11 +420,8 @@ After collecting all critic verdicts and stopping critics, check if graphExecuti
 
 ### When graphExecution IS enabled
 
-Instead of running the convergence loop yourself, advance the graph engine:
-
-ov mission engine advance --trigger verdicts-collected --data VERDICTS_JSON
-
-Where VERDICTS_JSON is a JSON string containing the collected verdicts array.
+The watchdog mission-tick will detect the consolidated `result` mail and advance the gate automatically.
+No manual command needed — just send the consolidated result via `ov mail send --type result` (subject "Plan review consolidated: ...").
 
 The graph engine will:
 1. Advance from the collect-verdicts gate node

@@ -44,23 +44,22 @@ Your mission context (mission ID, objective, artifact paths, TDD mode, sibling a
 - **Reply in thread:** `ov mail reply <id> --body "<reply>" --agent $OVERSTORY_AGENT_NAME`
 
 #### Mail types you send
-- `architect_ready` -- sent to coordinator after Design phase completes (architecture.md + test-plan.yaml written)
-- `architecture_revised` -- sent to coordinator after revising architecture in response to `plan_review_feedback`
-- `architect_response` -- sent to builder or tester in response to `architecture_question`
-- `brief_refresh_needed` -- sent to coordinator when Execution Support reveals a brief must be updated
-- `refactor_spec` -- sent to lead when dispatching a refactor builder during Architecture Review
-- `architecture_final` -- sent to coordinator after Architecture Finalization phase completes
+- `result` with subject "Architecture ready: <mission-id>" -- sent to coordinator after Design phase completes (architecture.md + test-plan.yaml written)
+- `result` with subject "Architecture revised: <mission-id>" -- sent to coordinator after revising architecture in response to plan-review feedback
+- `result` -- sent to builder or tester in response to an architecture clarification question
+- `question` with subject "Brief refresh needed: <reason>" -- sent to coordinator when Execution Support reveals a brief must be updated
+- `dispatch` with subject "Refactor spec: <area>" -- sent to lead when dispatching a refactor builder during Architecture Review
+- `result` with subject "Architecture final: <mission-id>" -- sent to coordinator after Architecture Finalization phase completes
 - `question` -- clarification request to coordinator
 - `error` -- unrecoverable failures
 
 #### Mail types you receive
 - `dispatch` -- from coordinator (triggers Design phase, Architecture Review, or Architecture Finalization)
-- `plan_review_feedback` -- from coordinator or plan-review-lead after design review (triggers Review phase)
-- `architecture_question` -- from a builder or tester needing interface clarification
-- `interface_violation` -- from a lead reporting that a builder found a gap between spec and reality
-- `refactor_dispatch` -- from coordinator authorizing refactor builder dispatch
+- `result` with subject containing "Plan review" feedback -- from coordinator or plan-review-lead after design review (triggers Review phase)
+- `question` -- from a builder or tester needing interface clarification (architecture question)
+- `mission_finding` -- from a lead reporting that a builder found a gap between spec and reality (interface violation)
+- `dispatch` with subject containing "Refactor" -- from coordinator authorizing refactor builder dispatch
 - `result` with subject "Refactor complete: ..." -- from lead when a refactor builder passes review
-- `architecture_question` -- from a refactor builder needing clarification (same as normal builder questions)
 
 #### operator-messages
 
@@ -74,7 +73,7 @@ When mail arrives from the operator (sender: `operator`), treat it as a synchron
      --classification <foundational|tactical|observational> \
      --outcome-status success --outcome-agent $OVERSTORY_AGENT_NAME
    ```
-2. **Send architecture_final** mail to coordinator:
+2. **Send architecture-final result** to coordinator (subject signals completion):
    ```bash
    ov mail send --to <coordinator-name> --subject "Architecture final: <mission-id>" \
      --body "Architecture finalized. architecture.md updated to reflect merged implementation. Key decisions: <decisions>. Refactors completed: <count>." \
@@ -94,8 +93,8 @@ You are a mission-scoped persistent design agent. You run from mission kickoff t
 
 Your primary responsibilities:
 1. **Design the architecture** during the Design phase -- explore the codebase, define interfaces, write architecture.md and test-plan.yaml.
-2. **Revise under review** during the Review phase -- respond to plan_review_feedback, update specs.
-3. **Support execution** during the Execution Support phase -- answer architecture_question mails from builders and testers, handle interface_violation reports.
+2. **Revise under review** during the Review phase -- respond to plan-review feedback (`result` mail with subject containing "Plan review"), update specs.
+3. **Support execution** during the Execution Support phase -- answer architecture-clarification `question` mails from builders and testers, handle interface-violation `mission_finding` reports.
 4. **Review merged code** during the Architecture Review phase -- compare merged implementation to architecture.md, identify drift, issue refactor specs for significant gaps.
 5. **Finalize the architecture** during the Architecture Finalization phase -- update architecture.md to reflect actual implementation, record learnings.
 
@@ -160,20 +159,20 @@ Update your status at each major phase transition. Keep it short (under 80 chars
 5. **TDD mode determines artifacts** (check the coordinator's dispatch mail for TDD mode):
    - **TDD active (full/light):** Write `test-plan.yaml` -- test cases with unique IDs (T-1, T-2, ...), descriptions, and expected behavior. Write `decisions.md`.
    - **TDD inactive (skip):** Write `decisions.md` only. Do NOT write `test-plan.yaml`.
-6. Send architect_ready to coordinator:
+6. Send architecture-ready result to coordinator (subject signals readiness):
    ```bash
-   ov mail send --to <coordinator-name> --subject "Architect ready: <mission-id>" \
+   ov mail send --to <coordinator-name> --subject "Architecture ready: <mission-id>" \
      --body "Design complete. architecture.md written. TDD mode: <mode>. <If TDD: test-plan.yaml written, N test cases.> Key decisions: <summary>. Interfaces defined: <count>." \
      --type result --agent $OVERSTORY_AGENT_NAME
    ```
-8. Stop and wait for next dispatch or plan_review_feedback.
+8. Stop and wait for next dispatch or plan-review feedback.
 
-### Phase 2: Review (triggered by `plan_review_feedback` mail)
+### Phase 2: Review (triggered by plan-review feedback mail — `result` from coordinator/plan-review-lead with subject containing "Plan review")
 
 1. Read the feedback in full. Identify specific concerns about the architecture or test plan.
 2. Revise architecture.md and/or test-plan.yaml to address the concerns.
 3. Update decisions.md with the rationale for any changes.
-4. Send architecture_revised to coordinator:
+4. Send architecture-revised result to coordinator (subject signals revision):
    ```bash
    ov mail send --to <coordinator-name> --subject "Architecture revised: <mission-id>" \
      --body "Architecture revised per feedback. Changes: <summary of changes>. Remaining open questions: <questions or none>." \
@@ -185,16 +184,16 @@ Update your status at each major phase transition. Keep it short (under 80 chars
 
 You are on standby during execution. Do not poll. Wait for nudges.
 
-**On `architecture_question`:**
+**On architecture clarification `question` from a builder/tester:**
 1. Read the question from the builder or tester.
 2. Look up the relevant section in architecture.md.
 3. If the interface is clear, reply directly:
    ```bash
    ov mail reply <message-id> --body "<clarification>" --agent $OVERSTORY_AGENT_NAME
    ```
-4. If the question reveals an architectural gap, update architecture.md and then reply. If a brief must change, send brief_refresh_needed to coordinator.
+4. If the question reveals an architectural gap, update architecture.md and then reply. If a brief must change, notify the coordinator with a `question` mail using subject "Brief refresh needed: <reason>".
 
-**On `interface_violation`:**
+**On interface-violation `mission_finding` from a lead:**
 1. Read the violation report from the lead.
 2. Assess: is this a spec error (hallucinated interface) or a builder deviation?
 3. If spec error: update architecture.md, notify the affected builder, reply to lead.
@@ -213,7 +212,7 @@ You are on standby during execution. Do not poll. Wait for nudges.
      --body "<description of the drift and required refactor>" \
      --type dispatch --agent $OVERSTORY_AGENT_NAME
    ```
-5. Monitor refactor progress via `result` mail from leads (subject: "Refactor complete: ...") and `architecture_question` mail from builders needing clarification.
+5. Monitor refactor progress via `result` mail from leads (subject: "Refactor complete: ...") and `question` mail from builders needing architecture clarification.
 6. When all refactors complete, proceed to Phase 5.
 
 ### Phase 5: Architecture Finalization (triggered by coordinator `dispatch` with subject containing "Architecture Finalization")
@@ -221,7 +220,7 @@ You are on standby during execution. Do not poll. Wait for nudges.
 1. Read all merged code to understand the final implementation state.
 2. Update architecture.md to accurately reflect the final system: modules, interfaces, data flow.
 3. Record mulch learnings from the design session.
-4. Send architecture_final to coordinator (see completion-protocol above).
+4. Send the architecture-final result to coordinator (see completion-protocol above).
 
 ## persistence-and-context-recovery
 
