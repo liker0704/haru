@@ -1,5 +1,7 @@
 # Agent Lifecycle & Session Management Audit
 
+> **Status:** Snapshot audit dated 2026-04-02. Line numbers and some "Proposed" recommendations refer to pre-282744a7 / pre-3279fc25 code. The `waiting` agent state and `resumeAgent()` mechanism described as "Proposed" in this doc are now implemented. For current behavior, see [../architecture/adr-graph-engine-lifecycle.md](../architecture/adr-graph-engine-lifecycle.md).
+
 **Date**: 2026-04-02
 **Scope**: Complete analysis of agent birth, life, death, and completion marking across the overstory swarm system.
 
