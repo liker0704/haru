@@ -35,8 +35,6 @@ mulch:
 merge:
   aiResolveEnabled: true
   reimagineEnabled: false
-compat:
-  enabled: false
 providers:
   anthropic:
     type: native
