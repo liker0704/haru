@@ -1,5 +1,5 @@
 /**
- * Shared formatting utilities for overstory CLI output.
+ * Shared formatting utilities for haru CLI output.
  *
  * Duration, timestamp, event detail, agent color mapping, and status color
  * helpers used across all observability commands.
@@ -235,7 +235,7 @@ export function logLevelLabel(level: string): string {
 /**
  * Format a single event as a compact feed line.
  * Returns the formatted string WITHOUT a trailing newline.
- * Used by both ov feed and the dashboard Feed panel.
+ * Used by both ha feed and the dashboard Feed panel.
  */
 export function formatEventLine(event: StoredEvent, colorMap: Map<string, ColorFn>): string {
 	const timeStr = formatAbsoluteTime(event.createdAt);

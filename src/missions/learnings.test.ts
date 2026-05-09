@@ -243,7 +243,10 @@ describe("buildSyncAgentContext", () => {
 
 	test("returns empty relatedFiles when no Components table", async () => {
 		await mkdir(join(tempDir, "plan"), { recursive: true });
-		await writeFile(join(tempDir, "plan", "architecture.md"), "# Architecture\n\nNo components here.");
+		await writeFile(
+			join(tempDir, "plan", "architecture.md"),
+			"# Architecture\n\nNo components here.",
+		);
 
 		const result = buildSyncAgentContext({
 			artifactRoot: tempDir,

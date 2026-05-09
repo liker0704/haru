@@ -1,7 +1,7 @@
 /**
  * Headless subprocess management for non-tmux agent runtimes.
  *
- * Used by `ov sling` when runtime.headless === true to bypass tmux entirely.
+ * Used by `ha sling` when runtime.headless === true to bypass tmux entirely.
  * Provides spawnHeadlessAgent() for direct Bun.spawn() invocation of
  * headless agent processes (e.g., Sapling running with --json).
  *
@@ -62,12 +62,12 @@ export interface SpawnHeadlessOptions {
 /**
  * Spawn a headless agent subprocess directly via Bun.spawn().
  *
- * Used by `ov sling` when runtime.headless === true to bypass all tmux
+ * Used by `ha sling` when runtime.headless === true to bypass all tmux
  * session management.
  *
  * **Backpressure prevention:** Pass stdoutFile (and stderrFile) to redirect
  * output to log files instead of pipes. This is the recommended mode for
- * `ov sling` — it prevents the OS pipe buffer (~64 KB) from filling up and
+ * `ha sling` — it prevents the OS pipe buffer (~64 KB) from filling up and
  * blocking the child process when the caller does not actively consume stdout.
  *
  * When no file paths are provided (default/legacy mode), stdout is a pipe and

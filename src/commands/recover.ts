@@ -1,7 +1,7 @@
 /**
- * CLI command: ov recover <bundle-path> [--force] [--dry-run] [--json]
+ * CLI command: ha recover <bundle-path> [--force] [--dry-run] [--json]
  *
- * Restores swarm state from a recovery bundle produced by `ov snapshot`.
+ * Restores swarm state from a recovery bundle produced by `ha snapshot`.
  * Calls restoreBundle(), then renders a ReconciliationReport with colored
  * component statuses and operator actions.
  */
@@ -106,7 +106,7 @@ export async function executeRecover(
 }
 
 /**
- * Create the `ov recover` command.
+ * Create the `ha recover` command.
  */
 export function createRecoverCommand(): Command {
 	return new Command("recover")

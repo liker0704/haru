@@ -5,14 +5,14 @@ import { cleanupTempDir, createTempGitRepo, runGitInDir } from "../test-helpers.
 import type { Spawner } from "./init.ts";
 import {
 	buildAgentManifest,
+	HARU_GITIGNORE,
+	HARU_README,
 	initCommand,
-	OVERSTORY_GITIGNORE,
-	OVERSTORY_README,
 	resolveToolSet,
 } from "./init.ts";
 
 /**
- * Tests for `overstory init` -- agent definition deployment.
+ * Tests for `haru init` -- agent definition deployment.
  *
  * Uses real temp git repos. Suppresses stdout to keep test output clean.
  * process.cwd() is saved/restored because initCommand uses it to find the project root.
@@ -153,7 +153,7 @@ describe("initCommand: agent-defs deployment", () => {
 		const stopHooks = parsed.hooks.Stop[0].hooks;
 
 		expect(stopHooks.length).toBe(2);
-		expect(stopHooks[0].command).toContain("ov log session-end");
+		expect(stopHooks[0].command).toContain("ha log session-end");
 		expect(stopHooks[1].command).toBe("mulch learn");
 	});
 
@@ -216,7 +216,7 @@ describe("initCommand: .overstory/.gitignore", () => {
 		expect(content).toContain("!agent-defs/**\n");
 
 		// Verify it matches the exported constant
-		expect(content).toBe(OVERSTORY_GITIGNORE);
+		expect(content).toBe(HARU_GITIGNORE);
 	});
 
 	test("gitignore is always written when init completes", async () => {
@@ -227,7 +227,7 @@ describe("initCommand: .overstory/.gitignore", () => {
 		const content = await Bun.file(gitignorePath).text();
 
 		// Verify gitignore was written with correct content
-		expect(content).toBe(OVERSTORY_GITIGNORE);
+		expect(content).toBe(HARU_GITIGNORE);
 
 		// Verify the file exists
 		const exists = await Bun.file(gitignorePath).exists();
@@ -253,7 +253,7 @@ describe("initCommand: .overstory/.gitignore", () => {
 
 		// Verify the file was overwritten with the new wildcard+whitelist format
 		const restored = await Bun.file(gitignorePath).text();
-		expect(restored).toBe(OVERSTORY_GITIGNORE);
+		expect(restored).toBe(HARU_GITIGNORE);
 		expect(restored).toContain("*\n");
 		expect(restored).toContain("!.gitignore\n");
 	});
@@ -309,11 +309,11 @@ describe("initCommand: .overstory/README.md", () => {
 		expect(exists).toBe(true);
 
 		const content = await Bun.file(readmePath).text();
-		expect(content).toBe(OVERSTORY_README);
+		expect(content).toBe(HARU_README);
 	});
 
 	test("README.md is whitelisted in gitignore", () => {
-		expect(OVERSTORY_GITIGNORE).toContain("!README.md\n");
+		expect(HARU_GITIGNORE).toContain("!README.md\n");
 	});
 
 	test("--force reinit overwrites README.md", async () => {
@@ -332,7 +332,7 @@ describe("initCommand: .overstory/README.md", () => {
 
 		// Verify restored to canonical content
 		const restored = await Bun.file(readmePath).text();
-		expect(restored).toBe(OVERSTORY_README);
+		expect(restored).toBe(HARU_README);
 	});
 
 	test("subsequent init without --force does not overwrite README.md", async () => {
@@ -790,7 +790,7 @@ describe("initCommand: scaffold commit", () => {
 			"git",
 			"commit",
 			"-m",
-			"chore: initialize overstory and ecosystem tools",
+			"chore: initialize haru and ecosystem tools",
 		]);
 	});
 

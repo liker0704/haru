@@ -1,4 +1,4 @@
-// OpenCode runtime adapter for overstory's AgentRuntime interface.
+// OpenCode runtime adapter for haru's AgentRuntime interface.
 // Implements the AgentRuntime contract for the `opencode` CLI (SST OpenCode).
 //
 // Key differences from Claude/Pi adapters:
@@ -113,7 +113,7 @@ export class OpenCodeRuntime implements AgentRuntime {
 	 *
 	 * Writes:
 	 * 1. AGENTS.md — overlay instructions
-	 * 2. .opencode/plugin/overstory-guard.ts — security guard plugin
+	 * 2. .opencode/plugin/haru-guard.ts — security guard plugin
 	 * 3. opencode.json — permission bypass + plugin + instructions config
 	 */
 	async deployConfig(
@@ -130,12 +130,12 @@ export class OpenCodeRuntime implements AgentRuntime {
 		// Write guard plugin
 		const pluginDir = join(worktreePath, ".opencode", "plugin");
 		await mkdir(pluginDir, { recursive: true });
-		await Bun.write(join(pluginDir, "overstory-guard.ts"), buildGuardPlugin(hooks));
+		await Bun.write(join(pluginDir, "haru-guard.ts"), buildGuardPlugin(hooks));
 
 		// Write opencode.json for permission bypass + plugin registration
 		const config = {
 			permission: "allow",
-			plugin: [".opencode/plugin/overstory-guard.ts"],
+			plugin: [".opencode/plugin/haru-guard.ts"],
 			instructions: ["AGENTS.md"],
 		};
 		await Bun.write(join(worktreePath, "opencode.json"), JSON.stringify(config, null, 2));
@@ -322,7 +322,7 @@ function buildGuardPlugin(hooks: HooksDef): string {
 	).join(",\n\t");
 	const safePrefixes = SAFE_BASH_PREFIXES.map((p) => JSON.stringify(p)).join(", ");
 
-	return `// Auto-generated overstory guard plugin for agent: ${hooks.agentName}
+	return `// Auto-generated haru guard plugin for agent: ${hooks.agentName}
 // Capability: ${hooks.capability} | Worktree: ${hooks.worktreePath}
 
 const BLOCKED_TOOLS = new Set(${JSON.stringify(blockedTools)});
@@ -334,14 +334,14 @@ const DANGEROUS_PATTERNS = [
 const SAFE_PREFIXES = [${safePrefixes}];
 
 export default {
-\tname: "overstory-guard",
+\tname: "haru-guard",
 \thooks: {
 \t\t"tool.execute.before": (event: { tool: string; args: Record<string, unknown> }) => {
 \t\t\tconst { tool, args } = event;
 
 \t\t\t// Block forbidden tools
 \t\t\tif (BLOCKED_TOOLS.has(tool)) {
-\t\t\t\treturn { blocked: true, reason: \`Tool '\${tool}' is blocked for overstory agents. Use ov mail for coordination.\` };
+\t\t\t\treturn { blocked: true, reason: \`Tool '\${tool}' is blocked for haru agents. Use ha mail for coordination.\` };
 \t\t\t}
 
 \t\t\t// Block write tools for read-only agents

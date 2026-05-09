@@ -4,7 +4,7 @@
  * Overstory CLI — main entry point and command router.
  *
  * Routes subcommands to their respective handlers in src/commands/.
- * Usage: ov <command> [args...]
+ * Usage: ha <command> [args...]
  */
 
 import { existsSync } from "node:fs";
@@ -79,7 +79,7 @@ if ((rawArgs.includes("-v") || rawArgs.includes("--version")) && rawArgs.include
 	const platform = `${process.platform}-${process.arch}`;
 	console.log(
 		JSON.stringify({
-			name: "@os-eco/overstory-cli",
+			name: "@hana/haru-cli",
 			version: VERSION,
 			runtime: "bun",
 			platform,
@@ -204,7 +204,7 @@ program
 			const COL_WIDTH = 20;
 			const lines: string[] = [];
 
-			lines.push(`${brand.bold("overstory")} ${muted(`v${VERSION}`)} — Multi-agent orchestration`);
+			lines.push(`${brand.bold("haru")} ${muted(`v${VERSION}`)} — Multi-agent orchestration`);
 			lines.push("");
 
 			lines.push(`Usage: ${chalk.dim("ov")} <command> [options]`);
@@ -254,7 +254,7 @@ program.hook("preAction", (thisCmd) => {
 		const resolvedProject = resolve(process.cwd(), projectFlag);
 		if (!existsSync(join(resolvedProject, ".overstory", "config.yaml"))) {
 			throw new ConfigError(
-				`'${resolvedProject}' is not an overstory project (missing .overstory/config.yaml). Run 'ov init' first.`,
+				`'${resolvedProject}' is not an haru project (missing .overstory/config.yaml). Run 'ha init' first.`,
 				{ configPath: join(resolvedProject, ".overstory", "config.yaml") },
 			);
 		}
@@ -399,7 +399,7 @@ program
 	.option("--metrics", "Delete metrics.db")
 	.option("--logs", "Remove all agent logs")
 	.option("--worktrees", "Remove all worktrees + kill tmux sessions")
-	.option("--branches", "Delete all overstory/* branch refs")
+	.option("--branches", "Delete all haru/* branch refs")
 	.option("--agents", "Remove agent identity files")
 	.option("--specs", "Remove task spec files")
 	.option("--headroom", "Delete headroom.db")
@@ -519,7 +519,7 @@ program.on("command:*", (operands) => {
 	if (suggestion) {
 		process.stderr.write(`Did you mean '${suggestion}'?\n`);
 	}
-	process.stderr.write("Run 'ov --help' for usage.\n");
+	process.stderr.write("Run 'ha --help' for usage.\n");
 	process.exitCode = 1;
 });
 
@@ -533,9 +533,9 @@ if (import.meta.main)
 		// Friendly message when running outside a git repository
 		if (err instanceof WorktreeError && err.message.includes("not a git repository")) {
 			if (useJson) {
-				jsonError("ov", "Not in an overstory project. Run 'ov init' first.");
+				jsonError("ov", "Not in an haru project. Run 'ha init' first.");
 			} else {
-				process.stderr.write("Not in an overstory project. Run 'ov init' first.\n");
+				process.stderr.write("Not in an haru project. Run 'ha init' first.\n");
 			}
 			process.exitCode = 1;
 			return;

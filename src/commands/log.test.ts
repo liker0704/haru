@@ -14,7 +14,7 @@ import type { AgentSession, MulchLearnResult, StoredEvent } from "../types.ts";
 import { appendOutcomeToAppliedRecords, autoRecordExpertise, logCommand } from "./log.ts";
 
 /**
- * Tests for `overstory log` command.
+ * Tests for `haru log` command.
  *
  * Uses real filesystem (temp dirs) and real bun:sqlite to test logging behavior.
  * Captures process.stdout.write to verify help text output.
@@ -344,7 +344,7 @@ describe("logCommand", () => {
 			worktreePath: tempDir,
 			branchName: "main",
 			taskId: "",
-			tmuxSession: "overstory-coordinator",
+			tmuxSession: "haru-coordinator",
 			state: "working",
 			pid: 11111,
 			parentAgent: null,
@@ -389,7 +389,7 @@ describe("logCommand", () => {
 			worktreePath: tempDir,
 			branchName: "main",
 			taskId: "",
-			tmuxSession: "overstory-monitor",
+			tmuxSession: "haru-monitor",
 			state: "working",
 			pid: 22222,
 			parentAgent: null,
@@ -501,7 +501,7 @@ describe("logCommand", () => {
 
 	describe("session-end coordinator run completion", () => {
 		test("session-end does NOT auto-complete the active run for coordinator agent (per-turn Stop hook guard)", async () => {
-			// Regression test for overstory-adc5:
+			// Regression test for haru-adc5:
 			// The coordinator's Stop hook fires on every turn boundary, not just at true session exit.
 			// session-end must NOT auto-complete the run, or the coordinator dies after its first turn.
 			const dbPath = join(tempDir, ".overstory", "sessions.db");
@@ -514,7 +514,7 @@ describe("logCommand", () => {
 				worktreePath: tempDir,
 				branchName: "main",
 				taskId: "",
-				tmuxSession: "overstory-coordinator",
+				tmuxSession: "haru-coordinator",
 				state: "working",
 				pid: 11111,
 				parentAgent: null,
@@ -574,7 +574,7 @@ describe("logCommand", () => {
 				worktreePath: tempDir,
 				branchName: "main",
 				taskId: "",
-				tmuxSession: "overstory-coordinator-no-run",
+				tmuxSession: "haru-coordinator-no-run",
 				state: "working",
 				pid: 11112,
 				parentAgent: null,
@@ -610,7 +610,7 @@ describe("logCommand", () => {
 				worktreePath: tempDir,
 				branchName: "builder-branch",
 				taskId: "bead-builder-001",
-				tmuxSession: "overstory-builder",
+				tmuxSession: "haru-builder",
 				state: "working",
 				pid: 11113,
 				parentAgent: null,
@@ -670,7 +670,7 @@ describe("logCommand", () => {
 				worktreePath: tempDir,
 				branchName: "main",
 				taskId: "",
-				tmuxSession: "overstory-coordinator-completed",
+				tmuxSession: "haru-coordinator-completed",
 				state: "working",
 				pid: 11114,
 				parentAgent: null,
@@ -729,7 +729,7 @@ describe("logCommand", () => {
 			worktreePath: tempDir,
 			branchName: "lead-alpha-branch",
 			taskId: "bead-lead-001",
-			tmuxSession: "overstory-lead-alpha",
+			tmuxSession: "haru-lead-alpha",
 			state: "working",
 			pid: 33333,
 			parentAgent: null,
@@ -775,7 +775,7 @@ describe("logCommand", () => {
 			worktreePath: tempDir,
 			branchName: "builder-beta-branch",
 			taskId: "bead-builder-001",
-			tmuxSession: "overstory-builder-beta",
+			tmuxSession: "haru-builder-beta",
 			state: "working",
 			pid: 44444,
 			parentAgent: null,
@@ -1007,7 +1007,7 @@ describe("logCommand", () => {
 			worktreePath: tempDir,
 			branchName: "mulch-fail-branch",
 			taskId: "bead-mulch-001",
-			tmuxSession: "overstory-mulch-fail",
+			tmuxSession: "haru-mulch-fail",
 			state: "working",
 			pid: 55555,
 			parentAgent: "parent-agent",
@@ -1052,7 +1052,7 @@ describe("logCommand", () => {
 			worktreePath: tempDir,
 			branchName: "main",
 			taskId: "",
-			tmuxSession: "overstory-coordinator-mulch",
+			tmuxSession: "haru-coordinator-mulch",
 			state: "working",
 			pid: 66666,
 			parentAgent: null,
@@ -1377,7 +1377,7 @@ describe("logCommand", () => {
 });
 
 /**
- * Tests for `overstory log` with --stdin flag.
+ * Tests for `haru log` with --stdin flag.
  *
  * Uses Bun.spawn to invoke the log command as a subprocess with piped stdin,
  * because Bun.stdin.stream() cannot be injected in-process.
@@ -1400,7 +1400,7 @@ describe("logCommand --stdin integration", () => {
 	});
 
 	/**
-	 * Helper: run `overstory log` as a subprocess with stdin piped.
+	 * Helper: run `haru log` as a subprocess with stdin piped.
 	 * Uses bun to run the CLI entry point directly.
 	 */
 	async function runLogWithStdin(

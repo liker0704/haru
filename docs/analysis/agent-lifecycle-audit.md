@@ -3,7 +3,7 @@
 > **Status:** Snapshot audit dated 2026-04-02. Line numbers and some "Proposed" recommendations refer to pre-282744a7 / pre-3279fc25 code. The `waiting` agent state and `resumeAgent()` mechanism described as "Proposed" in this doc are now implemented. For current behavior, see [../architecture/adr-graph-engine-lifecycle.md](../architecture/adr-graph-engine-lifecycle.md).
 
 **Date**: 2026-04-02
-**Scope**: Complete analysis of agent birth, life, death, and completion marking across the overstory swarm system.
+**Scope**: Complete analysis of agent birth, life, death, and completion marking across the haru swarm system.
 
 ---
 
@@ -12,7 +12,7 @@
 ### State Diagram
 
 ```
-                    ov sling / startPersistentAgent
+                    ha sling / startPersistentAgent
                               |
                               v
                         +---------+
@@ -60,7 +60,7 @@
 
 | Transition | Trigger | Code Location |
 |---|---|---|
-| (spawn) -> booting | `ov sling` or `startPersistentAgent` records session | `spawn.ts`, `persistent-root.ts` |
+| (spawn) -> booting | `ha sling` or `startPersistentAgent` records session | `spawn.ts`, `persistent-root.ts` |
 | booting -> working | First tool event updates lastActivity | `log.ts:updateLastActivity()` line 71 |
 | working -> stalled | Watchdog detects `elapsedMs > staleMs` | `health.ts:evaluateTimeBased()` line 137 |
 | stalled -> working | Agent resumes activity (escalationLevel reset) | `daemon.ts` line 1400 |
@@ -105,7 +105,7 @@
    - `nudgeIfIdle()` (mail.ts line 87): calls `resolveTargetSession()`, gets null, returns without nudging.
    - `writePendingNudge()` still writes a marker file -- but nobody reads it since the agent is dead.
 
-5. **Can agent be woken?** NO. Once completed, the session is terminal. A new agent must be spawned for new work. The `ov resume` command exists but only works for sessions that crashed mid-work (zombie/stalled with live tmux).
+5. **Can agent be woken?** NO. Once completed, the session is terminal. A new agent must be spawned for new work. The `ha resume` command exists but only works for sessions that crashed mid-work (zombie/stalled with live tmux).
 
 ### 2.2 Persistent Agent Death
 
@@ -115,7 +115,7 @@
 
 1. **log.ts `transitionToCompleted()`** (line 118):
    - Checks `PERSISTENT_CAPABILITIES` set -- capability IS in the set
-   - **Special case**: For `coordinator`, checks if `ov run complete` was already called. If the run status is `"completed"`, marks the session as completed too.
+   - **Special case**: For `coordinator`, checks if `ha run complete` was already called. If the run status is `"completed"`, marks the session as completed too.
    - **Default case**: For all other persistent agents, it DOES NOT mark completed. It only calls `store.updateLastActivity()` and returns.
    - **CRITICAL**: Claude Code fires the Stop hook on EVERY turn boundary, not just at true session exit. So the Stop hook is essentially a no-op for persistent agents (it just updates lastActivity).
 
@@ -158,7 +158,7 @@ This is either a bug or an intentional design choice that creates fragility.
 
 | Agent | Waits For | How Long | What Happens If It Dies While Waiting |
 |---|---|---|---|
-| **Coordinator** | `merge_ready` from leads | Minutes to hours | **PERSISTENT** -- nudge system + watchdog keep it alive. If it actually dies, zombie -> manual restart via `ov coordinator start`. Leads' merge_ready mails queue in mail.db. |
+| **Coordinator** | `merge_ready` from leads | Minutes to hours | **PERSISTENT** -- nudge system + watchdog keep it alive. If it actually dies, zombie -> manual restart via `ha coordinator start`. Leads' merge_ready mails queue in mail.db. |
 | **Lead** | `worker_done` from builder | Minutes | **NOT PERSISTENT** -- told to "stop and do nothing" while waiting. Claude Code exits (Stop). Session-end marks it completed. Builder's `worker_done` mail arrives but lead is dead. **LOST WORK.** |
 | **Lead** | `result` from reviewer | Minutes | Same as above. |
 | **Lead** | `result` from scout | Minutes | Same as above. |
@@ -197,7 +197,7 @@ When a message arrives for an agent that is in `completed` state:
 4. The message sits in `mail.db` with `state = "queued"`, unread.
 
 **No mechanism exists to wake a completed agent.** The message is effectively lost unless:
-- A human manually checks `ov mail list --to <dead-agent> --unread`
+- A human manually checks `ha mail list --to <dead-agent> --unread`
 - The coordinator notices the lead has been silent and manually checks
 
 ### 3.4 Builder `architecture_question` Wait
@@ -235,7 +235,7 @@ Orchestrator (human Claude Code session)
     |                 |                  |-- status --> Coordinator
     |                 |                  |-- error --> Coordinator
     |                 |
-    |                 |-- ov merge --> (merges branch)
+    |                 |-- ha merge --> (merges branch)
     |                 |-- close issue
     |
     |-- starts --> Mission Analyst (persistent, depth 0)
@@ -353,8 +353,8 @@ Add a `waiting` state between `working` and `completed`:
 ### Option C: Nudge System Handles Resuming Dead Sessions
 
 Instead of preventing death, handle resurrection:
-- When `mail send` detects recipient is `completed/zombie`, auto-resume via `ov resume`
-- The `ov resume` command respawns Claude Code in the same tmux session with the same overlay
+- When `mail send` detects recipient is `completed/zombie`, auto-resume via `ha resume`
+- The `ha resume` command respawns Claude Code in the same tmux session with the same overlay
 - The resumed agent picks up by checking mail
 
 **Pros**:
@@ -401,7 +401,7 @@ done
 Combine Options B and C:
 
 1. **Add `waiting` state**:
-   - Agent calls `ov status set --state waiting` before stopping
+   - Agent calls `ha status set --state waiting` before stopping
    - Stop hook checks: if state is `waiting`, do NOT mark completed
    - Health.ts: `waiting` agents exempted from stale/zombie (like persistent)
    - State ordering: `booting(0) < working(1) < waiting(2) < completed(3) < stalled(4) < zombie(5)`
@@ -410,7 +410,7 @@ Combine Options B and C:
    - `resolveTargetSession()`: allow nudge to `waiting` agents (currently filters out completed/zombie)
    - When `mail send` targets a `waiting` agent with no live tmux:
      - Write pending nudge marker (existing behavior)
-     - Also trigger `ov resume <agent>` to respawn Claude in the same worktree
+     - Also trigger `ha resume <agent>` to respawn Claude in the same worktree
    - Resumed agent's first hook cycle picks up the pending nudge and processes mail
 
 3. **Watchdog handling**:
@@ -419,7 +419,7 @@ Combine Options B and C:
    - `waiting` for more than `waitingTimeoutMs` without any mail arrival: escalate to parent
 
 4. **Lead workflow change**:
-   - After spawning workers: `ov status set --state waiting`
+   - After spawning workers: `ha status set --state waiting`
    - After processing worker results: state transitions back to `working`
 
 **Benefits**:
@@ -438,7 +438,7 @@ Combine Options B and C:
 - `nudge.ts:resolveTargetSession()`: Allow `waiting` state
 - `mail.ts:nudgeIfIdle()`: Trigger resume for `waiting` agents with dead tmux
 - Agent definitions (`lead.md`, `plan-review-lead.md`): Replace "stop and do nothing" with "set state to waiting, then stop"
-- New `ov resume` or `ov wake` command for respawning dead waiting sessions
+- New `ha resume` or `ha wake` command for respawning dead waiting sessions
 
 ### Immediate Fix: plan-review-lead PERSISTENT_CAPABILITIES Consistency
 
@@ -481,9 +481,9 @@ This doesn't fix the root cause but makes lost messages visible.
 | Merger | `result` mail to parent | YES ("Stop. Do not continue merging after closing.") |
 | Plan Critics | `plan_critic_verdict` to plan-review-lead | YES (implicit) |
 | Lead | `merge_ready` per builder to coordinator, then `status` summary | YES ("Stop. Do not spawn additional workers after closing.") |
-| Coordinator | `ov run complete`, status mail to operator | YES ("Stop processing.") |
-| Plan-Review-Lead | `plan_review_consolidated` to mission-analyst | Stops when told by analyst via `ov stop` |
-| Mission Analyst | `result` to coordinator | Persistent, stopped via `ov mission complete` |
+| Coordinator | `ha run complete`, status mail to operator | YES ("Stop processing.") |
+| Plan-Review-Lead | `plan_review_consolidated` to mission-analyst | Stops when told by analyst via `ha stop` |
+| Mission Analyst | `result` to coordinator | Persistent, stopped via `ha mission complete` |
 | Execution Director | `status` (batch complete) to coordinator | Persistent, stopped via mission lifecycle |
 
 ## Appendix C: Watchdog Daemon Completion Marking Paths

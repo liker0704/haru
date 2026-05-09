@@ -1,5 +1,5 @@
 /**
- * CLI command: ov mission workstream-complete <workstream-id>
+ * CLI command: ha mission workstream-complete <workstream-id>
  *
  * Operator escape hatch to manually mark a workstream as completed.
  * Primarily used when the engine's automatic detection fails or for testing.
@@ -25,7 +25,7 @@ export function createWorkstreamCompleteCommand(): Command {
 
 				if (!mission) {
 					if (opts.json) {
-						process.stdout.write(JSON.stringify({ error: "No active mission found" }) + "\n");
+						process.stdout.write(`${JSON.stringify({ error: "No active mission found" })}\n`);
 					} else {
 						process.stderr.write("Error: No active mission found\n");
 					}
@@ -37,12 +37,12 @@ export function createWorkstreamCompleteCommand(): Command {
 
 				if (opts.json) {
 					process.stdout.write(
-						JSON.stringify({
+						`${JSON.stringify({
 							missionId: mission.id,
 							workstreamId,
 							status: "completed",
 							updatedBy: "operator",
-						}) + "\n",
+						})}\n`,
 					);
 				} else {
 					process.stdout.write(

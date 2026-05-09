@@ -11,7 +11,7 @@ describe("identity", () => {
 	let tempDir: string;
 
 	beforeEach(async () => {
-		tempDir = await mkdtemp(join(tmpdir(), "overstory-identity-test-"));
+		tempDir = await mkdtemp(join(tmpdir(), "haru-identity-test-"));
 	});
 
 	afterEach(async () => {

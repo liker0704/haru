@@ -1,5 +1,5 @@
 /**
- * CLI command: ov adaptive [--json]
+ * CLI command: ha adaptive [--json]
  *
  * Shows the current adaptive parallelism state: effective max concurrent,
  * last scaling decision, direction, and whether spawn is paused.
@@ -108,7 +108,7 @@ export async function executeAdaptive(opts: AdaptiveOptions): Promise<void> {
 }
 
 /**
- * Create the `ov adaptive` command.
+ * Create the `ha adaptive` command.
  */
 export function createAdaptiveCommand(): Command {
 	return new Command("adaptive")

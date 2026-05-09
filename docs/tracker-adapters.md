@@ -236,7 +236,7 @@ method returns immediately without error for compatibility with callers that cal
 The GitHub poller is a background daemon that watches GitHub Issues for issues
 bearing a configured `readyLabel`, claims them (swaps label), and dispatches them
 to the coordinator via the mail store. It runs as a standalone process started
-by `ov coordinator start --auto-pull` (or when `coordinator.autoPull: true` in
+by `ha coordinator start --auto-pull` (or when `coordinator.autoPull: true` in
 config).
 
 ### Configuration

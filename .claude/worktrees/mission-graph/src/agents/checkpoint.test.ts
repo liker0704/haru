@@ -9,12 +9,12 @@ import { clearCheckpoint, loadCheckpoint, saveCheckpoint } from "./checkpoint.ts
 function makeCheckpoint(overrides?: Partial<SessionCheckpoint>): SessionCheckpoint {
 	return {
 		agentName: "test-agent",
-		taskId: "overstory-abc1",
+		taskId: "haru-abc1",
 		sessionId: "session-001",
 		timestamp: "2025-01-01T00:00:00.000Z",
 		progressSummary: "Implemented checkpoint module",
 		filesModified: ["src/agents/checkpoint.ts"],
-		currentBranch: "overstory/test-agent/overstory-abc1",
+		currentBranch: "haru/test-agent/haru-abc1",
 		pendingWork: "Write tests",
 		mulchDomains: ["agents"],
 		...overrides,
@@ -25,7 +25,7 @@ describe("checkpoint", () => {
 	let agentsDir: string;
 
 	beforeEach(async () => {
-		agentsDir = await mkdtemp(join(tmpdir(), "overstory-checkpoint-test-"));
+		agentsDir = await mkdtemp(join(tmpdir(), "haru-checkpoint-test-"));
 	});
 
 	afterEach(async () => {
@@ -40,11 +40,11 @@ describe("checkpoint", () => {
 
 		expect(loaded).not.toBeNull();
 		expect(loaded?.agentName).toBe("test-agent");
-		expect(loaded?.taskId).toBe("overstory-abc1");
+		expect(loaded?.taskId).toBe("haru-abc1");
 		expect(loaded?.sessionId).toBe("session-001");
 		expect(loaded?.progressSummary).toBe("Implemented checkpoint module");
 		expect(loaded?.filesModified).toEqual(["src/agents/checkpoint.ts"]);
-		expect(loaded?.currentBranch).toBe("overstory/test-agent/overstory-abc1");
+		expect(loaded?.currentBranch).toBe("haru/test-agent/haru-abc1");
 		expect(loaded?.pendingWork).toBe("Write tests");
 		expect(loaded?.mulchDomains).toEqual(["agents"]);
 	});

@@ -87,18 +87,12 @@ describe("renderMissionNarrative", () => {
 	});
 
 	test("includes the mission state", () => {
-		const result = renderMissionNarrative(
-			makeMission({ state: "completed" }),
-			"/does/not/matter",
-		);
+		const result = renderMissionNarrative(makeMission({ state: "completed" }), "/does/not/matter");
 		expect(result).toContain("completed");
 	});
 
 	test("includes the mission phase", () => {
-		const result = renderMissionNarrative(
-			makeMission({ phase: "plan" }),
-			"/does/not/matter",
-		);
+		const result = renderMissionNarrative(makeMission({ phase: "plan" }), "/does/not/matter");
 		expect(result).toContain("plan");
 	});
 

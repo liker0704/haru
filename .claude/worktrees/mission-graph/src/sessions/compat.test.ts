@@ -16,7 +16,7 @@ let tempDir: string;
 let overstoryDir: string;
 
 beforeEach(async () => {
-	tempDir = await mkdtemp(join(tmpdir(), "overstory-compat-test-"));
+	tempDir = await mkdtemp(join(tmpdir(), "haru-compat-test-"));
 	overstoryDir = join(tempDir, ".overstory");
 	const { mkdir } = await import("node:fs/promises");
 	await mkdir(overstoryDir, { recursive: true });
@@ -39,9 +39,9 @@ function makeJsonSession(overrides: Record<string, unknown> = {}): Record<string
 		agentName: "test-agent",
 		capability: "builder",
 		worktreePath: "/tmp/worktrees/test-agent",
-		branchName: "overstory/test-agent/task-1",
+		branchName: "haru/test-agent/task-1",
 		taskId: "task-1",
-		tmuxSession: "overstory-test-agent",
+		tmuxSession: "haru-test-agent",
 		state: "working",
 		pid: 12345,
 		parentAgent: null,
@@ -135,7 +135,7 @@ describe("openSessionStore", () => {
 	test("imports from sessions.json when sessions.db exists but is empty", async () => {
 		// Simulate the scenario where sessions.db was created (e.g., by init) but
 		// no sessions were ever written to it, while sessions.json has records from
-		// a previous coordinator start that used the old code path (overstory-036f).
+		// a previous coordinator start that used the old code path (haru-036f).
 		const { store: emptyStore } = openSessionStore(overstoryDir);
 		expect(emptyStore.getAll()).toHaveLength(0);
 		emptyStore.close();
@@ -198,9 +198,9 @@ describe("data integrity", () => {
 			agentName: "full-agent",
 			capability: "scout",
 			worktreePath: "/tmp/worktrees/full-agent",
-			branchName: "overstory/full-agent/task-42",
+			branchName: "haru/full-agent/task-42",
 			taskId: "task-42",
-			tmuxSession: "overstory-full-agent",
+			tmuxSession: "haru-full-agent",
 			state: "stalled",
 			pid: 99999,
 			parentAgent: "lead-agent",
@@ -221,9 +221,9 @@ describe("data integrity", () => {
 		expect(result?.agentName).toBe("full-agent");
 		expect(result?.capability).toBe("scout");
 		expect(result?.worktreePath).toBe("/tmp/worktrees/full-agent");
-		expect(result?.branchName).toBe("overstory/full-agent/task-42");
+		expect(result?.branchName).toBe("haru/full-agent/task-42");
 		expect(result?.taskId).toBe("task-42");
-		expect(result?.tmuxSession).toBe("overstory-full-agent");
+		expect(result?.tmuxSession).toBe("haru-full-agent");
 		expect(result?.state).toBe("stalled");
 		expect(result?.pid).toBe(99999);
 		expect(result?.parentAgent).toBe("lead-agent");

@@ -1,18 +1,18 @@
-# `ov mission` Implementation Guide
+# `ha mission` Implementation Guide
 
 > **Status:** Historical delivery record. Sections §3-§16 describe the original PR sequence for Epic #13 (now shipped). Section §21 is current and reflects the live `TIER_PHASES` and cell registry.
 
-This document turns the agreed `ov mission` RFC into a concrete implementation
+This document turns the agreed `ha mission` RFC into a concrete implementation
 plan and implementation reference for Overstory.
 
 Primary design source:
 
-- [`docs/ov-mission.md`](./ov-mission.md)
-- [`docs/ov-mission-usage.md`](./ov-mission-usage.md)
+- [`docs/haru-mission.md`](./haru-mission.md)
+- [`docs/haru-mission-usage.md`](./haru-mission-usage.md)
 
 Current status:
 
-- `ov mission v1` shipped in Epic #13 and is no longer experimental.
+- `ha mission v1` shipped in Epic #13 and is no longer experimental.
 - This document remains the implementation reference and acceptance contract.
 - The PR-order sections below are still useful, but some are now historical
   delivery context rather than future work.
@@ -26,7 +26,7 @@ This guide is intentionally implementation-oriented:
 - rollout and fallback rules
 
 It is written for incremental delivery.
-The goal is to land `ov mission` without destabilizing the current fast path.
+The goal is to land `ha mission` without destabilizing the current fast path.
 
 ---
 
@@ -34,11 +34,11 @@ The goal is to land `ov mission` without destabilizing the current fast path.
 
 Implementation should follow these rules:
 
-- keep the current `ov coordinator` fast path working
+- keep the current `ha coordinator` fast path working
 - reuse existing Overstory primitives wherever possible
 - land infrastructure before prompts
 - land persistence before UI polish
-- land mission-mode features behind explicit `ov mission` entrypoints
+- land mission-mode features behind explicit `ha mission` entrypoints
 - prefer additive migrations over destructive rewrites
 
 Recommended order:
@@ -80,7 +80,7 @@ Recommended PR sequence:
 
 1. `Phase 0 groundwork: root agents + run model`
 2. `MissionStore + filesystem layout`
-3. `ov mission` command skeleton
+3. `ha mission` command skeleton
 4. `workstreams/task bridge + execution handoff skeleton`
 5. `Execution Director runtime path`
 6. `Mission Analyst runtime path`
@@ -113,11 +113,11 @@ persistent-root abstraction while keeping existing behavior intact.
 
 ### Primary files
 
-- [`src/commands/coordinator.ts`](/home/liker2/projects/os-eco/overstory/src/commands/coordinator.ts)
-- [`src/types.ts`](/home/liker2/projects/os-eco/overstory/src/types.ts)
-- [`src/sessions/store.ts`](/home/liker2/projects/os-eco/overstory/src/sessions/store.ts)
-- [`src/commands/status.ts`](/home/liker2/projects/os-eco/overstory/src/commands/status.ts)
-- [`src/commands/agents.ts`](/home/liker2/projects/os-eco/overstory/src/commands/agents.ts)
+- [`src/commands/coordinator.ts`](/home/liker2/projects/os-eco/haru/src/commands/coordinator.ts)
+- [`src/types.ts`](/home/liker2/projects/os-eco/haru/src/types.ts)
+- [`src/sessions/store.ts`](/home/liker2/projects/os-eco/haru/src/sessions/store.ts)
+- [`src/commands/status.ts`](/home/liker2/projects/os-eco/haru/src/commands/status.ts)
+- [`src/commands/agents.ts`](/home/liker2/projects/os-eco/haru/src/commands/agents.ts)
 - runtime capability allowlists or guards if they key off capabilities
 
 ### Step-by-step
@@ -128,7 +128,7 @@ persistent-root abstraction while keeping existing behavior intact.
    - `stopPersistentAgent(...)`
    - `getPersistentAgentStatus(...)`
    - `readPersistentAgentOutput(...)`
-3. Keep the existing `ov coordinator ...` commands as wrappers over that
+3. Keep the existing `ha coordinator ...` commands as wrappers over that
    internal abstraction.
 4. Extend capability handling so new root capabilities are first-class:
    - `mission-analyst`
@@ -156,7 +156,7 @@ run.
 
 ### Acceptance criteria
 
-- existing `ov coordinator start/status/output/stop` still work
+- existing `ha coordinator start/status/output/stop` still work
 - a new root capability can be started without cloning coordinator logic
 - `RunStatus = stopped` is accepted by types, storage, and tests
 - `status.ts` behavior around null-run root sessions remains correct
@@ -186,10 +186,10 @@ layout without yet implementing the full mission workflow.
 
 ### Primary files
 
-- [`src/sessions/store.ts`](/home/liker2/projects/os-eco/overstory/src/sessions/store.ts)
+- [`src/sessions/store.ts`](/home/liker2/projects/os-eco/haru/src/sessions/store.ts)
 - new mission-store module near existing session/run stores
-- [`src/types.ts`](/home/liker2/projects/os-eco/overstory/src/types.ts)
-- [`docs/ov-mission.md`](/home/liker2/projects/os-eco/overstory/docs/ov-mission.md)
+- [`src/types.ts`](/home/liker2/projects/os-eco/haru/src/types.ts)
+- [`docs/haru-mission.md`](./haru-mission.md)
 
 ### Required schema
 
@@ -264,7 +264,7 @@ Add `missions` table with fields aligned to the RFC:
 
 ---
 
-## 6. Phase 2: `ov mission` Command Shell
+## 6. Phase 2: `ha mission` Command Shell
 
 ### Goal
 
@@ -272,45 +272,45 @@ Add the user-facing mission command family before full execution logic exists.
 
 ### Primary files
 
-- new [`src/commands/mission.ts`](/home/liker2/projects/os-eco/overstory/src/commands)
+- new [`src/commands/mission.ts`](/home/liker2/projects/os-eco/haru/src/commands)
 - command registration / CLI wiring
-- [`src/commands/coordinator.ts`](/home/liker2/projects/os-eco/overstory/src/commands/coordinator.ts)
+- [`src/commands/coordinator.ts`](/home/liker2/projects/os-eco/haru/src/commands/coordinator.ts)
 
 ### Required commands
 
-- `ov mission start`
-- `ov mission status`
-- `ov mission output`
-- `ov mission answer`
-- `ov mission artifacts`
-- `ov mission handoff`
-- `ov mission pause`
-- `ov mission resume`
-- `ov mission refresh-briefs`
-- `ov mission complete`
-- `ov mission stop`
-- `ov mission list`
-- `ov mission show`
-- `ov mission bundle`
+- `ha mission start`
+- `ha mission status`
+- `ha mission output`
+- `ha mission answer`
+- `ha mission artifacts`
+- `ha mission handoff`
+- `ha mission pause`
+- `ha mission resume`
+- `ha mission refresh-briefs`
+- `ha mission complete`
+- `ha mission stop`
+- `ha mission list`
+- `ha mission show`
+- `ha mission bundle`
 
 ### Step-by-step
 
 1. Add the CLI command surface with no-op or minimally functional handlers.
-2. Wire `ov mission start` to:
+2. Wire `ha mission start` to:
    - ensure coordinator exists
    - create mission-owned run immediately
    - write `current-run.txt`
    - create mission row
    - write `current-mission.txt`
    - create artifact root
-3. Make `ov mission status` read `MissionSummary`.
-4. Make `ov mission artifacts` print the derived artifact root and known paths.
-5. Make `ov mission stop` terminalize the mission and clear pointers.
-6. Make `ov mission list/show` use `MissionStore`.
+3. Make `ha mission status` read `MissionSummary`.
+4. Make `ha mission artifacts` print the derived artifact root and known paths.
+5. Make `ha mission stop` terminalize the mission and clear pointers.
+6. Make `ha mission list/show` use `MissionStore`.
 
 ### Important invariant
 
-`ov mission start` must create the mission-owned run immediately.
+`ha mission start` must create the mission-owned run immediately.
 Do **not** delay run creation until execution handoff.
 
 ### Acceptance criteria
@@ -322,7 +322,7 @@ Do **not** delay run creation until execution handoff.
 
 ### Tests to add
 
-- command tests for all `ov mission` subcommands
+- command tests for all `ha mission` subcommands
 - start/stop pointer synchronization tests
 - tests for active mission refusal when one mission already exists
 
@@ -337,7 +337,7 @@ Make workstreams real runtime entities instead of a second planning namespace.
 ### Primary files
 
 - new mission planning helpers
-- [`src/commands/sling.ts`](/home/liker2/projects/os-eco/overstory/src/commands/sling.ts)
+- [`src/commands/sling.ts`](/home/liker2/projects/os-eco/haru/src/commands/sling.ts)
 - tracker integration layer used today by coordinator/sling
 - mission artifact generation code
 
@@ -370,7 +370,7 @@ Every workstream in `v1` must have a canonical `taskId`.
    - coordinator creates tracker task before final handoff
    - or mission planning creates them as part of decomposition
 3. Ensure `taskId` is present before any lead spawn.
-4. Ensure `Execution Director` uses `taskId` as the runtime bridge into `ov sling`.
+4. Ensure `Execution Director` uses `taskId` as the runtime bridge into `ha sling`.
 
 ### Acceptance criteria
 
@@ -395,17 +395,17 @@ runtime and persistence substrate exists.
 
 ### New prompt files
 
-- [`agents/coordinator-mission.md`](/home/liker2/projects/os-eco/overstory/agents)
-- [`agents/mission-analyst.md`](/home/liker2/projects/os-eco/overstory/agents)
-- [`agents/execution-director.md`](/home/liker2/projects/os-eco/overstory/agents)
-- [`agents/lead-mission.md`](/home/liker2/projects/os-eco/overstory/agents)
+- [`agents/coordinator-mission.md`](/home/liker2/projects/os-eco/haru/agents)
+- [`agents/mission-analyst.md`](/home/liker2/projects/os-eco/haru/agents)
+- [`agents/execution-director.md`](/home/liker2/projects/os-eco/haru/agents)
+- [`agents/lead-mission.md`](/home/liker2/projects/os-eco/haru/agents)
 
 ### Step-by-step
 
 1. Materialize the prompt skeletons from the RFC into real files.
 2. Keep existing:
-   - [`agents/coordinator.md`](/home/liker2/projects/os-eco/overstory/agents/coordinator.md)
-   - [`agents/lead.md`](/home/liker2/projects/os-eco/overstory/agents/lead.md)
+   - [`agents/coordinator.md`](/home/liker2/projects/os-eco/haru/agents/coordinator.md)
+   - [`agents/lead.md`](/home/liker2/projects/os-eco/haru/agents/lead.md)
    unchanged for the fast path.
 3. Add mission-mode prompt selection logic.
 4. Add artifact writers for:
@@ -446,7 +446,7 @@ selective ingress.
 
 ### Step-by-step
 
-1. Start `mission-analyst` during `ov mission start`.
+1. Start `mission-analyst` during `ha mission start`.
 2. Attach analyst session to the mission-owned run.
 3. Store `analystSessionId` in `MissionSummary`.
 4. Ensure analyst stop on:
@@ -484,7 +484,7 @@ execution motion after handoff.
 
 - persistent-root lifecycle
 - mission handoff logic
-- [`src/commands/sling.ts`](/home/liker2/projects/os-eco/overstory/src/commands/sling.ts)
+- [`src/commands/sling.ts`](/home/liker2/projects/os-eco/haru/src/commands/sling.ts)
 - mission command layer
 - status/dashboard surfaces
 
@@ -497,13 +497,13 @@ execution motion after handoff.
    - workstream/task bridge creation
    - brief generation
 3. Ensure it joins the existing mission-owned run.
-4. Formalize how it dispatches leads through `ov sling`.
+4. Formalize how it dispatches leads through `ha sling`.
 5. Update hierarchy assumptions so it may spawn only leads.
 6. Keep lead-to-worker hierarchy unchanged under the new director.
 
 ### Required runtime questions to answer in code
 
-- how does `Execution Director` pass parent identity into `ov sling`
+- how does `Execution Director` pass parent identity into `ha sling`
 - how is depth represented for a root actor that is not coordinator
 - how do hierarchy checks distinguish:
   - persistent root actors
@@ -532,8 +532,8 @@ Implement the typed mission protocol on top of existing mail infrastructure.
 
 ### Primary files
 
-- [`src/mail/client.ts`](/home/liker2/projects/os-eco/overstory/src/mail/client.ts)
-- mail types in [`src/types.ts`](/home/liker2/projects/os-eco/overstory/src/types.ts)
+- [`src/mail/client.ts`](/home/liker2/projects/os-eco/haru/src/mail/client.ts)
+- mail types in [`src/types.ts`](/home/liker2/projects/os-eco/haru/src/types.ts)
 - mission command/runtime code
 
 ### Required protocol types
@@ -585,7 +585,7 @@ Prevent stale local execution after brief refreshes or mission reopen/refreeze.
 - spec generation code
 - `.overstory/specs/`
 - new spec metadata helper
-- [`agents/lead.md`](/home/liker2/projects/os-eco/overstory/agents/lead.md) as behavioral reference
+- [`agents/lead.md`](/home/liker2/projects/os-eco/haru/agents/lead.md) as behavioral reference
 
 ### `v1` chosen model
 
@@ -646,8 +646,8 @@ Implement mission-layer pause semantics without changing `AgentState` in `v1`.
 
 - mission runtime coordination layer
 - `MissionStore`
-- [`src/commands/status.ts`](/home/liker2/projects/os-eco/overstory/src/commands/status.ts)
-- [`src/commands/dashboard.ts`](/home/liker2/projects/os-eco/overstory/src/commands/dashboard.ts)
+- [`src/commands/status.ts`](/home/liker2/projects/os-eco/haru/src/commands/status.ts)
+- [`src/commands/dashboard.ts`](/home/liker2/projects/os-eco/haru/src/commands/dashboard.ts)
 
 ### Step-by-step
 
@@ -655,8 +655,8 @@ Implement mission-layer pause semantics without changing `AgentState` in `v1`.
 2. Ensure `pausedWorkstreamCount` is derived, not separately authoritative.
 3. Add mission-level pause/resume instructions through mail/control flow.
 4. Show pause state in:
-   - `ov mission status`
-   - `ov dashboard`
+   - `ha mission status`
+   - `ha dashboard`
 5. Keep runtime `AgentState` unchanged in `v1`.
 
 ### Acceptance criteria
@@ -681,8 +681,8 @@ Surface mission lifecycle cleanly without overloading agent health.
 
 ### Primary files
 
-- [`src/commands/status.ts`](/home/liker2/projects/os-eco/overstory/src/commands/status.ts)
-- [`src/commands/dashboard.ts`](/home/liker2/projects/os-eco/overstory/src/commands/dashboard.ts)
+- [`src/commands/status.ts`](/home/liker2/projects/os-eco/haru/src/commands/status.ts)
+- [`src/commands/dashboard.ts`](/home/liker2/projects/os-eco/haru/src/commands/dashboard.ts)
 
 ### Step-by-step
 
@@ -714,7 +714,7 @@ Preserve enough retained mission evidence for later analysis and improvement.
 
 ### Primary files
 
-- [`src/events/store.ts`](/home/liker2/projects/os-eco/overstory/src/events/store.ts)
+- [`src/events/store.ts`](/home/liker2/projects/os-eco/haru/src/events/store.ts)
 - mission command/runtime layer
 - bundle export helper
 - mission artifact directory
@@ -762,9 +762,9 @@ Extend the existing deterministic review system to support mission-level review.
 
 ### Primary files
 
-- [`src/review/types.ts`](/home/liker2/projects/os-eco/overstory/src/review/types.ts)
-- [`src/review/store.ts`](/home/liker2/projects/os-eco/overstory/src/review/store.ts)
-- [`src/review/staleness.ts`](/home/liker2/projects/os-eco/overstory/src/review/staleness.ts)
+- [`src/review/types.ts`](/home/liker2/projects/os-eco/haru/src/review/types.ts)
+- [`src/review/store.ts`](/home/liker2/projects/os-eco/haru/src/review/store.ts)
+- [`src/review/staleness.ts`](/home/liker2/projects/os-eco/haru/src/review/staleness.ts)
 - review analyzers
 - review command/reporting surfaces
 
@@ -831,7 +831,7 @@ Turn the new runtime and persistence into a usable mission mode.
    - lost `current-mission.txt`
    - lost `current-run.txt`
    - paused workstreams after restart
-4. Add explicit fast-path regression tests for existing `ov coordinator`.
+4. Add explicit fast-path regression tests for existing `ha coordinator`.
 
 ### Manual test scenarios
 
@@ -863,17 +863,17 @@ This is the practical “where code will move” checklist.
 
 ### Very likely to change
 
-- [`src/types.ts`](/home/liker2/projects/os-eco/overstory/src/types.ts)
-- [`src/sessions/store.ts`](/home/liker2/projects/os-eco/overstory/src/sessions/store.ts)
-- [`src/commands/coordinator.ts`](/home/liker2/projects/os-eco/overstory/src/commands/coordinator.ts)
-- [`src/commands/sling.ts`](/home/liker2/projects/os-eco/overstory/src/commands/sling.ts)
-- [`src/commands/status.ts`](/home/liker2/projects/os-eco/overstory/src/commands/status.ts)
-- [`src/commands/dashboard.ts`](/home/liker2/projects/os-eco/overstory/src/commands/dashboard.ts)
-- [`src/events/store.ts`](/home/liker2/projects/os-eco/overstory/src/events/store.ts)
-- [`src/mail/client.ts`](/home/liker2/projects/os-eco/overstory/src/mail/client.ts)
-- [`src/review/types.ts`](/home/liker2/projects/os-eco/overstory/src/review/types.ts)
-- [`src/review/store.ts`](/home/liker2/projects/os-eco/overstory/src/review/store.ts)
-- [`src/review/staleness.ts`](/home/liker2/projects/os-eco/overstory/src/review/staleness.ts)
+- [`src/types.ts`](/home/liker2/projects/os-eco/haru/src/types.ts)
+- [`src/sessions/store.ts`](/home/liker2/projects/os-eco/haru/src/sessions/store.ts)
+- [`src/commands/coordinator.ts`](/home/liker2/projects/os-eco/haru/src/commands/coordinator.ts)
+- [`src/commands/sling.ts`](/home/liker2/projects/os-eco/haru/src/commands/sling.ts)
+- [`src/commands/status.ts`](/home/liker2/projects/os-eco/haru/src/commands/status.ts)
+- [`src/commands/dashboard.ts`](/home/liker2/projects/os-eco/haru/src/commands/dashboard.ts)
+- [`src/events/store.ts`](/home/liker2/projects/os-eco/haru/src/events/store.ts)
+- [`src/mail/client.ts`](/home/liker2/projects/os-eco/haru/src/mail/client.ts)
+- [`src/review/types.ts`](/home/liker2/projects/os-eco/haru/src/review/types.ts)
+- [`src/review/store.ts`](/home/liker2/projects/os-eco/haru/src/review/store.ts)
+- [`src/review/staleness.ts`](/home/liker2/projects/os-eco/haru/src/review/staleness.ts)
 
 ### New files likely needed
 
@@ -905,8 +905,8 @@ Actually delivered (mission-related agent prompts):
 
 ### Existing prompt files that must remain intact
 
-- [`agents/coordinator.md`](/home/liker2/projects/os-eco/overstory/agents/coordinator.md)
-- [`agents/lead.md`](/home/liker2/projects/os-eco/overstory/agents/lead.md)
+- [`agents/coordinator.md`](/home/liker2/projects/os-eco/haru/agents/coordinator.md)
+- [`agents/lead.md`](/home/liker2/projects/os-eco/haru/agents/lead.md)
 - other current worker prompts used by fast path
 
 ---
@@ -937,7 +937,7 @@ Wrong order smells:
 Epic #13 closes this checklist.
 The criteria remain listed here as the regression contract for `v1`:
 
-- a mission can be started, inspected, answered, and stopped through `ov mission`
+- a mission can be started, inspected, answered, and stopped through `ha mission`
 - a mission-owned run is created immediately and terminalized correctly
 - mission analyst lifecycle is deterministic and mission-scoped
 - execution director can dispatch leads through the real runtime
@@ -947,9 +947,9 @@ The criteria remain listed here as the regression contract for `v1`:
 - mission status and dashboard surfaces show mission lifecycle correctly
 - mission result bundle is exported on terminal states
 - mission review contour can score completed/stopped missions
-- current fast-path `ov coordinator` behavior still works
+- current fast-path `ha coordinator` behavior still works
 
-`ov mission v1` satisfies the majority of this definition of done and is
+`ha mission v1` satisfies the majority of this definition of done and is
 the real mission mode for complex tasks. Known gaps documented in the
 [verification review](./epic-13-verification-review.md):
 
@@ -1021,7 +1021,7 @@ dispatch-leads → await-leads-done → merge-all → (loop or complete)
 | `src/missions/cells/plan-phase.ts` | Plan phase cell |
 | `src/missions/cells/done-phase.ts` | Done phase cell |
 | `src/watchdog/mission-tick.ts` | Engine tick, grace periods, dead agent recovery |
-| `src/commands/mission-tier.ts` | CLI for `ov mission tier show/set` |
+| `src/commands/mission-tier.ts` | CLI for `ha mission tier show/set` |
 
 ### Tier Transition Mechanics
 

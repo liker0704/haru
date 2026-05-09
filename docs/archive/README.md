@@ -12,4 +12,4 @@ not reflect the current state of the codebase. For current docs, see [../README.
 | [mission-system-audit.md](mission-system-audit.md) | 2026-05-09 | Self-superseded 2026-04-05; findings addressed; see [../architecture/adr-graph-engine-lifecycle.md](../architecture/adr-graph-engine-lifecycle.md) |
 | [mission-lifecycle-audit.md](mission-lifecycle-audit.md) | 2026-05-09 | All 14 bugs annotated FIXED; residuals are by-design architectural decisions |
 | [mission-e2e-smoke.md](mission-e2e-smoke.md) | 2026-05-09 | 3-line timestamp artifact; absorbed into mission docs history |
-| [mission-monitoring.md](mission-monitoring.md) | 2026-05-09 | Superseded by [../ov-mission-usage.md](../ov-mission-usage.md); unique content merged |
+| [mission-monitoring.md](mission-monitoring.md) | 2026-05-09 | Superseded by [../haru-mission-usage.md](../haru-mission-usage.md); unique content merged |

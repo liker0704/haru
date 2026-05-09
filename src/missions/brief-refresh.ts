@@ -162,7 +162,7 @@ function shellQuote(arg: string): string {
 	return /^[A-Za-z0-9_./:=+-]+$/.test(arg) ? arg : `'${arg.replaceAll("'", `'\\''`)}'`;
 }
 
-// === ov mission refresh-briefs ===
+// === ha mission refresh-briefs ===
 
 interface RefreshBriefOpts {
 	workstream?: string;
@@ -271,7 +271,7 @@ export async function missionRefreshBriefsCommand(
 					.map((result) =>
 						[
 							`${result.workstream.id} (${result.taskId}) brief=${result.projectRelativeBriefPath} metaMissing=${result.metaMissing} markedStale=${result.specMarkedStale} alreadyStale=${result.specWasStale} regenerationRequired=${result.regenerationRequired}`,
-							`Regenerate with: ov spec write ${result.taskId} --body '<updated spec>' --agent $OVERSTORY_AGENT_NAME --workstream-id ${result.workstream.id} --brief-path ${shellQuote(result.projectRelativeBriefPath)}`,
+							`Regenerate with: ha spec write ${result.taskId} --body '<updated spec>' --agent $HARU_AGENT_NAME --workstream-id ${result.workstream.id} --brief-path ${shellQuote(result.projectRelativeBriefPath)}`,
 						].join("\n"),
 					)
 					.join("\n")

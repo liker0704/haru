@@ -39,7 +39,7 @@ export const errorRecurrencePolicy: ReminderPolicy = {
 					title: "Recurring error pattern detected",
 					whyNow: `Error "${key}" occurred ${count} times in the lookback window.`,
 					expectedImpact: "Fixing recurring errors will reduce agent failures and retries.",
-					action: `Search logs for this pattern: \`ov logs --level error | grep "${key.slice(0, 40)}"\``,
+					action: `Search logs for this pattern: \`ha logs --level error | grep "${key.slice(0, 40)}"\``,
 					verificationStep: "After the fix, verify the error does not reappear in the next window.",
 					priority: "high",
 					factor: "reminder_error_recurrence",

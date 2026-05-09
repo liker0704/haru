@@ -784,10 +784,10 @@ describe("createMergeResolver", () => {
 		});
 
 		test("failed result preserves original entry fields", async () => {
-			await setupDeleteModifyConflict(repoDir, defaultBranch, "overstory/my-agent/bead-xyz");
+			await setupDeleteModifyConflict(repoDir, defaultBranch, "haru/my-agent/bead-xyz");
 
 			const entry = makeTestEntry({
-				branchName: "overstory/my-agent/bead-xyz",
+				branchName: "haru/my-agent/bead-xyz",
 				taskId: "bead-xyz",
 				agentName: "my-agent",
 				filesModified: ["src/test.ts"],
@@ -800,7 +800,7 @@ describe("createMergeResolver", () => {
 
 			const result = await resolver.resolve(entry, defaultBranch, repoDir);
 
-			expect(result.entry.branchName).toBe("overstory/my-agent/bead-xyz");
+			expect(result.entry.branchName).toBe("haru/my-agent/bead-xyz");
 			expect(result.entry.taskId).toBe("bead-xyz");
 			expect(result.entry.agentName).toBe("my-agent");
 		});
@@ -1687,7 +1687,7 @@ describe("createMergeResolver", () => {
 				const defaultBranch = await getDefaultBranch(repoDir);
 
 				// Set up .gitattributes with merge=union for *.jsonl files so that
-				// both git's built-in union driver AND overstory's Tier 2 union path
+				// both git's built-in union driver AND haru's Tier 2 union path
 				// are configured to keep all lines from both sides.
 				await commitFile(repoDir, ".gitattributes", "*.jsonl merge=union\n");
 				// Common ancestor: one line
@@ -1714,7 +1714,7 @@ describe("createMergeResolver", () => {
 				const result = await resolver.resolve(entry, defaultBranch, repoDir);
 
 				// With merge=union, git either resolves cleanly (Tier 1) or
-				// overstory's union path handles it (Tier 2). Either way, success
+				// haru's union path handles it (Tier 2). Either way, success
 				// and both sides' content must be preserved.
 				expect(result.success).toBe(true);
 				expect(result.entry.status).toBe("merged");
@@ -1733,7 +1733,7 @@ describe("createMergeResolver", () => {
 		test("Tier 2 union auto-resolve keeps both sides when git produces conflict markers", async () => {
 			// This test verifies the Tier 2 code path: when git produces conflict
 			// markers for a file that has merge=union set in .gitattributes,
-			// overstory resolves it by keeping both canonical and incoming content.
+			// haru resolves it by keeping both canonical and incoming content.
 			// We produce conflict markers by doing a content conflict on a file whose
 			// attribute is set to merge=union AFTER the conflict state exists, then
 			// run only the auto-resolve path via a standalone resolver call.

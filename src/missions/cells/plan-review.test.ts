@@ -403,7 +403,7 @@ describe("convergence handler", () => {
 	test("all approve verdicts → approved trigger", async () => {
 		const deps = makeDeps();
 		const handlers = planReviewCell.buildHandlers(deps);
-		const handler = handlers["convergence"];
+		const handler = handlers.convergence;
 		if (!handler) throw new Error("convergence handler not found");
 
 		const ctx = makeHandlerCtx({
@@ -417,7 +417,7 @@ describe("convergence handler", () => {
 	test("no verdicts → approved trigger", async () => {
 		const deps = makeDeps();
 		const handlers = planReviewCell.buildHandlers(deps);
-		const handler = handlers["convergence"];
+		const handler = handlers.convergence;
 		if (!handler) throw new Error("convergence handler not found");
 
 		const ctx = makeHandlerCtx({ nodeId: "plan-review:convergence", checkpoint: null });
@@ -428,7 +428,7 @@ describe("convergence handler", () => {
 	test("BLOCK verdict with no previous concerns → revision-needed", async () => {
 		const deps = makeDeps();
 		const handlers = planReviewCell.buildHandlers(deps);
-		const handler = handlers["convergence"];
+		const handler = handlers.convergence;
 		if (!handler) throw new Error("convergence handler not found");
 
 		const ctx = makeHandlerCtx({
@@ -447,7 +447,7 @@ describe("convergence handler", () => {
 	test("BLOCK verdict with same concern as previous → stuck", async () => {
 		const deps = makeDeps();
 		const handlers = planReviewCell.buildHandlers(deps);
-		const handler = handlers["convergence"];
+		const handler = handlers.convergence;
 		if (!handler) throw new Error("convergence handler not found");
 
 		const ctx = makeHandlerCtx({
@@ -466,7 +466,7 @@ describe("convergence handler", () => {
 	test("round >= maxRounds → stuck regardless of concerns", async () => {
 		const deps = makeDeps();
 		const handlers = planReviewCell.buildHandlers(deps);
-		const handler = handlers["convergence"];
+		const handler = handlers.convergence;
 		if (!handler) throw new Error("convergence handler not found");
 
 		const ctx = makeHandlerCtx({
@@ -485,7 +485,7 @@ describe("convergence handler", () => {
 	test("RECOMMEND_CHANGES verdict → revision-needed", async () => {
 		const deps = makeDeps();
 		const handlers = planReviewCell.buildHandlers(deps);
-		const handler = handlers["convergence"];
+		const handler = handlers.convergence;
 		if (!handler) throw new Error("convergence handler not found");
 
 		const ctx = makeHandlerCtx({

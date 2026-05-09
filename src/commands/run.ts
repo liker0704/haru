@@ -1,5 +1,5 @@
 /**
- * CLI command: overstory run [subcommand] [--json]
+ * CLI command: haru run [subcommand] [--json]
  *
  * Manage runs (coordinator session groupings).
  * A "run" groups all agents spawned from one coordinator session.
@@ -278,7 +278,7 @@ interface RunCompleteOpts {
 export function createRunCommand(): Command {
 	const cmd = new Command("run").description("Manage runs (coordinator session groupings)");
 
-	// Default action (bare `overstory run`)
+	// Default action (bare `haru run`)
 	cmd.option("--json", "Output as JSON").action(async (opts: RunDefaultOpts) => {
 		const cwd = process.cwd();
 		const config = await loadConfig(cwd);
@@ -286,7 +286,7 @@ export function createRunCommand(): Command {
 		await showCurrentRun(overstoryDir, opts.json ?? false);
 	});
 
-	// `overstory run list`
+	// `haru run list`
 	cmd
 		.command("list")
 		.description("List recent runs")
@@ -307,7 +307,7 @@ export function createRunCommand(): Command {
 			await listRuns(overstoryDir, limit, opts.json ?? false);
 		});
 
-	// `overstory run show <id>`
+	// `haru run show <id>`
 	cmd
 		.command("show")
 		.description("Show run details (agents, duration)")
@@ -320,7 +320,7 @@ export function createRunCommand(): Command {
 			await showRun(overstoryDir, id, opts.json ?? false);
 		});
 
-	// `overstory run complete`
+	// `haru run complete`
 	cmd
 		.command("complete")
 		.description("Mark current run as completed")

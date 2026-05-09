@@ -1,5 +1,5 @@
 /**
- * CLI command: ov stop <agent-name>
+ * CLI command: ha stop <agent-name>
  *
  * Explicitly terminates a running agent by:
  * 1. Looking up the agent session by name
@@ -8,7 +8,7 @@
  * 3. Marking it as completed in the SessionStore
  * 4. Optionally removing its worktree and branch (--clean-worktree)
  *
- * Completed agents: ov stop <name> without --clean-worktree throws a helpful error
+ * Completed agents: ha stop <name> without --clean-worktree throws a helpful error
  * when no stale runtime is still alive. If a completed agent still has a live tmux
  * session or headless PID, stop reclaims that stale runtime before returning.
  */
@@ -72,7 +72,7 @@ async function deleteBranchBestEffort(repoRoot: string, branch: string): Promise
 }
 
 /**
- * Entry point for `ov stop <agent-name>`.
+ * Entry point for `ha stop <agent-name>`.
  *
  * @param agentName - Name of the agent to stop
  * @param opts - Command options
@@ -159,7 +159,7 @@ export async function stopCommand(
 				{
 					agentName,
 					capability: session.capability,
-					reason: "explicit ov stop",
+					reason: "explicit ha stop",
 				},
 				{ force: true },
 			);

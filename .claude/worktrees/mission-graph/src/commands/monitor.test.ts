@@ -39,14 +39,14 @@ describe("buildMonitorBeacon", () => {
 		expect(beacon).toContain("mulch prime");
 	});
 
-	test("contains startup instruction: ov status --json", () => {
+	test("contains startup instruction: ha status --json", () => {
 		const beacon = buildMonitorBeacon();
-		expect(beacon).toContain("ov status --json");
+		expect(beacon).toContain("ha status --json");
 	});
 
-	test("contains startup instruction: ov mail check --agent monitor", () => {
+	test("contains startup instruction: ha mail check --agent monitor", () => {
 		const beacon = buildMonitorBeacon();
-		expect(beacon).toContain("ov mail check --agent monitor");
+		expect(beacon).toContain("ha mail check --agent monitor");
 	});
 
 	test("contains startup instruction: patrol loop", () => {

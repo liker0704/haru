@@ -53,7 +53,7 @@ describe("areHooksInstalled", () => {
 		expect(result).toBe(false);
 	});
 
-	test("returns false when settings.local.json exists but has no overstory reference", async () => {
+	test("returns false when settings.local.json exists but has no haru reference", async () => {
 		await mkdir(join(tmpDir, ".overstory"), { recursive: true });
 		await writeFile(join(tmpDir, ".overstory", "hooks.json"), "{}");
 		await mkdir(join(tmpDir, ".claude"), { recursive: true });
@@ -62,13 +62,13 @@ describe("areHooksInstalled", () => {
 		expect(result).toBe(false);
 	});
 
-	test("returns true when both files exist and settings references overstory", async () => {
+	test("returns true when both files exist and settings references haru", async () => {
 		await mkdir(join(tmpDir, ".overstory"), { recursive: true });
 		await writeFile(join(tmpDir, ".overstory", "hooks.json"), "{}");
 		await mkdir(join(tmpDir, ".claude"), { recursive: true });
 		await writeFile(
 			join(tmpDir, ".claude", "settings.local.json"),
-			'{"hooks":{"SessionStart":[{"matcher":"","hooks":[{"type":"command","command":"overstory prime"}]}]}}',
+			'{"hooks":{"SessionStart":[{"matcher":"","hooks":[{"type":"command","command":"haru prime"}]}]}}',
 		);
 		const result = await areHooksInstalled(tmpDir);
 		expect(result).toBe(true);

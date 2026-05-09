@@ -44,7 +44,7 @@ export const completionTrendPolicy: ReminderPolicy = {
 				whyNow: `Session completion rate dropped by ${(degradation * 100).toFixed(0)}% in the recent half of the lookback window compared to the earlier half.`,
 				expectedImpact: "Identifying the root cause will reduce abandoned sessions.",
 				action:
-					"Run `ov errors` to check for recurring failures. Review recent agent logs with `ov logs --level error`.",
+					"Run `ha errors` to check for recurring failures. Review recent agent logs with `ha logs --level error`.",
 				verificationStep:
 					"After addressing root cause, verify next window shows stable or improved completion rate.",
 				priority,

@@ -16,7 +16,7 @@ async function runSd(
 	cwd: string,
 	context: string,
 ): Promise<{ stdout: string; stderr: string }> {
-	const proc = Bun.spawn(["sd", ...args], { cwd, stdout: "pipe", stderr: "pipe" });
+	const proc = Bun.spawn(["su", ...args], { cwd, stdout: "pipe", stderr: "pipe" });
 	const stdout = await new Response(proc.stdout).text();
 	const stderr = await new Response(proc.stderr).text();
 	const exitCode = await proc.exited;

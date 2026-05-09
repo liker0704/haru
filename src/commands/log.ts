@@ -1,5 +1,5 @@
 /**
- * CLI command: ov log <event> --agent <name> [--stdin]
+ * CLI command: ha log <event> --agent <name> [--stdin]
  *
  * Called by Pre/PostToolUse and Stop hooks.
  * Events: tool-start, tool-end, session-end.
@@ -58,7 +58,7 @@ async function getSessionDir(logsBase: string, agentName: string): Promise<strin
  * Update the lastActivity timestamp for an agent in the SessionStore.
  * Non-fatal: silently ignores errors to avoid breaking hook execution.
  */
-function updateLastActivity(projectRoot: string, agentName: string, event?: string): void {
+function updateLastActivity(projectRoot: string, agentName: string, _event?: string): void {
 	try {
 		const overstoryDir = join(projectRoot, ".overstory");
 		const { store } = openSessionStore(overstoryDir);
@@ -661,7 +661,7 @@ async function runLog(opts: {
 					// NOTE: We intentionally do NOT auto-complete the run here for coordinator agents.
 					// The coordinator's Stop hook fires on every turn boundary, not just at true session exit,
 					// so auto-completing the run here would kill the session after the first turn.
-					// Run completion is handled by: `ov coordinator stop`, `ov run complete` (self-exit),
+					// Run completion is handled by: `ha coordinator stop`, `ha run complete` (self-exit),
 					// or the watchdog daemon detecting a dead coordinator process.
 
 					try {
@@ -825,7 +825,7 @@ export function createLogCommand(): Command {
 }
 
 /**
- * Entry point for `ov log <event> --agent <name>`.
+ * Entry point for `ha log <event> --agent <name>`.
  */
 export async function logCommand(args: string[]): Promise<void> {
 	const cmd = createLogCommand();

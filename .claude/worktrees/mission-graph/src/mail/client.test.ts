@@ -14,7 +14,7 @@ describe("createMailClient", () => {
 	let client: MailClient;
 
 	beforeEach(async () => {
-		tempDir = await mkdtemp(join(tmpdir(), "overstory-mail-client-test-"));
+		tempDir = await mkdtemp(join(tmpdir(), "haru-mail-client-test-"));
 		store = createMailStore(join(tempDir, "mail.db"));
 		client = createMailClient(store);
 	});
@@ -226,7 +226,7 @@ describe("createMailClient", () => {
 			});
 
 			const result = client.checkInject("orchestrator");
-			expect(result).toContain(`ov mail reply ${id}`);
+			expect(result).toContain(`ha mail reply ${id}`);
 		});
 
 		test("formats multiple messages with correct count", () => {

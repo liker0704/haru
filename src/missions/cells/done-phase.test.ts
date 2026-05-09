@@ -26,6 +26,6 @@ describe("donePhaseCell.buildSubgraph", () => {
 	test("summary has gate: async", () => {
 		const node = graph.nodes.find((n) => n.id === "done-phase:summary");
 		expect(node).toBeDefined();
-		expect(node!.gate).toBe("async");
+		expect(node?.gate).toBe("async");
 	});
 });

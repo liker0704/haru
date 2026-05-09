@@ -80,7 +80,7 @@ function makeEngineReturning(stepResult: StepResult): GraphEngine {
 	};
 }
 
-/** Create a temp overstory directory with sessions.db. */
+/** Create a temp haru directory with sessions.db. */
 async function createTempOvDir(): Promise<{ overstoryDir: string; dbPath: string }> {
 	const base = await mkdtemp(join(tmpdir(), "ov-mission-tick-test-"));
 	const overstoryDir = join(base, ".overstory");
@@ -199,7 +199,12 @@ describe("runMissionTick", () => {
 	});
 
 	test("calls engine step and releases lock for an active mission", async () => {
-		missionStore.create({ id: "m-active", slug: "active-mission", objective: "test", tier: "full" });
+		missionStore.create({
+			id: "m-active",
+			slug: "active-mission",
+			objective: "test",
+			tier: "full",
+		});
 		missionStore.updateCurrentNode("m-active", "understand:active");
 
 		const stepResults: string[] = [];

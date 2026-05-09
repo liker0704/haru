@@ -12,7 +12,7 @@ checkpoint mechanism, and a walkthrough for adding a new agent type.
 The agent lifecycle is implemented across six modules in `src/agents/`:
 
 ```
-ov sling <task-id>
+ha sling <task-id>
        |
        v
 src/commands/sling.ts         # CLI parsing, validation, guard checks (steps 1-6)
@@ -99,7 +99,7 @@ constructed on early-exit paths (validation failures, spawn-paused sentinel).
 The session record is written to `sessions.db` **before** the beacon is sent
 (step 13 before 13b). This ensures the watchdog daemon can observe the agent in
 `booting` state and never treats it as an orphan if a crash occurs between
-session creation and beacon delivery (overstory-036f).
+session creation and beacon delivery (haru-036f).
 
 ### Spawn Guards
 
@@ -154,7 +154,7 @@ template is `templates/overlay.md.tmpl` in the repo root.
 | `{{MULCH_DOMAINS}}` | `ml prime` command for relevant expertise domains |
 | `{{MULCH_EXPERTISE}}` | Pre-fetched expertise blocks (omitted if empty) |
 | `{{PROJECT_CONTEXT}}` | Compact project context (omitted if empty) |
-| `{{CAN_SPAWN}}` | Spawn permission block with example `ov sling` command |
+| `{{CAN_SPAWN}}` | Spawn permission block with example `ha sling` command |
 | `{{QUALITY_GATES}}` | Full quality gates section with gate commands |
 | `{{CONSTRAINTS}}` | Worktree isolation and write-scope constraints |
 | `{{TRACKER_CLI}}` | `sd`, `bd`, or `gh` depending on resolved backend |
@@ -176,7 +176,7 @@ writing. This prevents agent overlays from overwriting the user's
 `.claude/CLAUDE.md` at the repo root — a bug that would break the orchestrator's
 own Claude Code session. Path comparison is used (not file-existence heuristics)
 to handle dogfooding scenarios where `.overstory/config.yaml` exists in every
-worktree checkout (overstory-p4st, overstory-uwg4).
+worktree checkout (haru-p4st, haru-uwg4).
 
 ---
 
@@ -195,7 +195,7 @@ Three tiers of guards are merged per agent:
 1. **Universal guards** (all agents): block `NATIVE_TEAM_TOOLS` (Task, TeamCreate,
    etc.) and `INTERACTIVE_TOOLS` (AskUserQuestion, EnterPlanMode).
 2. **Path boundary guards** (all agents): Write, Edit, NotebookEdit tool calls
-   check `OVERSTORY_WORKTREE_PATH` against the target path.
+   check `HARU_WORKTREE_PATH` against the target path.
 3. **Capability-specific guards**:
    - Non-implementation capabilities (scout, reviewer, lead, monitor, etc.) — block
      Write/Edit/NotebookEdit tools entirely and add dangerous Bash pattern guards.
@@ -207,17 +207,17 @@ Three tiers of guards are merged per agent:
 
 All hooks include an `ENV_GUARD` prefix:
 ```bash
-[ -z "$OVERSTORY_AGENT_NAME" ] && exit 0
+[ -z "$HARU_AGENT_NAME" ] && exit 0
 ```
 This makes every guard a no-op for the user's own Claude Code sessions at the
 project root.
 
 ### Pi Runtime Guards
 
-Pi agents get a TypeScript extension at `.pi/extensions/overstory-guard.ts`
+Pi agents get a TypeScript extension at `.pi/extensions/haru-guard.ts`
 instead of Claude Code hooks. The extension uses `pi.on("tool_call", ...)` and
 returns `{ block: true, reason }` to mirror PreToolUse behavior. It also handles
-activity tracking via `pi.exec("ov log ...")` so the watchdog daemon does not
+activity tracking via `pi.exec("ha log ...")` so the watchdog daemon does not
 misclassify Pi agents as zombies.
 
 ---
@@ -237,7 +237,7 @@ interface AgentDefinition {
   model: string;        // Default model alias (e.g. "sonnet", "haiku")
   tools: string[];      // Allowed tool names
   capabilities: string[]; // Capability strings this agent declares
-  canSpawn: boolean;    // Whether this agent may use ov sling
+  canSpawn: boolean;    // Whether this agent may use ha sling
   constraints: string[]; // Human-readable constraint descriptions
 }
 ```
@@ -245,7 +245,7 @@ interface AgentDefinition {
 ### Capability Index
 
 `createManifestLoader` builds a `capabilityIndex: Record<string, string[]>` that
-maps each capability string to the list of agent names declaring it. `ov sling
+maps each capability string to the list of agent names declaring it. `ha sling
 --capability builder` calls `findByCapability("builder")` to resolve which agent
 definition to use.
 
@@ -281,7 +281,7 @@ expertiseDomains:
   - sessions
   - mail
 recentTasks:
-  - taskId: overstory-1234
+  - taskId: haru-1234
     summary: "Add WAL mode to mail store"
     completedAt: "2026-01-15T11:30:00.000Z"
 ```
@@ -319,7 +319,7 @@ auto-clears `waiting → working` when the agent begins processing.
 
 **`zombie`** is set by the watchdog when a tmux session dies or an agent has
 been inactive past the zombie threshold. A zombie may be respawned (`zombie →
-booting`) via `ov resume`.
+booting`) via `ha resume`.
 
 ### ZFC Override
 
@@ -354,7 +354,7 @@ The three public functions:
 - `loadCheckpoint(agentsDir, agentName)` — read checkpoint, return null if absent
 - `clearCheckpoint(agentsDir, agentName)` — delete checkpoint (ENOENT is ignored)
 
-`ov resume` loads the checkpoint to restore session context before re-spawning
+`ha resume` loads the checkpoint to restore session context before re-spawning
 the agent in its original worktree.
 
 ---
@@ -369,14 +369,14 @@ affects both runtimes.
 
 | Export | Type | Purpose |
 |--------|------|---------|
-| `NATIVE_TEAM_TOOLS` | `string[]` | Claude Code team tools that bypass overstory orchestration |
+| `NATIVE_TEAM_TOOLS` | `string[]` | Claude Code team tools that bypass haru orchestration |
 | `INTERACTIVE_TOOLS` | `string[]` | Tools that block indefinitely in non-interactive sessions |
 | `WRITE_TOOLS` | `string[]` | File-writing tools blocked for non-implementation capabilities |
 | `ARTIFACT_WRITE_CAPABILITIES` | `Set<string>` | Capabilities allowed to write `.overstory/` paths |
 | `DANGEROUS_BASH_PATTERNS` | `string[]` | Regex fragments matched against Bash commands |
 | `SAFE_BASH_PREFIXES` | `string[]` | Bash prefixes exempt from blocklist checks |
 
-The safe prefix check runs before the blocklist. `ov `, `sd `, `git status`,
+The safe prefix check runs before the blocklist. `ha `, `sd `, `git status`,
 `git log`, `git diff`, `mulch `, and similar read-only commands always pass.
 
 ---
@@ -410,14 +410,14 @@ Add an entry to `.overstory/agent-manifest.json`:
       "canSpawn": false,
       "constraints": [
         "Read-only access — may not modify project files",
-        "Must report results via ov mail"
+        "Must report results via ha mail"
       ]
     }
   }
 }
 ```
 
-The `capabilities` array is indexed at load time. Use `ov sling --capability
+The `capabilities` array is indexed at load time. Use `ha sling --capability
 my-capability` to spawn agents of this type.
 
 ### Step 3: Map to an overlay capability
@@ -443,7 +443,7 @@ const READ_ONLY_CAPABILITIES = new Set([
 ### Step 4: Add capability routing in overlay.ts (if needed)
 
 If the agent can spawn sub-workers, add it to `EXAMPLE_CHILD_CAPABILITY` so the
-overlay shows a realistic `ov sling` example:
+overlay shows a realistic `ha sling` example:
 
 ```typescript
 const EXAMPLE_CHILD_CAPABILITY: Record<string, string> = {

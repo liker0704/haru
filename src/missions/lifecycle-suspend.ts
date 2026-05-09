@@ -112,7 +112,7 @@ export async function suspendMission(opts: {
 		});
 
 		if (!json) {
-			printSuccess("Mission suspended", `${mission.slug} — use 'ov mission resume' to restore`);
+			printSuccess("Mission suspended", `${mission.slug} — use 'ha mission resume' to restore`);
 		}
 	} finally {
 		missionStore.close();

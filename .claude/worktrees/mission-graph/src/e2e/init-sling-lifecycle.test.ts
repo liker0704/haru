@@ -12,8 +12,8 @@ import type { OverlayConfig } from "../types.ts";
 /**
  * E2E test: init→sling lifecycle on a throwaway external project.
  *
- * Validates the "project-agnostic" promise by running overstory init on a
- * fresh temp git repo (NOT the overstory repo itself), then verifying all
+ * Validates the "project-agnostic" promise by running haru init on a
+ * fresh temp git repo (NOT the haru repo itself), then verifying all
  * artifacts, loading config + manifest via real APIs, and generating an overlay.
  *
  * Uses real filesystem and real git repos.
@@ -180,7 +180,7 @@ describe("E2E: init→sling lifecycle on external project", () => {
 			agentName: "test-agent",
 			taskId: "test-bead-001",
 			specPath: null,
-			branchName: "overstory/test-agent/test-bead-001",
+			branchName: "haru/test-agent/test-bead-001",
 			worktreePath: join(tempDir, ".overstory", "worktrees", "test-agent"),
 			fileScope: [],
 			mulchDomains: [],
@@ -208,7 +208,7 @@ describe("E2E: init→sling lifecycle on external project", () => {
 		// Verify template placeholders were replaced
 		expect(content).toContain("test-agent");
 		expect(content).toContain("test-bead-001");
-		expect(content).toContain("overstory/test-agent/test-bead-001");
+		expect(content).toContain("haru/test-agent/test-bead-001");
 		expect(content).not.toContain("{{AGENT_NAME}}");
 		expect(content).not.toContain("{{BEAD_ID}}");
 		expect(content).not.toContain("{{BRANCH_NAME}}");
@@ -247,7 +247,7 @@ describe("E2E: init→sling lifecycle on external project", () => {
 			agentName: "lifecycle-builder",
 			taskId: "lifecycle-001",
 			specPath: join(tempDir, ".overstory", "specs", "lifecycle-001.md"),
-			branchName: "overstory/lifecycle-builder/lifecycle-001",
+			branchName: "haru/lifecycle-builder/lifecycle-001",
 			worktreePath: join(tempDir, ".overstory", "worktrees", "lifecycle-builder"),
 			fileScope: ["src/main.ts", "src/utils.ts"],
 			mulchDomains: ["typescript"],
@@ -269,7 +269,7 @@ describe("E2E: init→sling lifecycle on external project", () => {
 		// Verify all overlay fields rendered correctly
 		expect(overlayContent).toContain("lifecycle-builder");
 		expect(overlayContent).toContain("lifecycle-001");
-		expect(overlayContent).toContain("overstory/lifecycle-builder/lifecycle-001");
+		expect(overlayContent).toContain("haru/lifecycle-builder/lifecycle-001");
 		expect(overlayContent).toContain("orchestrator");
 		expect(overlayContent).toContain("`src/main.ts`");
 		expect(overlayContent).toContain("`src/utils.ts`");

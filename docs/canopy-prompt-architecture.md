@@ -1,6 +1,6 @@
 # Canopy Prompt Architecture
 
-How overstory uses canopy for agent prompt management: inheritance chains, shared sections, variable substitution, and runtime flow.
+How haru uses canopy for agent prompt management: inheritance chains, shared sections, variable substitution, and runtime flow.
 
 ## Prompt Inheritance Tree
 
@@ -181,7 +181,7 @@ Used in completion/capabilities sections. Canopy resolves these at render time b
 |---|---|---|
 | `{{INSTRUCTION_PATH}}` | Where agent reads its task overlay | `.claude/CLAUDE.md` |
 
-### Overlay Variables (set by `ov sling` at spawn time)
+### Overlay Variables (set by `ha sling` at spawn time)
 
 These are substituted into `templates/overlay.md.tmpl` when spawning an agent:
 
@@ -212,7 +212,7 @@ Control                         Content
 How canopy prompts are assembled and delivered to an agent:
 
 ```
-                         ov sling <task-id> --capability builder --profile ov-architecture
+                         ha sling <task-id> --capability builder --profile ov-architecture
                                               │
                     ┌─────────────────────────┼──────────────────────────┐
                     ▼                         ▼                          ▼

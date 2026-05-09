@@ -115,7 +115,7 @@ function formatForInjection(messages: MailMessage[]): string {
 		if (msg.payload !== null && PROTOCOL_TYPES.has(msg.type)) {
 			lines.push(`Payload: ${msg.payload}`);
 		}
-		lines.push(`[Reply with: ov mail reply ${msg.id} --body "..."]`);
+		lines.push(`[Reply with: ha mail reply ${msg.id} --body "..."]`);
 		lines.push("");
 	}
 

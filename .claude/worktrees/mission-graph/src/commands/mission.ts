@@ -1,7 +1,7 @@
 /**
- * CLI command: ov mission <subcommand>
+ * CLI command: ha mission <subcommand>
  *
- * Long-running objective tracking for overstory mission mode.
+ * Long-running objective tracking for haru mission mode.
  */
 
 import { mkdir, rm } from "node:fs/promises";
@@ -476,7 +476,7 @@ async function suspendMission(opts: {
 		});
 
 		if (!json) {
-			printSuccess("Mission suspended", `${mission.slug} — use 'ov mission resume' to restore`);
+			printSuccess("Mission suspended", `${mission.slug} — use 'ha mission resume' to restore`);
 		}
 	} finally {
 		missionStore.close();
@@ -638,7 +638,7 @@ async function terminalizeMission(opts: {
 	}
 }
 
-// === ov mission start ===
+// === ha mission start ===
 
 interface StartOpts {
 	slug?: string;
@@ -677,7 +677,7 @@ export async function missionStart(
 				jsonError("mission start", `Active mission already exists: ${existing.id}`);
 			} else {
 				printError("An active mission already exists", existing.slug);
-				printHint("Stop it first with: ov mission stop");
+				printHint("Stop it first with: ha mission stop");
 			}
 			process.exitCode = 1;
 			return;
@@ -775,7 +775,7 @@ export async function missionStart(
 					"",
 					"No objective was provided at start. Begin by asking the operator what they want to accomplish.",
 					"Once you understand the objective, set the mission identity:",
-					`  ov mission update --slug <short-name> --objective '<real objective>'`,
+					`  ha mission update --slug <short-name> --objective '<real objective>'`,
 					"Then proceed with standard mission coordination (planning, freeze, handoff).",
 					"Mission Analyst is running and available for research queries via mail.",
 				]
@@ -906,7 +906,7 @@ export async function missionStart(
 	}
 }
 
-// === ov mission update ===
+// === ha mission update ===
 
 interface UpdateOpts {
 	slug?: string;
@@ -932,7 +932,7 @@ export async function missionUpdate(overstoryDir: string, opts: UpdateOpts): Pro
 		if (json) {
 			jsonError("mission update", "No active mission");
 		} else {
-			printError("No active mission", "Start one with: ov mission start");
+			printError("No active mission", "Start one with: ha mission start");
 		}
 		process.exitCode = 1;
 		return;
@@ -965,7 +965,7 @@ export async function missionUpdate(overstoryDir: string, opts: UpdateOpts): Pro
 	}
 }
 
-// === ov mission status ===
+// === ha mission status ===
 
 export async function missionStatus(overstoryDir: string, json: boolean): Promise<void> {
 	const missionId = await resolveCurrentMissionId(overstoryDir);
@@ -1038,7 +1038,7 @@ export async function missionStatus(overstoryDir: string, json: boolean): Promis
 	}
 }
 
-// === ov mission output ===
+// === ha mission output ===
 
 export async function missionOutput(overstoryDir: string, json: boolean): Promise<void> {
 	const missionId = await resolveCurrentMissionId(overstoryDir);
@@ -1107,7 +1107,7 @@ export async function missionOutput(overstoryDir: string, json: boolean): Promis
 	}
 }
 
-// === ov mission answer ===
+// === ha mission answer ===
 
 interface AnswerOpts {
 	body?: string;
@@ -1230,7 +1230,7 @@ export async function missionAnswer(
 	}
 }
 
-// === ov mission artifacts ===
+// === ha mission artifacts ===
 
 export async function missionArtifacts(overstoryDir: string, json: boolean): Promise<void> {
 	const missionId = await resolveCurrentMissionId(overstoryDir);
@@ -1276,7 +1276,7 @@ export async function missionArtifacts(overstoryDir: string, json: boolean): Pro
 	}
 }
 
-// === ov mission handoff ===
+// === ha mission handoff ===
 
 interface HandoffOpts {
 	json?: boolean;
@@ -1553,7 +1553,7 @@ export async function missionHandoff(
 	}
 }
 
-// === ov mission pause / resume / refresh-briefs ===
+// === ha mission pause / resume / refresh-briefs ===
 
 interface PauseOpts {
 	reason?: string;
@@ -1920,7 +1920,7 @@ export async function missionRefreshBriefsCommand(
 					.map((result) =>
 						[
 							`${result.workstream.id} (${result.taskId}) brief=${result.projectRelativeBriefPath} metaMissing=${result.metaMissing} markedStale=${result.specMarkedStale} alreadyStale=${result.specWasStale} regenerationRequired=${result.regenerationRequired}`,
-							`Regenerate with: ov spec write ${result.taskId} --body '<updated spec>' --agent $OVERSTORY_AGENT_NAME --workstream-id ${result.workstream.id} --brief-path ${shellQuote(result.projectRelativeBriefPath)}`,
+							`Regenerate with: ha spec write ${result.taskId} --body '<updated spec>' --agent $HARU_AGENT_NAME --workstream-id ${result.workstream.id} --brief-path ${shellQuote(result.projectRelativeBriefPath)}`,
 						].join("\n"),
 					)
 					.join("\n")
@@ -2053,7 +2053,7 @@ export async function missionRefreshBriefsCommand(
 	}
 }
 
-// === ov mission stop / complete ===
+// === ha mission stop / complete ===
 
 export async function missionStop(
 	overstoryDir: string,
@@ -2279,7 +2279,7 @@ export async function missionComplete(
 	}
 }
 
-// === ov mission list ===
+// === ha mission list ===
 
 export async function missionList(overstoryDir: string, json: boolean): Promise<void> {
 	const dbPath = join(overstoryDir, "sessions.db");
@@ -2322,7 +2322,7 @@ export async function missionList(overstoryDir: string, json: boolean): Promise<
 	}
 }
 
-// === ov mission show ===
+// === ha mission show ===
 
 export async function missionShow(
 	overstoryDir: string,
@@ -2391,7 +2391,7 @@ export async function missionShow(
 	}
 }
 
-// === ov mission bundle ===
+// === ha mission bundle ===
 
 interface BundleOpts {
 	missionId?: string;

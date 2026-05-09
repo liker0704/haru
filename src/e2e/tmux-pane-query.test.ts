@@ -16,7 +16,7 @@ import {
  * Requires tmux to be installed. Uses real tmux — no mocks.
  */
 
-const TEST_SESSION = "overstory-test-pane-query";
+const TEST_SESSION = "haru-test-pane-query";
 
 /** Run a tmux command, return stdout. Throws on failure. */
 async function tmuxRun(...args: string[]): Promise<string> {
@@ -132,12 +132,12 @@ describe("E2E: tmux pane width/activity queries", () => {
 	});
 
 	test("getPaneWidth returns null for nonexistent session", async () => {
-		const width = await getPaneWidth("overstory-nonexistent-xyz");
+		const width = await getPaneWidth("haru-nonexistent-xyz");
 		expect(width).toBeNull();
 	});
 
 	test("getPaneActivity returns null for nonexistent session", async () => {
-		const activity = await getPaneActivity("overstory-nonexistent-xyz");
+		const activity = await getPaneActivity("haru-nonexistent-xyz");
 		expect(activity).toBeNull();
 	});
 

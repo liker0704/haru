@@ -88,7 +88,7 @@ describe("recordPolicyEvent", () => {
 
 		const events = eventStore.getByAgent("health-policy");
 		expect(events).toHaveLength(1);
-		expect(events[0]!.level).toBe("warn");
+		expect(events[0]?.level).toBe("warn");
 	});
 
 	test("triggered + suppressed (duplicate in history) → no event recorded (dedup works)", () => {

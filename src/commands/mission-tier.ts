@@ -1,5 +1,5 @@
 /**
- * CLI command: ov mission tier <set|show>
+ * CLI command: ha mission tier <set|show>
  *
  * Manage mission complexity tier. The coordinator calls `tier set` after
  * assessing complexity. Supports upward escalation (direct→planned→full).
@@ -123,7 +123,7 @@ async function tierSetCommand(tierArg: string, opts: { json?: boolean }): Promis
 		// 4. Wrap all DB mutations in a single transaction
 		missionStore.transaction(() => {
 			// 4a. updateTier — direction enforcement inside store
-			missionStore.updateTier(mission.id, newTier, process.env.OVERSTORY_AGENT_NAME ?? "operator");
+			missionStore.updateTier(mission.id, newTier, process.env.HARU_AGENT_NAME ?? "operator");
 
 			// 4b-c. Clear stale state if escalation
 			if (previousTier !== null) {

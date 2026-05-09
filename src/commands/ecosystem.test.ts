@@ -1,5 +1,5 @@
 /**
- * Tests for the ov ecosystem command.
+ * Tests for the ha ecosystem command.
  *
  * Structural tests for CLI registration, plus a smoke test that runs the
  * actual command and verifies the JSON output shape. The smoke test hits
@@ -76,7 +76,7 @@ describe("executeEcosystem — JSON output shape", () => {
 		expect(parsed.summary.total).toBe(parsed.tools.length);
 	}, 30_000); // Network calls may be slow
 
-	test("includes overstory in tool list", async () => {
+	test("includes haru in tool list", async () => {
 		const chunks: string[] = [];
 		const originalWrite = process.stdout.write;
 		process.stdout.write = (chunk: string | Uint8Array) => {
@@ -91,11 +91,11 @@ describe("executeEcosystem — JSON output shape", () => {
 		}
 
 		const parsed = JSON.parse(chunks.join("").trim());
-		const overstory = parsed.tools.find((t: { name: string }) => t.name === "overstory");
-		expect(overstory).toBeDefined();
+		const haru = parsed.tools.find((t: { name: string }) => t.name === "haru");
+		expect(haru).toBeDefined();
 		// In CI, `ov` may not be globally installed — only assert version when installed
-		if (overstory.installed) {
-			expect(overstory.version).toBeDefined();
+		if (haru.installed) {
+			expect(haru.version).toBeDefined();
 		}
 	}, 30_000);
 });

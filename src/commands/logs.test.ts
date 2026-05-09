@@ -37,7 +37,7 @@ describe("logsCommand", () => {
 		// Create a temp directory for each test
 		tmpDir = join(
 			tmpdir(),
-			`overstory-logs-test-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+			`haru-logs-test-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
 		);
 		await mkdir(tmpDir, { recursive: true });
 

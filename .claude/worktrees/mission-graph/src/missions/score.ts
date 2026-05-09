@@ -2,8 +2,8 @@
  * Mission health score module.
  *
  * Computes a compact health snapshot (MissionScore) from bundle data,
- * runtime signals, and review dimensions. Surfaced in ov mission status
- * and ov health --json.
+ * runtime signals, and review dimensions. Surfaced in ha mission status
+ * and ha health --json.
  *
  * Score model
  * -----------

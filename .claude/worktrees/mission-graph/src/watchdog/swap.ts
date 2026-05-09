@@ -176,7 +176,7 @@ export async function swapRuntime(options: SwapOptions): Promise<SwapResult> {
 
 		const env: Record<string, string> = {
 			...targetRuntime.buildEnv(resolvedModel),
-			OVERSTORY_AGENT_NAME: session.agentName,
+			HARU_AGENT_NAME: session.agentName,
 		};
 
 		// Root-level agents get their definition via prompt
@@ -218,7 +218,7 @@ export async function swapRuntime(options: SwapOptions): Promise<SwapResult> {
 
 		// 8. Nudge new session to check mail
 		try {
-			await nudgeAgent(root, session.agentName, `ov mail check --agent ${session.agentName}`, true);
+			await nudgeAgent(root, session.agentName, `ha mail check --agent ${session.agentName}`, true);
 		} catch {
 			// Nudge failure is non-fatal
 		}
@@ -322,8 +322,8 @@ export function buildHandoffDocument(opts: {
 You are continuing work from a previous ${opts.fromRuntime} session that hit rate limits.
 **Do NOT restart from scratch.** Review the context below and continue where the previous agent left off.
 
-Use \`ov mail check --agent $OVERSTORY_AGENT_NAME\` to check for messages.
-Use \`ov mail send\` to communicate with coordinator and other agents.
+Use \`ha mail check --agent $HARU_AGENT_NAME\` to check for messages.
+Use \`ha mail send\` to communicate with coordinator and other agents.
 
 ## Task
 - **ID:** ${opts.taskId}

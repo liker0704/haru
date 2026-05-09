@@ -1,5 +1,5 @@
 /**
- * Human-readable rendering for ov health and ov next-improvement output.
+ * Human-readable rendering for ha health and ha next-improvement output.
  *
  * Follows the visual conventions in src/logging/theme.ts and ecosystem.ts:
  * - brand.bold() for headers

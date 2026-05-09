@@ -54,9 +54,9 @@ const RULES: RecommendationRule[] = [
 			expectedImpact:
 				"Free worktree slots, eliminate false-positive stall signals, and recover accurate session counts.",
 			action:
-				"Run `ov clean --agent <name>` for each zombie, or `ov worktree clean --completed` to batch-remove finished worktrees.",
+				"Run `ha clean --agent <name>` for each zombie, or `ha worktree clean --completed` to batch-remove finished worktrees.",
 			verificationStep:
-				"Run `ov status` and confirm zombie count is 0. Re-run `ov health` to verify score improvement.",
+				"Run `ha status` and confirm zombie count is 0. Re-run `ha health` to verify score improvement.",
 		}),
 	},
 
@@ -71,9 +71,9 @@ const RULES: RecommendationRule[] = [
 			expectedImpact:
 				"Restore reliable agent spawning, database access, and merge pipeline integrity.",
 			action:
-				"Run `ov doctor --fix` to auto-fix fixable issues, then `ov doctor` to review remaining failures manually.",
+				"Run `ha doctor --fix` to auto-fix fixable issues, then `ha doctor` to review remaining failures manually.",
 			verificationStep:
-				"Run `ov doctor` and confirm all checks show status pass or warn. Re-run `ov health`.",
+				"Run `ha doctor` and confirm all checks show status pass or warn. Re-run `ha health`.",
 		}),
 	},
 
@@ -86,9 +86,9 @@ const RULES: RecommendationRule[] = [
 			title: "Address doctor check warnings",
 			whyNow: `${f.details}. Warnings indicate degraded conditions that may escalate to failures under load.`,
 			expectedImpact: "Prevent warnings from becoming failures during a busy run.",
-			action: "Run `ov doctor --verbose` to see all warnings, then address them one by one.",
+			action: "Run `ha doctor --verbose` to see all warnings, then address them one by one.",
 			verificationStep:
-				"Run `ov doctor` and confirm warning count has decreased. Re-run `ov health`.",
+				"Run `ha doctor` and confirm warning count has decreased. Re-run `ha health`.",
 		}),
 	},
 
@@ -103,9 +103,9 @@ const RULES: RecommendationRule[] = [
 			expectedImpact:
 				"Faster task throughput, reduced watchdog noise, and lower overall session cost.",
 			action:
-				"Run `ov inspect <agent>` on each stalled agent to diagnose the cause. Common fixes: increase `watchdog.staleThresholdMs` if tasks legitimately take longer, or check for provider rate limits with `ov status`.",
+				"Run `ha inspect <agent>` on each stalled agent to diagnose the cause. Common fixes: increase `watchdog.staleThresholdMs` if tasks legitimately take longer, or check for provider rate limits with `ha status`.",
 			verificationStep:
-				"Run `ov status` and confirm stalled count has dropped. Monitor `ov dashboard` for new stalls over the next run.",
+				"Run `ha status` and confirm stalled count has dropped. Monitor `ha dashboard` for new stalls over the next run.",
 		}),
 	},
 
@@ -120,9 +120,9 @@ const RULES: RecommendationRule[] = [
 			expectedImpact:
 				"Higher task throughput, lower cost-per-outcome, and fewer orphaned branches.",
 			action:
-				"Run `ov errors` to see recent agent errors. Run `ov replay` to review failed session timelines. Check if specs are ambiguous or file scopes are too broad.",
+				"Run `ha errors` to see recent agent errors. Run `ha replay` to review failed session timelines. Check if specs are ambiguous or file scopes are too broad.",
 			verificationStep:
-				"Track completion rate over the next two runs using `ov health`. Target ≥ 80%.",
+				"Track completion rate over the next two runs using `ha health`. Target ≥ 80%.",
 		}),
 	},
 
@@ -137,9 +137,9 @@ const RULES: RecommendationRule[] = [
 			expectedImpact:
 				"Faster merge throughput and lower reliance on AI-resolve and reimagine tiers.",
 			action:
-				"Review overlapping file scopes across concurrent agents. Use `ov worktree list` to identify agents editing the same files. Split large tasks into smaller, non-overlapping scopes.",
+				"Review overlapping file scopes across concurrent agents. Use `ha worktree list` to identify agents editing the same files. Split large tasks into smaller, non-overlapping scopes.",
 			verificationStep:
-				"Run `ov merge --dry-run` before the next batch and confirm fewer predicted conflicts. Check merge_quality factor in `ov health`.",
+				"Run `ha merge --dry-run` before the next batch and confirm fewer predicted conflicts. Check merge_quality factor in `ha health`.",
 		}),
 	},
 
@@ -154,9 +154,9 @@ const RULES: RecommendationRule[] = [
 			expectedImpact:
 				"More predictable agent behaviour and reduced session overhead from swap/resume cycles.",
 			action:
-				"Run `ov costs --by-capability` to see which capabilities are swapping most. Check provider status and consider adjusting `rateLimit.behavior` in config.yaml from 'swap' to 'wait' if rate limits are transient.",
+				"Run `ha costs --by-capability` to see which capabilities are swapping most. Check provider status and consider adjusting `rateLimit.behavior` in config.yaml from 'swap' to 'wait' if rate limits are transient.",
 			verificationStep:
-				"Run `ov health` after the next run and confirm runtime_stability score has improved.",
+				"Run `ha health` after the next run and confirm runtime_stability score has improved.",
 		}),
 	},
 
@@ -169,8 +169,8 @@ const RULES: RecommendationRule[] = [
 			title: "Monitor task completion trend",
 			whyNow: `${f.details}. Completion rate is slightly below ideal — worth tracking before it degrades further.`,
 			expectedImpact: "Early detection prevents a small dip from becoming a systemic problem.",
-			action: "Run `ov errors --limit 5` to spot any recurring error patterns across agents.",
-			verificationStep: "Compare completion rate in `ov health` across the next three runs.",
+			action: "Run `ha errors --limit 5` to spot any recurring error patterns across agents.",
+			verificationStep: "Compare completion rate in `ha health` across the next three runs.",
 		}),
 	},
 
@@ -184,9 +184,9 @@ const RULES: RecommendationRule[] = [
 			whyNow: `${f.details}. Architecture quality is critically low — missing artifacts or failing holdout checks.`,
 			expectedImpact: "Restore architectural integrity and unblock mission completion.",
 			action:
-				"Run `ov mission holdout` to see specific failures. Ensure architecture.md and test-plan.yaml exist.",
+				"Run `ha mission holdout` to see specific failures. Ensure architecture.md and test-plan.yaml exist.",
 			verificationStep:
-				"Run `ov mission holdout` and confirm all Level 1+2 checks pass. Re-run `ov health`.",
+				"Run `ha mission holdout` and confirm all Level 1+2 checks pass. Re-run `ha health`.",
 		}),
 	},
 	{
@@ -198,8 +198,8 @@ const RULES: RecommendationRule[] = [
 			whyNow: `${f.details}. Some architecture checks are degraded.`,
 			expectedImpact: "Better mission delivery quality and artifact completeness.",
 			action:
-				"Review `ov mission holdout` output. Ensure ADR coverage for key architecture decisions.",
-			verificationStep: "Run `ov health` and confirm architecture_quality score has improved.",
+				"Review `ha mission holdout` output. Ensure ADR coverage for key architecture decisions.",
+			verificationStep: "Run `ha health` and confirm architecture_quality score has improved.",
 		}),
 	},
 
@@ -213,9 +213,9 @@ const RULES: RecommendationRule[] = [
 			whyNow: `${f.details}. Open breakers prevent task dispatch to affected capabilities.`,
 			expectedImpact: "Restore full capability coverage and unblock pending tasks.",
 			action:
-				"Run `ov status` to see which breakers are open. Check provider health and error patterns. Consider adjusting `resilience.circuitBreaker.failureThreshold` in config.yaml if breakers are tripping too aggressively.",
+				"Run `ha status` to see which breakers are open. Check provider health and error patterns. Consider adjusting `resilience.circuitBreaker.failureThreshold` in config.yaml if breakers are tripping too aggressively.",
 			verificationStep:
-				"Run `ov health` and confirm resilience score has improved. Check `ov status` for breaker state.",
+				"Run `ha health` and confirm resilience score has improved. Check `ha status` for breaker state.",
 		}),
 	},
 ];

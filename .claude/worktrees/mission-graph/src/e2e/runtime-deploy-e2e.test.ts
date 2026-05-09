@@ -9,9 +9,9 @@ import type { HooksDef } from "../runtimes/types.ts";
 import { cleanupTempDir, createTempGitRepo } from "../test-helpers.ts";
 
 /**
- * E2E test: runtime deployConfig on a real overstory-initialized project.
+ * E2E test: runtime deployConfig on a real haru-initialized project.
  *
- * Creates a real temp git repo, runs `ov init`, then deploys Gemini and Qwen
+ * Creates a real temp git repo, runs `ha init`, then deploys Gemini and Qwen
  * runtime configs into worktree-like directories. Validates:
  * - Instruction files written correctly (GEMINI.md / AGENTS.md)
  * - Settings files created with hooks
@@ -480,7 +480,7 @@ describe("E2E: runtime deployConfig on initialized project", () => {
 			// Find the write_file path boundary guard (first one with matcher "write_file")
 			const writeFileGuard = hooks.BeforeTool?.find(
 				(e) =>
-					e.matcher === "write_file" && e.hooks[0]?.command.includes("OVERSTORY_WORKTREE_PATH"),
+					e.matcher === "write_file" && e.hooks[0]?.command.includes("HARU_WORKTREE_PATH"),
 			);
 			expect(writeFileGuard).toBeDefined();
 
@@ -497,8 +497,8 @@ describe("E2E: runtime deployConfig on initialized project", () => {
 				stderr: "pipe",
 				env: {
 					...process.env,
-					OVERSTORY_AGENT_NAME: "boundary-test",
-					OVERSTORY_WORKTREE_PATH: worktreePath,
+					HARU_AGENT_NAME: "boundary-test",
+					HARU_WORKTREE_PATH: worktreePath,
 				},
 			});
 			const [stdout, exitCode] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
@@ -530,7 +530,7 @@ describe("E2E: runtime deployConfig on initialized project", () => {
 
 			const writeFileGuard = hooks.BeforeTool?.find(
 				(e) =>
-					e.matcher === "write_file" && e.hooks[0]?.command.includes("OVERSTORY_WORKTREE_PATH"),
+					e.matcher === "write_file" && e.hooks[0]?.command.includes("HARU_WORKTREE_PATH"),
 			);
 			expect(writeFileGuard).toBeDefined();
 
@@ -547,8 +547,8 @@ describe("E2E: runtime deployConfig on initialized project", () => {
 				stderr: "pipe",
 				env: {
 					...process.env,
-					OVERSTORY_AGENT_NAME: "boundary-ok",
-					OVERSTORY_WORKTREE_PATH: worktreePath,
+					HARU_AGENT_NAME: "boundary-ok",
+					HARU_WORKTREE_PATH: worktreePath,
 				},
 			});
 			const [stdout, exitCode] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
@@ -596,7 +596,7 @@ describe("E2E: runtime deployConfig on initialized project", () => {
 				stderr: "pipe",
 				env: {
 					...process.env,
-					OVERSTORY_AGENT_NAME: "bash-danger",
+					HARU_AGENT_NAME: "bash-danger",
 				},
 			});
 			const [stdout, exitCode] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
@@ -643,7 +643,7 @@ describe("E2E: runtime deployConfig on initialized project", () => {
 				stderr: "pipe",
 				env: {
 					...process.env,
-					OVERSTORY_AGENT_NAME: "bash-safe",
+					HARU_AGENT_NAME: "bash-safe",
 				},
 			});
 			const [stdout, exitCode] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
@@ -693,7 +693,7 @@ describe("E2E: runtime deployConfig on initialized project", () => {
 				stderr: "pipe",
 				env: {
 					...process.env,
-					OVERSTORY_AGENT_NAME: "scout-bash",
+					HARU_AGENT_NAME: "scout-bash",
 				},
 			});
 			const [stdout, exitCode] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
@@ -726,7 +726,7 @@ describe("E2E: runtime deployConfig on initialized project", () => {
 			// Find the tracker close guard
 			const trackerGuard = hooks.BeforeTool?.find(
 				(e) =>
-					e.matcher === "run_shell_command" && e.hooks[0]?.command.includes("OVERSTORY_TASK_ID"),
+					e.matcher === "run_shell_command" && e.hooks[0]?.command.includes("HARU_TASK_ID"),
 			);
 			expect(trackerGuard).toBeDefined();
 
@@ -743,8 +743,8 @@ describe("E2E: runtime deployConfig on initialized project", () => {
 				stderr: "pipe",
 				env: {
 					...process.env,
-					OVERSTORY_AGENT_NAME: "tracker-guard",
-					OVERSTORY_TASK_ID: "my-task-456",
+					HARU_AGENT_NAME: "tracker-guard",
+					HARU_TASK_ID: "my-task-456",
 				},
 			});
 			const [stdout, exitCode] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
@@ -777,7 +777,7 @@ describe("E2E: runtime deployConfig on initialized project", () => {
 
 			const trackerGuard = hooks.BeforeTool?.find(
 				(e) =>
-					e.matcher === "run_shell_command" && e.hooks[0]?.command.includes("OVERSTORY_TASK_ID"),
+					e.matcher === "run_shell_command" && e.hooks[0]?.command.includes("HARU_TASK_ID"),
 			);
 			expect(trackerGuard).toBeDefined();
 
@@ -794,8 +794,8 @@ describe("E2E: runtime deployConfig on initialized project", () => {
 				stderr: "pipe",
 				env: {
 					...process.env,
-					OVERSTORY_AGENT_NAME: "tracker-ok",
-					OVERSTORY_TASK_ID: "my-task-456",
+					HARU_AGENT_NAME: "tracker-ok",
+					HARU_TASK_ID: "my-task-456",
 				},
 			});
 			const [stdout, exitCode] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);

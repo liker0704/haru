@@ -98,10 +98,10 @@ export async function reconcileSnapshot(
 
 			if (status === "missing") {
 				operatorActions.push(
-					`Re-spawn missing agent: ov sling <task-id> --name ${session.agentName}`,
+					`Re-spawn missing agent: ha sling <task-id> --name ${session.agentName}`,
 				);
 			} else if (status === "degraded") {
-				operatorActions.push(`Inspect degraded agent: ov inspect ${session.agentName}`);
+				operatorActions.push(`Inspect degraded agent: ha inspect ${session.agentName}`);
 			}
 		}
 	}

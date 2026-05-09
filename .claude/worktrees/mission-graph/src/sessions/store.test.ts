@@ -18,7 +18,7 @@ let dbPath: string;
 let store: SessionStore;
 
 beforeEach(async () => {
-	tempDir = await mkdtemp(join(tmpdir(), "overstory-sessions-test-"));
+	tempDir = await mkdtemp(join(tmpdir(), "haru-sessions-test-"));
 	dbPath = join(tempDir, "sessions.db");
 	store = createSessionStore(dbPath);
 });
@@ -36,9 +36,9 @@ function makeSession(overrides: Partial<AgentSession> = {}): AgentSession {
 		capability: "builder",
 		runtime: "claude",
 		worktreePath: "/tmp/worktrees/test-agent",
-		branchName: "overstory/test-agent/task-1",
+		branchName: "haru/test-agent/task-1",
 		taskId: "task-1",
-		tmuxSession: "overstory-test-agent",
+		tmuxSession: "haru-test-agent",
 		state: "booting",
 		pid: 12345,
 		parentAgent: null,
@@ -87,9 +87,9 @@ describe("upsert", () => {
 			agentName: "roundtrip-agent",
 			capability: "scout",
 			worktreePath: "/tmp/worktrees/roundtrip",
-			branchName: "overstory/roundtrip-agent/task-42",
+			branchName: "haru/roundtrip-agent/task-42",
 			taskId: "task-42",
-			tmuxSession: "overstory-roundtrip-agent",
+			tmuxSession: "haru-roundtrip-agent",
 			state: "working",
 			pid: 99999,
 			parentAgent: "lead-agent",
@@ -604,7 +604,7 @@ describe("edge cases", () => {
 		const session = makeSession({
 			agentName: "agent-with-special_chars.v2",
 			worktreePath: "/tmp/path with spaces/worktree",
-			branchName: "overstory/agent-with-special_chars.v2/task-1",
+			branchName: "haru/agent-with-special_chars.v2/task-1",
 		});
 
 		store.upsert(session);

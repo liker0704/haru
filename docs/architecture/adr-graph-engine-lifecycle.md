@@ -19,14 +19,14 @@ Mission lifecycle currently depends entirely on LLM agents staying alive and exe
 Two production bugs in `asrp.science-llm` exposed the root cause:
 
 **Bug #96 -- Mission stuck in `understand` phase:**
-Mission `auth-mock` coordinator dispatched analyst for research. Analyst spawned 3 scouts, all completed by 20:16. Both coordinator and analyst sessions ended (rate limit / context overflow). `ov status` showed both as "working" 40+ minutes later. `workstreams.json` remained empty. Mission stuck in `understand:active` forever.
+Mission `auth-mock` coordinator dispatched analyst for research. Analyst spawned 3 scouts, all completed by 20:16. Both coordinator and analyst sessions ended (rate limit / context overflow). `ha status` showed both as "working" 40+ minutes later. `workstreams.json` remained empty. Mission stuck in `understand:active` forever.
 
 **Bug #97 -- WS2 never dispatched after WS1 merge:**
 Mission `auth-mock-v2` had 2 sequential workstreams: `shared-auth` (no deps) then `user-model` (depends on `shared-auth`). WS1 completed, built, reviewed, merged. Coordinator replied to exec-director: "Proceed with WS2 dispatch." Exec-director was already dead. Both workstreams still showed `"planned"` in `workstreams.json` -- status was never updated to `"completed"`. WS2 was never dispatched.
 
 ### Three Specific Gaps in Current Architecture
 
-1. **No automatic phase transitions.** `understand -> plan -> execute` requires the coordinator agent to manually call `ov mission handoff` (`src/missions/lifecycle.ts`). If coordinator dies before this, the mission is permanently stuck.
+1. **No automatic phase transitions.** `understand -> plan -> execute` requires the coordinator agent to manually call `ha mission handoff` (`src/missions/lifecycle.ts`). If coordinator dies before this, the mission is permanently stuck.
 
 2. **No workstream status updates after merge.** `persistWorkstreamsFile()` exists (`src/missions/workstreams.ts:368`) but is never called with status updates after a merge completes. `packageHandoffs()` (`src/missions/workstreams.ts:546`) checks `status === "completed"` to determine which workstreams are dispatchable, but nothing ever writes `"completed"`. The function that could enable sequential dispatch exists but is never fed the data it needs.
 
@@ -299,7 +299,7 @@ if (result.status === "gate") {
 
 ### `align` and `decide` Phases
 
-The graph defines 5 working phases: understand, align, decide, plan, execute. Currently `align` and `decide` are **not used in any production mission** — missions jump directly from understand to plan (the coordinator calls `ov mission handoff` which sets phase to "execute", skipping align/decide entirely).
+The graph defines 5 working phases: understand, align, decide, plan, execute. Currently `align` and `decide` are **not used in any production mission** — missions jump directly from understand to plan (the coordinator calls `ha mission handoff` which sets phase to "execute", skipping align/decide entirely).
 
 For the engine, `align:active` and `decide:active` nodes get **auto-advance handlers**:
 
@@ -441,7 +441,7 @@ db.prepare(`DELETE FROM mission_tick_lock WHERE mission_id = $id`).run({ $id: mi
 
 One row per mission. `INSERT OR IGNORE` is atomic. Stale lock cleanup prevents dead-lock from daemon crashes. No OS-level locking needed.
 
-**Singleton enforcement**: The watchdog daemon already writes a PID file at `.overstory/watchdog.pid` (`src/commands/watch.ts`). The `startDaemon()` function checks for an existing PID file and refuses to start if another daemon is running. This prevents concurrent `ov watch` instances.
+**Singleton enforcement**: The watchdog daemon already writes a PID file at `.overstory/watchdog.pid` (`src/commands/watch.ts`). The `startDaemon()` function checks for an existing PID file and refuses to start if another daemon is running. This prevents concurrent `ha watch` instances.
 
 **Confidence**: High -- the daemon already has all required dependencies injected via `DaemonOptions`.
 
@@ -522,7 +522,7 @@ CREATE INDEX idx_mgs_active ON mission_gate_state(mission_id, resolved_at);
 - SQLite provides transactional writes, crash safety (WAL), and no file corruption risk
 - `workstreams.json` remains the plan definition (workstream names, objectives, deps, scope, TDD mode) — status lives in SQLite
 - Agents can write `planned → active` (when starting work) without conflicting with engine's `→ completed` writes
-- `ov mission workstream-complete <ws-id>` CLI command as operator escape hatch
+- `ha mission workstream-complete <ws-id>` CLI command as operator escape hatch
 
 **Confidence**: High -- this directly fixes the root cause of bug #97.
 
@@ -640,7 +640,7 @@ This ensures the engine starts monitoring from the correct position, not from `u
 - `engine_ws_status_updated` -- engine updates workstream status
 - `engine_mission_suspended` -- circuit breaker triggers mission suspension
 
-These events are queryable via `ov trace` and visible in `ov dashboard`.
+These events are queryable via `ha trace` and visible in `ha dashboard`.
 
 **Confidence**: High -- follows existing event recording pattern in `src/events/store.ts`.
 
@@ -726,8 +726,8 @@ These events are queryable via `ov trace` and visible in `ov dashboard`.
   --override--> [await-handoff]  (coordinator overrides)
 
 [await-handoff]  gate: async, graceMs: 120_000
-  check: phase changed to "execute"? (coordinator called ov mission handoff)
-  nudge: coordinator "all prereqs met, call ov mission handoff"
+  check: phase changed to "execute"? (coordinator called ha mission handoff)
+  nudge: coordinator "all prereqs met, call ha mission handoff"
   --handoff_complete--> [terminal: plan-complete]
 ```
 
@@ -869,7 +869,7 @@ Edges:
   merge-all        --all_merged-->  complete
 ```
 
-`dispatch-leads` reads the mission's workstreams and dispatches lead agents directly (no ED intermediary). `await-leads-done` is an async gate that resolves when a lead sends `worker_done` mail. `merge-all` calls `ov merge` for the completed lead's branch and loops back if more leads remain unmerged.
+`dispatch-leads` reads the mission's workstreams and dispatches lead agents directly (no ED intermediary). `await-leads-done` is an async gate that resolves when a lead sends `worker_done` mail. `merge-all` calls `ha merge` for the completed lead's branch and loops back if more leads remain unmerged.
 
 ### Engine Wiring
 
@@ -885,7 +885,7 @@ Phase cells (understand, plan, execute, done) live in a separate registry: `PHAS
 
 **Concern**: Two overlapping async ticks can both evaluate the same gate, causing duplicate respawns or double state transitions.
 
-**Resolution**: Per-mission advisory lock via dedicated `mission_tick_lock` table (one row per mission). `INSERT OR IGNORE` acquires lock atomically. Stale lock cleanup prevents deadlock. See Decision #1 for schema and implementation. Watchdog PID file prevents concurrent `ov watch` instances.
+**Resolution**: Per-mission advisory lock via dedicated `mission_tick_lock` table (one row per mission). `INSERT OR IGNORE` acquires lock atomically. Stale lock cleanup prevents deadlock. See Decision #1 for schema and implementation. Watchdog PID file prevents concurrent `ha watch` instances.
 
 ### C2: Subgraph execution model mismatch (CRITICAL)
 
@@ -961,7 +961,7 @@ Phase cells (understand, plan, execute, done) live in a separate registry: `PHAS
 
 **Concern**: Making the engine the sole writer for workstream status prevents agents from updating status themselves, which may be needed for intermediate states like "active".
 
-**Mitigation**: The engine owns the `planned -> completed` transition (the one that was missing). Agents can still write `planned -> active` (when they start working on a WS) without conflict. The critical invariant is: only the engine writes `completed`, because that triggers `packageHandoffs()` for sequential dispatch. A `ov mission workstream-complete <ws-id>` CLI command is also provided as an escape hatch for operators.
+**Mitigation**: The engine owns the `planned -> completed` transition (the one that was missing). Agents can still write `planned -> active` (when they start working on a WS) without conflict. The critical invariant is: only the engine writes `completed`, because that triggers `packageHandoffs()` for sequential dispatch. A `ha mission workstream-complete <ws-id>` CLI command is also provided as an escape hatch for operators.
 
 ### Checkpoint Collision Between Parent and Subgraph Engines
 
@@ -1021,7 +1021,7 @@ Estimated overhead: 5-15ms per active mission per tick. With 1-2 active missions
 
 - Engine-aware `lifecycle.ts`: `missionAnswer()` and `missionHandoff()` notify the engine
 - Workstream status update triggers `packageHandoffs()` re-evaluation for sequential dispatch
-- `ov mission workstream-complete <ws-id>` CLI command (operator escape hatch)
+- `ha mission workstream-complete <ws-id>` CLI command (operator escape hatch)
 - Prompt update: `agents/mission-analyst.md` — architecture feedback routing on BLOCK
 - End-to-end tests: mission start to completion with simulated agent deaths
 
@@ -1061,9 +1061,9 @@ All 12 design decisions documented in this ADR have been verified as implemented
 
 These extensions were added after the original ADR was accepted. They are operational in the current code and are documented here so this ADR remains an accurate reference for the live system.
 
-### 1. Legacy WS-completion opt-out (`OVERSTORY_LEGACY_WS_COMPLETION`)
+### 1. Legacy WS-completion opt-out (`HARU_LEGACY_WS_COMPLETION`)
 
-`evaluateWsCompletion()` (`src/watchdog/gate-evaluators.ts:282-291`) checks the `OVERSTORY_LEGACY_WS_COMPLETION=true` env var. When set, the gate keeps the pre-SSOT behavior — advancing on the first `merged` mail received by the execution-director. This is a kill-switch for sites that need to roll back from the SSOT path during incident response. Default (env unset) follows the SSOT path described next.
+`evaluateWsCompletion()` (`src/watchdog/gate-evaluators.ts:282-291`) checks the `HARU_LEGACY_WS_COMPLETION=true` env var. When set, the gate keeps the pre-SSOT behavior — advancing on the first `merged` mail received by the execution-director. This is a kill-switch for sites that need to roll back from the SSOT path during incident response. Default (env unset) follows the SSOT path described next.
 
 ### 2. SSOT path via `missionStore.areAllWorkstreamsDone()`
 

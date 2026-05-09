@@ -1,4 +1,4 @@
-// GitHub Copilot runtime adapter for overstory's AgentRuntime interface.
+// GitHub Copilot runtime adapter for haru's AgentRuntime interface.
 // Implements the AgentRuntime contract for the `copilot` CLI (GitHub Copilot).
 
 import { mkdir } from "node:fs/promises";

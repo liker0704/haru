@@ -374,11 +374,11 @@ export function createMyStore(dbPath: string): MyStore {
 }
 ```
 
-### Step 3: Add to ov init
+### Step 3: Add to ha init
 
-If the store should be created when `ov init` runs, add the DB path to the init
+If the store should be created when `ha init` runs, add the DB path to the init
 command in `src/commands/init.ts`. The file is created lazily on first `Database()`
-call — `ov init` only needs to list it so users know it exists.
+call — `ha init` only needs to list it so users know it exists.
 
 ---
 

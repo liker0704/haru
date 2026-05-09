@@ -10,12 +10,12 @@ Related docs:
 
 Target:
 
-- Close the remaining gaps so `ov mission v1` can be considered "real" under the Definition of Done in `docs/ov-mission-implementation.md`.
+- Close the remaining gaps so `ha mission v1` can be considered "real" under the Definition of Done in `docs/ov-mission-implementation.md`.
 
 Current status:
 
 - Mission happy-path is implemented and broadly working.
-- `ov mission v1` is still not DoD-complete because of:
+- `ha mission v1` is still not DoD-complete because of:
   - missing runtime enforcement for `Execution Director -> lead only`
   - incomplete stale-spec safety model
   - incomplete canonical task bridge wiring
@@ -32,8 +32,8 @@ This plan is complete only when all of the following are true:
 - Selective ingress is enforced in code and routing, not only by prompts.
 - Shared `status` and `dashboard` surfaces show the required mission lifecycle and role presence.
 - Crash/recovery and terminal-path proof match Phase 13.
-- `ov review missions` and `ov review mission <id>` have functional CLI proof.
-- `ov coordinator` fast-path remains green.
+- `ha review missions` and `ha review mission <id>` have functional CLI proof.
+- `ha coordinator` fast-path remains green.
 
 ## Execution Order
 
@@ -65,8 +65,8 @@ Goal:
 
 Why this phase exists:
 
-- Today `resolveCurrentMissionId()` in `ov mission` can recover from `MissionStore`.
-- `ov sling` still uses `.overstory/current-mission.txt` directly to decide whether mission-mode guards apply.
+- Today `resolveCurrentMissionId()` in `ha mission` can recover from `MissionStore`.
+- `ha sling` still uses `.overstory/current-mission.txt` directly to decide whether mission-mode guards apply.
 - Phase 13 explicitly requires recovery coverage for lost `current-mission.txt` and lost `current-run.txt`.
 
 Primary files:
@@ -103,7 +103,7 @@ Tests to add:
 Acceptance criteria:
 
 - Mission-aware behavior does not silently degrade when pointer files are lost.
-- `ov sling` still applies mission-aware guards after recovery.
+- `ha sling` still applies mission-aware guards after recovery.
 - Pointer files are restored automatically from durable state.
 
 Risks:
@@ -314,7 +314,7 @@ Primary files:
 Implementation tasks:
 
 - Decide the enforcement point:
-  - validate on `ov mail send` when `--to mission-analyst --type mission_finding`
+  - validate on `ha mail send` when `--to mission-analyst --type mission_finding`
   - optionally validate again when consuming mission finding mail
 - Require structured payload sufficient for ingress validation.
 - Reject non-qualifying `mission_finding` messages before they enter the analyst channel.
@@ -349,7 +349,7 @@ Status: planned
 
 Goal:
 
-- Bring `ov status` and `ov dashboard` mission surfaces up to Phase 10 expectations.
+- Bring `ha status` and `ha dashboard` mission surfaces up to Phase 10 expectations.
 
 Why this phase exists:
 
@@ -364,7 +364,7 @@ Primary files:
 
 Implementation tasks:
 
-- Extend the mission summary rendered by `ov status` to show role presence fields.
+- Extend the mission summary rendered by `ha status` to show role presence fields.
 - Extend the dashboard mission strip or nearby panel so it includes role presence without cluttering the screen.
 - Keep mission lifecycle rendering independent from agent health rendering.
 - Ensure JSON output, if any, remains stable or intentionally versioned.
@@ -400,7 +400,7 @@ Status: planned
 
 Goal:
 
-- Add real command-level proof for `ov review missions` and `ov review mission <id>`.
+- Add real command-level proof for `ha review missions` and `ha review mission <id>`.
 
 Why this phase exists:
 
@@ -472,7 +472,7 @@ Implementation tasks:
   - run is terminalized as `stopped`
   - result bundle exports
   - mission review materializes
-- Reconfirm `ov coordinator` fast-path regression after all changes.
+- Reconfirm `ha coordinator` fast-path regression after all changes.
 
 Tests to add:
 
@@ -525,8 +525,8 @@ hold and the tests named here are green.
   separate ad-hoc `current-mission.txt` reads in commands that enforce mission
   guardrails.
 - Keep pointer files as cache/output artifacts, not the authoritative source.
-- Mission-only guardrails must remain mission-scoped. Non-mission `ov sling`,
-  `ov mail`, and `ov coordinator` behavior must remain unchanged unless
+- Mission-only guardrails must remain mission-scoped. Non-mission `ha sling`,
+  `ha mail`, and `ha coordinator` behavior must remain unchanged unless
   explicitly noted below.
 - Any runtime invariant that is required by `docs/ov-mission-implementation.md`
   must be enforced in code, not only in prompts.
@@ -681,7 +681,7 @@ Implementation notes:
 
 Required command-path enforcement:
 
-- `ov sling <task> --capability builder --parent <lead>` in mission mode with no
+- `ha sling <task> --capability builder --parent <lead>` in mission mode with no
   `--spec` must fail
 - same for `reviewer`
 - same commands outside mission mode must keep current behavior
@@ -804,7 +804,7 @@ Required UI contract:
 
 Implementation note:
 
-- Reuse the same role-state semantics as `ov mission status`:
+- Reuse the same role-state semantics as `ha mission status`:
   - `running`
   - `stopped`
   - `not started`

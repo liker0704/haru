@@ -3,12 +3,10 @@
  */
 
 import { dirname, join } from "node:path";
-import { loadConfig } from "../config.ts";
 import { jsonError, jsonOutput } from "../json.ts";
 import { accent, printError, printHint, printSuccess, printWarning } from "../logging/color.ts";
 import { createMailClient } from "../mail/client.ts";
 import { createMailStore } from "../mail/store.ts";
-import type { Mission } from "../types.ts";
 import { recordMissionEvent } from "./events.ts";
 import {
 	resolveCurrentMissionId,
@@ -46,7 +44,7 @@ async function readAnswerBody(opts: { body?: string; file?: string }): Promise<s
 	return null;
 }
 
-// === ov mission update ===
+// === ha mission update ===
 
 interface UpdateOpts {
 	slug?: string;
@@ -130,7 +128,7 @@ export async function missionUpdate(
 		if (json) {
 			jsonError("mission update", "No active mission");
 		} else {
-			printError("No active mission", "Start one with: ov mission start");
+			printError("No active mission", "Start one with: ha mission start");
 		}
 		process.exitCode = 1;
 		return;
@@ -202,7 +200,7 @@ export async function missionUpdate(
 	}
 }
 
-// === ov mission answer ===
+// === ha mission answer ===
 
 interface AnswerOpts {
 	body?: string;
@@ -326,7 +324,7 @@ export async function missionAnswer(
 	}
 }
 
-// === ov mission pause ===
+// === ha mission pause ===
 
 interface PauseOpts {
 	reason?: string;
@@ -455,7 +453,7 @@ export async function missionPause(
 	}
 }
 
-// === ov mission extract-learnings ===
+// === ha mission extract-learnings ===
 
 export async function missionExtractLearnings(
 	overstoryDir: string,
@@ -510,10 +508,10 @@ export async function missionExtractLearnings(
 			if (opts.json) {
 				jsonError(
 					"extract-learnings",
-					`No bundle found at ${bundlePath}. Run 'ov mission bundle' first.`,
+					`No bundle found at ${bundlePath}. Run 'ha mission bundle' first.`,
 				);
 			} else {
-				printError(`No bundle found at ${bundlePath}. Run 'ov mission bundle' first.`);
+				printError(`No bundle found at ${bundlePath}. Run 'ha mission bundle' first.`);
 			}
 			process.exitCode = 1;
 			return;

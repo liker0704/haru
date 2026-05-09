@@ -1,7 +1,7 @@
 /**
- * CLI command: ov doctor [options]
+ * CLI command: ha doctor [options]
  *
- * Runs health checks on overstory subsystems and reports problems.
+ * Runs health checks on haru subsystems and reports problems.
  */
 
 import { join } from "node:path";
@@ -157,11 +157,11 @@ export interface DoctorCommandOptions {
 }
 
 /**
- * Create the Commander command for `overstory doctor`.
+ * Create the Commander command for `haru doctor`.
  */
 export function createDoctorCommand(options?: DoctorCommandOptions): Command {
 	return new Command("doctor")
-		.description("Run health checks on overstory setup")
+		.description("Run health checks on haru setup")
 		.option("--json", "Output as JSON")
 		.option("--verbose", "Show passing checks (default: only problems)")
 		.option("--category <name>", "Run only one category")
@@ -240,7 +240,7 @@ export function createDoctorCommand(options?: DoctorCommandOptions): Command {
 }
 
 /**
- * Entry point for `overstory doctor [--json] [--verbose] [--category <name>]`.
+ * Entry point for `haru doctor [--json] [--verbose] [--category <name>]`.
  *
  * @returns Exit code (1 if any check failed, undefined otherwise)
  */

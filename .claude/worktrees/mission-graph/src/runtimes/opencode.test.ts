@@ -249,7 +249,7 @@ describe("OpenCodeRuntime", () => {
 		let tempDir: string;
 
 		beforeEach(async () => {
-			tempDir = await mkdtemp(join(tmpdir(), "overstory-opencode-test-"));
+			tempDir = await mkdtemp(join(tmpdir(), "haru-opencode-test-"));
 		});
 
 		afterEach(async () => {
@@ -295,7 +295,7 @@ describe("OpenCodeRuntime", () => {
 			expect(exists).toBe(false);
 			// Guard plugin and config are still written
 			const guardExists = await Bun.file(
-				join(worktreePath, ".opencode", "plugin", "overstory-guard.ts"),
+				join(worktreePath, ".opencode", "plugin", "haru-guard.ts"),
 			).exists();
 			expect(guardExists).toBe(true);
 		});
@@ -311,7 +311,7 @@ describe("OpenCodeRuntime", () => {
 
 			const configContent = JSON.parse(await Bun.file(join(worktreePath, "opencode.json")).text());
 			expect(configContent.permission).toBe("allow");
-			expect(configContent.plugin).toContain(".opencode/plugin/overstory-guard.ts");
+			expect(configContent.plugin).toContain(".opencode/plugin/haru-guard.ts");
 			expect(configContent.instructions).toContain("AGENTS.md");
 		});
 
@@ -325,9 +325,9 @@ describe("OpenCodeRuntime", () => {
 			);
 
 			const guardContent = await Bun.file(
-				join(worktreePath, ".opencode", "plugin", "overstory-guard.ts"),
+				join(worktreePath, ".opencode", "plugin", "haru-guard.ts"),
 			).text();
-			expect(guardContent).toContain("overstory-guard");
+			expect(guardContent).toContain("haru-guard");
 			expect(guardContent).toContain("test-scout");
 			expect(guardContent).toContain("READ_ONLY = true");
 		});
@@ -342,7 +342,7 @@ describe("OpenCodeRuntime", () => {
 			);
 
 			const guardContent = await Bun.file(
-				join(worktreePath, ".opencode", "plugin", "overstory-guard.ts"),
+				join(worktreePath, ".opencode", "plugin", "haru-guard.ts"),
 			).text();
 			expect(guardContent).toContain("READ_ONLY = false");
 		});

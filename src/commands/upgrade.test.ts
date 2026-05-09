@@ -1,5 +1,5 @@
 /**
- * Tests for the ov upgrade command.
+ * Tests for the ha upgrade command.
  *
  * Structural tests for CLI registration and option parsing.
  * Network calls and subprocess execution happen via real implementations;
@@ -15,9 +15,9 @@ describe("createUpgradeCommand — CLI structure", () => {
 		expect(cmd.name()).toBe("upgrade");
 	});
 
-	test("description mentions overstory", () => {
+	test("description mentions haru", () => {
 		const cmd = createUpgradeCommand();
-		expect(cmd.description().toLowerCase()).toContain("overstory");
+		expect(cmd.description().toLowerCase()).toContain("haru");
 	});
 
 	test("has --check option", () => {

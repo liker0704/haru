@@ -39,7 +39,7 @@ async function runGit(
  * Create a new git worktree for an agent.
  *
  * Creates a worktree at `{baseDir}/{agentName}` with a new branch
- * named `overstory/{agentName}/{taskId}` based on `baseBranch`.
+ * named `haru/{agentName}/{taskId}` based on `baseBranch`.
  *
  * @returns The absolute worktree path and branch name.
  */
@@ -53,7 +53,7 @@ export async function createWorktree(options: {
 	const { repoRoot, baseDir, agentName, baseBranch, taskId } = options;
 
 	const worktreePath = join(baseDir, agentName);
-	const branchName = `overstory/${agentName}/${taskId}`;
+	const branchName = `haru/${agentName}/${taskId}`;
 
 	await runGit(repoRoot, ["worktree", "add", "-b", branchName, worktreePath, baseBranch], {
 		worktreePath,
@@ -119,7 +119,7 @@ interface WorktreeEntry {
  *
  * worktree /path/to/wt
  * HEAD def456
- * branch refs/heads/overstory/agent/bead
+ * branch refs/heads/haru/agent/bead
  * ```
  */
 function parseWorktreeOutput(output: string): WorktreeEntry[] {

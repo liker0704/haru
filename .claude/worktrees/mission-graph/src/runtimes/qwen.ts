@@ -1,4 +1,4 @@
-// Qwen Code runtime adapter for overstory's AgentRuntime interface.
+// Qwen Code runtime adapter for haru's AgentRuntime interface.
 // Implements the AgentRuntime contract for Alibaba's `qwen` CLI (Gemini CLI fork).
 //
 // Key characteristics:
@@ -46,7 +46,7 @@ export class QwenRuntime implements AgentRuntime {
 	readonly instructionPath = "AGENTS.md";
 
 	/**
-	 * Anthropic aliases used by overstory manifests that Qwen CLI does not
+	 * Anthropic aliases used by haru manifests that Qwen CLI does not
 	 * accept as --model values.
 	 */
 	private static readonly SKIP_MODEL_FLAG = new Set(["sonnet", "opus", "haiku", "default"]);

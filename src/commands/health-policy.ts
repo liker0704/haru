@@ -1,8 +1,8 @@
 /**
- * CLI command: ov health policy [--execute] [--json]
- *              ov health policy history [--limit N] [--json]
- *              ov health policy disable
- *              ov health policy enable
+ * CLI command: ha health policy [--execute] [--json]
+ *              ha health policy history [--limit N] [--json]
+ *              ha health policy disable
+ *              ha health policy enable
  *
  * Evaluates health policy rules against the current swarm health score.
  * Dry-run is the default; pass --execute to apply actions.
@@ -81,7 +81,7 @@ export function createHealthPolicyCommand(): Command {
 				return;
 			}
 
-			process.stdout.write(renderPolicyEvaluation(result) + "\n");
+			process.stdout.write(`${renderPolicyEvaluation(result)}\n`);
 		});
 
 	cmd
@@ -115,7 +115,7 @@ export function createHealthPolicyCommand(): Command {
 				return;
 			}
 
-			process.stdout.write(renderPolicyHistory(records) + "\n");
+			process.stdout.write(`${renderPolicyHistory(records)}\n`);
 		});
 
 	cmd

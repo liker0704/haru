@@ -1,5 +1,5 @@
 /**
- * CLI command: overstory status [--json] [--watch]
+ * CLI command: haru status [--json] [--watch]
  *
  * Shows active agents, worktree status, task summary, mail queue depth,
  * and merge queue state. --watch mode uses polling for live updates.
@@ -356,7 +356,7 @@ export function printStatus(data: StatusData): void {
 	w("\n");
 
 	// Worktrees
-	const overstoryWts = data.worktrees.filter((wt) => wt.branch.startsWith("overstory/"));
+	const overstoryWts = data.worktrees.filter((wt) => wt.branch.startsWith("haru/"));
 	w(`Worktrees: ${overstoryWts.length}\n`);
 	for (const wt of overstoryWts) {
 		w(`   ${wt.branch}\n`);
@@ -414,7 +414,7 @@ async function executeStatus(opts: StatusOpts): Promise<void> {
 
 	if (watch) {
 		process.stderr.write(
-			"Warning: --watch is deprecated. Use 'ov dashboard' for live monitoring.\n\n",
+			"Warning: --watch is deprecated. Use 'ha dashboard' for live monitoring.\n\n",
 		);
 		// Polling loop (kept for one release cycle)
 		while (true) {
@@ -472,7 +472,7 @@ export function createStatusCommand(): Command {
 		.option("--verbose", "Show extra detail per agent (worktree, logs, mail timestamps)")
 		.option("--agent <name>", "Show unread mail for this agent (default: orchestrator)")
 		.option("--all", "Show sessions from all runs (default: current run only)")
-		.option("--watch", "(deprecated) Use 'ov dashboard' for live monitoring")
+		.option("--watch", "(deprecated) Use 'ha dashboard' for live monitoring")
 		.option("--interval <ms>", "Poll interval for --watch in milliseconds (default: 3000)")
 		.action(async (opts: StatusOpts) => {
 			await executeStatus(opts);
@@ -480,7 +480,7 @@ export function createStatusCommand(): Command {
 
 	cmd.command("set <statusLine>")
 		.description("Set agent status line (self-reported current activity)")
-		.requiredOption("--agent <name>", "Agent name (use $OVERSTORY_AGENT_NAME)")
+		.requiredOption("--agent <name>", "Agent name (use $HARU_AGENT_NAME)")
 		.option("--json", "Output as JSON")
 		.action(async (statusLine: string, opts: { agent: string; json?: boolean }) => {
 			await executeStatusSet(statusLine, opts);

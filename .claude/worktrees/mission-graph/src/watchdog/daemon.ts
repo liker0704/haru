@@ -264,7 +264,7 @@ function reconcileSessionToCompleted(params: {
 function buildRateLimitResumeNudge(session: AgentSession): string {
 	return [
 		"Rate limit has reset.",
-		`Run ov mail check --agent ${session.agentName} if needed, then continue task ${session.taskId} from where you left off.`,
+		`Run ha mail check --agent ${session.agentName} if needed, then continue task ${session.taskId} from where you left off.`,
 	].join(" ");
 }
 
@@ -927,7 +927,7 @@ export async function runDaemonTick(options: DaemonOptions): Promise<void> {
 									.slice(0, 3)
 									.map((m) => m.subject)
 									.join("; ");
-								const msg = `You have ${unread.length} unread message(s): ${subjects} — check mail: ov mail check --agent ${session.agentName}`;
+								const msg = `You have ${unread.length} unread message(s): ${subjects} — check mail: ha mail check --agent ${session.agentName}`;
 								await sendInput(session.tmuxSession, msg);
 								await Bun.sleep(500);
 								await sendInput(session.tmuxSession, "");

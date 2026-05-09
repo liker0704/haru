@@ -30,7 +30,7 @@ Use the Task tool to spawn parallel agents (one per issue, or batch small sets i
 - Are there technical blockers or unknowns?
 
 #### c. Project alignment review
-- Does this issue align with overstory's goals (agent orchestration, zero runtime deps, Bun-native)?
+- Does this issue align with haru's goals (agent orchestration, zero runtime deps, Bun-native)?
 - Does it conflict with existing architecture decisions?
 - Is it a feature request, bug fix, improvement, or maintenance task?
 - Would addressing it create technical debt or reduce it?
@@ -56,7 +56,7 @@ Each agent should return a structured review:
 - **Recommended priority:** Critical / High / Medium / Low / Wontfix
 - **Scope:** Small / Medium / Large
 - **Summary:** 2-3 sentence assessment
-- **Alignment:** How well it fits overstory's direction
+- **Alignment:** How well it fits haru's direction
 - **Risks:** Potential pitfalls or concerns
 - **Suggestions:** Refinements to the issue, alternative approaches, or related work
 - **Related code:** Key files/subsystems that would be affected

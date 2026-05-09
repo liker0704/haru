@@ -59,7 +59,7 @@ export async function runQuickstart(
 
 		if (result.status === "failed" && step.id === "prerequisites") {
 			process.stderr.write(
-				`Prerequisite check failed. Fix the issues above and re-run 'ov quickstart'.\n`,
+				`Prerequisite check failed. Fix the issues above and re-run 'ha quickstart'.\n`,
 			);
 			return;
 		}

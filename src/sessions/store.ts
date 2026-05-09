@@ -348,7 +348,7 @@ const SESSION_MIGRATIONS: Migration[] = [
 					"SELECT sql FROM sqlite_master WHERE type='table' AND name='sessions'",
 				)
 				.get();
-			return result !== null && result.sql.includes("'waiting'");
+			return result?.sql.includes("'waiting'");
 		},
 	},
 ];
@@ -372,12 +372,8 @@ const STATE_LOG_MIGRATION: Migration = {
 				run_id TEXT
 			)
 		`);
-		db.exec(
-			"CREATE INDEX IF NOT EXISTS idx_asl_agent ON agent_state_log(agent_name)",
-		);
-		db.exec(
-			"CREATE INDEX IF NOT EXISTS idx_asl_run ON agent_state_log(run_id)",
-		);
+		db.exec("CREATE INDEX IF NOT EXISTS idx_asl_agent ON agent_state_log(agent_name)");
+		db.exec("CREATE INDEX IF NOT EXISTS idx_asl_run ON agent_state_log(run_id)");
 		// Trigger: log state changes automatically
 		db.exec(`
 			CREATE TRIGGER IF NOT EXISTS trg_session_state_change

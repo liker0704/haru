@@ -36,7 +36,7 @@ export function renderMissionNarrative(mission: Mission, overstoryDir: string): 
 	return renderNarrative(buildNarrative(mission, loadMissionEvents(overstoryDir, mission)));
 }
 
-// === ov mission status ===
+// === ha mission status ===
 
 export async function missionStatus(
 	overstoryDir: string,
@@ -178,7 +178,7 @@ export async function missionStatus(
 	}
 }
 
-// === ov mission output ===
+// === ha mission output ===
 
 export async function missionOutput(
 	overstoryDir: string,
@@ -251,7 +251,7 @@ export async function missionOutput(
 	}
 }
 
-// === ov mission artifacts ===
+// === ha mission artifacts ===
 
 export async function missionArtifacts(
 	overstoryDir: string,
@@ -301,7 +301,7 @@ export async function missionArtifacts(
 	}
 }
 
-// === ov mission list ===
+// === ha mission list ===
 
 export async function missionList(overstoryDir: string, json: boolean): Promise<void> {
 	const dbPath = join(overstoryDir, "sessions.db");
@@ -344,7 +344,7 @@ export async function missionList(overstoryDir: string, json: boolean): Promise<
 	}
 }
 
-// === ov mission show ===
+// === ha mission show ===
 
 export async function missionShow(
 	overstoryDir: string,
@@ -413,7 +413,7 @@ export async function missionShow(
 	}
 }
 
-// === ov mission graph ===
+// === ha mission graph ===
 
 export async function missionGraph(
 	overstoryDir: string,

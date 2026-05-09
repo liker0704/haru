@@ -6,7 +6,13 @@
 
 import { loadConfig } from "../config.ts";
 import { printHint, printWarning } from "../logging/color.ts";
-import { areHooksInstalled, areDependenciesAvailable, hasActiveAgents, isInitialized, isRuntimeAvailable } from "./detect.ts";
+import {
+	areDependenciesAvailable,
+	areHooksInstalled,
+	hasActiveAgents,
+	isInitialized,
+	isRuntimeAvailable,
+} from "./detect.ts";
 import { askYesNo } from "./prompts.ts";
 import type { QuickstartOptions, QuickstartStep, StepResult } from "./types.ts";
 
@@ -63,8 +69,8 @@ export function buildSteps(options: QuickstartOptions): QuickstartStep[] {
 	/** Step 2: init */
 	const init: QuickstartStep = {
 		id: "init",
-		title: "Initialize overstory",
-		description: "Run ov init to set up .overstory/ in this project",
+		title: "Initialize haru",
+		description: "Run ha init to set up .overstory/ in this project",
 		check: async () => {
 			return (await isInitialized(projectRoot)) ? "complete" : "pending";
 		},
@@ -74,7 +80,7 @@ export function buildSteps(options: QuickstartOptions): QuickstartStep[] {
 			}
 			const result = await runCommand(["ov", "init", "--yes"]);
 			if (!result.ok) {
-				return { status: "failed", message: "ov init failed", details: [result.stderr] };
+				return { status: "failed", message: "ha init failed", details: [result.stderr] };
 			}
 			if (verbose) {
 				process.stdout.write(result.stdout);
@@ -263,7 +269,7 @@ export function buildSteps(options: QuickstartOptions): QuickstartStep[] {
 			return {
 				status: "complete",
 				message: "Timed out — agent may still be running",
-				details: ["Use `ov status` to check agent progress", "Use `ov attach` to follow logs"],
+				details: ["Use `ha status` to check agent progress", "Use `ha attach` to follow logs"],
 			};
 		},
 	};
@@ -279,8 +285,8 @@ export function buildSteps(options: QuickstartOptions): QuickstartStep[] {
 			if (result.ok && verbose) {
 				process.stdout.write(result.stdout);
 			}
-			printHint("Use `ov inspect quickstart-scout` to see full agent output");
-			printHint("Use `ov logs --agent quickstart-scout` to tail agent logs");
+			printHint("Use `ha inspect quickstart-scout` to see full agent output");
+			printHint("Use `ha logs --agent quickstart-scout` to tail agent logs");
 			return { status: "complete", message: "Review complete" };
 		},
 	};

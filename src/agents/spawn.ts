@@ -15,7 +15,7 @@
  * calls rollbackWorktree() on failure before re-throwing.
  *
  * Session-before-beacon ordering: session record is persisted before
- * the beacon is sent (per overstory-036f).
+ * the beacon is sent (per haru-036f).
  */
 
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
@@ -230,7 +230,7 @@ export function createSpawnService(deps: SpawnDeps): SpawnService {
 					/* ignore parse errors */
 				}
 				throw new AgentError(
-					`Spawning paused by health policy (rule: ${ruleId}). Run \`ov health policy enable\` or remove .overstory/spawn-paused to resume.`,
+					`Spawning paused by health policy (rule: ${ruleId}). Run \`ha health policy enable\` or remove .overstory/spawn-paused to resume.`,
 					{ agentName: opts.name },
 				);
 			}
@@ -324,8 +324,7 @@ async function executePostWorktreeSteps(
 	}
 
 	// 8b. Resolve canopy profile if specified
-	const profileName =
-		opts.profile ?? process.env.OVERSTORY_PROFILE ?? config.project.defaultProfile;
+	const profileName = opts.profile ?? process.env.HARU_PROFILE ?? config.project.defaultProfile;
 	let profileContent: string | undefined;
 	if (profileName) {
 		try {
@@ -525,10 +524,10 @@ async function spawnHeadless(
 
 	const directEnv = {
 		...runtime.buildEnv(resolvedModel),
-		OVERSTORY_AGENT_NAME: name,
-		OVERSTORY_PARENT_AGENT: parentAgent ?? "",
-		OVERSTORY_WORKTREE_PATH: worktreePath,
-		OVERSTORY_TASK_ID: taskId,
+		HARU_AGENT_NAME: name,
+		HARU_PARENT_AGENT: parentAgent ?? "",
+		HARU_WORKTREE_PATH: worktreePath,
+		HARU_TASK_ID: taskId,
 	};
 
 	if (!runtime.buildDirectSpawn) {
@@ -617,7 +616,7 @@ async function spawnInteractive(
 	await tmux.ensureTmuxAvailable();
 
 	// 12. Create tmux session running agent in interactive mode
-	const tmuxSessionName = `overstory-${sanitizeTmuxName(config.project.name)}-${name}`;
+	const tmuxSessionName = `haru-${sanitizeTmuxName(config.project.name)}-${name}`;
 	const sessionId = crypto.randomUUID();
 	const spawnTimestamp = Date.now();
 	const spawnCmd = runtime.buildSpawnCommand({
@@ -628,21 +627,21 @@ async function spawnInteractive(
 		sharedWritableDirs: getSharedWritableDirs(config.project.root, capability),
 		env: {
 			...runtime.buildEnv(resolvedModel),
-			OVERSTORY_AGENT_NAME: name,
-			OVERSTORY_PARENT_AGENT: parentAgent ?? "",
-			OVERSTORY_WORKTREE_PATH: worktreePath,
-			OVERSTORY_TASK_ID: taskId,
+			HARU_AGENT_NAME: name,
+			HARU_PARENT_AGENT: parentAgent ?? "",
+			HARU_WORKTREE_PATH: worktreePath,
+			HARU_TASK_ID: taskId,
 		},
 	});
 	const pid = await tmux.createSession(tmuxSessionName, worktreePath, spawnCmd, {
 		...runtime.buildEnv(resolvedModel),
-		OVERSTORY_AGENT_NAME: name,
-		OVERSTORY_PARENT_AGENT: parentAgent ?? "",
-		OVERSTORY_WORKTREE_PATH: worktreePath,
-		OVERSTORY_TASK_ID: taskId,
+		HARU_AGENT_NAME: name,
+		HARU_PARENT_AGENT: parentAgent ?? "",
+		HARU_WORKTREE_PATH: worktreePath,
+		HARU_TASK_ID: taskId,
 	});
 
-	// 13. Record session BEFORE sending the beacon (overstory-036f ordering guarantee).
+	// 13. Record session BEFORE sending the beacon (haru-036f ordering guarantee).
 	const session: AgentSession = {
 		id: sessionId,
 		agentName: name,

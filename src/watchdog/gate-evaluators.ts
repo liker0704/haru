@@ -248,7 +248,7 @@ export async function evaluateArchitectDesign(
 	};
 }
 
-/** Check if coordinator has called ov mission handoff (phase changed to execute). */
+/** Check if coordinator has called ha mission handoff (phase changed to execute). */
 export function evaluateAwaitHandoff(mission: Mission): GateEvalResult {
 	if (mission.phase === "execute" || mission.phase === "done") {
 		return { met: true, trigger: "handoff_complete" };
@@ -256,7 +256,7 @@ export function evaluateAwaitHandoff(mission: Mission): GateEvalResult {
 	return {
 		met: false,
 		nudgeTarget: `coordinator-${mission.slug}`,
-		nudgeMessage: "All prerequisites met. Call 'ov mission handoff' to start execution.",
+		nudgeMessage: "All prerequisites met. Call 'ha mission handoff' to start execution.",
 	};
 }
 
@@ -279,7 +279,7 @@ export async function evaluateWsCompletion(
 
 	// Legacy path (opt-out via env var) — advance on first `merged` mail to ED.
 	// Default is the new SSOT path below.
-	if (process.env.OVERSTORY_LEGACY_WS_COMPLETION === "true") {
+	if (process.env.HARU_LEGACY_WS_COMPLETION === "true") {
 		const msgs = mailStore.getAll({ to: edName });
 		const mergedMail = msgs.find(
 			(m) => m.type === "merged" && (!gateEnteredAt || m.createdAt >= gateEnteredAt),
@@ -571,7 +571,7 @@ export async function evaluateGate(
 		case "collect-verdicts":
 			return evaluateCollectVerdicts(mission, stores.mailStore, gateEnteredAt);
 		case "frozen":
-			// Human gates are resolved by ov mission answer, not by evaluators.
+			// Human gates are resolved by ha mission answer, not by evaluators.
 			// Return met:false without unknown flag to suppress missing-evaluator warnings.
 			return { met: false };
 		default:

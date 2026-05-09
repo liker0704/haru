@@ -34,10 +34,7 @@ interface GateDeps {
 	gitRevParse: (repoRoot: string, ref: string) => Promise<string>;
 }
 
-async function defaultGitRevParse(
-	repoRoot: string,
-	ref: string,
-): Promise<string> {
+async function defaultGitRevParse(repoRoot: string, ref: string): Promise<string> {
 	const proc = Bun.spawn(["git", "rev-parse", ref], {
 		cwd: repoRoot,
 		stdout: "pipe",
@@ -61,11 +58,7 @@ function matchesAnyPattern(filePath: string, patterns: string[]): boolean {
 }
 
 /** Build a minimal CompatibilityResult for early-exit cases. */
-function earlyAdmitResult(
-	branchA: string,
-	branchB: string,
-	summary: string,
-): CompatibilityResult {
+function earlyAdmitResult(branchA: string, branchB: string, summary: string): CompatibilityResult {
 	return {
 		compatible: true,
 		changes: [],
@@ -104,11 +97,7 @@ export async function runCompatGate(
 
 	// 1. Gate disabled — admit immediately without analysis
 	if (!config.enabled) {
-		const result = earlyAdmitResult(
-			canonicalBranch,
-			entry.branchName,
-			"compat gate disabled",
-		);
+		const result = earlyAdmitResult(canonicalBranch, entry.branchName, "compat gate disabled");
 		return { action: "admit", reason: "compat gate disabled", result };
 	}
 
@@ -132,10 +121,7 @@ export async function runCompatGate(
 	}
 
 	// 3. Validate branch name
-	if (
-		!BRANCH_PATTERN.test(entry.branchName) ||
-		entry.branchName.includes("..")
-	) {
+	if (!BRANCH_PATTERN.test(entry.branchName) || entry.branchName.includes("..")) {
 		throw new Error(`Invalid branch name: "${entry.branchName}"`);
 	}
 
@@ -149,11 +135,7 @@ export async function runCompatGate(
 	if (cacheHit !== undefined) {
 		canonicalSurface = cacheHit;
 	} else {
-		canonicalSurface = await deps.extractSurface(
-			repoRoot,
-			canonicalBranch,
-			DEFAULT_FILE_PATTERNS,
-		);
+		canonicalSurface = await deps.extractSurface(repoRoot, canonicalBranch, DEFAULT_FILE_PATTERNS);
 		cache?.set(canonicalSha, canonicalSurface);
 	}
 

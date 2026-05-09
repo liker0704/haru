@@ -5,7 +5,7 @@ domains:
   - typescript
   - cli
   - messaging
-  - overstory
+  - haru
   - ecosystem
   - tracker
   - evals

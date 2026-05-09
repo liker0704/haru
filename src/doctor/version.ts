@@ -3,7 +3,7 @@ import type { DoctorCheck, DoctorCheckFn } from "./types.ts";
 
 /**
  * Version compatibility checks.
- * Validates overstory CLI version, config schema version, database schema versions.
+ * Validates haru CLI version, config schema version, database schema versions.
  */
 export const checkVersion: DoctorCheckFn = async (
 	_config,
@@ -11,7 +11,7 @@ export const checkVersion: DoctorCheckFn = async (
 ): Promise<DoctorCheck[]> => {
 	const checks: DoctorCheck[] = [];
 
-	// Determine overstory tool root (not the target project)
+	// Determine haru tool root (not the target project)
 	// import.meta.dir is src/doctor/, so go up two levels to repo root
 	const toolRoot = join(import.meta.dir, "..", "..");
 
@@ -47,7 +47,7 @@ async function checkCurrentVersion(toolRoot: string): Promise<DoctorCheck> {
 			name: "version-current",
 			category: "version",
 			status: "pass",
-			message: `ov v${packageJson.version}`,
+			message: `ha v${packageJson.version}`,
 		};
 	} catch (error) {
 		return {

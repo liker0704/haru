@@ -1,5 +1,5 @@
 /**
- * CLI command: ov costs [--agent <name>] [--run <id>] [--by-capability] [--last <n>] [--self] [--json]
+ * CLI command: ha costs [--agent <name>] [--run <id>] [--by-capability] [--last <n>] [--self] [--json]
  *
  * Shows token/cost analysis and breakdown for agent sessions.
  * Data source: metrics.db via createMetricsStore().

@@ -1,5 +1,5 @@
 /**
- * Types for the overstory review contour.
+ * Types for the haru review contour.
  *
  * Self-contained module — all review types live here, not in src/types.ts.
  */

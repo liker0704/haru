@@ -15,8 +15,8 @@ describe("CursorRuntime", () => {
 			expect(runtime.id).toBe("cursor");
 		});
 
-		test("instructionPath is .cursor/rules/overstory.md", () => {
-			expect(runtime.instructionPath).toBe(".cursor/rules/overstory.md");
+		test("instructionPath is .cursor/rules/haru.md", () => {
+			expect(runtime.instructionPath).toBe(".cursor/rules/haru.md");
 		});
 	});
 
@@ -240,7 +240,7 @@ describe("CursorRuntime", () => {
 			await cleanupTempDir(tempDir);
 		});
 
-		test("writes overlay to .cursor/rules/overstory.md when provided", async () => {
+		test("writes overlay to .cursor/rules/haru.md when provided", async () => {
 			const worktreePath = join(tempDir, "worktree");
 
 			await runtime.deployConfig(
@@ -249,7 +249,7 @@ describe("CursorRuntime", () => {
 				{ agentName: "test-builder", capability: "builder", worktreePath },
 			);
 
-			const overlayPath = join(worktreePath, ".cursor", "rules", "overstory.md");
+			const overlayPath = join(worktreePath, ".cursor", "rules", "haru.md");
 			const content = await Bun.file(overlayPath).text();
 			expect(content).toBe("# Cursor Instructions\nYou are a builder.");
 		});
@@ -263,9 +263,7 @@ describe("CursorRuntime", () => {
 				{ agentName: "test", capability: "builder", worktreePath },
 			);
 
-			const fileExists = await Bun.file(
-				join(worktreePath, ".cursor", "rules", "overstory.md"),
-			).exists();
+			const fileExists = await Bun.file(join(worktreePath, ".cursor", "rules", "haru.md")).exists();
 			expect(fileExists).toBe(true);
 		});
 
@@ -279,7 +277,7 @@ describe("CursorRuntime", () => {
 			});
 
 			const overlayExists = await Bun.file(
-				join(worktreePath, ".cursor", "rules", "overstory.md"),
+				join(worktreePath, ".cursor", "rules", "haru.md"),
 			).exists();
 			expect(overlayExists).toBe(false);
 		});
@@ -300,18 +298,18 @@ describe("CursorRuntime", () => {
 				},
 			);
 
-			const overlayFile = Bun.file(join(worktreePath, ".cursor", "rules", "overstory.md"));
+			const overlayFile = Bun.file(join(worktreePath, ".cursor", "rules", "haru.md"));
 			expect(await overlayFile.exists()).toBe(true);
 
 			const settingsFile = Bun.file(join(worktreePath, ".claude", "settings.local.json"));
 			expect(await settingsFile.exists()).toBe(false);
 
-			const piGuardFile = Bun.file(join(worktreePath, ".pi", "extensions", "overstory-guard.ts"));
+			const piGuardFile = Bun.file(join(worktreePath, ".pi", "extensions", "haru-guard.ts"));
 			expect(await piGuardFile.exists()).toBe(false);
 		});
 
 		test("overwrites existing overlay file", async () => {
-			const overlayPath = join(tempDir, ".cursor", "rules", "overstory.md");
+			const overlayPath = join(tempDir, ".cursor", "rules", "haru.md");
 			const { mkdir: mkdirFS } = await import("node:fs/promises");
 			await mkdirFS(join(tempDir, ".cursor", "rules"), { recursive: true });
 			await Bun.write(overlayPath, "# Old content");
@@ -468,8 +466,8 @@ describe("CursorRuntime", () => {
 		test("env is safe to spread into session env", () => {
 			const model: ResolvedModel = { model: "sonnet" };
 			const env = runtime.buildEnv(model);
-			const combined = { ...env, OVERSTORY_AGENT_NAME: "builder-1" };
-			expect(combined).toEqual({ OVERSTORY_AGENT_NAME: "builder-1" });
+			const combined = { ...env, HARU_AGENT_NAME: "builder-1" };
+			expect(combined).toEqual({ HARU_AGENT_NAME: "builder-1" });
 		});
 	});
 
@@ -492,6 +490,6 @@ describe("CursorRuntime integration: registry resolves 'cursor'", () => {
 		const rt = getRuntime("cursor");
 		expect(rt).toBeInstanceOf(CursorRuntime);
 		expect(rt.id).toBe("cursor");
-		expect(rt.instructionPath).toBe(".cursor/rules/overstory.md");
+		expect(rt.instructionPath).toBe(".cursor/rules/haru.md");
 	});
 });

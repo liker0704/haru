@@ -10,10 +10,9 @@ import type { MetricsStore } from "../metrics/store.ts";
 import type { SessionMetrics } from "../metrics/types.ts";
 import { normalizeSpans } from "../observability/normalize.ts";
 import type { ExportSpan } from "../observability/types.ts";
-import type { SessionStore } from "../sessions/store.ts";
+import type { SessionStore, StateLogEntry } from "../sessions/store.ts";
 import type { Run, RunStore } from "../sessions/types.ts";
 import { enrichSpanHierarchy } from "./enrich.ts";
-import type { StateLogEntry } from "../sessions/store.ts";
 import type { ProfilerSpan, ProfilerTrace, RunInfo, StateSegment, TraceSummary } from "./types.ts";
 
 /** Instant span kinds that should be collapsed by (agentName, kind). */

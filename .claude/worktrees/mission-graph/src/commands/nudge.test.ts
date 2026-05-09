@@ -47,9 +47,9 @@ function makeSession(overrides: Partial<AgentSession> = {}): AgentSession {
 		capability: "builder",
 		runtime: "claude",
 		worktreePath: "/tmp/wt",
-		branchName: "overstory/test-agent/task-1",
+		branchName: "haru/test-agent/task-1",
 		taskId: "task-1",
-		tmuxSession: "overstory-test-agent",
+		tmuxSession: "haru-test-agent",
 		state: "working",
 		pid: 12345,
 		parentAgent: null,
@@ -156,7 +156,7 @@ describe("nudgeAgent", () => {
 		writeSessionsToStore(tempDir, [
 			makeSession({
 				agentName: "orchestrator",
-				tmuxSession: "overstory-orchestrator",
+				tmuxSession: "haru-orchestrator",
 				state: "working",
 			}),
 		]);
@@ -169,7 +169,7 @@ describe("nudgeAgent", () => {
 		const result = await nudgeAgent(tempDir, "orchestrator");
 		// Should use sessions.db entry, fail at tmux alive check
 		expect(result.delivered).toBe(false);
-		expect(result.reason).toContain("overstory-orchestrator");
+		expect(result.reason).toContain("haru-orchestrator");
 	});
 
 	test("records nudge event to EventStore after delivery attempt", async () => {

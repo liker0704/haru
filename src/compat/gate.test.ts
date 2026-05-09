@@ -7,18 +7,11 @@ import { createEventStore } from "../events/store.ts";
 import type { MergeEntry } from "../merge/types.ts";
 import { cleanupTempDir } from "../test-helpers.ts";
 import { createSurfaceCache, runCompatGate } from "./gate.ts";
-import type {
-	CompatConfig,
-	CompatibilityResult,
-	TypeSurface,
-} from "./types.ts";
+import type { CompatConfig, CompatibilityResult, TypeSurface } from "./types.ts";
 
 // --- Test fixtures ---
 
-function makeSurface(
-	ref: string,
-	symbols: TypeSurface["symbols"] = [],
-): TypeSurface {
+function makeSurface(ref: string, symbols: TypeSurface["symbols"] = []): TypeSurface {
 	return { ref, symbols, extractedAt: new Date().toISOString() };
 }
 
@@ -42,9 +35,7 @@ function makeCompatResult(compatible: boolean): CompatibilityResult {
 				],
 		branchA: "main",
 		branchB: "feature",
-		summary: compatible
-			? "No changes detected."
-			: "1 breaking change. Surfaces are incompatible.",
+		summary: compatible ? "No changes detected." : "1 breaking change. Surfaces are incompatible.",
 		staticOnly: true,
 		analyzedAt: new Date().toISOString(),
 	};
@@ -52,7 +43,7 @@ function makeCompatResult(compatible: boolean): CompatibilityResult {
 
 function makeEntry(filesModified: string[] = ["src/foo.ts"]): MergeEntry {
 	return {
-		branchName: "overstory/agent/task-123",
+		branchName: "haru/agent/task-123",
 		taskId: "task-123",
 		agentName: "agent",
 		filesModified,
@@ -73,8 +64,7 @@ const DEFAULT_CONFIG: CompatConfig = {
 /** Noop deps: no git, mock surface extraction and analysis. */
 function makeDeps(compatible = true) {
 	return {
-		extractSurface: async (_r: string, ref: string, _p: string[]) =>
-			makeSurface(ref),
+		extractSurface: async (_r: string, ref: string, _p: string[]) => makeSurface(ref),
 		analyze: async () => makeCompatResult(compatible),
 		gitRevParse: async () => "abc123sha",
 	};
@@ -136,15 +126,9 @@ describe("runCompatGate", () => {
 	});
 
 	test("compatible branches → admit", async () => {
-		const decision = await runCompatGate(
-			"/repo",
-			makeEntry(),
-			"main",
-			DEFAULT_CONFIG,
-			{
-				_deps: makeDeps(true),
-			},
-		);
+		const decision = await runCompatGate("/repo", makeEntry(), "main", DEFAULT_CONFIG, {
+			_deps: makeDeps(true),
+		});
 		expect(decision.action).toBe("admit");
 		expect(decision.result.compatible).toBe(true);
 	});
@@ -159,15 +143,9 @@ describe("runCompatGate", () => {
 	});
 
 	test("incompatible branches in non-strict mode → defer", async () => {
-		const decision = await runCompatGate(
-			"/repo",
-			makeEntry(),
-			"main",
-			DEFAULT_CONFIG,
-			{
-				_deps: makeDeps(false),
-			},
-		);
+		const decision = await runCompatGate("/repo", makeEntry(), "main", DEFAULT_CONFIG, {
+			_deps: makeDeps(false),
+		});
 		expect(decision.action).toBe("defer");
 		expect(decision.result.compatible).toBe(false);
 	});
@@ -205,22 +183,16 @@ describe("runCompatGate", () => {
 		};
 
 		// First call: canonical + branch = 2 extract calls
-		await runCompatGate(
-			"/repo",
-			makeEntry(["src/a.ts"]),
-			"main",
-			DEFAULT_CONFIG,
-			{
-				surfaceCache,
-				_deps: deps,
-			},
-		);
+		await runCompatGate("/repo", makeEntry(["src/a.ts"]), "main", DEFAULT_CONFIG, {
+			surfaceCache,
+			_deps: deps,
+		});
 		expect(extractCallCount).toBe(2); // canonical + branch
 
 		// Second call: canonical should come from cache, only branch extracted
 		const entry2 = {
 			...makeEntry(["src/b.ts"]),
-			branchName: "overstory/agent/task-456",
+			branchName: "haru/agent/task-456",
 		};
 		await runCompatGate("/repo", entry2, "main", DEFAULT_CONFIG, {
 			surfaceCache,
@@ -234,22 +206,14 @@ describe("runCompatGate", () => {
 		const preStore = createEventStore(eventsDbPath);
 		preStore.close();
 
-		const decision = await runCompatGate(
-			"/repo",
-			makeEntry(),
-			"main",
-			DEFAULT_CONFIG,
-			{
-				eventsDbPath,
-				_deps: makeDeps(true),
-			},
-		);
+		const decision = await runCompatGate("/repo", makeEntry(), "main", DEFAULT_CONFIG, {
+			eventsDbPath,
+			_deps: makeDeps(true),
+		});
 
 		const db = new Database(eventsDbPath, { readonly: true });
 		const rows = db
-			.prepare(
-				"SELECT event_type, level, data FROM events WHERE event_type = 'custom'",
-			)
+			.prepare("SELECT event_type, level, data FROM events WHERE event_type = 'custom'")
 			.all() as Array<{ event_type: string; level: string; data: string }>;
 		db.close();
 
@@ -281,9 +245,9 @@ describe("runCompatGate", () => {
 		);
 
 		const db = new Database(eventsDbPath, { readonly: true });
-		const rows = db
-			.prepare("SELECT level FROM events WHERE event_type = 'custom'")
-			.all() as Array<{ level: string }>;
+		const rows = db.prepare("SELECT level FROM events WHERE event_type = 'custom'").all() as Array<{
+			level: string;
+		}>;
 		db.close();
 
 		expect(rows.length).toBeGreaterThan(0);

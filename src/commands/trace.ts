@@ -1,5 +1,5 @@
 /**
- * CLI command: ov trace <target> [--json] [--since <ts>] [--until <ts>] [--limit <n>]
+ * CLI command: ha trace <target> [--json] [--since <ts>] [--until <ts>] [--limit <n>]
  *
  * Shows a chronological timeline of events for an agent or task.
  * Target can be an agent name or a task ID (resolved to agent name via SessionStore).
@@ -24,7 +24,7 @@ import type { StoredEvent } from "../types.ts";
 
 /**
  * Detect whether a target string looks like a task ID.
- * Task IDs follow the pattern: word-alphanumeric (e.g., "overstory-rj1k", "myproject-abc1").
+ * Task IDs follow the pattern: word-alphanumeric (e.g., "haru-rj1k", "myproject-abc1").
  */
 function looksLikeTaskId(target: string): boolean {
 	return /^[a-z][a-z0-9]*-[a-z0-9]{3,}$/i.test(target);

@@ -1,4 +1,4 @@
-// Pi runtime adapter for overstory's AgentRuntime interface.
+// Pi runtime adapter for haru's AgentRuntime interface.
 // Implements the AgentRuntime contract for the `pi` CLI (Mario Zechner's Pi coding agent).
 
 import { mkdir } from "node:fs/promises";
@@ -117,7 +117,7 @@ export class PiRuntime implements AgentRuntime {
 	 *
 	 * Writes up to three files:
 	 * 1. `.claude/CLAUDE.md` — agent's task-specific overlay. Skipped when overlay is undefined.
-	 * 2. `.pi/extensions/overstory-guard.ts` — Pi guard extension (always deployed).
+	 * 2. `.pi/extensions/haru-guard.ts` — Pi guard extension (always deployed).
 	 * 3. `.pi/settings.json` — Pi settings enabling the extensions directory (always deployed).
 	 *
 	 * @param worktreePath - Absolute path to the agent's git worktree
@@ -138,7 +138,7 @@ export class PiRuntime implements AgentRuntime {
 		// Always deploy Pi guard extension.
 		const piExtDir = join(worktreePath, ".pi", "extensions");
 		await mkdir(piExtDir, { recursive: true });
-		await Bun.write(join(piExtDir, "overstory-guard.ts"), generatePiGuardExtension(hooks));
+		await Bun.write(join(piExtDir, "haru-guard.ts"), generatePiGuardExtension(hooks));
 
 		// Always deploy Pi settings pointing at the extensions directory.
 		const piDir = join(worktreePath, ".pi");

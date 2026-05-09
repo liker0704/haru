@@ -11,7 +11,7 @@ describe("lifecycle", () => {
 	let agentsDir: string;
 
 	beforeEach(async () => {
-		agentsDir = await mkdtemp(join(tmpdir(), "overstory-lifecycle-test-"));
+		agentsDir = await mkdtemp(join(tmpdir(), "haru-lifecycle-test-"));
 	});
 
 	afterEach(async () => {
@@ -23,11 +23,11 @@ describe("lifecycle", () => {
 			agentsDir,
 			agentName: "builder-1",
 			sessionId: "session-100",
-			taskId: "overstory-xyz1",
+			taskId: "haru-xyz1",
 			reason: "compaction",
 			progressSummary: "Built the widget",
 			pendingWork: "Tests remain",
-			currentBranch: "overstory/builder-1/overstory-xyz1",
+			currentBranch: "haru/builder-1/haru-xyz1",
 			filesModified: ["src/widget.ts"],
 			mulchDomains: ["agents"],
 		});
@@ -56,11 +56,11 @@ describe("lifecycle", () => {
 			agentsDir,
 			agentName: "builder-2",
 			sessionId: "session-200",
-			taskId: "overstory-abc2",
+			taskId: "haru-abc2",
 			reason: "crash",
 			progressSummary: "Halfway done",
 			pendingWork: "Finish implementation",
-			currentBranch: "overstory/builder-2/overstory-abc2",
+			currentBranch: "haru/builder-2/haru-abc2",
 			filesModified: ["src/foo.ts"],
 			mulchDomains: [],
 		});
@@ -82,11 +82,11 @@ describe("lifecycle", () => {
 			agentsDir,
 			agentName: "builder-3",
 			sessionId: "session-300",
-			taskId: "overstory-def3",
+			taskId: "haru-def3",
 			reason: "manual",
 			progressSummary: "Done with phase 1",
 			pendingWork: "Phase 2",
-			currentBranch: "overstory/builder-3/overstory-def3",
+			currentBranch: "haru/builder-3/haru-def3",
 			filesModified: [],
 			mulchDomains: [],
 		});
@@ -116,11 +116,11 @@ describe("lifecycle", () => {
 			agentsDir,
 			agentName: "builder-4",
 			sessionId: "session-400",
-			taskId: "overstory-ghi4",
+			taskId: "haru-ghi4",
 			reason: "compaction",
 			progressSummary: "First session work",
 			pendingWork: "Continue",
-			currentBranch: "overstory/builder-4/overstory-ghi4",
+			currentBranch: "haru/builder-4/haru-ghi4",
 			filesModified: ["a.ts"],
 			mulchDomains: [],
 		});
@@ -137,11 +137,11 @@ describe("lifecycle", () => {
 			agentsDir,
 			agentName: "builder-4",
 			sessionId: "session-401",
-			taskId: "overstory-ghi4",
+			taskId: "haru-ghi4",
 			reason: "timeout",
 			progressSummary: "Second session work",
 			pendingWork: "Finish up",
-			currentBranch: "overstory/builder-4/overstory-ghi4",
+			currentBranch: "haru/builder-4/haru-ghi4",
 			filesModified: ["a.ts", "b.ts"],
 			mulchDomains: [],
 		});
@@ -172,11 +172,11 @@ describe("lifecycle", () => {
 			agentsDir,
 			agentName: "builder-5",
 			sessionId: "session-500",
-			taskId: "overstory-jkl5",
+			taskId: "haru-jkl5",
 			reason: "compaction",
 			progressSummary: "Done",
 			pendingWork: "Nothing",
-			currentBranch: "overstory/builder-5/overstory-jkl5",
+			currentBranch: "haru/builder-5/haru-jkl5",
 			filesModified: [],
 			mulchDomains: [],
 		});

@@ -13,7 +13,7 @@ describe("checkMergeQueue", () => {
 	let mockConfig: OverstoryConfig;
 
 	beforeEach(() => {
-		tempDir = mkdtempSync(join(tmpdir(), "overstory-test-"));
+		tempDir = mkdtempSync(join(tmpdir(), "haru-test-"));
 		mockConfig = {
 			project: { name: "test", root: tempDir, canonicalBranch: "main" },
 			agents: {

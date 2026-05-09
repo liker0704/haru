@@ -1,5 +1,5 @@
 /**
- * CLI command: ov resume [agent-name]
+ * CLI command: ha resume [agent-name]
  *
  * Resumes interrupted agent sessions by recreating tmux sessions.
  * For Claude Code agents, uses `--resume <session-id>` to restore
@@ -41,7 +41,7 @@ async function resumeCommand(
 	agentName: string | undefined,
 	opts: { list?: boolean; attach?: boolean; json?: boolean },
 ): Promise<void> {
-	// Support `ov resume list` as alias for `ov resume --list`
+	// Support `ha resume list` as alias for `ha resume --list`
 	if (agentName === "list") {
 		opts.list = true;
 		agentName = undefined;
@@ -145,7 +145,7 @@ async function resumeCommand(
 				}
 			} else if (succeeded.length > 1 && !json) {
 				printWarning(
-					"--attach requires a single agent. Specify agent name: ov resume <name> --attach",
+					"--attach requires a single agent. Specify agent name: ha resume <name> --attach",
 				);
 			}
 		}
@@ -161,7 +161,7 @@ async function resumeCommand(
 function buildResumeNudge(session: AgentSession): string {
 	const parts = [
 		`[OVERSTORY RESUME] ${session.agentName} (${session.capability}) — session restored after interruption.`,
-		`Recovery: check git status, run ov mail check --agent ${session.agentName}, then continue task ${session.taskId}.`,
+		`Recovery: check git status, run ha mail check --agent ${session.agentName}, then continue task ${session.taskId}.`,
 	];
 	return parts.join(" ");
 }
@@ -195,8 +195,8 @@ export async function resumeAgent(
 
 	const env: Record<string, string> = {
 		...runtime.buildEnv(resolvedModel),
-		OVERSTORY_AGENT_NAME: session.agentName,
-		OVERSTORY_WORKTREE_PATH: session.worktreePath,
+		HARU_AGENT_NAME: session.agentName,
+		HARU_WORKTREE_PATH: session.worktreePath,
 	};
 
 	// Root-level agents (coordinator, supervisor, monitor) get their definition

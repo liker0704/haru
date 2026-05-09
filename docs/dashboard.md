@@ -1,22 +1,22 @@
 # Dashboard
 
-This document is the contributor guide for the `ov dashboard` command. It covers
+This document is the contributor guide for the `ha dashboard` command. It covers
 panel layout, data sources, refresh mechanics, CLI flags, performance
 considerations, and instructions for modifying the dashboard.
 
 ---
 
-## 1. What `ov dashboard` Does
+## 1. What `ha dashboard` Does
 
-`ov dashboard` renders a live, multi-panel terminal UI using raw ANSI escape codes
+`ha dashboard` renders a live, multi-panel terminal UI using raw ANSI escape codes
 (no runtime UI library dependency). It polls multiple SQLite stores and subprocess
 outputs on a configurable interval and overwrites the terminal frame in place using
 cursor-control sequences.
 
 ```bash
-ov dashboard                  # Refresh every 2000ms, scope to current run
-ov dashboard --interval 500   # Refresh every 500ms (minimum)
-ov dashboard --all            # Show all runs, not just current-run.txt
+ha dashboard                  # Refresh every 2000ms, scope to current run
+ha dashboard --interval 500   # Refresh every 500ms (minimum)
+ha dashboard --all            # Show all runs, not just current-run.txt
 ```
 
 ---
@@ -28,7 +28,7 @@ dynamically from terminal dimensions (`process.stdout.rows`, `process.stdout.col
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│ ov dashboard v1.x.x                      HH:MM:SS [run: abc12345] | 2000ms  │
+│ ha dashboard v1.x.x                      HH:MM:SS [run: abc12345] | 2000ms  │
 ├──────────────────────────────────────────────────────────────────────────────┤
 │ Mission: my-mission [active/execute]   (optional — present when mission active)
 ├──────────────────────────────────────────────────────────────────────────────┤

@@ -1,6 +1,6 @@
-# `ov mission` Operator Guide
+# `ha mission` Operator Guide
 
-`ov mission v1` is implemented and no longer experimental.
+`ha mission v1` is implemented and no longer experimental.
 Use this document for day-to-day operation.
 
 Related references:
@@ -8,16 +8,16 @@ Related references:
 - [Design / RFC context](./ov-mission.md)
 - [Implementation / acceptance contract](./ov-mission-implementation.md)
 
-## When To Use `ov mission`
+## When To Use `ha mission`
 
-Use `ov mission` for larger tasks where you want the system to:
+Use `ha mission` for larger tasks where you want the system to:
 
 1. clarify the objective first
 2. build mission artifacts and workstreams
 3. dispatch execution only after handoff
 4. keep mission state durable across runtime interruptions
 
-Use the fast-path `ov coordinator` flow when the task is already clear and you
+Use the fast-path `ha coordinator` flow when the task is already clear and you
 do not need mission-level freeze / handoff discipline.
 
 ## Core Lifecycle
@@ -25,7 +25,7 @@ do not need mission-level freeze / handoff discipline.
 ### 1. Start a mission
 
 ```bash
-ov mission start --slug auth-refresh --objective "Stabilize the auth mission"
+ha mission start --slug auth-refresh --objective "Stabilize the auth mission"
 ```
 
 What this does immediately:
@@ -36,28 +36,28 @@ What this does immediately:
 - starts the long-lived `mission-analyst`
 
 Execution does **not** start yet.
-`execution-director` starts only at `ov mission handoff`.
+`execution-director` starts only at `ha mission handoff`.
 
 ### 2. Answer pending mission questions
 
 If the mission is waiting on clarification, answer through:
 
 ```bash
-ov mission answer --body "Admin-only. Keep passwords. No external provider."
+ha mission answer --body "Admin-only. Keep passwords. No external provider."
 ```
 
 Or:
 
 ```bash
-ov mission answer --file answers.md
+ha mission answer --file answers.md
 ```
 
 Useful inspection commands while the mission is forming:
 
 ```bash
-ov mission status
-ov mission output
-ov mission artifacts
+ha mission status
+ha mission output
+ha mission artifacts
 ```
 
 ## Mission Artifacts
@@ -82,7 +82,7 @@ pointer is stale or missing.
 Once planning artifacts are ready, hand off execution:
 
 ```bash
-ov mission handoff
+ha mission handoff
 ```
 
 Runtime requirements enforced by `v1`:
@@ -96,13 +96,13 @@ Runtime requirements enforced by `v1`:
 After handoff, monitor the mission with:
 
 ```bash
-ov mission status
-ov mission output
-ov status
-ov dashboard
+ha mission status
+ha mission output
+ha status
+ha dashboard
 ```
 
-Shared `ov status` and `ov dashboard` now show mission runtime presence for:
+Shared `ha status` and `ha dashboard` now show mission runtime presence for:
 
 - coordinator
 - mission analyst
@@ -113,7 +113,7 @@ Shared `ov status` and `ov dashboard` now show mission runtime presence for:
 When a brief changes, refresh the affected workstream:
 
 ```bash
-ov mission refresh-briefs --workstream ws-auth
+ha mission refresh-briefs --workstream ws-auth
 ```
 
 Effect:
@@ -126,22 +126,22 @@ To make the workstream resumable again, regenerate the current spec from the
 current brief:
 
 ```bash
-ov spec write task-auth --agent lead-auth --workstream-id ws-auth --brief-path .overstory/missions/<mission-id>/plan/ws-auth.md < auth-spec.md
+ha spec write task-auth --agent lead-auth --workstream-id ws-auth --brief-path .overstory/missions/<mission-id>/plan/ws-auth.md < auth-spec.md
 ```
 
 Then resume:
 
 ```bash
-ov mission resume ws-auth
+ha mission resume ws-auth
 ```
 
-`ov mission resume` will refuse to continue if the workstream has no current
+`ha mission resume` will refuse to continue if the workstream has no current
 spec metadata.
 
 If you need a manual operator pause without changing runtime agent state:
 
 ```bash
-ov mission pause ws-auth --reason "Waiting on product clarification"
+ha mission pause ws-auth --reason "Waiting on product clarification"
 ```
 
 ## Finish Or Abort
@@ -149,20 +149,20 @@ ov mission pause ws-auth --reason "Waiting on product clarification"
 Complete the mission:
 
 ```bash
-ov mission complete
+ha mission complete
 ```
 
 Or stop it intentionally:
 
 ```bash
-ov mission stop
+ha mission stop
 ```
 
 Both terminal paths export a mission result bundle.
 You can also force bundle regeneration later:
 
 ```bash
-ov mission bundle --mission-id <mission-id> --force
+ha mission bundle --mission-id <mission-id> --force
 ```
 
 ## Review Commands
@@ -171,8 +171,8 @@ Mission review now has command-level proof for both list and single-mission
 paths:
 
 ```bash
-ov review missions
-ov review mission <mission-id-or-slug>
+ha review missions
+ha review mission <mission-id-or-slug>
 ```
 
 Add `--json` when you want machine-readable output.
@@ -182,28 +182,28 @@ Add `--json` when you want machine-readable output.
 For most real missions, the operator-facing loop is:
 
 ```bash
-ov mission start --slug <slug> --objective "<objective>"
-ov mission status
-ov mission output
-ov mission answer --body "..."
-ov mission handoff
-ov status
-ov dashboard
-ov mission refresh-briefs --workstream <id>
-ov spec write <task-id> --agent <lead-name> --workstream-id <id> --brief-path <brief-path> < spec.md
-ov mission resume <id>
-ov mission complete
-ov review mission <mission-id-or-slug>
+ha mission start --slug <slug> --objective "<objective>"
+ha mission status
+ha mission output
+ha mission answer --body "..."
+ha mission handoff
+ha status
+ha dashboard
+ha mission refresh-briefs --workstream <id>
+ha spec write <task-id> --agent <lead-name> --workstream-id <id> --brief-path <brief-path> < spec.md
+ha mission resume <id>
+ha mission complete
+ha review mission <mission-id-or-slug>
 ```
 
 ## Troubleshooting
 
-- `ov mission handoff` fails:
+- `ha mission handoff` fails:
   check that `plan/workstreams.json` is valid, every workstream has a canonical
   `taskId`, and each dispatchable workstream has a real `briefPath`.
-- `ov mission resume` fails:
+- `ha mission resume` fails:
   the workstream still has stale or missing `.overstory/specs/<task-id>.meta.json`;
-  regenerate the spec with `ov spec write`.
+  regenerate the spec with `ha spec write`.
 - `builder` / `reviewer` spawn fails under mission mode:
   supply `--spec`, and make sure the spec metadata matches the task being
   dispatched.

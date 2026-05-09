@@ -45,7 +45,7 @@ describe("mission context helpers", () => {
 	let mission: Mission;
 
 	beforeEach(async () => {
-		tempDir = await mkdtemp(join(tmpdir(), "overstory-mission-context-"));
+		tempDir = await mkdtemp(join(tmpdir(), "haru-mission-context-"));
 		await mkdir(join(tempDir, "agent-defs"), { recursive: true });
 		await Bun.write(
 			join(tempDir, "agent-defs", "mission-analyst.md"),

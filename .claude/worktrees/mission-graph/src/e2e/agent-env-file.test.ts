@@ -39,9 +39,9 @@ describe("E2E: agent env file lifecycle", () => {
 	describe("writeAgentEnvFile / removeAgentEnvFile", () => {
 		test("creates .claude/.agent-env with export lines", async () => {
 			const env = {
-				OVERSTORY_AGENT_NAME: "test-builder",
-				OVERSTORY_WORKTREE_PATH: "/tmp/test-worktree",
-				OVERSTORY_TASK_ID: "task-42",
+				HARU_AGENT_NAME: "test-builder",
+				HARU_WORKTREE_PATH: "/tmp/test-worktree",
+				HARU_TASK_ID: "task-42",
 			};
 
 			await writeAgentEnvFile(tempDir, env);
@@ -50,13 +50,13 @@ describe("E2E: agent env file lifecycle", () => {
 			expect(existsSync(filePath)).toBe(true);
 
 			const content = await Bun.file(filePath).text();
-			expect(content).toContain('export OVERSTORY_AGENT_NAME="test-builder"');
-			expect(content).toContain('export OVERSTORY_WORKTREE_PATH="/tmp/test-worktree"');
-			expect(content).toContain('export OVERSTORY_TASK_ID="task-42"');
+			expect(content).toContain('export HARU_AGENT_NAME="test-builder"');
+			expect(content).toContain('export HARU_WORKTREE_PATH="/tmp/test-worktree"');
+			expect(content).toContain('export HARU_TASK_ID="task-42"');
 		});
 
 		test("removeAgentEnvFile deletes the file", async () => {
-			const env = { OVERSTORY_AGENT_NAME: "test-agent" };
+			const env = { HARU_AGENT_NAME: "test-agent" };
 			await writeAgentEnvFile(tempDir, env);
 
 			const filePath = join(tempDir, ".claude", ".agent-env");
@@ -73,8 +73,8 @@ describe("E2E: agent env file lifecycle", () => {
 		});
 
 		test("overwrites existing env file on re-create", async () => {
-			await writeAgentEnvFile(tempDir, { OVERSTORY_AGENT_NAME: "old-agent" });
-			await writeAgentEnvFile(tempDir, { OVERSTORY_AGENT_NAME: "new-agent" });
+			await writeAgentEnvFile(tempDir, { HARU_AGENT_NAME: "old-agent" });
+			await writeAgentEnvFile(tempDir, { HARU_AGENT_NAME: "new-agent" });
 
 			const content = await Bun.file(join(tempDir, ".claude", ".agent-env")).text();
 			expect(content).toContain("new-agent");
@@ -110,8 +110,8 @@ describe("E2E: agent env file lifecycle", () => {
 		test("guard sources .agent-env and activates when file exists", async () => {
 			// Write env file simulating an agent session
 			await writeAgentEnvFile(tempDir, {
-				OVERSTORY_AGENT_NAME: "coordinator",
-				OVERSTORY_WORKTREE_PATH: tempDir,
+				HARU_AGENT_NAME: "coordinator",
+				HARU_WORKTREE_PATH: tempDir,
 			});
 
 			// Use buildBashFileGuardScript which includes ENV_GUARD
@@ -125,7 +125,7 @@ describe("E2E: agent env file lifecycle", () => {
 		});
 
 		test("guard exits silently when no env file and no env var", async () => {
-			// No .agent-env file, no OVERSTORY_AGENT_NAME env var
+			// No .agent-env file, no HARU_AGENT_NAME env var
 			// Guard should exit 0 (no-op for user's own session)
 			const script = buildBashFileGuardScript("scout");
 			const input = JSON.stringify({ command: "rm -rf /tmp/something" });
@@ -138,8 +138,8 @@ describe("E2E: agent env file lifecycle", () => {
 
 		test("path boundary guard recovers worktree path from env file", async () => {
 			await writeAgentEnvFile(tempDir, {
-				OVERSTORY_AGENT_NAME: "test-builder",
-				OVERSTORY_WORKTREE_PATH: tempDir,
+				HARU_AGENT_NAME: "test-builder",
+				HARU_WORKTREE_PATH: tempDir,
 			});
 
 			const script = buildPathBoundaryGuardScript("file_path");
@@ -152,8 +152,8 @@ describe("E2E: agent env file lifecycle", () => {
 
 		test("path boundary guard allows files inside worktree", async () => {
 			await writeAgentEnvFile(tempDir, {
-				OVERSTORY_AGENT_NAME: "test-builder",
-				OVERSTORY_WORKTREE_PATH: tempDir,
+				HARU_AGENT_NAME: "test-builder",
+				HARU_WORKTREE_PATH: tempDir,
 			});
 
 			const script = buildPathBoundaryGuardScript("file_path");
@@ -165,8 +165,8 @@ describe("E2E: agent env file lifecycle", () => {
 
 		test("tracker close guard recovers task ID from env file", async () => {
 			await writeAgentEnvFile(tempDir, {
-				OVERSTORY_AGENT_NAME: "test-worker",
-				OVERSTORY_TASK_ID: "my-task-123",
+				HARU_AGENT_NAME: "test-worker",
+				HARU_TASK_ID: "my-task-123",
 			});
 
 			const script = buildTrackerCloseGuardScript();
@@ -184,8 +184,8 @@ describe("E2E: agent env file lifecycle", () => {
 
 		test("bash path boundary guard recovers from env file", async () => {
 			await writeAgentEnvFile(tempDir, {
-				OVERSTORY_AGENT_NAME: "test-builder",
-				OVERSTORY_WORKTREE_PATH: tempDir,
+				HARU_AGENT_NAME: "test-builder",
+				HARU_WORKTREE_PATH: tempDir,
 			});
 
 			const script = buildBashPathBoundaryScript();
@@ -214,7 +214,7 @@ describe("E2E: agent env file lifecycle", () => {
 			expect(before.stdout).not.toContain("block");
 
 			// Phase 2: Write env file — guard activates
-			await writeAgentEnvFile(tempDir, { OVERSTORY_AGENT_NAME: "scout-agent" });
+			await writeAgentEnvFile(tempDir, { HARU_AGENT_NAME: "scout-agent" });
 			const during = await runGuardInDir(script, tempDir, input);
 			expect(during.stdout).toContain('"decision":"block"');
 

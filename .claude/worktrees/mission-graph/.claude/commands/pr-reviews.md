@@ -49,7 +49,7 @@ Each agent should return a structured review:
 - **Strengths:** What's good about this PR
 - **Issues:** Bugs, risks, or concerns (with file:line references)
 - **Suggestions:** Non-blocking improvements
-- **Project alignment:** How well it fits overstory's direction
+- **Project alignment:** How well it fits haru's direction
 
 ### 3. Present consolidated report
 

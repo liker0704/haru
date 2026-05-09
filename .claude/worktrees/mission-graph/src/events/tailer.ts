@@ -2,8 +2,8 @@
  * Background NDJSON event tailer for headless agent stdout logs.
  *
  * Headless agents (e.g. Sapling) write NDJSON events to a stdout.log file
- * in .overstory/logs/{agentName}/{timestamp}/stdout.log. After ov sling exits,
- * nobody reads this stream — so ov status, ov dashboard, and ov feed cannot
+ * in .overstory/logs/{agentName}/{timestamp}/stdout.log. After ha sling exits,
+ * nobody reads this stream — so ha status, ha dashboard, and ha feed cannot
  * show live progress for headless agents.
  *
  * This module provides startEventTailer(), which polls the log file on a

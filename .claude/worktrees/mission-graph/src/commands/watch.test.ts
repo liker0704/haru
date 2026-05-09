@@ -6,7 +6,7 @@ import { cleanupTempDir } from "../test-helpers.ts";
 import { watchCommand } from "./watch.ts";
 
 /**
- * Tests for `overstory watch` command.
+ * Tests for `haru watch` command.
  *
  * IMPORTANT: We CANNOT test the actual daemon loop (it would hang the test).
  * Focus on:
@@ -121,7 +121,7 @@ describe("watchCommand", () => {
 
 		// Try to start in background mode
 		// This will clean up the stale PID file, then attempt to spawn.
-		// The spawn will fail because there's no real overstory binary in test env,
+		// The spawn will fail because there's no real haru binary in test env,
 		// but the important part is that the stale PID file gets removed.
 		try {
 			await watchCommand(["--background"]);

@@ -2,8 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { access, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { InsertMission } from "../types.ts";
-import { createMissionStore } from "./store.ts";
+import type { AgentSession, Mission } from "../types.ts";
 import {
 	addActiveMission,
 	listActiveMissions,
@@ -13,15 +12,15 @@ import {
 	readMissionRunPointer,
 	removeActiveMission,
 	resolveActiveMissionContext,
+	resolveMissionRoleStates,
 	writeMissionRuntimePointers,
 } from "./runtime-context.ts";
-import type { AgentSession, Mission } from "../types.ts";
-import { resolveMissionRoleStates } from "./runtime-context.ts";
+import { createMissionStore } from "./store.ts";
 
 let tempDir: string;
 
 beforeEach(async () => {
-	tempDir = await mkdtemp(join(tmpdir(), "overstory-runtime-context-test-"));
+	tempDir = await mkdtemp(join(tmpdir(), "haru-runtime-context-test-"));
 });
 
 afterEach(async () => {
@@ -130,9 +129,7 @@ describe("removeActiveMission", () => {
 		const ids = await listActiveMissions(tempDir);
 		expect(ids).toEqual([]);
 		// File should be gone
-		await expect(
-			access(join(tempDir, "current-mission.txt")),
-		).rejects.toThrow();
+		await expect(access(join(tempDir, "current-mission.txt"))).rejects.toThrow();
 	});
 
 	test("removing non-existent ID is a no-op", async () => {
@@ -274,8 +271,8 @@ describe("resolveActiveMissionContext", () => {
 
 		const ctx = await resolveActiveMissionContext(tempDir);
 		expect(ctx).not.toBeNull();
-		expect(ctx!.missionId).toBe("mission-db-001");
-		expect(ctx!.runId).toBe(mission.runId);
+		expect(ctx?.missionId).toBe("mission-db-001");
+		expect(ctx?.runId).toBe(mission.runId);
 	});
 
 	test("returns first active mission when multiple active — no throw", async () => {
@@ -288,7 +285,7 @@ describe("resolveActiveMissionContext", () => {
 		// Should not throw even with multiple active missions
 		const ctx = await resolveActiveMissionContext(tempDir);
 		expect(ctx).not.toBeNull();
-		expect(["mission-aaa", "mission-bbb"]).toContain(ctx!.missionId);
+		expect(["mission-aaa", "mission-bbb"]).toContain(ctx?.missionId);
 	});
 
 	test("returns pointed mission when pointer matches an active db mission", async () => {
@@ -301,7 +298,7 @@ describe("resolveActiveMissionContext", () => {
 		await addActiveMission(tempDir, "mission-bbb");
 		const ctx = await resolveActiveMissionContext(tempDir);
 		expect(ctx).not.toBeNull();
-		expect(ctx!.missionId).toBe("mission-bbb");
+		expect(ctx?.missionId).toBe("mission-bbb");
 	});
 });
 

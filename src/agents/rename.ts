@@ -1,7 +1,7 @@
 /**
  * Rename a running mission-scoped agent in-place.
  *
- * Called from `ov mission update --slug` when the mission slug changes after
+ * Called from `ha mission update --slug` when the mission slug changes after
  * agents have been spawned. Keeps tmux, SQLite, directories, and mail inboxes
  * in sync so the running agent keeps processing mail under its new identity.
  */

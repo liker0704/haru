@@ -5,9 +5,9 @@ import { join } from "node:path";
 import type { OverstoryConfig } from "../types.ts";
 import { checkConfig } from "./config-check.ts";
 
-// Helper to create a temp overstory dir with config.yaml
+// Helper to create a temp haru dir with config.yaml
 function createTempOverstoryDir(configYaml: string): string {
-	const tempDir = mkdtempSync(join(tmpdir(), "overstory-test-"));
+	const tempDir = mkdtempSync(join(tmpdir(), "haru-test-"));
 	const overstoryDir = join(tempDir, ".overstory");
 	mkdirSync(overstoryDir, { recursive: true });
 	writeFileSync(join(overstoryDir, "config.yaml"), configYaml);

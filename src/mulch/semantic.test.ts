@@ -59,7 +59,9 @@ describe("embedTexts", () => {
 	describe("single provider string (backward compat)", () => {
 		test("returns embeddings on success", async () => {
 			const vec = [0.1, 0.2, 0.3];
-			globalThis.fetch = mock(() => Promise.resolve(makeOpenAIResponse([vec]))) as unknown as typeof fetch;
+			globalThis.fetch = mock(() =>
+				Promise.resolve(makeOpenAIResponse([vec])),
+			) as unknown as typeof fetch;
 			const result = await embedTexts(["hello"], "openai", "text-embedding-3-small");
 			expect(result).not.toBeNull();
 			expect(result?.length).toBe(1);
@@ -93,7 +95,9 @@ describe("embedTexts", () => {
 	describe("provider array fallback", () => {
 		test("returns result from first provider on success", async () => {
 			const vec = [1, 2, 3];
-			globalThis.fetch = mock(() => Promise.resolve(makeOpenAIResponse([vec]))) as unknown as typeof fetch;
+			globalThis.fetch = mock(() =>
+				Promise.resolve(makeOpenAIResponse([vec])),
+			) as unknown as typeof fetch;
 			const result = await embedTexts(["hello"], ["openai", "ollama"], "text-embedding-3-small");
 			expect(result).not.toBeNull();
 			expect(result?.[0]).not.toBeUndefined();
@@ -129,7 +133,9 @@ describe("embedTexts", () => {
 	describe("header parsing", () => {
 		test("parses all 5 rate-limit headers correctly", async () => {
 			const headers = makeHeaders();
-			globalThis.fetch = mock(() => Promise.resolve(makeOpenAIResponse([[0.1, 0.2]], headers))) as unknown as typeof fetch;
+			globalThis.fetch = mock(() =>
+				Promise.resolve(makeOpenAIResponse([[0.1, 0.2]], headers)),
+			) as unknown as typeof fetch;
 
 			let captured: HeadroomSnapshot | null = null;
 			const store = createHeadroomStore(":memory:");
@@ -154,7 +160,9 @@ describe("embedTexts", () => {
 
 		test("missing headers produce null fields", async () => {
 			const headers = new Headers(); // no rate-limit headers
-			globalThis.fetch = mock(() => Promise.resolve(makeOpenAIResponse([[0.1]], headers))) as unknown as typeof fetch;
+			globalThis.fetch = mock(() =>
+				Promise.resolve(makeOpenAIResponse([[0.1]], headers)),
+			) as unknown as typeof fetch;
 
 			const store = createHeadroomStore(":memory:");
 			await embedTexts(["hello"], "openai", "text-embedding-3-small", {
@@ -177,7 +185,9 @@ describe("embedTexts", () => {
 				"x-ratelimit-remaining-requests": "not-a-number",
 				"x-ratelimit-limit-requests": "also-nope",
 			});
-			globalThis.fetch = mock(() => Promise.resolve(makeOpenAIResponse([[0.1]], headers))) as unknown as typeof fetch;
+			globalThis.fetch = mock(() =>
+				Promise.resolve(makeOpenAIResponse([[0.1]], headers)),
+			) as unknown as typeof fetch;
 
 			const store = createHeadroomStore(":memory:");
 			await embedTexts(["hello"], "openai", "text-embedding-3-small", {
@@ -195,7 +205,9 @@ describe("embedTexts", () => {
 	describe("onHeaders callback", () => {
 		test("called with correct HeadroomSnapshot after success", async () => {
 			const headers = makeHeaders();
-			globalThis.fetch = mock(() => Promise.resolve(makeOpenAIResponse([[0.5]], headers))) as unknown as typeof fetch;
+			globalThis.fetch = mock(() =>
+				Promise.resolve(makeOpenAIResponse([[0.5]], headers)),
+			) as unknown as typeof fetch;
 
 			const snapshots: HeadroomSnapshot[] = [];
 			const store = createHeadroomStore(":memory:");

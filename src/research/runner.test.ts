@@ -19,7 +19,7 @@ import {
 let tempDir: string;
 
 beforeEach(async () => {
-	tempDir = await mkdtemp(join(tmpdir(), "overstory-runner-test-"));
+	tempDir = await mkdtemp(join(tmpdir(), "haru-runner-test-"));
 });
 
 afterEach(async () => {
@@ -35,7 +35,7 @@ function makeSession(overrides: Partial<AgentSession> = {}): AgentSession {
 		worktreePath: "/proj",
 		branchName: "main",
 		taskId: "research-my-topic",
-		tmuxSession: "overstory-research-my-topic",
+		tmuxSession: "haru-research-my-topic",
 		state: "working",
 		pid: 1234,
 		parentAgent: null,

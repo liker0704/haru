@@ -13,7 +13,7 @@ Overstory уже не выглядит как “сырой агентный э�
 | Mission graph engine | `src/missions/engine.ts` исполняет DAG фаз `understand → plan → execute → done` с async/human gates | Новые фазы `intake`, `debug`, `review`, `deploy` можно добавить без редизайна core |
 | Runtime abstraction | `src/runtimes/` содержит адаптеры к нескольким CLI-агентам | Можно делать cost/quality routing: clarifier на дешевой модели, builder/architect на frontier |
 | Mail-bus | `src/mail/` на SQLite с claim/ack/DLQ/lease | Готовая основа для async HITL, PR comments, debugger events, budget alerts |
-| Worktree isolation | `ov sling` создает worktree и branch per task | Это уже совпадает с паттерном параллельной разработки через git worktrees |
+| Worktree isolation | `ha sling` создает worktree и branch per task | Это уже совпадает с паттерном параллельной разработки через git worktrees |
 | Plan review subgraph | `plan-review` dispatches critics, collects verdicts, loops until convergence | Это почти готовый verification pattern для spec/plan review |
 | Merge resolver | Clean merge, auto-resolve, AI-resolve, reimagine | Хорошая основа для autonomous merge, но destructive tiers требуют hard human gate |
 | Watchdog | Per-node grace/ceiling, stuck detection, respawn, nudge | Нужен для long-running autonomous missions |
@@ -84,7 +84,7 @@ Done/deploy
 - `src/missions/cells/intake-phase.ts`: новый subgraph `ingest-intent → clarifier-dispatch → await-clarifications → spec-draft → human-spec-review → ready`.
 - `agents/product-clarifier.md`: новая роль.
 - `src/agents/capabilities.ts`: capability `product-clarifier`.
-- `src/commands/mission.ts`: `ov mission start --from-intent "..."` и `--interactive`.
+- `src/commands/mission.ts`: `ha mission start --from-intent "..."` и `--interactive`.
 - `.overstory/artifacts/<mission>/product-spec.md`: официальный contract между product layer и technical planning.
 - `src/missions/risk-tier.ts`: deterministic classifier для `direct/planned/full`.
 
@@ -177,7 +177,7 @@ Done/deploy
 
 Изменения:
 
-- `ov sling --sandbox=docker`.
+- `ha sling --sandbox=docker`.
 - `src/sandbox/`: adapters `local`, `docker`, later `gvisor/firecracker`.
 - Network policy: default deny, allow by explicit task policy.
 - Eval-as-CI: GitHub Action runs `evals/`, stores baseline, blocks autonomous merge on regression.

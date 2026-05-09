@@ -297,7 +297,7 @@ export async function validateWorkstreamResume(
 	};
 }
 
-// === ov mission resume (per-workstream) ===
+// === ha mission resume (per-workstream) ===
 
 export async function missionResume(
 	overstoryDir: string,
@@ -448,7 +448,7 @@ function openMailClient(overstoryDir: string) {
 	return createMailClient(createMailStore(join(overstoryDir, "mail.db")));
 }
 
-// === ov mission handoff ===
+// === ha mission handoff ===
 
 export async function missionHandoff(
 	overstoryDir: string,

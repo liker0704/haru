@@ -130,7 +130,7 @@ export async function checkConsistency(
 
 	// 5. Check for orphaned tmux sessions (tmux session exists but no SessionStore entry)
 	const projectName = config.project.name;
-	const overstoryTmuxPrefix = `overstory-${sanitizeTmuxName(projectName)}-`;
+	const overstoryTmuxPrefix = `haru-${sanitizeTmuxName(projectName)}-`;
 	const overstoryTmuxSessions = tmuxSessions.filter((s) => s.name.startsWith(overstoryTmuxPrefix));
 	const storeTmuxNames = new Set(storeSessions.map((s) => s.tmuxSession));
 

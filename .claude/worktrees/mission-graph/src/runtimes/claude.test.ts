@@ -341,7 +341,7 @@ describe("ClaudeRuntime", () => {
 
 		test("returns loading when Running a tool call", () => {
 			const pane = [
-				"● Bash(sleep 240 && ov mail check)",
+				"● Bash(sleep 240 && ha mail check)",
 				"  Running… (1m 28s · timeout 5m)",
 				"",
 				"❯",
@@ -393,7 +393,7 @@ describe("ClaudeRuntime", () => {
 		let tempDir: string;
 
 		beforeEach(async () => {
-			tempDir = await mkdtemp(join(tmpdir(), "overstory-claude-test-"));
+			tempDir = await mkdtemp(join(tmpdir(), "haru-claude-test-"));
 		});
 
 		afterEach(async () => {
@@ -527,7 +527,7 @@ describe("ClaudeRuntime", () => {
 		let tempDir: string;
 
 		beforeEach(async () => {
-			tempDir = await mkdtemp(join(tmpdir(), "overstory-transcript-test-"));
+			tempDir = await mkdtemp(join(tmpdir(), "haru-transcript-test-"));
 		});
 
 		afterEach(async () => {
@@ -627,7 +627,7 @@ describe("ClaudeRuntime integration: spawn command matches pre-refactor behavior
 			model: "sonnet",
 			permissionMode: "bypass",
 			cwd: "/project/.overstory/worktrees/builder-1",
-			env: { OVERSTORY_AGENT_NAME: "builder-1" },
+			env: { HARU_AGENT_NAME: "builder-1" },
 		});
 		// Pre-refactor: `claude --model ${model} --permission-mode bypassPermissions`
 		expect(cmd).toBe("claude --model sonnet --permission-mode bypassPermissions");
@@ -640,7 +640,7 @@ describe("ClaudeRuntime integration: spawn command matches pre-refactor behavior
 			permissionMode: "bypass",
 			cwd: "/project",
 			appendSystemPrompt: baseDefinition,
-			env: { OVERSTORY_AGENT_NAME: "coordinator" },
+			env: { HARU_AGENT_NAME: "coordinator" },
 		});
 		// Pre-refactor: `claude --model ${model} --permission-mode bypassPermissions --append-system-prompt '...'`
 		expect(cmd).toBe(
@@ -655,7 +655,7 @@ describe("ClaudeRuntime integration: spawn command matches pre-refactor behavior
 			permissionMode: "bypass",
 			cwd: "/project",
 			appendSystemPrompt: baseDefinition,
-			env: { OVERSTORY_AGENT_NAME: "supervisor-1" },
+			env: { HARU_AGENT_NAME: "supervisor-1" },
 		});
 		expect(cmd).toContain("--model opus");
 		expect(cmd).toContain("--permission-mode bypassPermissions");
@@ -670,7 +670,7 @@ describe("ClaudeRuntime integration: spawn command matches pre-refactor behavior
 			permissionMode: "bypass",
 			cwd: "/project",
 			appendSystemPrompt: baseDefinition,
-			env: { OVERSTORY_AGENT_NAME: "monitor" },
+			env: { HARU_AGENT_NAME: "monitor" },
 		});
 		expect(cmd).toBe(
 			`claude --model sonnet --permission-mode bypassPermissions --append-system-prompt '# Monitor\nYou patrol the fleet.'`,
@@ -754,8 +754,8 @@ describe("ClaudeRuntime integration: buildEnv matches pre-refactor env injection
 		const env = runtime.buildEnv(model);
 		expect(env).toEqual({});
 		// Must be safe to spread into createSession env
-		const combined = { ...env, OVERSTORY_AGENT_NAME: "builder-1" };
-		expect(combined).toEqual({ OVERSTORY_AGENT_NAME: "builder-1" });
+		const combined = { ...env, HARU_AGENT_NAME: "builder-1" };
+		expect(combined).toEqual({ HARU_AGENT_NAME: "builder-1" });
 	});
 });
 

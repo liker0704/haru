@@ -1,5 +1,5 @@
 /**
- * Tests for overstory run command.
+ * Tests for haru run command.
  *
  * Uses real SQLite (temp files) and real file I/O for current-run.txt.
  * No mocks -- tests exercise the actual RunStore and SessionStore.
@@ -21,7 +21,7 @@ let runStore: RunStore;
 let sessionStore: SessionStore;
 
 beforeEach(async () => {
-	tempDir = await mkdtemp(join(tmpdir(), "overstory-run-test-"));
+	tempDir = await mkdtemp(join(tmpdir(), "haru-run-test-"));
 	overstoryDir = join(tempDir, ".overstory");
 	await mkdir(overstoryDir, { recursive: true });
 	dbPath = join(overstoryDir, "sessions.db");
@@ -69,9 +69,9 @@ function makeSession(overrides: Partial<AgentSession> = {}): AgentSession {
 		capability: "builder",
 		runtime: "claude",
 		worktreePath: "/tmp/worktrees/test-agent",
-		branchName: "overstory/test-agent/task-1",
+		branchName: "haru/test-agent/task-1",
 		taskId: "task-1",
-		tmuxSession: "overstory-test-agent",
+		tmuxSession: "haru-test-agent",
 		state: "working",
 		pid: 12345,
 		parentAgent: null,

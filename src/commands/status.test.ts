@@ -26,7 +26,7 @@ const tmuxAvailable = await Bun.spawn(["tmux", "-V"], {
 const describeTmux = tmuxAvailable ? describe : describe.skip;
 
 /**
- * Tests for the --verbose flag in overstory status.
+ * Tests for the --verbose flag in haru status.
  *
  * printStatus is tested by capturing process.stdout.write output.
  * We spy on stdout.write because printStatus uses it directly.
@@ -39,9 +39,9 @@ function makeAgent(overrides: Partial<AgentSession> = {}): AgentSession {
 		capability: "builder",
 		runtime: "claude",
 		worktreePath: "/tmp/worktrees/test-builder",
-		branchName: "overstory/test-builder/task-1",
+		branchName: "haru/test-builder/task-1",
 		taskId: "task-1",
-		tmuxSession: "overstory-test-builder",
+		tmuxSession: "haru-test-builder",
 		state: "working",
 		pid: 12345,
 		parentAgent: null,
@@ -64,7 +64,7 @@ function makeStatusData(overrides: Partial<StatusData> = {}): StatusData {
 	return {
 		agents: [makeAgent()],
 		worktrees: [],
-		tmuxSessions: [{ name: "overstory-test-builder", pid: 12345 }],
+		tmuxSessions: [{ name: "haru-test-builder", pid: 12345 }],
 		unreadMailCount: 0,
 		mergeQueueCount: 0,
 		recentMetricsCount: 0,
@@ -201,18 +201,18 @@ describe("printStatus", () => {
 	});
 
 	test("verbose with multiple agents: each gets its own detail", () => {
-		const agent1 = makeAgent({ agentName: "builder-1", tmuxSession: "overstory-builder-1" });
+		const agent1 = makeAgent({ agentName: "builder-1", tmuxSession: "haru-builder-1" });
 		const agent2 = makeAgent({
 			agentName: "scout-1",
 			capability: "scout",
-			tmuxSession: "overstory-scout-1",
+			tmuxSession: "haru-scout-1",
 		});
 
 		const data = makeStatusData({
 			agents: [agent1, agent2],
 			tmuxSessions: [
-				{ name: "overstory-builder-1", pid: 100 },
-				{ name: "overstory-scout-1", pid: 200 },
+				{ name: "haru-builder-1", pid: 100 },
+				{ name: "haru-scout-1", pid: 200 },
 			],
 			verboseDetails: {
 				"builder-1": {
@@ -383,21 +383,21 @@ describe("run scoping", () => {
 				agentName: "coordinator",
 				capability: "coordinator",
 				runId: null,
-				tmuxSession: "overstory-fake-coordinator",
+				tmuxSession: "haru-fake-coordinator",
 			}),
 			makeAgent({
 				id: "sess-002",
 				agentName: "builder-1",
 				capability: "builder",
 				runId: "run-001",
-				tmuxSession: "overstory-fake-builder-1",
+				tmuxSession: "haru-fake-builder-1",
 			}),
 			makeAgent({
 				id: "sess-003",
 				agentName: "builder-2",
 				capability: "builder",
 				runId: "run-002",
-				tmuxSession: "overstory-fake-builder-2",
+				tmuxSession: "haru-fake-builder-2",
 			}),
 		] as AgentSession[]) {
 			session.startedAt = now;
@@ -529,7 +529,7 @@ describe("headless agent alive markers", () => {
 	test("printStatus uses tmux check (not PID) for tmux-based agents", () => {
 		const agent = makeAgent({
 			agentName: "tmux-builder",
-			tmuxSession: "overstory-test-builder",
+			tmuxSession: "haru-test-builder",
 			pid: process.pid, // alive PID, but should use tmux check
 			state: "working",
 		});
@@ -561,7 +561,7 @@ describe("--watch deprecation", () => {
 
 		const out = chunks.join("");
 		expect(out).toContain("deprecated");
-		expect(out).toContain("ov dashboard");
+		expect(out).toContain("ha dashboard");
 	});
 
 	test("--watch writes deprecation notice to stderr", async () => {
@@ -591,7 +591,7 @@ describe("--watch deprecation", () => {
 
 		const err = stderrChunks.join("");
 		expect(err).toContain("--watch is deprecated");
-		expect(err).toContain("ov dashboard");
+		expect(err).toContain("ha dashboard");
 	});
 });
 
@@ -611,7 +611,7 @@ describe("gatherStatus reconciliation", () => {
 			agentName: "boot-builder",
 			capability: "builder",
 			state: "booting",
-			tmuxSession: "overstory-boot-builder",
+			tmuxSession: "haru-boot-builder",
 			runId: null,
 		});
 		session.startedAt = now;
@@ -642,7 +642,7 @@ describe("gatherStatus reconciliation", () => {
 			agentName: "done-builder",
 			capability: "builder",
 			state: "completed",
-			tmuxSession: "overstory-done-builder",
+			tmuxSession: "haru-done-builder",
 			runId: null,
 		});
 		session.startedAt = now;
@@ -671,7 +671,7 @@ describe("gatherStatus reconciliation", () => {
 			agentName: "working-builder",
 			capability: "builder",
 			state: "working",
-			tmuxSession: "overstory-working-builder",
+			tmuxSession: "haru-working-builder",
 			runId: null,
 		});
 		session.startedAt = now;

@@ -641,7 +641,7 @@ describe("concurrent access", () => {
 		const { join } = require("node:path");
 		const { rmSync } = require("node:fs");
 
-		const tempDir = mkdtempSync(join(tmpdir(), "overstory-events-test-"));
+		const tempDir = mkdtempSync(join(tmpdir(), "haru-events-test-"));
 		const dbPath = join(tempDir, "events.db");
 
 		const store1 = createEventStore(dbPath);

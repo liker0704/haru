@@ -16,9 +16,9 @@ function makeSession(overrides: Partial<AgentSession> = {}): AgentSession {
 		capability: "builder",
 		runtime: "claude",
 		worktreePath: "/tmp/worktrees/test-agent",
-		branchName: "overstory/test-agent/task-1",
+		branchName: "haru/test-agent/task-1",
 		taskId: "task-1",
-		tmuxSession: "overstory-test-agent",
+		tmuxSession: "haru-test-agent",
 		state: "working",
 		pid: 12345,
 		parentAgent: null,
@@ -116,7 +116,7 @@ describe("createSnapshot", () => {
 		// Populate merge-queue.db
 		const mergeQueue = createMergeQueue(mergeQueueDbPath);
 		mergeQueue.enqueue({
-			branchName: "overstory/test-agent/task-1",
+			branchName: "haru/test-agent/task-1",
 			taskId: "task-1",
 			agentName: "test-agent",
 			filesModified: ["src/foo.ts"],

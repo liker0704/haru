@@ -191,7 +191,7 @@ export const DEFAULT_CONFIG: OverstoryConfig = {
 
 const CONFIG_FILENAME = "config.yaml";
 const CONFIG_LOCAL_FILENAME = "config.local.yaml";
-const OVERSTORY_DIR = ".overstory";
+const HARU_DIR = ".overstory";
 
 /**
  * Validate that a config object has the required structure and sane values.
@@ -499,7 +499,7 @@ function validateConfig(config: OverstoryConfig): void {
 	// runtime.default must be a string if present
 	if (config.runtime !== undefined && typeof config.runtime.default !== "string") {
 		process.stderr.write(
-			`[overstory] WARNING: runtime.default must be a string. Got: ${typeof config.runtime.default}. Ignoring.\n`,
+			`[haru] WARNING: runtime.default must be a string. Got: ${typeof config.runtime.default}. Ignoring.\n`,
 		);
 	}
 
@@ -529,12 +529,12 @@ function validateConfig(config: OverstoryConfig): void {
 		const delay = config.runtime.shellInitDelayMs;
 		if (typeof delay !== "number" || delay < 0 || !Number.isFinite(delay)) {
 			process.stderr.write(
-				`[overstory] WARNING: runtime.shellInitDelayMs must be a non-negative number. Got: ${delay}. Using default (0).\n`,
+				`[haru] WARNING: runtime.shellInitDelayMs must be a non-negative number. Got: ${delay}. Using default (0).\n`,
 			);
 			config.runtime.shellInitDelayMs = 0;
 		} else if (delay > 30_000) {
 			process.stderr.write(
-				`[overstory] WARNING: runtime.shellInitDelayMs is ${delay}ms (>${30}s). This adds delay before every agent spawn. Consider a lower value.\n`,
+				`[haru] WARNING: runtime.shellInitDelayMs is ${delay}ms (>${30}s). This adds delay before every agent spawn. Consider a lower value.\n`,
 			);
 		}
 	}
@@ -748,7 +748,7 @@ function validateConfig(config: OverstoryConfig): void {
 				if (!_warnedOnce.has(warnKey)) {
 					_warnedOnce.add(warnKey);
 					process.stderr.write(
-						`[overstory] WARNING: models.${role} uses non-Anthropic model '${model}'. Tool-use compatibility cannot be verified at config time.\n`,
+						`[haru] WARNING: models.${role} uses non-Anthropic model '${model}'. Tool-use compatibility cannot be verified at config time.\n`,
 					);
 				}
 			}
@@ -758,7 +758,7 @@ function validateConfig(config: OverstoryConfig): void {
 				if (allowBareModelRefs) {
 					if (toolHeavyRoles.includes(role)) {
 						process.stderr.write(
-							`[overstory] WARNING: models.${role} uses non-Anthropic model '${model}'. Tool-use compatibility cannot be verified at config time.\n`,
+							`[haru] WARNING: models.${role} uses non-Anthropic model '${model}'. Tool-use compatibility cannot be verified at config time.\n`,
 						);
 					}
 					continue;
@@ -885,7 +885,7 @@ async function mergeLocalConfig(
 	resolvedRoot: string,
 	config: OverstoryConfig,
 ): Promise<OverstoryConfig> {
-	const localPath = join(resolvedRoot, OVERSTORY_DIR, CONFIG_LOCAL_FILENAME);
+	const localPath = join(resolvedRoot, HARU_DIR, CONFIG_LOCAL_FILENAME);
 	const localFile = Bun.file(localPath);
 
 	if (!(await localFile.exists())) {
@@ -959,7 +959,7 @@ export async function resolveProjectRoot(startDir: string): Promise<string> {
 			// Main repo root is the parent of the .git directory
 			const mainRoot = dirname(absGitCommon);
 			// If mainRoot differs from startDir, we're in a worktree — resolve to canonical root
-			if (mainRoot !== startDir && existsSync(join(mainRoot, OVERSTORY_DIR, CONFIG_FILENAME))) {
+			if (mainRoot !== startDir && existsSync(join(mainRoot, HARU_DIR, CONFIG_FILENAME))) {
 				return mainRoot;
 			}
 		}
@@ -969,7 +969,7 @@ export async function resolveProjectRoot(startDir: string): Promise<string> {
 
 	// Not inside a worktree (or git not available).
 	// Check if .overstory/config.yaml exists at startDir.
-	if (existsSync(join(startDir, OVERSTORY_DIR, CONFIG_FILENAME))) {
+	if (existsSync(join(startDir, HARU_DIR, CONFIG_FILENAME))) {
 		return startDir;
 	}
 
@@ -978,7 +978,7 @@ export async function resolveProjectRoot(startDir: string): Promise<string> {
 }
 
 /**
- * Load the overstory configuration for a project.
+ * Load the haru configuration for a project.
  *
  * Reads `.overstory/config.yaml` from the project root, parses it,
  * merges with defaults, and validates the result.
@@ -994,7 +994,7 @@ export async function loadConfig(projectRoot: string): Promise<OverstoryConfig> 
 	// Resolve the actual project root (handles git worktrees)
 	const resolvedRoot = await resolveProjectRoot(projectRoot);
 
-	const configPath = join(resolvedRoot, OVERSTORY_DIR, CONFIG_FILENAME);
+	const configPath = join(resolvedRoot, HARU_DIR, CONFIG_FILENAME);
 
 	// Start with defaults, setting the project root
 	const defaults = structuredClone(DEFAULT_CONFIG);

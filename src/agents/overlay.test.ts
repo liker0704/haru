@@ -17,7 +17,7 @@ import {
 
 const SAMPLE_BASE_DEFINITION = `# Builder Agent
 
-You are a **builder agent** in the overstory swarm system.
+You are a **builder agent** in the haru swarm system.
 
 ## Role
 Implement changes according to a spec.
@@ -34,9 +34,9 @@ Read your assignment. Execute immediately.
 function makeConfig(overrides?: Partial<OverlayConfig>): OverlayConfig {
 	return {
 		agentName: "test-builder",
-		taskId: "overstory-abc",
-		specPath: ".overstory/specs/overstory-abc.md",
-		branchName: "agent/test-builder/overstory-abc",
+		taskId: "haru-abc",
+		specPath: ".overstory/specs/haru-abc.md",
+		branchName: "agent/test-builder/haru-abc",
 		worktreePath: "/tmp/test-project/.overstory/worktrees/test-builder",
 		fileScope: ["src/agents/manifest.ts", "src/agents/overlay.ts"],
 		mulchDomains: ["typescript", "testing"],
@@ -58,17 +58,17 @@ describe("generateOverlay", () => {
 	});
 
 	test("output contains task ID", async () => {
-		const config = makeConfig({ taskId: "overstory-xyz" });
+		const config = makeConfig({ taskId: "haru-xyz" });
 		const output = await generateOverlay(config);
 
-		expect(output).toContain("overstory-xyz");
+		expect(output).toContain("haru-xyz");
 	});
 
 	test("output contains branch name", async () => {
-		const config = makeConfig({ branchName: "agent/scout/overstory-xyz" });
+		const config = makeConfig({ branchName: "agent/scout/haru-xyz" });
 		const output = await generateOverlay(config);
 
-		expect(output).toContain("agent/scout/overstory-xyz");
+		expect(output).toContain("agent/scout/haru-xyz");
 	});
 
 	test("output contains parent agent name", async () => {
@@ -168,7 +168,7 @@ describe("generateOverlay", () => {
 		});
 		const output = await generateOverlay(config);
 
-		expect(output).toContain("ov sling");
+		expect(output).toContain("ha sling");
 		expect(output).toContain("--parent lead-alpha");
 		expect(output).toContain("--depth 2");
 	});
@@ -270,13 +270,13 @@ describe("generateOverlay", () => {
 		const config = makeConfig({
 			capability: "scout",
 			agentName: "recon-1",
-			taskId: "overstory-task1",
+			taskId: "haru-task1",
 			parentAgent: "lead-alpha",
 		});
 		const output = await generateOverlay(config);
 
-		expect(output).toContain("sd close overstory-task1");
-		expect(output).toContain("ov mail send --to lead-alpha");
+		expect(output).toContain("sd close haru-task1");
+		expect(output).toContain("ha mail send --to lead-alpha");
 	});
 
 	test("reviewer completion section uses coordinator when no parent", async () => {
@@ -293,8 +293,8 @@ describe("generateOverlay", () => {
 		const config = makeConfig({ agentName: "worker-42" });
 		const output = await generateOverlay(config);
 
-		expect(output).toContain("ov mail check --agent worker-42");
-		expect(output).toContain("ov mail send --to");
+		expect(output).toContain("ha mail check --agent worker-42");
+		expect(output).toContain("ha mail send --to");
 	});
 
 	test("output includes base agent definition content (Layer 1)", async () => {
@@ -428,21 +428,21 @@ describe("generateOverlay", () => {
 	});
 
 	test("default trackerCli renders as sd in quality gates", async () => {
-		const config = makeConfig({ capability: "builder", taskId: "overstory-task1" });
+		const config = makeConfig({ capability: "builder", taskId: "haru-task1" });
 		const output = await generateOverlay(config);
 
-		expect(output).toContain("sd close overstory-task1");
+		expect(output).toContain("sd close haru-task1");
 	});
 
 	test("custom trackerCli replaces sd in quality gates", async () => {
 		const config = makeConfig({
 			capability: "builder",
 			trackerCli: "sd",
-			taskId: "overstory-test1",
+			taskId: "haru-test1",
 		});
 		const output = await generateOverlay(config);
 
-		expect(output).toContain("sd close overstory-test1");
+		expect(output).toContain("sd close haru-test1");
 		expect(output).not.toContain("bd close");
 	});
 
@@ -460,11 +460,11 @@ describe("generateOverlay", () => {
 		const config = makeConfig({
 			capability: "scout",
 			trackerCli: "sd",
-			taskId: "overstory-test2",
+			taskId: "haru-test2",
 		});
 		const output = await generateOverlay(config);
 
-		expect(output).toContain("sd close overstory-test2");
+		expect(output).toContain("sd close haru-test2");
 		expect(output).not.toContain("bd close");
 	});
 
@@ -491,10 +491,10 @@ describe("generateOverlay", () => {
 	});
 
 	test("defaults: no trackerCli/trackerName produces sd/seeds", async () => {
-		const config = makeConfig({ capability: "builder", taskId: "overstory-back" });
+		const config = makeConfig({ capability: "builder", taskId: "haru-back" });
 		const output = await generateOverlay(config);
 
-		expect(output).toContain("sd close overstory-back");
+		expect(output).toContain("sd close haru-back");
 	});
 
 	test("dispatch overrides: skipReview injects SKIP REVIEW directive for leads", async () => {
@@ -603,7 +603,7 @@ describe("writeOverlay", () => {
 	let tempDir: string;
 
 	beforeEach(async () => {
-		tempDir = await mkdtemp(join(tmpdir(), "overstory-overlay-test-"));
+		tempDir = await mkdtemp(join(tmpdir(), "haru-overlay-test-"));
 	});
 
 	afterEach(async () => {
@@ -737,18 +737,15 @@ describe("writeOverlay", () => {
 	});
 
 	test("succeeds for worktree with .overstory/config.yaml (dogfooding scenario)", async () => {
-		// When dogfooding on overstory's own repo, .overstory/config.yaml is tracked
+		// When dogfooding on haru's own repo, .overstory/config.yaml is tracked
 		// in git. Every worktree checkout includes it. The old file-existence heuristic
 		// would incorrectly reject these worktrees. The path-comparison guard must allow
-		// writes because the worktree path differs from the canonical root (overstory-p4st).
-		const fakeProjectRoot = join(tempDir, "overstory-dogfood");
+		// writes because the worktree path differs from the canonical root (haru-p4st).
+		const fakeProjectRoot = join(tempDir, "haru-dogfood");
 		const worktreePath = join(fakeProjectRoot, ".overstory", "worktrees", "dogfood-agent");
 		await mkdir(join(worktreePath, ".overstory"), { recursive: true });
 		// Simulate tracked .overstory/config.yaml appearing in the worktree checkout
-		await Bun.write(
-			join(worktreePath, ".overstory", "config.yaml"),
-			"project:\n  name: overstory\n",
-		);
+		await Bun.write(join(worktreePath, ".overstory", "config.yaml"), "project:\n  name: haru\n");
 
 		const config = makeConfig({ agentName: "dogfood-agent" });
 
@@ -802,8 +799,8 @@ describe("isCanonicalRoot", () => {
 	test("returns false for worktree even when it contains .overstory/config.yaml (dogfooding)", () => {
 		// This is the core dogfooding scenario: the worktree has .overstory/config.yaml
 		// because it's tracked in git, but the path is different from the canonical root.
-		const canonicalRoot = "/projects/overstory";
-		const worktreePath = "/projects/overstory/.overstory/worktrees/dogfood-agent";
+		const canonicalRoot = "/projects/haru";
+		const worktreePath = "/projects/haru/.overstory/worktrees/dogfood-agent";
 		expect(isCanonicalRoot(worktreePath, canonicalRoot)).toBe(false);
 	});
 });

@@ -6,14 +6,14 @@ report, CLI usage, and failure modes.
 
 ---
 
-## 1. What `ov snapshot` and `ov recover` Do
+## 1. What `ha snapshot` and `ha recover` Do
 
-**`ov snapshot`** captures the full state of a running swarm into a portable
+**`ha snapshot`** captures the full state of a running swarm into a portable
 bundle on disk. The bundle includes all SQLite data and file-based agent state.
 It is the primary mechanism for creating a recovery point before risky operations
 or when diagnosing a degraded swarm.
 
-**`ov recover`** restores a swarm from a snapshot bundle. It re-populates the
+**`ha recover`** restores a swarm from a snapshot bundle. It re-populates the
 SQLite stores, writes agent file state, and reconciles the bundle against live
 external state (tmux sessions and git worktrees). A reconciliation report
 describes what was restored and lists operator actions for anything that could
@@ -22,9 +22,9 @@ not be restored automatically.
 Typical workflow:
 
 ```
-ov snapshot                       # Create recovery bundle
+ha snapshot                       # Create recovery bundle
 # ... disaster or migration ...
-ov recover --bundle .overstory/snapshots/<id>
+ha recover --bundle .overstory/snapshots/<id>
 ```
 
 ---
@@ -233,8 +233,8 @@ Component status per agent:
 | No | No | `missing` |
 | One of each | — | `degraded` |
 
-For `missing` agents: `operatorActions` includes `ov sling <task-id> --name <agentName>`.
-For `degraded` agents: `operatorActions` includes `ov inspect <agentName>`.
+For `missing` agents: `operatorActions` includes `ha sling <task-id> --name <agentName>`.
+For `degraded` agents: `operatorActions` includes `ha inspect <agentName>`.
 
 The reconciler accepts injectable `deps` for testing:
 
@@ -257,26 +257,26 @@ export interface ReconcileDeps {
 
 ```bash
 # Create a recovery bundle (default location: .overstory/snapshots/<id>/)
-ov snapshot
+ha snapshot
 
 # Create bundle with custom output directory
-ov snapshot --output /tmp/my-bundle
+ha snapshot --output /tmp/my-bundle
 
 # Snapshot only specific agents
-ov snapshot --agent my-builder --agent my-scout
+ha snapshot --agent my-builder --agent my-scout
 
 # Include completed sessions (excluded by default)
-ov snapshot --include-completed
+ha snapshot --include-completed
 
 # Restore from a bundle
-ov recover --bundle .overstory/snapshots/snap-2026-05-09T14-30-00-000Z
+ha recover --bundle .overstory/snapshots/snap-2026-05-09T14-30-00-000Z
 
 # Dry run: validate and reconcile without writing
-ov recover --bundle .overstory/snapshots/snap-... --dry-run
+ha recover --bundle .overstory/snapshots/snap-... --dry-run
 
 # JSON output
-ov snapshot --json
-ov recover --bundle .overstory/snapshots/snap-... --json
+ha snapshot --json
+ha recover --bundle .overstory/snapshots/snap-... --json
 ```
 
 ---
@@ -294,8 +294,8 @@ ov recover --bundle .overstory/snapshots/snap-... --json
 | Agent checkpoints and handoffs | Yes | Overwritten if already exist |
 | Agent identities | Yes | May fail silently on permission errors |
 | `current-run.txt`, `session-branch.txt` | Yes | Overwritten |
-| git worktrees | No | Must be re-created manually or via `ov sling` |
-| tmux sessions | No | Must be re-spawned via `ov sling` or `ov resume` |
+| git worktrees | No | Must be re-created manually or via `ha sling` |
+| tmux sessions | No | Must be re-spawned via `ha sling` or `ha resume` |
 | Agent log files | No | Logs are ephemeral; not captured |
 | Events database (`events.db`) | No | Not captured in snapshot |
 | Metrics database (`metrics.db`) | No | Not captured in snapshot |
@@ -319,11 +319,11 @@ how many were skipped (`src/recovery/restore.ts:352`).
 **Agent files partial restore**: If writing checkpoints or identities fails (e.g.,
 permission denied), the `agent-files` component is marked `degraded`. The
 `operatorActions` list directs the operator to inspect agent file state. Agent
-processes that need their checkpoint restored can be re-synced via `ov snapshot`
+processes that need their checkpoint restored can be re-synced via `ha snapshot`
 on a healthy peer and selectively restored.
 
 **Tmux and worktrees missing**: This is the normal post-restore state. `missing`
-agents require `ov sling <task-id> --name <agentName>` to re-spawn. The
+agents require `ha sling <task-id> --name <agentName>` to re-spawn. The
 reconciliation report lists the exact commands needed.
 
 ---

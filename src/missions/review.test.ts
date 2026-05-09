@@ -19,7 +19,7 @@ describe("mission review generation", () => {
 	let mission: Mission;
 
 	beforeEach(async () => {
-		tempDir = await mkdtemp(join(tmpdir(), "overstory-mission-review-"));
+		tempDir = await mkdtemp(join(tmpdir(), "haru-mission-review-"));
 		overstoryDir = tempDir;
 		dbPath = join(overstoryDir, "sessions.db");
 

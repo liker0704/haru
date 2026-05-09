@@ -1,5 +1,5 @@
 /**
- * Shell completion generation for overstory CLI.
+ * Shell completion generation for haru CLI.
  *
  * Generates completion scripts for bash, zsh, and fish shells.
  */
@@ -189,7 +189,7 @@ export const COMMANDS: readonly CommandDef[] = [
 	},
 	{
 		name: "doctor",
-		desc: "Run health checks on overstory setup",
+		desc: "Run health checks on haru setup",
 		flags: [
 			{ name: "--json", desc: "JSON output" },
 			{ name: "--verbose", desc: "Show passing checks too" },
@@ -795,7 +795,7 @@ export const COMMANDS: readonly CommandDef[] = [
 	},
 	{
 		name: "upgrade",
-		desc: "Upgrade overstory to the latest version",
+		desc: "Upgrade haru to the latest version",
 		flags: [
 			{ name: "--check", desc: "Compare current vs latest without installing" },
 			{ name: "--all", desc: "Upgrade all os-eco tools" },
@@ -814,7 +814,7 @@ export function generateBash(): string {
 	const lines: string[] = [
 		"# Bash completion for ov",
 		"# Source this file to enable completions:",
-		"#   source <(ov --completions bash)",
+		"#   source <(ha --completions bash)",
 		"",
 		"_ov() {",
 		"  local cur prev words cword",
@@ -881,7 +881,7 @@ export function generateZsh(): string {
 		"#compdef ov",
 		"# Zsh completion for ov",
 		"# Place this file in your fpath or source it:",
-		"#   source <(ov --completions zsh)",
+		"#   source <(ha --completions zsh)",
 		"",
 		"_ov() {",
 		"  local -a commands",
@@ -990,15 +990,15 @@ export function generateFish(): string {
 	const lines: string[] = [
 		"# Fish completion for ov",
 		"# Place this file in ~/.config/fish/completions/ov.fish or source it:",
-		"#   ov --completions fish | source",
+		"#   ha --completions fish | source",
 		"",
 		"# Remove all existing completions for ov",
-		"complete -c ov -e",
+		"complete -c ha -e",
 		"",
 		"# Global options",
-		"complete -c ov -l help -d 'Show help'",
-		"complete -c ov -l version -d 'Show version'",
-		"complete -c ov -l completions -d 'Generate shell completions' -xa 'bash zsh fish'",
+		"complete -c ha -l help -d 'Show help'",
+		"complete -c ha -l version -d 'Show version'",
+		"complete -c ha -l completions -d 'Generate shell completions' -xa 'bash zsh fish'",
 		"",
 	];
 
@@ -1006,13 +1006,13 @@ export function generateFish(): string {
 	for (const cmd of COMMANDS) {
 		// Command name
 		lines.push(`# ${cmd.desc}`);
-		lines.push(`complete -c ov -f -n '__fish_use_subcommand' -a '${cmd.name}' -d '${cmd.desc}'`);
+		lines.push(`complete -c ha -f -n '__fish_use_subcommand' -a '${cmd.name}' -d '${cmd.desc}'`);
 
 		if (cmd.subcommands && cmd.subcommands.length > 0) {
 			// Subcommand names
 			for (const subcmd of cmd.subcommands) {
 				lines.push(
-					`complete -c ov -f -n '__fish_seen_subcommand_from ${cmd.name}; and not __fish_seen_subcommand_from ${cmd.subcommands.map((s) => s.name).join(" ")}' -a '${subcmd.name}' -d '${subcmd.desc}'`,
+					`complete -c ha -f -n '__fish_seen_subcommand_from ${cmd.name}; and not __fish_seen_subcommand_from ${cmd.subcommands.map((s) => s.name).join(" ")}' -a '${subcmd.name}' -d '${subcmd.desc}'`,
 				);
 
 				// Subcommand flags
@@ -1023,12 +1023,12 @@ export function generateFish(): string {
 
 						if (flag.values) {
 							lines.push(
-								`complete -c ov -f -n ${cond} -l '${flagName}' -d '${flag.desc}' -xa '${flag.values.join(" ")}'`,
+								`complete -c ha -f -n ${cond} -l '${flagName}' -d '${flag.desc}' -xa '${flag.values.join(" ")}'`,
 							);
 						} else if (flag.takesValue) {
-							lines.push(`complete -c ov -n ${cond} -l '${flagName}' -d '${flag.desc}'`);
+							lines.push(`complete -c ha -n ${cond} -l '${flagName}' -d '${flag.desc}'`);
 						} else {
-							lines.push(`complete -c ov -f -n ${cond} -l '${flagName}' -d '${flag.desc}'`);
+							lines.push(`complete -c ha -f -n ${cond} -l '${flagName}' -d '${flag.desc}'`);
 						}
 					}
 				}
@@ -1043,12 +1043,12 @@ export function generateFish(): string {
 
 				if (flag.values) {
 					lines.push(
-						`complete -c ov -f -n ${cond} -l '${flagName}' -d '${flag.desc}' -xa '${flag.values.join(" ")}'`,
+						`complete -c ha -f -n ${cond} -l '${flagName}' -d '${flag.desc}' -xa '${flag.values.join(" ")}'`,
 					);
 				} else if (flag.takesValue) {
-					lines.push(`complete -c ov -n ${cond} -l '${flagName}' -d '${flag.desc}'`);
+					lines.push(`complete -c ha -n ${cond} -l '${flagName}' -d '${flag.desc}'`);
 				} else {
-					lines.push(`complete -c ov -f -n ${cond} -l '${flagName}' -d '${flag.desc}'`);
+					lines.push(`complete -c ha -f -n ${cond} -l '${flagName}' -d '${flag.desc}'`);
 				}
 			}
 		}
@@ -1060,7 +1060,7 @@ export function generateFish(): string {
 }
 
 /**
- * Create the Commander command for `overstory completions`.
+ * Create the Commander command for `haru completions`.
  */
 export function createCompletionsCommand(): Command {
 	return new Command("completions")
@@ -1075,7 +1075,7 @@ export function completionsCommand(args: string[]): void {
 	const shell = args[0];
 
 	if (!shell) {
-		printError("missing shell argument", "Usage: ov --completions <bash|zsh|fish>");
+		printError("missing shell argument", "Usage: ha --completions <bash|zsh|fish>");
 		process.exitCode = 1;
 		return;
 	}

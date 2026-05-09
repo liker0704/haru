@@ -473,7 +473,7 @@ export function createMulchClient(
 		args: string[],
 		context: string,
 	): Promise<{ stdout: string; stderr: string }> {
-		const { stdout, stderr, exitCode } = await runCommand(["ml", ...args], cwd);
+		const { stdout, stderr, exitCode } = await runCommand(["ku", ...args], cwd);
 		if (exitCode !== 0) {
 			throw new AgentError(`mulch ${context} failed (exit ${exitCode}): ${stderr.trim()}`);
 		}

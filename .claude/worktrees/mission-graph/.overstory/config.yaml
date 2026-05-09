@@ -1,9 +1,9 @@
 # Overstory configuration
-# See: https://github.com/overstory/overstory
+# See: https://github.com/haru/haru
 
 project:
-  name: overstory
-  root: /home/liker/projects/os-eco/overstory
+  name: haru
+  root: /home/liker/projects/os-eco/haru
   canonicalBranch: main
   qualityGates:
     - name: Tests

@@ -48,7 +48,7 @@ export const mergeConflictsPolicy: ReminderPolicy = {
 				expectedImpact:
 					"Reducing conflicts will speed up delivery and reduce manual resolution work.",
 				action:
-					"Review overlapping file scopes across active tasks. Run `ov status` to check for agents working on the same files.",
+					"Review overlapping file scopes across active tasks. Run `ha status` to check for agents working on the same files.",
 				verificationStep:
 					"After scoping adjustments, verify next merge window shows lower conflict rate.",
 				priority: "medium",

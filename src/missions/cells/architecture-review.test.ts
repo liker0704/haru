@@ -406,7 +406,7 @@ describe("convergence handler", () => {
 	test("all approve verdicts → approved trigger", async () => {
 		const deps = makeDeps();
 		const handlers = architectureReviewCell.buildHandlers(deps);
-		const handler = handlers["convergence"];
+		const handler = handlers.convergence;
 		if (!handler) throw new Error("convergence handler not found");
 
 		const ctx = makeHandlerCtx({
@@ -420,7 +420,7 @@ describe("convergence handler", () => {
 	test("no verdicts → approved trigger", async () => {
 		const deps = makeDeps();
 		const handlers = architectureReviewCell.buildHandlers(deps);
-		const handler = handlers["convergence"];
+		const handler = handlers.convergence;
 		if (!handler) throw new Error("convergence handler not found");
 
 		const ctx = makeHandlerCtx({ nodeId: "arch-review:convergence", checkpoint: null });
@@ -431,7 +431,7 @@ describe("convergence handler", () => {
 	test("BLOCK verdict with no previous concerns → revision-needed", async () => {
 		const deps = makeDeps();
 		const handlers = architectureReviewCell.buildHandlers(deps);
-		const handler = handlers["convergence"];
+		const handler = handlers.convergence;
 		if (!handler) throw new Error("convergence handler not found");
 
 		const ctx = makeHandlerCtx({
@@ -450,7 +450,7 @@ describe("convergence handler", () => {
 	test("BLOCK verdict with same concern as previous → stuck", async () => {
 		const deps = makeDeps();
 		const handlers = architectureReviewCell.buildHandlers(deps);
-		const handler = handlers["convergence"];
+		const handler = handlers.convergence;
 		if (!handler) throw new Error("convergence handler not found");
 
 		const ctx = makeHandlerCtx({
@@ -469,7 +469,7 @@ describe("convergence handler", () => {
 	test("round >= maxRounds → stuck regardless of concerns", async () => {
 		const deps = makeDeps();
 		const handlers = architectureReviewCell.buildHandlers(deps);
-		const handler = handlers["convergence"];
+		const handler = handlers.convergence;
 		if (!handler) throw new Error("convergence handler not found");
 
 		const ctx = makeHandlerCtx({
@@ -488,7 +488,7 @@ describe("convergence handler", () => {
 	test("RECOMMEND_CHANGES verdict → revision-needed", async () => {
 		const deps = makeDeps();
 		const handlers = architectureReviewCell.buildHandlers(deps);
-		const handler = handlers["convergence"];
+		const handler = handlers.convergence;
 		if (!handler) throw new Error("convergence handler not found");
 
 		const ctx = makeHandlerCtx({
@@ -507,7 +507,7 @@ describe("convergence handler", () => {
 	test("medium severity concern with coupling dimension is elevated to high for stuck detection", async () => {
 		const deps = makeDeps();
 		const handlers = architectureReviewCell.buildHandlers(deps);
-		const handler = handlers["convergence"];
+		const handler = handlers.convergence;
 		if (!handler) throw new Error("convergence handler not found");
 
 		// coupling weight=1.0: medium+coupling -> high, so concern-coupling-01 should be in blocking IDs

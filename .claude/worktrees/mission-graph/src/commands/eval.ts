@@ -1,5 +1,5 @@
 /**
- * CLI command: ov eval run <scenario> / ov eval show <run-id> / ov eval list / ov eval compare
+ * CLI command: ha eval run <scenario> / ha eval show <run-id> / ha eval list / ha eval compare
  *
  * Scenario-based orchestration evaluation. Runs a coordinator in a fixture repo
  * and evaluates assertions against the collected metrics.

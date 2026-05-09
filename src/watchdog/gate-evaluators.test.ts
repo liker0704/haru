@@ -302,11 +302,11 @@ describe("evaluateAwaitPlan", () => {
 });
 
 describe("evaluateWsCompletion", () => {
-	// Legacy path is triggered via OVERSTORY_LEGACY_WS_COMPLETION=true (opt-out flag).
+	// Legacy path is triggered via HARU_LEGACY_WS_COMPLETION=true (opt-out flag).
 	// The default (SSOT-based) path requires artifactRoot + missionStore + workstreams.json.
 
 	it("legacy: ignores merged mail before gateEnteredAt", async () => {
-		process.env.OVERSTORY_LEGACY_WS_COMPLETION = "true";
+		process.env.HARU_LEGACY_WS_COMPLETION = "true";
 		try {
 			const mission = makeMission({ slug: "test" });
 			const mailStore = createTestMailStore([
@@ -327,12 +327,12 @@ describe("evaluateWsCompletion", () => {
 			);
 			expect(result.met).toBe(false);
 		} finally {
-			process.env.OVERSTORY_LEGACY_WS_COMPLETION = undefined;
+			process.env.HARU_LEGACY_WS_COMPLETION = undefined;
 		}
 	});
 
 	it("legacy: accepts merged mail after gateEnteredAt", async () => {
-		process.env.OVERSTORY_LEGACY_WS_COMPLETION = "true";
+		process.env.HARU_LEGACY_WS_COMPLETION = "true";
 		try {
 			const mission = makeMission({ slug: "test" });
 			const mailStore = createTestMailStore([
@@ -354,7 +354,7 @@ describe("evaluateWsCompletion", () => {
 			);
 			expect(result.met).toBe(true);
 		} finally {
-			process.env.OVERSTORY_LEGACY_WS_COMPLETION = undefined;
+			process.env.HARU_LEGACY_WS_COMPLETION = undefined;
 		}
 	});
 

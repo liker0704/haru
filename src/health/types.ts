@@ -1,5 +1,5 @@
 /**
- * Types for the overstory health scoring and recommendation system.
+ * Types for the haru health scoring and recommendation system.
  *
  * The health system converts raw telemetry (sessions, metrics, doctor checks)
  * into an operational score and a prioritized improvement recommendation.
@@ -10,7 +10,7 @@ import type { DoctorCheck } from "../doctor/types.ts";
 // === Signals ===
 
 /**
- * Raw signals collected from overstory data stores.
+ * Raw signals collected from haru data stores.
  *
  * Gathered by collectSignals() from SessionStore, MetricsStore, and
  * optional pre-run doctor check results.

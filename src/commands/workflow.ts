@@ -1,7 +1,7 @@
 /**
- * CLI command: ov workflow
- *   ov workflow import <source-path> [--mission <slug>] [--dry-run] [--overwrite] [--json]
- *   ov workflow sync <source-path> [--mission <slug>] [--update] [--force] [--json]
+ * CLI command: ha workflow
+ *   ha workflow import <source-path> [--mission <slug>] [--dry-run] [--overwrite] [--json]
+ *   ha workflow sync <source-path> [--mission <slug>] [--update] [--force] [--json]
  *
  * Import: parse + transform + validate + write workstreams from a workflow source directory.
  * Sync: drift detection against stored manifest, with optional incremental update.
@@ -112,7 +112,7 @@ function renderSyncResult(result: SyncResult, sourcePath: string): void {
 		process.stdout.write(`Unchanged: ${result.unchanged.length} artifact(s)\n`);
 	}
 
-	process.stdout.write(`\nRun ${chalk.bold("ov workflow sync --update")} to apply changes.\n`);
+	process.stdout.write(`\nRun ${chalk.bold("ha workflow sync --update")} to apply changes.\n`);
 }
 
 // ── import command ───────────────────────────────────────────────────────────────────────────────
@@ -148,7 +148,7 @@ export async function executeWorkflowImport(
 	const sessionsDbPath = join(overstoryDir, "sessions.db");
 
 	if (!existsSync(sessionsDbPath)) {
-		const msg = "No sessions.db found — run `ov init` first or ensure a mission is active.";
+		const msg = "No sessions.db found — run `ha init` first or ensure a mission is active.";
 		if (json) {
 			jsonError("workflow:import", msg);
 		} else {
@@ -253,7 +253,7 @@ export async function executeWorkflowSync(opts: WorkflowSyncOptions): Promise<vo
 	const sessionsDbPath = join(overstoryDir, "sessions.db");
 
 	if (!existsSync(sessionsDbPath)) {
-		const msg = "No sessions.db found — run `ov init` first or ensure a mission is active.";
+		const msg = "No sessions.db found — run `ha init` first or ensure a mission is active.";
 		if (json) {
 			jsonError("workflow:sync", msg);
 		} else {
@@ -286,7 +286,7 @@ export async function executeWorkflowSync(opts: WorkflowSyncOptions): Promise<vo
 	const manifest = await readManifest(manifestPath);
 
 	if (manifest === null) {
-		const msg = `No import manifest found at ${manifestPath}. Run \`ov workflow import\` first.`;
+		const msg = `No import manifest found at ${manifestPath}. Run \`ha workflow import\` first.`;
 		if (json) {
 			jsonError("workflow:sync", msg);
 		} else {

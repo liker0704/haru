@@ -63,7 +63,7 @@ describe("selectRecommendation", () => {
 		expect(rec).not.toBeNull();
 		expect(rec?.factor).toBe("doctor_failures");
 		expect(rec?.priority).toBe("critical");
-		expect(rec?.action).toContain("ov doctor");
+		expect(rec?.action).toContain("ha doctor");
 	});
 
 	it("returns stalled_rate recommendation when many agents are stalled", () => {

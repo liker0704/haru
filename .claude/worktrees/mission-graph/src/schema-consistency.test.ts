@@ -34,7 +34,7 @@ describe("SQL schema consistency", () => {
 	let tmpDir: string;
 
 	beforeEach(async () => {
-		tmpDir = await mkdtemp(join(tmpdir(), "overstory-schema-test-"));
+		tmpDir = await mkdtemp(join(tmpdir(), "haru-schema-test-"));
 	});
 
 	afterEach(async () => {

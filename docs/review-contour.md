@@ -7,7 +7,7 @@ adding new analyzers.
 
 ---
 
-## 1. What `ov review` Does
+## 1. What `ha review` Does
 
 The review contour provides deterministic quality scoring of three kinds of
 orchestration artifacts:
@@ -371,8 +371,8 @@ export interface ReviewStore {
 
 **Source:** [`src/review/batching.ts`](../src/review/batching.ts)
 
-Bulk review commands (`ov review sessions`, `ov review handoffs`,
-`ov review specs`) drive analyzers through the batching helper in
+Bulk review commands (`ha review sessions`, `ha review handoffs`,
+`ha review specs`) drive analyzers through the batching helper in
 `src/review/batching.ts`. It iterates candidates, gathers per-subject input
 signals, dispatches to the appropriate analyzer, and persists each
 `InsertReviewRecord` via `ReviewStore.insert`. This module is also where
@@ -382,58 +382,58 @@ mission reviews are batched alongside the other subject types.
 
 ## 8. CLI Usage
 
-### `ov review sessions`
+### `ha review sessions`
 
 Review recent completed sessions.
 
 ```bash
-ov review sessions                  # Review last 10 sessions
-ov review sessions --recent 20      # Review last 20
-ov review sessions --json           # JSON output
+ha review sessions                  # Review last 10 sessions
+ha review sessions --recent 20      # Review last 20
+ha review sessions --json           # JSON output
 ```
 
 Output: table with per-agent scores for all six dimensions.
 
-### `ov review session <session-id>`
+### `ha review session <session-id>`
 
 Review a single session by agent name or session ID.
 
 ```bash
-ov review session my-builder        # By agent name
-ov review session a1b2c3d4          # By session ID
-ov review session my-builder --json
+ha review session my-builder        # By agent name
+ha review session a1b2c3d4          # By session ID
+ha review session my-builder --json
 ```
 
 Output: overall score, per-dimension breakdown with details, and notes.
 
-### `ov review handoffs`
+### `ha review handoffs`
 
 Review recent session handoffs (from checkpoint files).
 
 ```bash
-ov review handoffs                  # Review last 10 handoffs
-ov review handoffs --recent 5       # Review last 5
-ov review handoffs --json
+ha review handoffs                  # Review last 10 handoffs
+ha review handoffs --recent 5       # Review last 5
+ha review handoffs --json
 ```
 
-### `ov review specs`
+### `ha review specs`
 
 Review all spec files in `.overstory/specs/`.
 
 ```bash
-ov review specs
-ov review specs --json
+ha review specs
+ha review specs --json
 ```
 
 Output: table with per-spec scores, plus notes for any issues found.
 
-### `ov review stale`
+### `ha review stale`
 
 Check for changed watched surfaces and mark affected reviews as stale.
 
 ```bash
-ov review stale
-ov review stale --json
+ha review stale
+ha review stale --json
 ```
 
 Output: per-subject-type list of changed files, or "all up to date".

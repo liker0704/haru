@@ -114,7 +114,7 @@ function seedSession(rid: string): void {
 }
 
 beforeEach(async () => {
-	tempDir = await mkdtemp(join(tmpdir(), "overstory-bundle-test-"));
+	tempDir = await mkdtemp(join(tmpdir(), "haru-bundle-test-"));
 	overstoryDir = tempDir;
 	dbPath = join(overstoryDir, "sessions.db");
 	const seed = await seedMission();

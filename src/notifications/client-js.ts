@@ -3,7 +3,7 @@ export const NOTIFICATION_JS: string = `
 	"use strict";
 
 	/* ===== Settings ===== */
-	var SETTINGS_KEY = "overstory-notification-settings";
+	var SETTINGS_KEY = "haru-notification-settings";
 	var settings = { sound: false, browser: false, enabled: true };
 
 	function loadSettings() {
@@ -61,7 +61,7 @@ export const NOTIFICATION_JS: string = `
 		if (!match || !match[1]) return;
 		var slug = match[1];
 		try {
-			broadcastChannel = new BroadcastChannel("overstory-notifications-" + slug);
+			broadcastChannel = new BroadcastChannel("haru-notifications-" + slug);
 			broadcastChannel.addEventListener("message", function (e) {
 				if (e.data && e.data.type === "dismiss") {
 					removeToastById(e.data.id);

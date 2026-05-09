@@ -1,9 +1,11 @@
-# Overstory
+# Haru
+
+> Forked from jayminwest/overstory under MIT License.
 
 Multi-agent orchestration for AI coding agents.
 
-[![npm](https://img.shields.io/npm/v/@os-eco/overstory-cli)](https://www.npmjs.com/package/@os-eco/overstory-cli)
-[![CI](https://github.com/jayminwest/overstory/actions/workflows/ci.yml/badge.svg)](https://github.com/jayminwest/overstory/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/@hana/haru-cli)](https://www.npmjs.com/package/@hana/haru-cli)
+[![CI](https://github.com/jayminwest/haru/actions/workflows/ci.yml/badge.svg)](https://github.com/jayminwest/haru/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Overstory turns a single coding session into a multi-agent team by spawning worker agents in git worktrees via tmux, coordinating them through a custom SQLite mail system, and merging their work back with tiered conflict resolution. A pluggable `AgentRuntime` interface lets you swap between runtimes — Claude Code, [Pi](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent), [Gemini CLI](https://github.com/google-gemini/gemini-cli), or your own adapter.
@@ -24,20 +26,20 @@ Requires [Bun](https://bun.sh) v1.0+, git, and tmux. At least one supported agen
 - [OpenCode](https://opencode.ai) (`opencode` CLI)
 
 ```bash
-bun install -g @os-eco/overstory-cli
+bun install -g @hana/haru-cli
 ```
 
 Or try without installing:
 
 ```bash
-npx @os-eco/overstory-cli --help
+npx @hana/haru-cli --help
 ```
 
 ### Development
 
 ```bash
-git clone https://github.com/jayminwest/overstory.git
-cd overstory
+git clone https://github.com/jayminwest/haru.git
+cd haru
 bun install
 bun link              # Makes 'ov' available globally
 
@@ -49,30 +51,30 @@ bun run typecheck     # tsc --noEmit
 ## Quick Start
 
 ```bash
-# Initialize overstory in your project
+# Initialize haru in your project
 cd your-project
-ov init
+ha init
 
 # Install hooks into .claude/settings.local.json
-ov hooks install
+ha hooks install
 
 # Start a coordinator (persistent orchestrator)
-ov coordinator start
+ha coordinator start
 
 # Or spawn individual worker agents
-ov sling <task-id> --capability builder --name my-builder
+ha sling <task-id> --capability builder --name my-builder
 
 # Check agent status
-ov status
+ha status
 
 # Live dashboard for monitoring the fleet
-ov dashboard
+ha dashboard
 
 # Nudge a stalled agent
-ov nudge <agent-name>
+ha nudge <agent-name>
 
 # Check mail from agents
-ov mail check --inject
+ha mail check --inject
 ```
 
 ## Commands
@@ -83,132 +85,132 @@ Every command supports `--json` where noted. Global flags: `-q`/`--quiet`, `--ti
 
 | Command | Description |
 |---------|-------------|
-| `ov init` | Initialize `.overstory/` and bootstrap os-eco tools (`--yes`, `--name`, `--tools`, `--skip-mulch`, `--skip-seeds`, `--skip-canopy`, `--skip-onboard`, `--json`) |
-| `ov sling <task-id>` | Spawn a worker agent (`--capability`, `--name`, `--spec`, `--files`, `--parent`, `--depth`, `--skip-scout`, `--skip-review`, `--max-agents`, `--dispatch-max-agents`, `--skip-task-check`, `--no-scout-check`, `--runtime`, `--base-branch`, `--profile`, `--json`) |
-| `ov stop <agent-name>` | Terminate a running agent (`--clean-worktree`, `--json`) |
-| `ov prime` | Load context for orchestrator/agent (`--agent`, `--compact`) |
-| `ov spec write <task-id>` | Write a task specification (`--body`) |
-| `ov discover` | Discover a brownfield codebase via coordinator-driven scout swarm (`--skip`, `--name`, `--attach`, `--watchdog`, `--json`) |
-| `ov update` | Refresh `.overstory/` managed files from installed package (`--agents`, `--manifest`, `--hooks`, `--dry-run`, `--json`) |
+| `ha init` | Initialize `.overstory/` and bootstrap os-eco tools (`--yes`, `--name`, `--tools`, `--skip-mulch`, `--skip-seeds`, `--skip-canopy`, `--skip-onboard`, `--json`) |
+| `ha sling <task-id>` | Spawn a worker agent (`--capability`, `--name`, `--spec`, `--files`, `--parent`, `--depth`, `--skip-scout`, `--skip-review`, `--max-agents`, `--dispatch-max-agents`, `--skip-task-check`, `--no-scout-check`, `--runtime`, `--base-branch`, `--profile`, `--json`) |
+| `ha stop <agent-name>` | Terminate a running agent (`--clean-worktree`, `--json`) |
+| `ha prime` | Load context for orchestrator/agent (`--agent`, `--compact`) |
+| `ha spec write <task-id>` | Write a task specification (`--body`) |
+| `ha discover` | Discover a brownfield codebase via coordinator-driven scout swarm (`--skip`, `--name`, `--attach`, `--watchdog`, `--json`) |
+| `ha update` | Refresh `.overstory/` managed files from installed package (`--agents`, `--manifest`, `--hooks`, `--dry-run`, `--json`) |
 
 ### Coordination
 
 | Command | Description |
 |---------|-------------|
-| `ov coordinator start` | Start persistent coordinator agent (`--attach`/`--no-attach`, `--watchdog`, `--monitor`, `--profile`) |
-| `ov coordinator stop` | Stop coordinator |
-| `ov coordinator status` | Show coordinator state |
-| `ov coordinator send` | Fire-and-forget message to coordinator (`--subject`) |
-| `ov coordinator ask` | Synchronous request/response to coordinator (`--subject`, `--timeout`) |
-| `ov coordinator output` | Show recent coordinator output (`--lines`) |
-| `ov coordinator check-complete` | Evaluate exit triggers, return completion status |
-| `ov supervisor start` | **[DEPRECATED]** Start per-project supervisor agent |
-| `ov supervisor stop` | **[DEPRECATED]** Stop supervisor |
-| `ov supervisor status` | **[DEPRECATED]** Show supervisor state |
+| `ha coordinator start` | Start persistent coordinator agent (`--attach`/`--no-attach`, `--watchdog`, `--monitor`, `--profile`) |
+| `ha coordinator stop` | Stop coordinator |
+| `ha coordinator status` | Show coordinator state |
+| `ha coordinator send` | Fire-and-forget message to coordinator (`--subject`) |
+| `ha coordinator ask` | Synchronous request/response to coordinator (`--subject`, `--timeout`) |
+| `ha coordinator output` | Show recent coordinator output (`--lines`) |
+| `ha coordinator check-complete` | Evaluate exit triggers, return completion status |
+| `ha supervisor start` | **[DEPRECATED]** Start per-project supervisor agent |
+| `ha supervisor stop` | **[DEPRECATED]** Stop supervisor |
+| `ha supervisor status` | **[DEPRECATED]** Show supervisor state |
 
 ### Messaging
 
 | Command | Description |
 |---------|-------------|
-| `ov mail send` | Send a message (`--to`, `--subject`, `--body`, `--type`, `--priority`) |
-| `ov mail check` | Check inbox — unread messages (`--agent`, `--inject`, `--debounce`, `--json`) |
-| `ov mail list` | List messages with filters (`--from`, `--to`, `--unread`) |
-| `ov mail read <id>` | Mark message as read |
-| `ov mail reply <id>` | Reply in same thread (`--body`) |
-| `ov mail purge` | Purge old messages (`--older-than`, `--read-only`, `--dry-run`) |
-| `ov mail dlq` | List or inspect dead-letter queue messages |
-| `ov mail retry <id>` | Retry a dead-lettered message |
-| `ov nudge <agent> [message]` | Send a text nudge to an agent (`--from`, `--force`, `--json`) |
+| `ha mail send` | Send a message (`--to`, `--subject`, `--body`, `--type`, `--priority`) |
+| `ha mail check` | Check inbox — unread messages (`--agent`, `--inject`, `--debounce`, `--json`) |
+| `ha mail list` | List messages with filters (`--from`, `--to`, `--unread`) |
+| `ha mail read <id>` | Mark message as read |
+| `ha mail reply <id>` | Reply in same thread (`--body`) |
+| `ha mail purge` | Purge old messages (`--older-than`, `--read-only`, `--dry-run`) |
+| `ha mail dlq` | List or inspect dead-letter queue messages |
+| `ha mail retry <id>` | Retry a dead-lettered message |
+| `ha nudge <agent> [message]` | Send a text nudge to an agent (`--from`, `--force`, `--json`) |
 
 ### Task Groups
 
 | Command | Description |
 |---------|-------------|
-| `ov group create <name>` | Create a task group for batch tracking |
-| `ov group status <name>` | Show group progress |
-| `ov group add <name> <issue-id>` | Add issue to group |
-| `ov group remove <name> <issue-id>` | Remove issue from group |
-| `ov group list` | List all groups |
+| `ha group create <name>` | Create a task group for batch tracking |
+| `ha group status <name>` | Show group progress |
+| `ha group add <name> <issue-id>` | Add issue to group |
+| `ha group remove <name> <issue-id>` | Remove issue from group |
+| `ha group list` | List all groups |
 
 ### Merge
 
 | Command | Description |
 |---------|-------------|
-| `ov merge` | Merge agent branches into canonical (`--branch`, `--all`, `--into`, `--dry-run`, `--json`) |
+| `ha merge` | Merge agent branches into canonical (`--branch`, `--all`, `--into`, `--dry-run`, `--json`) |
 
 ### Mission Orchestration
 
 | Command | Description |
 |---------|-------------|
-| `ov mission start` | Start a mission with objective (`--slug`, `--objective`) |
-| `ov mission status` | Show mission phase, agents, workstreams |
-| `ov mission answer` | Answer a pending mission question (`--body`, `--file`) |
-| `ov mission handoff` | Hand off from plan to execute phase |
-| `ov mission pause <ws-id>` | Pause a workstream (`--reason`) |
-| `ov mission resume <ws-id>` | Resume a paused workstream |
-| `ov mission complete` | Complete the mission (runs holdout validation) |
-| `ov mission stop` | Stop the mission (suspends all agents) |
-| `ov mission list` | List all missions |
-| `ov mission show` | Show mission details |
-| `ov mission output` | Show mission coordinator output |
-| `ov mission graph` | Show mission graph state |
-| `ov mission workstream-complete <ws-id>` | Manually mark a workstream as completed |
-| `ov mission refresh-briefs` | Refresh workstream briefs after scope change |
-| `ov mission bundle` | Export mission result bundle |
-| `ov mission update` | Update mission objective or metadata |
-| `ov mission extract-learnings` | Extract reusable learnings from a completed mission |
-| `ov mission artifacts` | List artifacts produced during a mission |
-| `ov mission tier set` | Set the active tier for a mission |
-| `ov mission tier show` | Show current tier for a mission |
-| `ov mission holdout` | Run holdout validation against the mission |
+| `ha mission start` | Start a mission with objective (`--slug`, `--objective`) |
+| `ha mission status` | Show mission phase, agents, workstreams |
+| `ha mission answer` | Answer a pending mission question (`--body`, `--file`) |
+| `ha mission handoff` | Hand off from plan to execute phase |
+| `ha mission pause <ws-id>` | Pause a workstream (`--reason`) |
+| `ha mission resume <ws-id>` | Resume a paused workstream |
+| `ha mission complete` | Complete the mission (runs holdout validation) |
+| `ha mission stop` | Stop the mission (suspends all agents) |
+| `ha mission list` | List all missions |
+| `ha mission show` | Show mission details |
+| `ha mission output` | Show mission coordinator output |
+| `ha mission graph` | Show mission graph state |
+| `ha mission workstream-complete <ws-id>` | Manually mark a workstream as completed |
+| `ha mission refresh-briefs` | Refresh workstream briefs after scope change |
+| `ha mission bundle` | Export mission result bundle |
+| `ha mission update` | Update mission objective or metadata |
+| `ha mission extract-learnings` | Extract reusable learnings from a completed mission |
+| `ha mission artifacts` | List artifacts produced during a mission |
+| `ha mission tier set` | Set the active tier for a mission |
+| `ha mission tier show` | Show current tier for a mission |
+| `ha mission holdout` | Run holdout validation against the mission |
 
 ### Configuration
 
 | Command | Description |
 |---------|-------------|
-| `ov config list` | Show all current settings (merged config as YAML) |
-| `ov config get <key>` | Get a specific value (e.g., `taskTracker.backend`) |
-| `ov config set <key> <value>` | Set a config value (`--local` for machine-local overrides) |
-| `ov config reset` | Reset config to defaults (preserves project name/root/branch) |
+| `ha config list` | Show all current settings (merged config as YAML) |
+| `ha config get <key>` | Get a specific value (e.g., `taskTracker.backend`) |
+| `ha config set <key> <value>` | Set a config value (`--local` for machine-local overrides) |
+| `ha config reset` | Reset config to defaults (preserves project name/root/branch) |
 
 ### Observability
 
 | Command | Description |
 |---------|-------------|
-| `ov status` | Show all active agents, worktrees, tracker state (`--json`, `--verbose`, `--all`) |
-| `ov dashboard` | Live TUI dashboard for agent monitoring (`--interval`, `--all`) |
-| `ov inspect <agent>` | Deep per-agent inspection (`--follow`, `--interval`, `--no-tmux`, `--limit`, `--json`) |
-| `ov trace` | View agent/task timeline (`--agent`, `--run`, `--since`, `--until`, `--limit`, `--json`) |
-| `ov errors` | Aggregated error view across agents (`--agent`, `--run`, `--since`, `--until`, `--limit`, `--json`) |
-| `ov replay` | Interleaved chronological replay (`--run`, `--agent`, `--since`, `--until`, `--limit`, `--json`) |
-| `ov feed` | Unified real-time event stream (`--follow`, `--interval`, `--agent`, `--run`, `--json`) |
-| `ov logs` | Query NDJSON logs across agents (`--agent`, `--level`, `--since`, `--until`, `--follow`, `--json`) |
-| `ov costs` | Token/cost analysis and breakdown (`--live`, `--self`, `--agent`, `--run`, `--bead`, `--by-capability`, `--last`, `--json`) |
-| `ov metrics` | Show session metrics (`--last`, `--json`) |
-| `ov run list` | List orchestration runs (`--last`, `--json`) |
-| `ov run show <id>` | Show run details |
-| `ov run complete` | Mark current run as completed |
+| `ha status` | Show all active agents, worktrees, tracker state (`--json`, `--verbose`, `--all`) |
+| `ha dashboard` | Live TUI dashboard for agent monitoring (`--interval`, `--all`) |
+| `ha inspect <agent>` | Deep per-agent inspection (`--follow`, `--interval`, `--no-tmux`, `--limit`, `--json`) |
+| `ha trace` | View agent/task timeline (`--agent`, `--run`, `--since`, `--until`, `--limit`, `--json`) |
+| `ha errors` | Aggregated error view across agents (`--agent`, `--run`, `--since`, `--until`, `--limit`, `--json`) |
+| `ha replay` | Interleaved chronological replay (`--run`, `--agent`, `--since`, `--until`, `--limit`, `--json`) |
+| `ha feed` | Unified real-time event stream (`--follow`, `--interval`, `--agent`, `--run`, `--json`) |
+| `ha logs` | Query NDJSON logs across agents (`--agent`, `--level`, `--since`, `--until`, `--follow`, `--json`) |
+| `ha costs` | Token/cost analysis and breakdown (`--live`, `--self`, `--agent`, `--run`, `--bead`, `--by-capability`, `--last`, `--json`) |
+| `ha metrics` | Show session metrics (`--last`, `--json`) |
+| `ha run list` | List orchestration runs (`--last`, `--json`) |
+| `ha run show <id>` | Show run details |
+| `ha run complete` | Mark current run as completed |
 
 ### Infrastructure
 
 | Command | Description |
 |---------|-------------|
-| `ov hooks install` | Install orchestrator hooks to `.claude/settings.local.json` (`--force`) |
-| `ov hooks uninstall` | Remove orchestrator hooks |
-| `ov hooks status` | Check if hooks are installed |
-| `ov worktree list` | List worktrees with status |
-| `ov worktree clean` | Remove completed worktrees (`--completed`, `--all`, `--force`) |
-| `ov watch` | Start watchdog daemon — Tier 0 (`--interval`, `--background`) |
-| `ov monitor start` | Start Tier 2 monitor agent |
-| `ov monitor stop` | Stop monitor agent |
-| `ov monitor status` | Show monitor state |
-| `ov log <event>` | Log a hook event (`--agent`) |
-| `ov clean` | Clean up worktrees, sessions, artifacts (`--completed`, `--all`, `--run`) |
-| `ov doctor` | Run health checks on overstory setup — 11 categories (`--category`, `--fix`, `--json`) |
-| `ov ecosystem` | Show os-eco tool versions and health (`--json`) |
-| `ov upgrade` | Upgrade overstory to latest npm version (`--check`, `--all`, `--json`) |
-| `ov agents discover` | Discover agents by capability/state/parent (`--capability`, `--state`, `--parent`, `--json`) |
-| `ov completions <shell>` | Generate shell completions (bash, zsh, fish) |
+| `ha hooks install` | Install orchestrator hooks to `.claude/settings.local.json` (`--force`) |
+| `ha hooks uninstall` | Remove orchestrator hooks |
+| `ha hooks status` | Check if hooks are installed |
+| `ha worktree list` | List worktrees with status |
+| `ha worktree clean` | Remove completed worktrees (`--completed`, `--all`, `--force`) |
+| `ha watch` | Start watchdog daemon — Tier 0 (`--interval`, `--background`) |
+| `ha monitor start` | Start Tier 2 monitor agent |
+| `ha monitor stop` | Stop monitor agent |
+| `ha monitor status` | Show monitor state |
+| `ha log <event>` | Log a hook event (`--agent`) |
+| `ha clean` | Clean up worktrees, sessions, artifacts (`--completed`, `--all`, `--run`) |
+| `ha doctor` | Run health checks on haru setup — 11 categories (`--category`, `--fix`, `--json`) |
+| `ha ecosystem` | Show os-eco tool versions and health (`--json`) |
+| `ha upgrade` | Upgrade haru to latest npm version (`--check`, `--all`, `--json`) |
+| `ha agents discover` | Discover agents by capability/state/parent (`--capability`, `--state`, `--parent`, `--json`) |
+| `ha completions <shell>` | Generate shell completions (bash, zsh, fish) |
 
 ## Architecture
 
@@ -216,7 +218,7 @@ Overstory uses instruction overlays and tool-call guards to turn agent sessions 
 
 ### Runtime Adapters
 
-Overstory is runtime-agnostic. The `AgentRuntime` interface (`src/runtimes/types.ts`) defines the contract — each adapter handles spawning, config deployment, guard enforcement, readiness detection, and transcript parsing for its runtime. Set the default in `config.yaml` or override per-agent with `ov sling --runtime <name>`.
+Overstory is runtime-agnostic. The `AgentRuntime` interface (`src/runtimes/types.ts`) defines the contract — each adapter handles spawning, config deployment, guard enforcement, readiness detection, and transcript parsing for its runtime. Set the default in `config.yaml` or override per-agent with `ha sling --runtime <name>`.
 
 | Runtime | CLI | Guard Mechanism | Stability |
 |---------|-----|-----------------|-----------|
@@ -276,7 +278,7 @@ Orchestrator (multi-repo coordinator of coordinators)
 ## Project Structure
 
 ```
-overstory/
+haru/
   src/
     index.ts                      CLI entry point (Commander.js program)
     types.ts                      Shared types and interfaces
@@ -375,7 +377,7 @@ models:
 - Gateway agents get `ANTHROPIC_API_KEY=""` and `ANTHROPIC_AUTH_TOKEN` from provider config
 - Direct Anthropic API calls (merge resolver, watchdog triage) still need `ANTHROPIC_API_KEY` in the orchestrator env
 
-**Validation:** `ov doctor --category providers` checks reachability, auth tokens, model-provider refs, and tool-use compatibility.
+**Validation:** `ha doctor --category providers` checks reachability, auth tokens, model-provider refs, and tool-use compatibility.
 
 **`ProviderConfig` fields:**
 

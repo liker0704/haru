@@ -18,7 +18,7 @@ let tempDir: string;
 let store: MissionStore;
 
 beforeEach(async () => {
-	tempDir = await mkdtemp(join(tmpdir(), "overstory-smoke-test-"));
+	tempDir = await mkdtemp(join(tmpdir(), "haru-smoke-test-"));
 	const dbPath = join(tempDir, "sessions.db");
 	store = createMissionStore(dbPath);
 });

@@ -25,7 +25,7 @@ describe("deployHooks", () => {
 	let tempDir: string;
 
 	beforeEach(async () => {
-		tempDir = await mkdtemp(join(tmpdir(), "overstory-hooks-test-"));
+		tempDir = await mkdtemp(join(tmpdir(), "haru-hooks-test-"));
 	});
 
 	afterEach(async () => {
@@ -152,12 +152,12 @@ describe("deployHooks", () => {
 		// PostToolUse should have 3 entries: logger, mail check, and mulch diff Bash hook
 		expect(postToolUse).toHaveLength(3);
 		// First entry is the logging hook
-		expect(postToolUse[0].hooks[0].command).toContain("ov log tool-end");
+		expect(postToolUse[0].hooks[0].command).toContain("ha log tool-end");
 		// Second entry is the debounced mail check
-		expect(postToolUse[1].hooks[0].command).toContain("ov mail check --inject");
+		expect(postToolUse[1].hooks[0].command).toContain("ha mail check --inject");
 		expect(postToolUse[1].hooks[0].command).toContain("mail-check-agent");
 		expect(postToolUse[1].hooks[0].command).toContain("--debounce 30000");
-		expect(postToolUse[1].hooks[0].command).toContain("OVERSTORY_AGENT_NAME");
+		expect(postToolUse[1].hooks[0].command).toContain("HARU_AGENT_NAME");
 	});
 
 	test("PostToolUse hook includes mulch diff Bash hook", async () => {
@@ -205,7 +205,7 @@ describe("deployHooks", () => {
 		expect(hookTypes).toHaveLength(6);
 	});
 
-	test("SessionStart hook runs overstory prime with agent name", async () => {
+	test("SessionStart hook runs haru prime with agent name", async () => {
 		const worktreePath = join(tempDir, "worktree");
 
 		await deployHooks(worktreePath, "prime-agent");
@@ -215,8 +215,8 @@ describe("deployHooks", () => {
 		const parsed = JSON.parse(content);
 		const sessionStart = parsed.hooks.SessionStart[0];
 		expect(sessionStart.hooks[0].type).toBe("command");
-		expect(sessionStart.hooks[0].command).toContain("ov prime --agent prime-agent");
-		expect(sessionStart.hooks[0].command).toContain("OVERSTORY_AGENT_NAME");
+		expect(sessionStart.hooks[0].command).toContain("ha prime --agent prime-agent");
+		expect(sessionStart.hooks[0].command).toContain("HARU_AGENT_NAME");
 	});
 
 	test("UserPromptSubmit hook runs mail check with agent name", async () => {
@@ -228,11 +228,11 @@ describe("deployHooks", () => {
 		const content = await Bun.file(outputPath).text();
 		const parsed = JSON.parse(content);
 		const userPrompt = parsed.hooks.UserPromptSubmit[0];
-		expect(userPrompt.hooks[0].command).toContain("ov mail check --inject --agent mail-agent");
-		expect(userPrompt.hooks[0].command).toContain("OVERSTORY_AGENT_NAME");
+		expect(userPrompt.hooks[0].command).toContain("ha mail check --inject --agent mail-agent");
+		expect(userPrompt.hooks[0].command).toContain("HARU_AGENT_NAME");
 	});
 
-	test("PreCompact hook runs overstory prime with --compact flag", async () => {
+	test("PreCompact hook runs haru prime with --compact flag", async () => {
 		const worktreePath = join(tempDir, "worktree");
 
 		await deployHooks(worktreePath, "compact-agent");
@@ -242,11 +242,11 @@ describe("deployHooks", () => {
 		const parsed = JSON.parse(content);
 		const preCompact = parsed.hooks.PreCompact[0];
 		expect(preCompact.hooks[0].type).toBe("command");
-		expect(preCompact.hooks[0].command).toContain("ov prime --agent compact-agent --compact");
-		expect(preCompact.hooks[0].command).toContain("OVERSTORY_AGENT_NAME");
+		expect(preCompact.hooks[0].command).toContain("ha prime --agent compact-agent --compact");
+		expect(preCompact.hooks[0].command).toContain("HARU_AGENT_NAME");
 	});
 
-	test("PreToolUse hook pipes stdin to overstory log with --stdin flag", async () => {
+	test("PreToolUse hook pipes stdin to haru log with --stdin flag", async () => {
 		const worktreePath = join(tempDir, "worktree");
 
 		await deployHooks(worktreePath, "stdin-agent");
@@ -260,12 +260,12 @@ describe("deployHooks", () => {
 		const baseHook = preToolUse.find((h: { matcher: string }) => h.matcher === "");
 		expect(baseHook).toBeDefined();
 		expect(baseHook.hooks[0].command).toContain("--stdin");
-		expect(baseHook.hooks[0].command).toContain("ov log tool-start");
+		expect(baseHook.hooks[0].command).toContain("ha log tool-start");
 		expect(baseHook.hooks[0].command).toContain("stdin-agent");
 		expect(baseHook.hooks[0].command).not.toContain("read -r INPUT");
 	});
 
-	test("PostToolUse hook pipes stdin to overstory log with --stdin flag", async () => {
+	test("PostToolUse hook pipes stdin to haru log with --stdin flag", async () => {
 		const worktreePath = join(tempDir, "worktree");
 
 		await deployHooks(worktreePath, "stdin-agent");
@@ -275,7 +275,7 @@ describe("deployHooks", () => {
 		const parsed = JSON.parse(content);
 		const postToolUse = parsed.hooks.PostToolUse[0];
 		expect(postToolUse.hooks[0].command).toContain("--stdin");
-		expect(postToolUse.hooks[0].command).toContain("ov log tool-end");
+		expect(postToolUse.hooks[0].command).toContain("ha log tool-end");
 		expect(postToolUse.hooks[0].command).toContain("stdin-agent");
 		expect(postToolUse.hooks[0].command).not.toContain("read -r INPUT");
 	});
@@ -294,14 +294,14 @@ describe("deployHooks", () => {
 		expect(postToolUse.hooks).toHaveLength(2);
 
 		// Second hook should be mail check with debounce
-		expect(postToolUse.hooks[1].command).toContain("ov mail check");
+		expect(postToolUse.hooks[1].command).toContain("ha mail check");
 		expect(postToolUse.hooks[1].command).toContain("--inject");
 		expect(postToolUse.hooks[1].command).toContain("--agent mail-debounce-agent");
 		expect(postToolUse.hooks[1].command).toContain("--debounce 500");
-		expect(postToolUse.hooks[1].command).toContain("OVERSTORY_AGENT_NAME");
+		expect(postToolUse.hooks[1].command).toContain("HARU_AGENT_NAME");
 	});
 
-	test("Stop hook pipes stdin to overstory log with --stdin flag", async () => {
+	test("Stop hook pipes stdin to haru log with --stdin flag", async () => {
 		const worktreePath = join(tempDir, "worktree");
 
 		await deployHooks(worktreePath, "stdin-agent");
@@ -311,7 +311,7 @@ describe("deployHooks", () => {
 		const parsed = JSON.parse(content);
 		const stop = parsed.hooks.Stop[0];
 		expect(stop.hooks[0].command).toContain("--stdin");
-		expect(stop.hooks[0].command).toContain("ov log session-end");
+		expect(stop.hooks[0].command).toContain("ha log session-end");
 		expect(stop.hooks[0].command).toContain("stdin-agent");
 		expect(stop.hooks[0].command).not.toContain("read -r INPUT");
 	});
@@ -327,7 +327,7 @@ describe("deployHooks", () => {
 		const stop = parsed.hooks.Stop[0];
 		expect(stop.hooks.length).toBe(2);
 		expect(stop.hooks[1].command).toContain("ml learn");
-		expect(stop.hooks[1].command).toContain("OVERSTORY_AGENT_NAME");
+		expect(stop.hooks[1].command).toContain("HARU_AGENT_NAME");
 	});
 
 	test("hook commands no longer use sed-based extraction", async () => {
@@ -543,7 +543,7 @@ describe("deployHooks", () => {
 			(h: { matcher: string; hooks: Array<{ command: string }> }) => h.matcher === "Write",
 		);
 		// Path boundary guard, not a full block
-		expect(writeGuards[0].hooks[0].command).toContain("OVERSTORY_WORKTREE_PATH");
+		expect(writeGuards[0].hooks[0].command).toContain("HARU_WORKTREE_PATH");
 		expect(writeGuards[0].hooks[0].command).not.toContain("cannot modify files");
 
 		// Builder should have 4 Bash guards: danger guard + path boundary guard + tracker close guard + universal push guard
@@ -619,7 +619,7 @@ describe("deployHooks", () => {
 		expect(writeIdx).toBeLessThan(baseIdx);
 	});
 
-	test("preserves user hooks alongside overstory hooks", async () => {
+	test("preserves user hooks alongside haru hooks", async () => {
 		const worktreePath = join(tempDir, "merge-user-hooks-wt");
 		const claudeDir = join(worktreePath, ".claude");
 		const { mkdir } = await import("node:fs/promises");
@@ -666,10 +666,10 @@ describe("deployHooks", () => {
 
 		// Overstory hooks should also be present
 		expect(content).toContain("merge-agent");
-		expect(content).toContain("ov prime");
+		expect(content).toContain("ha prime");
 	});
 
-	test("overstory hooks appear before user hooks per event type", async () => {
+	test("haru hooks appear before user hooks per event type", async () => {
 		const worktreePath = join(tempDir, "order-merge-wt");
 		const claudeDir = join(worktreePath, ".claude");
 		const { mkdir } = await import("node:fs/promises");
@@ -694,15 +694,15 @@ describe("deployHooks", () => {
 		const parsed = JSON.parse(content);
 		const preToolUse = parsed.hooks.PreToolUse;
 
-		// User hook should be at the end (after all overstory hooks)
+		// User hook should be at the end (after all haru hooks)
 		const userIdx = preToolUse.findIndex(
 			(h: { hooks: Array<{ command: string }> }) => h.hooks[0]?.command === "echo user-guard-first",
 		);
 		const lastOverstoryIdx = preToolUse.reduce(
 			(last: number, h: { hooks: Array<{ command: string }> }, i: number) => {
 				if (
-					h.hooks[0]?.command?.includes("ov ") ||
-					h.hooks[0]?.command?.includes("overstory") ||
+					h.hooks[0]?.command?.includes("ha ") ||
+					h.hooks[0]?.command?.includes("haru") ||
 					h.hooks[0]?.command?.includes("OVERSTORY_")
 				) {
 					return i;
@@ -715,20 +715,20 @@ describe("deployHooks", () => {
 		expect(userIdx).toBeGreaterThan(lastOverstoryIdx);
 	});
 
-	test("strips stale overstory entries on re-deployment", async () => {
+	test("strips stale haru entries on re-deployment", async () => {
 		const worktreePath = join(tempDir, "stale-strip-wt");
 
 		// First deploy
 		await deployHooks(worktreePath, "stale-agent", "builder");
 
-		// Read the deployed config to count overstory entries
+		// Read the deployed config to count haru entries
 		const firstContent = await Bun.file(
 			join(worktreePath, ".claude", "settings.local.json"),
 		).text();
 		const firstParsed = JSON.parse(firstContent);
 		const firstPreToolUseCount = firstParsed.hooks.PreToolUse.length;
 
-		// Second deploy (should strip old overstory entries, not accumulate)
+		// Second deploy (should strip old haru entries, not accumulate)
 		await deployHooks(worktreePath, "stale-agent", "builder");
 
 		const secondContent = await Bun.file(
@@ -837,7 +837,7 @@ describe("deployHooks", () => {
 			entry.hooks.map((h) => h.command),
 		);
 		const mailCheckCmd = allCommands.find((cmd: string) =>
-			cmd.includes("ov mail check --inject --agent my-agent"),
+			cmd.includes("ha mail check --inject --agent my-agent"),
 		);
 		expect(mailCheckCmd).toBeDefined();
 	});
@@ -854,8 +854,8 @@ describe("deployHooks", () => {
 		const allCommands = sessionStart.flatMap((entry: { hooks: { command: string }[] }) =>
 			entry.hooks.map((h) => h.command),
 		);
-		const hasPrime = allCommands.some((cmd: string) => cmd.includes("ov prime --agent"));
-		const hasMailCheck = allCommands.some((cmd: string) => cmd.includes("ov mail check --inject"));
+		const hasPrime = allCommands.some((cmd: string) => cmd.includes("ha prime --agent"));
+		const hasMailCheck = allCommands.some((cmd: string) => cmd.includes("ha mail check --inject"));
 		expect(hasPrime).toBe(true);
 		expect(hasMailCheck).toBe(true);
 	});
@@ -872,18 +872,18 @@ describe("deployHooks", () => {
 		const allCommands = sessionStart.flatMap((entry: { hooks: { command: string }[] }) =>
 			entry.hooks.map((h) => h.command),
 		);
-		const mailCheckCmd = allCommands.find((cmd: string) => cmd.includes("ov mail check --inject"));
+		const mailCheckCmd = allCommands.find((cmd: string) => cmd.includes("ha mail check --inject"));
 		expect(mailCheckCmd).toBeDefined();
 		expect(mailCheckCmd).toContain(PATH_PREFIX);
 	});
 });
 
 describe("isOverstoryHookEntry", () => {
-	test("identifies entries with ov CLI commands", () => {
+	test("identifies entries with ha CLI commands", () => {
 		expect(
 			isOverstoryHookEntry({
 				matcher: "",
-				hooks: [{ type: "command", command: "ov prime --agent test" }],
+				hooks: [{ type: "command", command: "ha prime --agent test" }],
 			}),
 		).toBe(true);
 	});
@@ -895,28 +895,28 @@ describe("isOverstoryHookEntry", () => {
 				hooks: [
 					{
 						type: "command",
-						command: '[ -z "$OVERSTORY_AGENT_NAME" ] && exit 0; echo block',
+						command: '[ -z "$HARU_AGENT_NAME" ] && exit 0; echo block',
 					},
 				],
 			}),
 		).toBe(true);
 	});
 
-	test("identifies entries with OVERSTORY_WORKTREE_PATH", () => {
+	test("identifies entries with HARU_WORKTREE_PATH", () => {
 		expect(
 			isOverstoryHookEntry({
 				matcher: "Bash",
 				hooks: [
 					{
 						type: "command",
-						command: '[ -z "$OVERSTORY_WORKTREE_PATH" ] && exit 0;',
+						command: '[ -z "$HARU_WORKTREE_PATH" ] && exit 0;',
 					},
 				],
 			}),
 		).toBe(true);
 	});
 
-	test("returns false for user hooks without overstory references", () => {
+	test("returns false for user hooks without haru references", () => {
 		expect(
 			isOverstoryHookEntry({
 				matcher: "Bash",
@@ -934,13 +934,13 @@ describe("isOverstoryHookEntry", () => {
 		).toBe(false);
 	});
 
-	test("checks all hooks in the entry (any match = overstory)", () => {
+	test("checks all hooks in the entry (any match = haru)", () => {
 		expect(
 			isOverstoryHookEntry({
 				matcher: "",
 				hooks: [
 					{ type: "command", command: "echo user-thing" },
-					{ type: "command", command: "ov mail check" },
+					{ type: "command", command: "ha mail check" },
 				],
 			}),
 		).toBe(true);
@@ -987,7 +987,7 @@ describe("getCapabilityGuards", () => {
 		const guards = getCapabilityGuards("builder");
 		const bashGuard = guards.find((g) => g.matcher === "Bash");
 		expect(bashGuard).toBeDefined();
-		expect(bashGuard?.hooks[0]?.command).toContain("OVERSTORY_WORKTREE_PATH");
+		expect(bashGuard?.hooks[0]?.command).toContain("HARU_WORKTREE_PATH");
 		expect(bashGuard?.hooks[0]?.command).toContain("Bash path boundary violation");
 	});
 
@@ -995,7 +995,7 @@ describe("getCapabilityGuards", () => {
 		const guards = getCapabilityGuards("merger");
 		const bashGuard = guards.find((g) => g.matcher === "Bash");
 		expect(bashGuard).toBeDefined();
-		expect(bashGuard?.hooks[0]?.command).toContain("OVERSTORY_WORKTREE_PATH");
+		expect(bashGuard?.hooks[0]?.command).toContain("HARU_WORKTREE_PATH");
 		expect(bashGuard?.hooks[0]?.command).toContain("Bash path boundary violation");
 	});
 
@@ -1060,7 +1060,7 @@ describe("getCapabilityGuards", () => {
 			const guards = getCapabilityGuards(cap);
 			const taskGuard = guards.find((g) => g.matcher === "Task");
 			expect(taskGuard).toBeDefined();
-			expect(taskGuard?.hooks[0]?.command).toContain("ov sling");
+			expect(taskGuard?.hooks[0]?.command).toContain("ha sling");
 		}
 	});
 
@@ -1086,7 +1086,7 @@ describe("getCapabilityGuards", () => {
 		for (const tool of ["Write", "Edit", "NotebookEdit"]) {
 			const guard = guards.find((g) => g.matcher === tool);
 			expect(guard).toBeDefined();
-			expect(guard?.hooks[0]?.command).toContain('[ -z "$OVERSTORY_AGENT_NAME" ] && exit 0;');
+			expect(guard?.hooks[0]?.command).toContain('[ -z "$HARU_AGENT_NAME" ] && exit 0;');
 		}
 	});
 
@@ -1094,7 +1094,7 @@ describe("getCapabilityGuards", () => {
 		const guards = getCapabilityGuards("builder");
 		const taskGuard = guards.find((g) => g.matcher === "Task");
 		expect(taskGuard).toBeDefined();
-		expect(taskGuard?.hooks[0]?.command).toContain('[ -z "$OVERSTORY_AGENT_NAME" ] && exit 0;');
+		expect(taskGuard?.hooks[0]?.command).toContain('[ -z "$HARU_AGENT_NAME" ] && exit 0;');
 	});
 
 	test("coordinator gets 17 guards (10 team + 3 interactive + 3 tool blocks + 1 bash file guard)", () => {
@@ -1122,7 +1122,7 @@ describe("getCapabilityGuards", () => {
 			const guard = guards.find((g) => g.matcher === "AskUserQuestion");
 			expect(guard).toBeDefined();
 			expect(guard?.hooks[0]?.command).toContain("human interaction");
-			expect(guard?.hooks[0]?.command).toContain("ov mail");
+			expect(guard?.hooks[0]?.command).toContain("ha mail");
 		}
 	});
 
@@ -1141,7 +1141,7 @@ describe("getCapabilityGuards", () => {
 			const guard = guards.find((g) => g.matcher === "EnterPlanMode");
 			expect(guard).toBeDefined();
 			expect(guard?.hooks[0]?.command).toContain("human interaction");
-			expect(guard?.hooks[0]?.command).toContain("ov mail");
+			expect(guard?.hooks[0]?.command).toContain("ha mail");
 		}
 	});
 
@@ -1160,7 +1160,7 @@ describe("getCapabilityGuards", () => {
 			const guard = guards.find((g) => g.matcher === "EnterWorktree");
 			expect(guard).toBeDefined();
 			expect(guard?.hooks[0]?.command).toContain("human interaction");
-			expect(guard?.hooks[0]?.command).toContain("ov mail");
+			expect(guard?.hooks[0]?.command).toContain("ha mail");
 		}
 	});
 
@@ -1169,7 +1169,7 @@ describe("getCapabilityGuards", () => {
 		for (const tool of ["AskUserQuestion", "EnterPlanMode", "EnterWorktree"]) {
 			const guard = guards.find((g) => g.matcher === tool);
 			expect(guard).toBeDefined();
-			expect(guard?.hooks[0]?.command).toContain('[ -z "$OVERSTORY_AGENT_NAME" ] && exit 0;');
+			expect(guard?.hooks[0]?.command).toContain('[ -z "$HARU_AGENT_NAME" ] && exit 0;');
 		}
 	});
 
@@ -1194,7 +1194,7 @@ describe("getDangerGuards", () => {
 	test("guard command includes agent name for branch validation", () => {
 		const guards = getDangerGuards("my-builder");
 		const command = guards[0]?.hooks[0]?.command ?? "";
-		expect(command).toContain("overstory/my-builder/");
+		expect(command).toContain("haru/my-builder/");
 	});
 
 	test("guard command blocks all git push", () => {
@@ -1227,13 +1227,13 @@ describe("getDangerGuards", () => {
 	test("guard command includes env var guard prefix", () => {
 		const guards = getDangerGuards("test-agent");
 		const command = guards[0]?.hooks[0]?.command ?? "";
-		expect(command).toContain('[ -z "$OVERSTORY_AGENT_NAME" ]');
+		expect(command).toContain('[ -z "$HARU_AGENT_NAME" ]');
 	});
 
 	test("all capabilities get Bash danger guards in deployed hooks", async () => {
 		const capabilities = ["builder", "scout", "reviewer", "lead", "merger"];
 		const tempDir = await import("node:fs/promises").then((fs) =>
-			fs.mkdtemp(join(require("node:os").tmpdir(), "overstory-danger-test-")),
+			fs.mkdtemp(join(require("node:os").tmpdir(), "haru-danger-test-")),
 		);
 
 		try {
@@ -1248,7 +1248,7 @@ describe("getDangerGuards", () => {
 
 				const bashGuard = preToolUse.find((h: { matcher: string }) => h.matcher === "Bash");
 				expect(bashGuard).toBeDefined();
-				expect(bashGuard.hooks[0].command).toContain(`overstory/${cap}-agent/`);
+				expect(bashGuard.hooks[0].command).toContain(`haru/${cap}-agent/`);
 			}
 		} finally {
 			await import("node:fs/promises").then((fs) =>
@@ -1259,7 +1259,7 @@ describe("getDangerGuards", () => {
 
 	test("guard ordering: path boundary → danger → capability in scout", async () => {
 		const tempDir = await import("node:fs/promises").then((fs) =>
-			fs.mkdtemp(join(require("node:os").tmpdir(), "overstory-order-test-")),
+			fs.mkdtemp(join(require("node:os").tmpdir(), "haru-order-test-")),
 		);
 
 		try {
@@ -1274,7 +1274,7 @@ describe("getDangerGuards", () => {
 			// Path boundary Write guard (first) should come before Bash danger guard
 			const pathBoundaryWriteIdx = preToolUse.findIndex(
 				(h: { matcher: string; hooks: Array<{ command: string }> }) =>
-					h.matcher === "Write" && h.hooks[0]?.command?.includes("OVERSTORY_WORKTREE_PATH"),
+					h.matcher === "Write" && h.hooks[0]?.command?.includes("HARU_WORKTREE_PATH"),
 			);
 			const bashDangerIdx = preToolUse.findIndex((h: { matcher: string }) => h.matcher === "Bash");
 			// Capability block Write guard should come after Bash danger guard
@@ -1354,7 +1354,7 @@ describe("buildBashFileGuardScript", () => {
 
 	test("includes safe prefix whitelist checks", () => {
 		const script = buildBashFileGuardScript("scout");
-		expect(script).toContain("overstory ");
+		expect(script).toContain("haru ");
 		expect(script).toContain("bd ");
 		expect(script).toContain("sd ");
 		expect(script).toContain("git status");
@@ -1446,7 +1446,7 @@ describe("buildBashFileGuardScript", () => {
 
 	test("includes env var guard prefix", () => {
 		const script = buildBashFileGuardScript("scout");
-		expect(script).toMatch(/^if \[ -z "\$OVERSTORY_AGENT_NAME" \]/);
+		expect(script).toMatch(/^if \[ -z "\$HARU_AGENT_NAME" \]/);
 	});
 
 	test("accepts extra safe prefixes for coordinator", () => {
@@ -1481,7 +1481,7 @@ describe("structural enforcement integration", () => {
 	let tempDir: string;
 
 	beforeEach(async () => {
-		tempDir = await mkdtemp(join(tmpdir(), "overstory-structural-test-"));
+		tempDir = await mkdtemp(join(tmpdir(), "haru-structural-test-"));
 	});
 
 	afterEach(async () => {
@@ -1683,7 +1683,7 @@ describe("structural enforcement integration", () => {
 			expect(hooks.length).toBeGreaterThan(0);
 			const baseHook = hooks.find((h) => h.matcher === "");
 			expect(baseHook).toBeDefined();
-			expect(baseHook?.hooks[0]?.command).toContain("OVERSTORY_AGENT_NAME");
+			expect(baseHook?.hooks[0]?.command).toContain("HARU_AGENT_NAME");
 		}
 
 		// PreToolUse base hook (matcher == "") should also have ENV_GUARD
@@ -1693,7 +1693,7 @@ describe("structural enforcement integration", () => {
 		}>;
 		const basePreToolUse = preToolUse.find((h) => h.matcher === "");
 		expect(basePreToolUse).toBeDefined();
-		expect(basePreToolUse?.hooks[0]?.command).toContain("OVERSTORY_AGENT_NAME");
+		expect(basePreToolUse?.hooks[0]?.command).toContain("HARU_AGENT_NAME");
 	});
 
 	test("all deployed hook commands include env var guard for project root isolation", async () => {
@@ -1721,17 +1721,17 @@ describe("structural enforcement integration", () => {
 					if (
 						entry.matcher === "Bash" &&
 						hook.command.includes("git push is blocked") &&
-						!hook.command.includes("OVERSTORY_AGENT_NAME")
+						!hook.command.includes("HARU_AGENT_NAME")
 					) {
 						continue;
 					}
-					expect(hook.command).toContain("OVERSTORY_AGENT_NAME");
+					expect(hook.command).toContain("HARU_AGENT_NAME");
 				}
 			}
 		}
 	});
 
-	test("all capabilities block Task tool for overstory sling enforcement", async () => {
+	test("all capabilities block Task tool for haru sling enforcement", async () => {
 		const capabilities = [
 			"scout",
 			"reviewer",
@@ -1752,7 +1752,7 @@ describe("structural enforcement integration", () => {
 
 			const taskGuard = preToolUse.find((h: { matcher: string }) => h.matcher === "Task");
 			expect(taskGuard).toBeDefined();
-			expect(taskGuard.hooks[0].command).toContain("ov sling");
+			expect(taskGuard.hooks[0].command).toContain("ha sling");
 		}
 	});
 
@@ -1776,18 +1776,18 @@ describe("structural enforcement integration", () => {
 			const preToolUse = parsed.hooks.PreToolUse;
 
 			// Path boundary guards should be present for Write, Edit, NotebookEdit
-			// They use OVERSTORY_WORKTREE_PATH env var
+			// They use HARU_WORKTREE_PATH env var
 			const writeGuards = preToolUse.filter(
 				(h: { matcher: string; hooks: Array<{ command: string }> }) =>
-					h.matcher === "Write" && h.hooks[0]?.command?.includes("OVERSTORY_WORKTREE_PATH"),
+					h.matcher === "Write" && h.hooks[0]?.command?.includes("HARU_WORKTREE_PATH"),
 			);
 			const editGuards = preToolUse.filter(
 				(h: { matcher: string; hooks: Array<{ command: string }> }) =>
-					h.matcher === "Edit" && h.hooks[0]?.command?.includes("OVERSTORY_WORKTREE_PATH"),
+					h.matcher === "Edit" && h.hooks[0]?.command?.includes("HARU_WORKTREE_PATH"),
 			);
 			const notebookGuards = preToolUse.filter(
 				(h: { matcher: string; hooks: Array<{ command: string }> }) =>
-					h.matcher === "NotebookEdit" && h.hooks[0]?.command?.includes("OVERSTORY_WORKTREE_PATH"),
+					h.matcher === "NotebookEdit" && h.hooks[0]?.command?.includes("HARU_WORKTREE_PATH"),
 			);
 
 			expect(writeGuards.length).toBeGreaterThanOrEqual(1);
@@ -1809,7 +1809,7 @@ describe("structural enforcement integration", () => {
 		// Path boundary Write guard should come before Bash danger guard
 		const pathWriteIdx = preToolUse.findIndex(
 			(h: { matcher: string; hooks: Array<{ command: string }> }) =>
-				h.matcher === "Write" && h.hooks[0]?.command?.includes("OVERSTORY_WORKTREE_PATH"),
+				h.matcher === "Write" && h.hooks[0]?.command?.includes("HARU_WORKTREE_PATH"),
 		);
 		const bashDangerIdx = preToolUse.findIndex(
 			(h: { matcher: string; hooks: Array<{ command: string }> }) =>
@@ -1825,12 +1825,12 @@ describe("structural enforcement integration", () => {
 describe("buildPathBoundaryGuardScript", () => {
 	test("returns a string containing env var guard", () => {
 		const script = buildPathBoundaryGuardScript("file_path");
-		expect(script).toContain('[ -z "$OVERSTORY_AGENT_NAME" ] && exit 0;');
+		expect(script).toContain('[ -z "$HARU_AGENT_NAME" ] && exit 0;');
 	});
 
-	test("returns a string checking OVERSTORY_WORKTREE_PATH", () => {
+	test("returns a string checking HARU_WORKTREE_PATH", () => {
 		const script = buildPathBoundaryGuardScript("file_path");
-		expect(script).toContain('[ -z "$OVERSTORY_WORKTREE_PATH" ] && exit 0;');
+		expect(script).toContain('[ -z "$HARU_WORKTREE_PATH" ] && exit 0;');
 	});
 
 	test("reads stdin input", () => {
@@ -1853,7 +1853,7 @@ describe("buildPathBoundaryGuardScript", () => {
 
 	test("allows paths inside the worktree", () => {
 		const script = buildPathBoundaryGuardScript("file_path");
-		expect(script).toContain('"$OVERSTORY_WORKTREE_PATH"/*) exit 0');
+		expect(script).toContain('"$HARU_WORKTREE_PATH"/*) exit 0');
 	});
 
 	test("blocks paths outside the worktree with decision:block", () => {
@@ -1896,10 +1896,10 @@ describe("getPathBoundaryGuards", () => {
 		expect(notebookGuard?.hooks[0]?.command).toContain('"notebook_path"');
 	});
 
-	test("all guards include OVERSTORY_WORKTREE_PATH check", () => {
+	test("all guards include HARU_WORKTREE_PATH check", () => {
 		const guards = getPathBoundaryGuards();
 		for (const guard of guards) {
-			expect(guard.hooks[0]?.command).toContain("OVERSTORY_WORKTREE_PATH");
+			expect(guard.hooks[0]?.command).toContain("HARU_WORKTREE_PATH");
 		}
 	});
 
@@ -1914,12 +1914,12 @@ describe("getPathBoundaryGuards", () => {
 describe("buildBashPathBoundaryScript", () => {
 	test("returns a string containing env var guard", () => {
 		const script = buildBashPathBoundaryScript();
-		expect(script).toContain('[ -z "$OVERSTORY_AGENT_NAME" ] && exit 0;');
+		expect(script).toContain('[ -z "$HARU_AGENT_NAME" ] && exit 0;');
 	});
 
-	test("checks OVERSTORY_WORKTREE_PATH env var", () => {
+	test("checks HARU_WORKTREE_PATH env var", () => {
 		const script = buildBashPathBoundaryScript();
-		expect(script).toContain('[ -z "$OVERSTORY_WORKTREE_PATH" ] && exit 0;');
+		expect(script).toContain('[ -z "$HARU_WORKTREE_PATH" ] && exit 0;');
 	});
 
 	test("reads stdin input", () => {
@@ -1985,8 +1985,8 @@ describe("buildBashPathBoundaryScript", () => {
 
 	test("validates paths against worktree boundary", () => {
 		const script = buildBashPathBoundaryScript();
-		expect(script).toContain('"$OVERSTORY_WORKTREE_PATH"/*');
-		expect(script).toContain('"$OVERSTORY_WORKTREE_PATH")');
+		expect(script).toContain('"$HARU_WORKTREE_PATH"/*');
+		expect(script).toContain('"$HARU_WORKTREE_PATH")');
 	});
 
 	test("allows /dev/* paths as safe exceptions", () => {
@@ -2031,16 +2031,16 @@ describe("getBashPathBoundaryGuards", () => {
 		expect(guards[0]?.hooks[0]?.type).toBe("command");
 	});
 
-	test("guard command checks OVERSTORY_WORKTREE_PATH", () => {
+	test("guard command checks HARU_WORKTREE_PATH", () => {
 		const guards = getBashPathBoundaryGuards();
 		const command = guards[0]?.hooks[0]?.command ?? "";
-		expect(command).toContain("OVERSTORY_WORKTREE_PATH");
+		expect(command).toContain("HARU_WORKTREE_PATH");
 	});
 
 	test("guard command includes env var guard prefix", () => {
 		const guards = getBashPathBoundaryGuards();
 		const command = guards[0]?.hooks[0]?.command ?? "";
-		expect(command).toContain('[ -z "$OVERSTORY_AGENT_NAME" ]');
+		expect(command).toContain('[ -z "$HARU_AGENT_NAME" ]');
 	});
 
 	test("guard blocks paths outside worktree", () => {
@@ -2054,7 +2054,7 @@ describe("bash path boundary integration", () => {
 	let tempDir: string;
 
 	beforeEach(async () => {
-		tempDir = await mkdtemp(join(tmpdir(), "overstory-bash-path-test-"));
+		tempDir = await mkdtemp(join(tmpdir(), "haru-bash-path-test-"));
 	});
 
 	afterEach(async () => {
@@ -2080,7 +2080,7 @@ describe("bash path boundary integration", () => {
 			h.hooks[0]?.command?.includes("Bash path boundary violation"),
 		);
 		expect(pathGuard).toBeDefined();
-		expect(pathGuard.hooks[0].command).toContain("OVERSTORY_WORKTREE_PATH");
+		expect(pathGuard.hooks[0].command).toContain("HARU_WORKTREE_PATH");
 	});
 
 	test("merger gets Bash path boundary guard in deployed hooks", async () => {
@@ -2217,7 +2217,7 @@ describe("bash path boundary integration", () => {
 			(h: { matcher: string; hooks: Array<{ command: string }> }) =>
 				h.matcher === "Bash" &&
 				h.hooks[0]?.command?.includes("git push is blocked") &&
-				!h.hooks[0]?.command?.includes("OVERSTORY_AGENT_NAME"),
+				!h.hooks[0]?.command?.includes("HARU_AGENT_NAME"),
 		);
 		expect(universalGuard).toBeDefined();
 		expect(universalGuard.hooks[0].command).toContain('"decision":"block"');
@@ -2248,7 +2248,7 @@ describe("PATH prefix in deployed hooks", () => {
 	let tempDir: string;
 
 	beforeEach(async () => {
-		tempDir = await mkdtemp(join(tmpdir(), "overstory-path-prefix-test-"));
+		tempDir = await mkdtemp(join(tmpdir(), "haru-path-prefix-test-"));
 	});
 
 	afterEach(async () => {
@@ -2331,7 +2331,7 @@ describe("PATH prefix in deployed hooks", () => {
 		const cmd = parsed.hooks.SessionStart[0].hooks[0].command as string;
 		// PATH export must come before the CLI invocation
 		const pathIdx = cmd.indexOf("export PATH=");
-		const ovIdx = cmd.indexOf("ov prime");
+		const ovIdx = cmd.indexOf("ha prime");
 		expect(pathIdx).toBeGreaterThanOrEqual(0);
 		expect(ovIdx).toBeGreaterThan(pathIdx);
 	});
@@ -2362,7 +2362,7 @@ describe("PATH prefix in deployed hooks", () => {
 		// Path boundary guards (Write/Edit/NotebookEdit) are generated — no PATH prefix
 		const writeGuard = preToolUse.find(
 			(h: { matcher: string; hooks: Array<{ command: string }> }) =>
-				h.matcher === "Write" && h.hooks[0]?.command?.includes("OVERSTORY_WORKTREE_PATH"),
+				h.matcher === "Write" && h.hooks[0]?.command?.includes("HARU_WORKTREE_PATH"),
 		);
 		expect(writeGuard).toBeDefined();
 		expect(writeGuard.hooks[0].command).not.toContain("export PATH=");
@@ -2416,12 +2416,12 @@ describe("buildTrackerCloseGuardScript", () => {
 
 	test("contains ENV_GUARD prefix", () => {
 		const script = buildTrackerCloseGuardScript();
-		expect(script).toContain('[ -z "$OVERSTORY_AGENT_NAME" ] && exit 0;');
+		expect(script).toContain('[ -z "$HARU_AGENT_NAME" ] && exit 0;');
 	});
 
-	test("contains OVERSTORY_TASK_ID early-exit check", () => {
+	test("contains HARU_TASK_ID early-exit check", () => {
 		const script = buildTrackerCloseGuardScript();
-		expect(script).toContain('[ -z "$OVERSTORY_TASK_ID" ] && exit 0;');
+		expect(script).toContain('[ -z "$HARU_TASK_ID" ] && exit 0;');
 	});
 
 	test("blocks sd close with wrong ID", async () => {
@@ -2431,7 +2431,7 @@ describe("buildTrackerCloseGuardScript", () => {
 			stdin: new TextEncoder().encode(input),
 			stdout: "pipe",
 			stderr: "pipe",
-			env: { ...process.env, OVERSTORY_AGENT_NAME: "test-agent", OVERSTORY_TASK_ID: "my-task" },
+			env: { ...process.env, HARU_AGENT_NAME: "test-agent", HARU_TASK_ID: "my-task" },
 		});
 		const output = await new Response(proc.stdout).text();
 		await proc.exited;
@@ -2448,7 +2448,7 @@ describe("buildTrackerCloseGuardScript", () => {
 			stdin: new TextEncoder().encode(input),
 			stdout: "pipe",
 			stderr: "pipe",
-			env: { ...process.env, OVERSTORY_AGENT_NAME: "test-agent", OVERSTORY_TASK_ID: "my-task" },
+			env: { ...process.env, HARU_AGENT_NAME: "test-agent", HARU_TASK_ID: "my-task" },
 		});
 		const output = await new Response(proc.stdout).text();
 		await proc.exited;
@@ -2462,7 +2462,7 @@ describe("buildTrackerCloseGuardScript", () => {
 			stdin: new TextEncoder().encode(input),
 			stdout: "pipe",
 			stderr: "pipe",
-			env: { ...process.env, OVERSTORY_AGENT_NAME: "test-agent", OVERSTORY_TASK_ID: "my-task" },
+			env: { ...process.env, HARU_AGENT_NAME: "test-agent", HARU_TASK_ID: "my-task" },
 		});
 		const output = await new Response(proc.stdout).text();
 		await proc.exited;
@@ -2478,7 +2478,7 @@ describe("buildTrackerCloseGuardScript", () => {
 			stdin: new TextEncoder().encode(input),
 			stdout: "pipe",
 			stderr: "pipe",
-			env: { ...process.env, OVERSTORY_AGENT_NAME: "test-agent", OVERSTORY_TASK_ID: "my-task" },
+			env: { ...process.env, HARU_AGENT_NAME: "test-agent", HARU_TASK_ID: "my-task" },
 		});
 		const output = await new Response(proc.stdout).text();
 		await proc.exited;
@@ -2487,14 +2487,14 @@ describe("buildTrackerCloseGuardScript", () => {
 		expect(parsed.reason).toContain("other-task");
 	});
 
-	test("exits early when OVERSTORY_TASK_ID is empty (coordinator/monitor)", async () => {
+	test("exits early when HARU_TASK_ID is empty (coordinator/monitor)", async () => {
 		const script = buildTrackerCloseGuardScript();
 		const input = JSON.stringify({ command: "sd close coordinator-task" });
 		const proc = Bun.spawn(["sh", "-c", script], {
 			stdin: new TextEncoder().encode(input),
 			stdout: "pipe",
 			stderr: "pipe",
-			env: { ...process.env, OVERSTORY_AGENT_NAME: "coordinator", OVERSTORY_TASK_ID: "" },
+			env: { ...process.env, HARU_AGENT_NAME: "coordinator", HARU_TASK_ID: "" },
 		});
 		const output = await new Response(proc.stdout).text();
 		await proc.exited;
@@ -2514,16 +2514,16 @@ describe("getTrackerCloseGuards", () => {
 		expect(guards[0]?.hooks[0]?.type).toBe("command");
 	});
 
-	test("guard command contains OVERSTORY_TASK_ID check", () => {
+	test("guard command contains HARU_TASK_ID check", () => {
 		const guards = getTrackerCloseGuards();
 		const command = guards[0]?.hooks[0]?.command ?? "";
-		expect(command).toContain("OVERSTORY_TASK_ID");
+		expect(command).toContain("HARU_TASK_ID");
 	});
 
 	test("guard command includes ENV_GUARD prefix", () => {
 		const guards = getTrackerCloseGuards();
 		const command = guards[0]?.hooks[0]?.command ?? "";
-		expect(command).toContain('[ -z "$OVERSTORY_AGENT_NAME" ]');
+		expect(command).toContain('[ -z "$HARU_AGENT_NAME" ]');
 	});
 });
 
@@ -2531,7 +2531,7 @@ describe("deployHooks tracker close guard integration", () => {
 	let tempDir: string;
 
 	beforeEach(async () => {
-		tempDir = await mkdtemp(join(tmpdir(), "overstory-tracker-close-test-"));
+		tempDir = await mkdtemp(join(tmpdir(), "haru-tracker-close-test-"));
 	});
 
 	afterEach(async () => {
@@ -2548,10 +2548,10 @@ describe("deployHooks tracker close guard integration", () => {
 
 		const trackerGuard = preToolUse.find(
 			(h: { matcher: string; hooks: Array<{ command: string }> }) =>
-				h.matcher === "Bash" && h.hooks[0]?.command?.includes("OVERSTORY_TASK_ID"),
+				h.matcher === "Bash" && h.hooks[0]?.command?.includes("HARU_TASK_ID"),
 		);
 		expect(trackerGuard).toBeDefined();
-		expect(trackerGuard.hooks[0].command).toContain("OVERSTORY_TASK_ID");
+		expect(trackerGuard.hooks[0].command).toContain("HARU_TASK_ID");
 	});
 
 	test("deployHooks includes tracker close guard in PreToolUse for all capabilities", async () => {
@@ -2567,7 +2567,7 @@ describe("deployHooks tracker close guard integration", () => {
 
 			const trackerGuard = preToolUse.find(
 				(h: { matcher: string; hooks: Array<{ command: string }> }) =>
-					h.matcher === "Bash" && h.hooks[0]?.command?.includes("OVERSTORY_TASK_ID"),
+					h.matcher === "Bash" && h.hooks[0]?.command?.includes("HARU_TASK_ID"),
 			);
 			expect(trackerGuard).toBeDefined();
 		}
@@ -2596,16 +2596,16 @@ describe("escapeForSingleQuotedShell", () => {
 		const taskGuard = guards.find((g) => g.matcher === "Task");
 		expect(taskGuard).toBeDefined();
 		const cmd = taskGuard?.hooks[0]?.command ?? "";
-		const echoCmd = cmd.replace('[ -z "$OVERSTORY_AGENT_NAME" ] && exit 0; ', "");
+		const echoCmd = cmd.replace('[ -z "$HARU_AGENT_NAME" ] && exit 0; ', "");
 		const proc = Bun.spawn(["sh", "-c", echoCmd], {
 			stdout: "pipe",
 			stderr: "pipe",
-			env: { ...process.env, OVERSTORY_AGENT_NAME: "test-agent" },
+			env: { ...process.env, HARU_AGENT_NAME: "test-agent" },
 		});
 		const output = await new Response(proc.stdout).text();
 		await proc.exited;
 		const parsed = JSON.parse(output.trim());
 		expect(parsed.decision).toBe("block");
-		expect(parsed.reason).toContain("ov sling");
+		expect(parsed.reason).toContain("ha sling");
 	});
 });

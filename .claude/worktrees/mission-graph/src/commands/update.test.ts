@@ -7,13 +7,13 @@ import {
 	buildAgentManifest,
 	buildHooksJson,
 	initCommand,
-	OVERSTORY_GITIGNORE,
-	OVERSTORY_README,
+	HARU_GITIGNORE,
+	HARU_README,
 } from "./init.ts";
 import { executeUpdate } from "./update.ts";
 
 /**
- * Tests for `ov update` — refresh .overstory/ managed files.
+ * Tests for `ha update` — refresh .overstory/ managed files.
  *
  * Uses real temp git repos. Suppresses stdout to keep test output clean.
  * Requires a pre-initialized .overstory/ directory (via initCommand).
@@ -60,12 +60,12 @@ describe("executeUpdate: not initialized", () => {
 		await expect(executeUpdate({})).rejects.toThrow("Not initialized");
 	});
 
-	test("error message hints to run ov init", async () => {
+	test("error message hints to run ha init", async () => {
 		try {
 			await executeUpdate({});
 			expect.unreachable("Should have thrown");
 		} catch (err) {
-			expect((err as Error).message).toContain("ov init");
+			expect((err as Error).message).toContain("ha init");
 		}
 	});
 });
@@ -127,10 +127,10 @@ describe("executeUpdate: refresh all (no flags)", () => {
 		expect(hooksContent).toBe(buildHooksJson());
 
 		const gitignoreContent = await Bun.file(join(tempDir, ".overstory", ".gitignore")).text();
-		expect(gitignoreContent).toBe(OVERSTORY_GITIGNORE);
+		expect(gitignoreContent).toBe(HARU_GITIGNORE);
 
 		const readmeContent = await Bun.file(join(tempDir, ".overstory", "README.md")).text();
-		expect(readmeContent).toBe(OVERSTORY_README);
+		expect(readmeContent).toBe(HARU_README);
 	});
 
 	test("does not touch config.yaml", async () => {

@@ -1,5 +1,5 @@
 /**
- * CLI command: ov context <generate|show|invalidate>
+ * CLI command: ha context <generate|show|invalidate>
  *
  * Manages the project context cache at .overstory/project-context.json.
  *
@@ -149,9 +149,9 @@ export async function executeContextShow(opts: ContextShowOptions): Promise<void
 
 	if (cached === null) {
 		if (json) {
-			jsonError("context show", "No cached context found. Run `ov context generate` first.");
+			jsonError("context show", "No cached context found. Run `ha context generate` first.");
 		} else {
-			process.stderr.write("No cached context found. Run `ov context generate` to create one.\n");
+			process.stderr.write("No cached context found. Run `ha context generate` to create one.\n");
 		}
 		process.exitCode = 1;
 		return;

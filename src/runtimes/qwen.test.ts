@@ -262,7 +262,7 @@ describe("QwenRuntime", () => {
 		let tempDir: string;
 
 		beforeEach(async () => {
-			tempDir = await mkdtemp(join(tmpdir(), "overstory-qwen-test-"));
+			tempDir = await mkdtemp(join(tmpdir(), "haru-qwen-test-"));
 		});
 
 		afterEach(async () => {
@@ -339,7 +339,7 @@ describe("QwenRuntime", () => {
 		let tempDir: string;
 
 		beforeEach(async () => {
-			tempDir = await mkdtemp(join(tmpdir(), "overstory-qwen-hooks-"));
+			tempDir = await mkdtemp(join(tmpdir(), "haru-qwen-hooks-"));
 		});
 
 		afterEach(async () => {

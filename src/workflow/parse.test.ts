@@ -113,9 +113,9 @@ Do the second thing.
 
 		const result = parseTaskBreakdown(content);
 		expect(result).toHaveLength(2);
-		expect(result[0]!.id).toBe("task-01");
-		expect(result[1]!.id).toBe("task-02");
-		expect(result[1]!.dependencies).toEqual(["task-01"]);
+		expect(result[0]?.id).toBe("task-01");
+		expect(result[1]?.id).toBe("task-02");
+		expect(result[1]?.dependencies).toEqual(["task-01"]);
 	});
 
 	it("parses comma-separated dependencies", () => {
@@ -125,7 +125,7 @@ Do the second thing.
 **TDD:** full`;
 
 		const result = parseTaskBreakdown(content);
-		expect(result[0]!.dependencies).toEqual(["task-01", "task-02"]);
+		expect(result[0]?.dependencies).toEqual(["task-01", "task-02"]);
 	});
 
 	it("handles TDD: skip", () => {
@@ -134,7 +134,7 @@ Do the second thing.
 **Dependencies:** None
 **TDD:** skip`;
 		const result = parseTaskBreakdown(content);
-		expect(result[0]!.tddMode).toBe("skip");
+		expect(result[0]?.tddMode).toBe("skip");
 	});
 
 	it("handles unknown TDD value as null", () => {
@@ -143,7 +143,7 @@ Do the second thing.
 **Dependencies:** None
 **TDD:** partial`;
 		const result = parseTaskBreakdown(content);
-		expect(result[0]!.tddMode).toBeNull();
+		expect(result[0]?.tddMode).toBeNull();
 	});
 
 	it("handles missing TDD field as null", () => {
@@ -151,7 +151,7 @@ Do the second thing.
 
 **Dependencies:** None`;
 		const result = parseTaskBreakdown(content);
-		expect(result[0]!.tddMode).toBeNull();
+		expect(result[0]?.tddMode).toBeNull();
 	});
 
 	it("returns empty array for empty content", () => {
@@ -189,8 +189,8 @@ describe("parseRisks", () => {
 
 		const result = parseRisks(content);
 		expect(result).toHaveLength(2);
-		expect(result[0]!.risk).toBe("Risk A");
-		expect(result[1]!.risk).toBe("Risk B");
+		expect(result[0]?.risk).toBe("Risk A");
+		expect(result[1]?.risk).toBe("Risk B");
 	});
 
 	it("returns empty array when no table found", () => {
@@ -212,7 +212,7 @@ Some footer.`;
 
 		const result = parseRisks(content);
 		expect(result).toHaveLength(1);
-		expect(result[0]!.risk).toBe("Data loss");
+		expect(result[0]?.risk).toBe("Data loss");
 	});
 });
 
@@ -242,7 +242,7 @@ describe("parseAcceptanceCriteria", () => {
 
 		const result = parseAcceptanceCriteria(content);
 		expect(result).toHaveLength(1);
-		expect(result[0]!.text).toBe("Item one");
+		expect(result[0]?.text).toBe("Item one");
 	});
 
 	it("returns empty array when section not found", () => {
@@ -260,7 +260,7 @@ describe("parseAcceptanceCriteria", () => {
 
 		const result = parseAcceptanceCriteria(content);
 		expect(result).toHaveLength(1);
-		expect(result[0]!.checked).toBe(true);
+		expect(result[0]?.checked).toBe(true);
 	});
 
 	it("handles multiple criteria with mixed states", () => {
@@ -272,9 +272,9 @@ describe("parseAcceptanceCriteria", () => {
 
 		const result = parseAcceptanceCriteria(content);
 		expect(result).toHaveLength(3);
-		expect(result[0]!.checked).toBe(true);
-		expect(result[1]!.checked).toBe(false);
-		expect(result[2]!.checked).toBe(true);
+		expect(result[0]?.checked).toBe(true);
+		expect(result[1]?.checked).toBe(false);
+		expect(result[2]?.checked).toBe(true);
 	});
 });
 
@@ -307,7 +307,7 @@ describe("parseComponents", () => {
 | DELETE | \`src/old.ts\` | Remove old file |`;
 
 		const result = parseComponents(content);
-		expect(result[0]!.path).toBe("src/old.ts");
+		expect(result[0]?.path).toBe("src/old.ts");
 	});
 
 	it("supports all valid actions", () => {
@@ -331,7 +331,7 @@ describe("parseComponents", () => {
 
 		const result = parseComponents(content);
 		expect(result).toHaveLength(1);
-		expect(result[0]!.action).toBe("CREATE");
+		expect(result[0]?.action).toBe("CREATE");
 	});
 
 	it("returns empty array when no table found", () => {

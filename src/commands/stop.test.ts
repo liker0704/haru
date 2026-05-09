@@ -1,5 +1,5 @@
 /**
- * Tests for overstory stop command.
+ * Tests for haru stop command.
  *
  * Uses real temp directories and real git repos for file I/O and config loading.
  * Tmux and worktree operations are injected via the StopDeps DI interface instead of
@@ -189,9 +189,9 @@ function makeAgentSession(overrides: Partial<AgentSession> = {}): AgentSession {
 		capability: "builder",
 		runtime: "claude",
 		worktreePath: join(tempDir, ".overstory", "worktrees", "my-builder"),
-		branchName: "overstory/my-builder/bead-123",
+		branchName: "haru/my-builder/bead-123",
 		taskId: "bead-123",
-		tmuxSession: "overstory-test-project-my-builder",
+		tmuxSession: "haru-test-project-my-builder",
 		state: "working",
 		pid: 99999,
 		parentAgent: null,

@@ -199,7 +199,7 @@ export function extractBlockingConcernIds(verdicts: PlanCriticVerdictPayload[]):
 export function guardBriefPath(briefPath: string, artifactRoot: string): boolean {
 	const resolved = resolve(artifactRoot, briefPath);
 	const normalizedRoot = resolve(artifactRoot);
-	return resolved.startsWith(normalizedRoot + "/") || resolved === normalizedRoot;
+	return resolved.startsWith(`${normalizedRoot}/`) || resolved === normalizedRoot;
 }
 
 /**

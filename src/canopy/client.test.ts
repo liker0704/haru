@@ -52,7 +52,7 @@ function makeInstrumentCtx(store: EventStore): InstrumentContext {
 // Check if canopy CLI is available
 let hasCanopy = false;
 try {
-	const proc = Bun.spawn(["which", "cn"], { stdout: "pipe", stderr: "pipe" });
+	const proc = Bun.spawn(["which", "ta"], { stdout: "pipe", stderr: "pipe" });
 	const exitCode = await proc.exited;
 	hasCanopy = exitCode === 0;
 } catch {

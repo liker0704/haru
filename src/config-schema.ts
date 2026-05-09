@@ -1,4 +1,4 @@
-/** Latest config schema version supported by this version of overstory. */
+/** Latest config schema version supported by this version of haru. */
 export const CURRENT_CONFIG_VERSION = 2;
 
 /** All supported config versions. */

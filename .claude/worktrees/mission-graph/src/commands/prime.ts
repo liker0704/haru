@@ -1,5 +1,5 @@
 /**
- * `ov prime` command.
+ * `ha prime` command.
  *
  * Loads context for the orchestrator or a specific agent and outputs it
  * to stdout for injection into Claude Code's context via hooks.
@@ -19,7 +19,7 @@ import { createMulchClient } from "../mulch/client.ts";
 import { openSessionStore } from "../sessions/compat.ts";
 import type { AgentIdentity, AgentManifest, SessionCheckpoint, SessionMetrics } from "../types.ts";
 import { getCurrentSessionName } from "../worktree/tmux.ts";
-import { OVERSTORY_GITIGNORE } from "./init.ts";
+import { HARU_GITIGNORE } from "./init.ts";
 
 export interface PrimeOptions {
 	agent?: string;
@@ -107,13 +107,13 @@ async function healGitignore(overstoryDir: string): Promise<void> {
 	const gitignorePath = join(overstoryDir, ".gitignore");
 	try {
 		const current = await Bun.file(gitignorePath).text();
-		if (current === OVERSTORY_GITIGNORE) {
+		if (current === HARU_GITIGNORE) {
 			return; // Already up to date
 		}
 	} catch {
 		// File does not exist — write it fresh
 	}
-	await Bun.write(gitignorePath, OVERSTORY_GITIGNORE);
+	await Bun.write(gitignorePath, HARU_GITIGNORE);
 }
 
 /**

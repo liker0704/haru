@@ -1,6 +1,6 @@
-# `ov mission`
+# `ha mission`
 
-This document captures the design agreements and rationale behind `ov mission`
+This document captures the design agreements and rationale behind `ha mission`
 mode in Overstory. It started as the RFC for the feature and now serves as the
 design reference for the shipped `v1`.
 
@@ -11,7 +11,7 @@ Current references:
 
 Current status:
 
-- `ov mission v1` is implemented and considered real after Epic #13.
+- `ha mission v1` is implemented and considered real after Epic #13.
 - This document remains the design / RFC reference, not the day-to-day
   operator manual.
 
@@ -25,7 +25,7 @@ Agreement status:
 
 ## 1. Product Model
 
-`ov mission` is a separate mode, not a flag on the existing coordinator.
+`ha mission` is a separate mode, not a flag on the existing coordinator.
 
 It is intended for complex tasks where execution should not begin until the
 system has first:
@@ -42,12 +42,12 @@ Core principle:
 understand -> align -> decide -> plan -> execute
 ```
 
-The main product value of `ov mission` is to combine:
+The main product value of `ha mission` is to combine:
 
 - the phase discipline from `orchestrate`
-- the live, mail-driven, persistent coordination model from `overstory`
+- the live, mail-driven, persistent coordination model from `haru`
 
-`ov mission` exists alongside the current execution-first coordinator flow.
+`ha mission` exists alongside the current execution-first coordinator flow.
 The existing coordinator remains the fast path for smaller or already-clear
 tasks.
 
@@ -116,7 +116,7 @@ peer analyst by default.
 
 Operational lifecycle for `v1`:
 
-- mission analyst starts when `ov mission start` creates the mission
+- mission analyst starts when `ha mission start` creates the mission
 - mission analyst joins the mission-owned run immediately
 - mission analyst is mission-scoped, not a project-global idle background role
 - mission analyst remains active for the full mission lifecycle
@@ -247,14 +247,14 @@ source-of-truth set so far.
 `workstreams.json` is not a second planning namespace detached from the runtime.
 
 In `v1`, each workstream must map to a canonical tracker task, because current
-`overstory` execution, dispatch, dashboard, and merge-close logic all assume
+`haru` execution, dispatch, dashboard, and merge-close logic all assume
 real `taskId` ownership.
 
 That means:
 
 - each workstream has a stable `workstreamId`
 - each workstream also has a canonical `taskId`
-- `taskId` is the runtime bridge for `ov sling`, agent sessions, merge-close,
+- `taskId` is the runtime bridge for `ha sling`, agent sessions, merge-close,
   and tracker-driven status
 
 Suggested minimum schema:
@@ -348,10 +348,10 @@ synthesis and updates.
 `brief.md` is not the final execution contract consumed by builders and
 reviewers.
 
-Current `overstory` lead execution is spec-driven, with worker dispatch centered
+Current `haru` lead execution is spec-driven, with worker dispatch centered
 on `.overstory/specs/<task-id>.md`.
 
-So in `ov mission`, the intended chain is:
+So in `ha mission`, the intended chain is:
 
 - mission artifacts -> `brief.md`
 - `brief.md` -> lead-owned spec
@@ -594,7 +594,7 @@ The system should not choose between:
 - "ask the user everything immediately"
 - "analyze first and ask later"
 
-Instead, `ov mission` should use a staged interaction loop:
+Instead, `ha mission` should use a staged interaction loop:
 
 1. short initial clarification
 2. current-state analysis
@@ -806,7 +806,7 @@ The coordinator should **not** ask the user when the answer should come from:
 
 ### 6.10 Reopen and Refreeze
 
-Mission freeze is not permanent. `ov mission` should allow controlled reopen
+Mission freeze is not permanent. `ha mission` should allow controlled reopen
 when execution reveals a contradiction or ambiguity that crosses back into the
 mission-contract layer.
 
@@ -933,7 +933,7 @@ doing its job.
 
 ## 7. Mission Telemetry And Learning Loop
 
-`ov mission` should not rely only on intuition for improvement. The system
+`ha mission` should not rely only on intuition for improvement. The system
 needs a mission telemetry layer that records how missions actually behave so the
 workflow, prompts, routing, and decision model can be improved over time.
 
@@ -964,13 +964,13 @@ This telemetry will later support:
 
 - better prompts
 - better routing heuristics
-- better `ov eval`
-- better `ov health`
+- better `ha eval`
+- better `ha health`
 - better mission retrospectives
 
 The exact schema can evolve, but the requirement itself is agreed:
 
-- every `ov mission` run must leave behind enough structured evidence that the
+- every `ha mission` run must leave behind enough structured evidence that the
   system can improve from real usage
 - logging and retained results are a first-class requirement, not optional
 - `v1` should prefer richer retention over a second analyst or more mission
@@ -1024,8 +1024,8 @@ system from raw tmux output.
 
 ### 7.3 Reuse Existing Overstory Analysis Layers
 
-`ov mission` should not invent a parallel analytics stack if the current
-overstory ecosystem already provides the right primitives.
+`ha mission` should not invent a parallel analytics stack if the current
+haru ecosystem already provides the right primitives.
 
 The preferred reuse direction is:
 
@@ -1034,13 +1034,13 @@ The preferred reuse direction is:
 - `reviews.db` for deterministic post-mission review and staleness tracking
 - mission artifacts on disk for human-readable source-of-truth context
 
-This matches the way existing overstory subsystems already work:
+This matches the way existing haru subsystems already work:
 
 - eval persists full run artifacts for later inspection
 - health computes scores from existing stores rather than from ad-hoc logs
 - review persists deterministic scores and stale-state separately from runtime
 
-`ov mission` should follow the same pattern instead of adding a new opaque log
+`ha mission` should follow the same pattern instead of adding a new opaque log
 layer.
 
 ### 7.4 Learning Loop Beyond Raw Logs
@@ -1110,7 +1110,7 @@ For `v1`, the preferred export behavior is:
 
 - materialize or refresh the `results/` bundle when a mission reaches a terminal
   state (`completed` or `stopped`)
-- allow later commands such as `ov mission show` or retrospective tooling to
+- allow later commands such as `ha mission show` or retrospective tooling to
   regenerate derived exports if a bundle is missing or stale
 
 The initial terminal export should be owned by the mission terminalization path
@@ -1118,7 +1118,7 @@ itself:
 
 - mission completion path writes/refreshed the bundle once the mission is marked
   terminal
-- `ov mission stop` does the same for intentional stop
+- `ha mission stop` does the same for intentional stop
 - later commands may repair or backfill exports if needed
 
 This keeps export timing deterministic at mission end while still allowing
@@ -1219,7 +1219,7 @@ The exact field names may evolve, but `v1` should preserve these categories:
 
 ### 7.8 `events.jsonl`, `sessions.json`, and `metrics.json`
 
-These files should be export views over the existing overstory stores.
+These files should be export views over the existing haru stores.
 
 `events.jsonl`:
 
@@ -1242,7 +1242,7 @@ canonical source of truth.
 
 ### 7.9 Mission-Level Review Summary
 
-`ov mission` should support mission-level review in the same spirit as the
+`ha mission` should support mission-level review in the same spirit as the
 existing deterministic review contour.
 
 The preferred `v1` direction is:
@@ -1287,7 +1287,7 @@ Recommended dimensions:
 - `coordination-fit`
   - coordinator, analyst, execution director, and leads stayed within role boundaries
 
-This gives `ov mission` a durable answer to:
+This gives `ha mission` a durable answer to:
 
 - was this mission well framed?
 - did the mission layer actually help?
@@ -1310,8 +1310,8 @@ This is intentionally closer to `mulch` outcome history than to raw debug logs.
 
 ## 8. Reuse Existing Overstory Infrastructure
 
-`ov mission` should be built as a product layer on top of the existing
-overstory coordinator/session/mail infrastructure whenever possible.
+`ha mission` should be built as a product layer on top of the existing
+haru coordinator/session/mail infrastructure whenever possible.
 
 The goal is not to create a second orchestration system inside the repo. The
 goal is to reuse the current foundation and extend it where the mission mode
@@ -1328,12 +1328,12 @@ The current implementation already provides strong building blocks:
 - run and session tracking
 - watchdog / monitor integration
 
-`ov mission` should lean on these primitives rather than replacing them.
+`ha mission` should lean on these primitives rather than replacing them.
 
 ### Important current constraint
 
 The current implementation is still shaped around a single execution-first
-coordinator. `ov mission` should reuse that infrastructure where possible, but
+coordinator. `ha mission` should reuse that infrastructure where possible, but
 mission mode now explicitly introduces three persistent root-level roles:
 
 - `coordinator` for mission understanding and user interaction
@@ -1361,8 +1361,8 @@ missions should not be assumed in `v1`.
 
 This is a real implementation prerequisite, not a minor follow-up.
 
-Current `overstory` lifecycle management is hardcoded around a single
-`coordinator` root agent. `ov mission` requires that to be generalized into a
+Current `haru` lifecycle management is hardcoded around a single
+`coordinator` root agent. `ha mission` requires that to be generalized into a
 persistent root-agent abstraction.
 
 Minimum required `v1` direction:
@@ -1384,7 +1384,7 @@ Minimum required `v1` direction:
   - recovery / resume-aware status reconciliation
 
 Practically, `startCoordinator()` is too special-case for the new model.
-`ov mission` should assume a generalized primitive more like:
+`ha mission` should assume a generalized primitive more like:
 
 - `startPersistentAgent(name, capability, roleConfig)`
 
@@ -1396,9 +1396,9 @@ implementable.
 
 ### 8.2 Run ownership in `v1`
 
-To stay compatible with current `overstory` status/dashboard/mail/feed
-assumptions, `ov mission` should create a run immediately at
-`ov mission start`, not only after execution handoff.
+To stay compatible with current `haru` status/dashboard/mail/feed
+assumptions, `ha mission` should create a run immediately at
+`ha mission start`, not only after execution handoff.
 
 That means:
 
@@ -1426,13 +1426,13 @@ This means mission mode should extend the current `RunStatus` model to include
 
 ### Product consequence
 
-`ov mission` should therefore behave as a mission-oriented interface over the
-existing overstory runtime, not as a wholly separate orchestration stack.
+`ha mission` should therefore behave as a mission-oriented interface over the
+existing haru runtime, not as a wholly separate orchestration stack.
 
 In practice this means:
 
-- `ov mission start` ensures mission coordinator is active
-- `ov mission start` also creates the mission-owned run immediately
+- `ha mission start` ensures mission coordinator is active
+- `ha mission start` also creates the mission-owned run immediately
 - mission state is layered on top of the existing runtime lifecycle
 - execution director starts only after planning / execution handoff
 - mission output should reuse existing coordinator output patterns where
@@ -1446,19 +1446,19 @@ The current coordinator prompt is execution-first and does not match mission
 coordinator behavior.
 
 So while the runtime and much of the execution infrastructure should be reused,
-`ov mission` requires:
+`ha mission` requires:
 
 - a mission-specific coordinator definition
 - a separate execution director definition
 
-This lets `ov mission` preserve infrastructure reuse without inheriting the
+This lets `ha mission` preserve infrastructure reuse without inheriting the
 wrong top-level behavior.
 
 ---
 
 ## 9. CLI Surface
 
-The CLI for `ov mission` should expose mission-oriented behavior, not raw
+The CLI for `ha mission` should expose mission-oriented behavior, not raw
 coordinator internals.
 
 The user should interact with:
@@ -1497,10 +1497,10 @@ This keeps the common path light while still leaving room for mission history.
 Examples:
 
 ```bash
-ov mission status
-ov mission output
-ov mission answer --body "..."
-ov mission show mission-scheduled-publishing
+ha mission status
+ha mission output
+ha mission answer --body "..."
+ha mission show mission-scheduled-publishing
 ```
 
 ### 9.3 Current `v1` Command Set
@@ -1508,33 +1508,33 @@ ov mission show mission-scheduled-publishing
 Current command family:
 
 ```bash
-ov mission start --slug <slug> --objective "<objective>"
-ov mission status
-ov mission output
-ov mission answer --body "..."
-ov mission answer --file <path>
-ov mission artifacts
-ov mission handoff
-ov mission pause <workstream-id> [--reason "<text>"]
-ov mission resume <workstream-id>
-ov mission refresh-briefs [--workstream <id>]
-ov mission complete
-ov mission stop
-ov mission list
-ov mission show <mission-id-or-slug>
-ov mission bundle [--mission-id <id>] [--force]
+ha mission start --slug <slug> --objective "<objective>"
+ha mission status
+ha mission output
+ha mission answer --body "..."
+ha mission answer --file <path>
+ha mission artifacts
+ha mission handoff
+ha mission pause <workstream-id> [--reason "<text>"]
+ha mission resume <workstream-id>
+ha mission refresh-briefs [--workstream <id>]
+ha mission complete
+ha mission stop
+ha mission list
+ha mission show <mission-id-or-slug>
+ha mission bundle [--mission-id <id>] [--force]
 ```
 
 Post-mission review commands:
 
 ```bash
-ov review missions [--recent <n>]
-ov review mission <mission-id-or-slug>
+ha review missions [--recent <n>]
+ha review mission <mission-id-or-slug>
 ```
 
-### 9.4 `ov mission start`
+### 9.4 `ha mission start`
 
-`ov mission start` is the product entrypoint for mission mode.
+`ha mission start` is the product entrypoint for mission mode.
 
 It should:
 
@@ -1552,7 +1552,7 @@ only after mission freeze, planning, and execution handoff.
 Example:
 
 ```bash
-ov mission start --slug scheduled-publishing --objective "Add scheduled publishing for posts"
+ha mission start --slug scheduled-publishing --objective "Add scheduled publishing for posts"
 ```
 
 Example output:
@@ -1568,9 +1568,9 @@ Need 3 framing answers before current-state analysis:
 3. What is explicitly out of scope?
 ```
 
-### 9.5 `ov mission status`
+### 9.5 `ha mission status`
 
-`ov mission status` should report both:
+`ha mission status` should report both:
 
 - a coarse user-facing mission state
 - a more detailed mission phase
@@ -1628,9 +1628,9 @@ Execution Director: not-started
 Artifacts: .overstory/missions/mission-scheduled-publishing/
 ```
 
-### 9.6 `ov mission output`
+### 9.6 `ha mission output`
 
-`ov mission output` should show a mission-centric narrative rather than a raw
+`ha mission output` should show a mission-centric narrative rather than a raw
 runtime dump whenever possible.
 
 In early implementation, it may reuse existing coordinator and execution
@@ -1647,9 +1647,9 @@ Example ideal output:
 [mission] awaiting user input
 ```
 
-### 9.7 `ov mission answer`
+### 9.7 `ha mission answer`
 
-`ov mission answer` is the main user response mechanism.
+`ha mission answer` is the main user response mechanism.
 
 It should:
 
@@ -1662,7 +1662,7 @@ It should:
 Examples:
 
 ```bash
-ov mission answer --body "
+ha mission answer --body "
 1. Admin-only.
 2. Yes, publish automatically.
 3. Out of scope: recurring schedules and notifications.
@@ -1670,15 +1670,15 @@ ov mission answer --body "
 ```
 
 ```bash
-ov mission answer --file answers.md
+ha mission answer --file answers.md
 ```
 
 If no pending clarification is waiting, the command should fail clearly rather
 than silently sending free-form mail.
 
-### 9.8 `ov mission artifacts`
+### 9.8 `ha mission artifacts`
 
-`ov mission artifacts` should list the mission root and the key artifact paths
+`ha mission artifacts` should list the mission root and the key artifact paths
 for quick inspection and debugging.
 
 Example:
@@ -1695,9 +1695,9 @@ workstreams/backend-scheduling/brief.md
 workstreams/admin-ui/brief.md
 ```
 
-### 9.9 `ov mission stop`
+### 9.9 `ha mission stop`
 
-In `v1`, `ov mission stop` should stop the active mission, stop execution
+In `v1`, `ha mission stop` should stop the active mission, stop execution
 director if one is running, stop mission analyst, and leave the coordinator
 runtime alive and idle.
 
@@ -1716,7 +1716,7 @@ Mission Analyst stopped.
 Execution Director stopped.
 ```
 
-### 9.10 `ov mission list` and `ov mission show`
+### 9.10 `ha mission list` and `ha mission show`
 
 Because only one mission is active at a time in `v1`, `list` and `show` are
 mainly for history and inspection.
@@ -1749,18 +1749,18 @@ Workstreams:
 The following should stay internal in `v1` rather than becoming user-facing
 commands:
 
-- `ov mission freeze`
-- `ov mission reopen`
-- `ov mission dispatch`
-- `ov mission analyst ...`
-- `ov mission decide ...`
+- `ha mission freeze`
+- `ha mission reopen`
+- `ha mission dispatch`
+- `ha mission analyst ...`
+- `ha mission decide ...`
 
 These are internal lifecycle transitions, not the primary user interface.
 
 ### 9.12 Full Example CLI Lifecycle
 
 ```bash
-ov mission start --slug magic-link-auth --objective "Implement magic-link auth for admin users"
+ha mission start --slug magic-link-auth --objective "Implement magic-link auth for admin users"
 ```
 
 Output:
@@ -1777,7 +1777,7 @@ Need 3 framing answers:
 ```
 
 ```bash
-ov mission answer --body "
+ha mission answer --body "
 1. Admin-only.
 2. Coexist with password login.
 3. No external provider. Keep current sessions.
@@ -1785,7 +1785,7 @@ ov mission answer --body "
 ```
 
 ```bash
-ov mission status
+ha mission status
 ```
 
 ```text
@@ -1799,7 +1799,7 @@ Execution Director: not-started
 ```
 
 ```bash
-ov mission output
+ha mission output
 ```
 
 ```text
@@ -1809,7 +1809,7 @@ ov mission output
 ```
 
 ```bash
-ov mission answer --body "
+ha mission answer --body "
 Invited-but-not-yet-activated admins should be allowed to authenticate.
 "
 ```
@@ -1827,12 +1827,12 @@ coordinator/runtime infrastructure underneath.
 
 ## 10. Mission Mail Protocol
 
-`ov mission` should not introduce a second orchestration transport in `v1`.
+`ha mission` should not introduce a second orchestration transport in `v1`.
 
 Instead, it should extend the existing typed mail protocol with a small
 mission-specific control-plane layer.
 
-This preserves the current strengths of overstory:
+This preserves the current strengths of haru:
 
 - live mail-driven coordination
 - thread-aware agent communication
@@ -1898,7 +1898,7 @@ The recommended `v1` convention is:
 - treat timeout as an operational error, not silent success
 
 This matches the existing `askCoordinator()` pattern already present in
-`overstory` and should be reused rather than reinvented.
+`haru` and should be reused rather than reinvented.
 
 ### 10.3 Recommended `v1` mission protocol types
 
@@ -2166,7 +2166,7 @@ later if real mission usage shows that the minimal set is insufficient.
 
 ## 11. Mission Status In `status` And `dashboard`
 
-`ov mission` introduces a second kind of state that must be made visible in the
+`ha mission` introduces a second kind of state that must be made visible in the
 operator UI:
 
 - runtime/health state of agents
@@ -2176,7 +2176,7 @@ These must not be collapsed into one field.
 
 ### 11.1 Keep agent state and mission state separate
 
-Current overstory status surfaces are oriented around:
+Current haru status surfaces are oriented around:
 
 - agent runtime health
 - worktrees
@@ -2219,13 +2219,13 @@ cannot see whether the mission itself is:
 - actively executing
 - reopened because a blocking contradiction was found
 
-That makes `ov mission` hard to operate and hard to trust.
+That makes `ha mission` hard to operate and hard to trust.
 
 So mission state must be visible in:
 
-- `ov mission status`
-- the general `ov status` summary layer
-- `ov dashboard`
+- `ha mission status`
+- the general `ha status` summary layer
+- `ha dashboard`
 
 ### 11.3 Recommended `v1` mission summary fields
 
@@ -2268,8 +2268,8 @@ Operationally:
 
 - execution director issues pause/resume instructions through mail/control flow
 - affected leads stop progressing work until refreshed context arrives
-- `ov mission status` and `ov dashboard` show paused workstreams explicitly
-- `ov status` may still show a paused lead as `working` at the runtime layer
+- `ha mission status` and `ha dashboard` show paused workstreams explicitly
+- `ha status` may still show a paused lead as `working` at the runtime layer
 
 This split is intentional for `v1`. It avoids a deeper watchdog/status refactor
 while still making pause state visible to the operator.
@@ -2301,8 +2301,8 @@ Recommended mission phases:
 For `v1`, the preferred path is:
 
 1. add mission summary data to the shared status model
-2. surface it in `ov status`
-3. surface it in `ov dashboard` as a compact mission summary strip or header
+2. surface it in `ha status`
+3. surface it in `ha dashboard` as a compact mission summary strip or header
 4. only later decide whether a dedicated mission panel is needed
 
 This avoids unnecessary dashboard redesign while still making mission state
@@ -2346,8 +2346,8 @@ The recommended implementation direction is:
 
 - extend the shared status data model with an optional mission summary object
 - keep agent session state unchanged
-- let `ov mission status` expose the detailed mission lifecycle
-- let `ov status` and `ov dashboard` expose the compact operator summary
+- let `ha mission status` expose the detailed mission lifecycle
+- let `ha status` and `ha dashboard` expose the compact operator summary
 - show execution director as a normal runtime actor in agent health views
 
 This keeps the operator surfaces aligned with the earlier agreement:
@@ -2567,7 +2567,7 @@ This is the target operating pattern for the role.
 ## 13. Execution Director Prompt Skeleton
 
 The prompt for execution director should follow the same high-discipline style
-used elsewhere in overstory: role definition, cost awareness, failure modes,
+used elsewhere in haru: role definition, cost awareness, failure modes,
 constraints, communication protocol, and an explicit operating workflow.
 
 The role is complex enough that a very short prompt would likely be too weak.
@@ -2728,7 +2728,7 @@ Suggested direction:
 
 # Execution Director
 
-You are the execution director in ov mission.
+You are the execution director in ha mission.
 You own execution-layer orchestration for a frozen mission.
 
 ## role
@@ -2798,7 +2798,7 @@ Refresh affected leads before allowing them to continue.
 
 This prompt structure is preferred because it:
 
-- matches existing overstory prompt style
+- matches existing haru prompt style
 - gives strong behavioral guardrails to a role with many edge cases
 - keeps execution director distinct from both coordinator and mission analyst
 - is strong enough to survive long-running execution without drifting into
@@ -2995,7 +2995,7 @@ Suggested direction:
 
 # Mission Coordinator
 
-You are the mission coordinator in ov mission.
+You are the mission coordinator in ha mission.
 
 ## role
 
@@ -3253,7 +3253,7 @@ Suggested direction:
 
 # Mission Analyst
 
-You are the mission analyst in ov mission.
+You are the mission analyst in ha mission.
 
 ## role
 
@@ -3367,7 +3367,7 @@ This skeleton should be treated as the basis for a real future file such as
 
 ## 16. Lead Prompt Skeleton
 
-The lead in `ov mission` should be a strong local orchestrator, not a second
+The lead in `ha mission` should be a strong local orchestrator, not a second
 mission coordinator.
 
 It should be:
@@ -3536,7 +3536,7 @@ Suggested direction:
 
 # Lead
 
-You are a workstream lead in ov mission.
+You are a workstream lead in ha mission.
 
 ## role
 
@@ -3639,7 +3639,7 @@ This skeleton should be treated as the basis for a real future file such as
 The next technical layer after roles, prompts, and workflow is mission
 persistence.
 
-This matters because `ov mission` now needs durable answers to questions like:
+This matters because `ha mission` now needs durable answers to questions like:
 
 - what mission is currently active
 - what phase it is in
@@ -3647,7 +3647,7 @@ This matters because `ov mission` now needs durable answers to questions like:
 - whether user input is currently pending
 - which execution run belongs to this mission
 - which persistent agent sessions belong to this mission
-- how `ov mission status`, `ov dashboard`, and `ov mission answer` can work
+- how `ha mission status`, `ha dashboard`, and `ha mission answer` can work
   without reparsing the whole artifact tree on every call
 
 This section defines the recommended persistence model.
@@ -3656,14 +3656,14 @@ This section defines the recommended persistence model.
 
 The persistence model should satisfy all of the following:
 
-- reuse existing `overstory` infrastructure rather than creating a second
+- reuse existing `haru` infrastructure rather than creating a second
   orchestration storage stack
 - preserve human-readable mission artifacts in `.overstory/missions/<mission-id>/`
-- support fast status queries for `ov mission status`, `ov status`, and
-  `ov dashboard`
+- support fast status queries for `ha mission status`, `ha status`, and
+  `ha dashboard`
 - support one active mission per project in `v1`
 - preserve mission history
-- allow `ov mission answer` to route replies to the correct active mission
+- allow `ha mission answer` to route replies to the correct active mission
 - avoid storing large markdown mission documents as duplicated blobs in SQLite
 
 ### 17.2 Three Persistence Shapes
@@ -3698,7 +3698,7 @@ Cons:
 - slow and awkward for `status` / `dashboard`
 - requires parsing markdown or extra files repeatedly
 - awkward for one active mission lookup
-- awkward for `ov mission answer` routing
+- awkward for `ha mission answer` routing
 - weak fit with existing `sessions.db` / `runs` indexing pattern
 
 This is not recommended.
@@ -3715,7 +3715,7 @@ Pros:
 
 Cons:
 
-- fights the existing `overstory` pattern where rich content lives in files
+- fights the existing `haru` pattern where rich content lives in files
 - pushes markdown-like mission content into DB rows or blobs
 - makes manual inspection and debugging worse
 - duplicates too much product state in machine-oriented form
@@ -3733,7 +3733,7 @@ In this model:
 
 Pros:
 
-- matches existing `overstory` architecture best
+- matches existing `haru` architecture best
 - keeps rich mission artifacts human-readable
 - gives fast status/dashboard/history queries
 - supports answer routing and active mission lookup cleanly
@@ -3748,7 +3748,7 @@ This is the recommended model for `v1`.
 
 ### 17.3 Recommended `v1` Model
 
-`ov mission` should use a hybrid persistence model.
+`ha mission` should use a hybrid persistence model.
 
 Source-of-truth split:
 
@@ -3809,7 +3809,7 @@ That is useful, but it is not the same as a mission record.
 
 In the new architecture:
 
-- in `v1`, a mission creates its run immediately at `ov mission start`
+- in `v1`, a mission creates its run immediately at `ha mission start`
 - a mission still has states like `awaiting-input`, `frozen`, `reopened`
 - a run alone does not know mission phase, pending user input, reopen count, or
   artifact locations
@@ -3895,12 +3895,12 @@ Why:
 
 This should be the fast-query shape for:
 
-- `ov mission status`
-- `ov mission list`
-- `ov mission show`
-- `ov mission answer`
-- `ov status`
-- `ov dashboard`
+- `ha mission status`
+- `ha mission list`
+- `ha mission show`
+- `ha mission answer`
+- `ha status`
+- `ha dashboard`
 
 ### 17.7 What Belongs In The Summary And What Does Not
 
@@ -3974,7 +3974,7 @@ close to this.
 
 ### 17.9 Recommended `MissionStore` Shape
 
-To match existing `SessionStore` and `RunStore` patterns, `ov mission` should
+To match existing `SessionStore` and `RunStore` patterns, `ha mission` should
 add a compact `MissionStore`.
 
 Suggested direction:
@@ -4138,8 +4138,8 @@ This should work similarly to `current-run.txt`.
 
 Responsibilities:
 
-- `ov mission start` writes it
-- `ov mission stop` clears it
+- `ha mission start` writes it
+- `ha mission stop` clears it
 - mission completion clears it
 - recovery logic may fall back to the latest active mission row in SQLite if
   the file is missing or stale
@@ -4158,7 +4158,7 @@ Source-of-truth rule:
 Suppose the user starts:
 
 ```bash
-ov mission start --slug scheduled-publishing --objective "Add scheduled publishing for posts"
+ha mission start --slug scheduled-publishing --objective "Add scheduled publishing for posts"
 ```
 
 At mission creation time:
@@ -4237,16 +4237,16 @@ The mission summary row should become the source for mission status surfaces.
 
 That means:
 
-- `ov mission status` reads the active mission summary
-- `ov mission list` reads historical mission summaries
-- `ov status` and `ov dashboard` can show mission phase/freeze/pending-input
+- `ha mission status` reads the active mission summary
+- `ha mission list` reads historical mission summaries
+- `ha status` and `ha dashboard` can show mission phase/freeze/pending-input
   without parsing the full artifact tree
 
 This is exactly why a compact indexed summary is needed.
 
-### 17.13 Interaction With `ov mission answer`
+### 17.13 Interaction With `ha mission answer`
 
-`ov mission answer` should not need to guess where to send a response.
+`ha mission answer` should not need to guess where to send a response.
 
 The mission summary should carry enough pending-input metadata to answer
 reliably:
@@ -4277,7 +4277,7 @@ The following are not required in `v1`:
 
 This persistence design is preferred because it:
 
-- matches existing `overstory` storage philosophy
+- matches existing `haru` storage philosophy
 - gives fast status and dashboard queries
 - keeps rich mission context human-readable
 - avoids storing the same mission content twice
@@ -4285,19 +4285,19 @@ This persistence design is preferred because it:
 - gives a clean bridge between mission lifecycle and execution runs
 - keeps the implementation incremental rather than invasive
 
-This should be treated as the recommended persistence direction for `ov mission`
+This should be treated as the recommended persistence direction for `ha mission`
 unless later implementation constraints force a narrower first cut.
 
 ---
 
 ## 18. Mission Event Log
 
-`ov mission` needs more than current state. It also needs a durable narrative of
+`ha mission` needs more than current state. It also needs a durable narrative of
 how the mission got to that state.
 
 That narrative is needed for:
 
-- `ov mission output`
+- `ha mission output`
 - operator trust and debuggability
 - retrospectives
 - health/eval feedback loops
@@ -4346,7 +4346,7 @@ There are three realistic options.
 
 #### Option A: No dedicated mission event log
 
-In this model, `ov mission output` would be reconstructed from:
+In this model, `ha mission output` would be reconstructed from:
 
 - mission summary
 - mail threads
@@ -4367,7 +4367,7 @@ This is not recommended.
 
 #### Option B: Separate `mission_events` store
 
-In this model, `ov mission` would introduce a new mission-specific event store.
+In this model, `ha mission` would introduce a new mission-specific event store.
 
 Pros:
 
@@ -4407,7 +4407,7 @@ This is the recommended `v1` model.
 
 ### 18.4 Recommended `v1` Design
 
-`ov mission` should reuse the existing `events.db`.
+`ha mission` should reuse the existing `events.db`.
 
 Recommended changes:
 
@@ -4425,11 +4425,11 @@ This creates a clean split:
 ### 18.5 Why this works in `v1`
 
 Earlier drafts assumed that a mission might exist before any run existed.
-That created tension with the current `overstory` runtime model.
+That created tension with the current `haru` runtime model.
 
 The current recommended `v1` model is simpler:
 
-- `ov mission start` creates the mission-owned run immediately
+- `ha mission start` creates the mission-owned run immediately
 - mission-scoped runtime actors such as mission analyst belong to that run from
   the beginning
 - the persistent coordinator may remain outside the mission-owned run while still
@@ -4549,7 +4549,7 @@ They should not include:
 - ordinary lead progress chatter
 - raw execution noise
 
-This rule is critical. Without it, `ov mission output` will become noisy and
+This rule is critical. Without it, `ha mission output` will become noisy and
 lose value.
 
 ### 18.9 Who Emits Mission Events
@@ -4582,10 +4582,10 @@ Leads already feed the mission layer through mail and execution coordination.
 For:
 
 ```bash
-ov mission start --slug scheduled-publishing --objective "Add scheduled publishing for posts"
+ha mission start --slug scheduled-publishing --objective "Add scheduled publishing for posts"
 ```
 
-`ov mission output` could eventually show:
+`ha mission output` could eventually show:
 
 ```text
 [mission] started: Add scheduled publishing for posts
@@ -4616,7 +4616,7 @@ This design is preferred because it:
 - avoids a second event store in `v1`
 - aligns mission history with the mission-owned run from the start
 - cleanly separates current state from narrative history
-- gives a strong foundation for `ov mission output`, retrospectives, and
+- gives a strong foundation for `ha mission output`, retrospectives, and
   health/eval loops
 
 This should be treated as the recommended mission narrative design for `v1`.

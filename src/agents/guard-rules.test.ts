@@ -324,12 +324,12 @@ describe("SAFE_BASH_PREFIXES", () => {
 		expect(unique.size).toBe(SAFE_BASH_PREFIXES.length);
 	});
 
-	test("includes overstory CLI shorthand 'ov '", () => {
-		expect(SAFE_BASH_PREFIXES).toContain("ov ");
+	test("includes haru CLI shorthand 'ha '", () => {
+		expect(SAFE_BASH_PREFIXES).toContain("ha ");
 	});
 
-	test("includes overstory CLI full name 'overstory '", () => {
-		expect(SAFE_BASH_PREFIXES).toContain("overstory ");
+	test("includes haru CLI full name 'haru '", () => {
+		expect(SAFE_BASH_PREFIXES).toContain("haru ");
 	});
 
 	test("includes beads CLI 'bd '", () => {
@@ -361,9 +361,9 @@ describe("SAFE_BASH_PREFIXES", () => {
 		const isSafe = (cmd: string) =>
 			SAFE_BASH_PREFIXES.some((prefix) => cmd.trimStart().startsWith(prefix));
 
-		expect(isSafe("ov mail send --to parent --subject test")).toBe(true);
-		expect(isSafe("overstory status")).toBe(true);
-		expect(isSafe("sd close overstory-1234")).toBe(true);
+		expect(isSafe("ha mail send --to parent --subject test")).toBe(true);
+		expect(isSafe("haru status")).toBe(true);
+		expect(isSafe("sd close haru-1234")).toBe(true);
 		expect(isSafe("bd ready")).toBe(true);
 		expect(isSafe("mulch record cli --type convention")).toBe(true);
 		expect(isSafe("git status")).toBe(true);

@@ -68,7 +68,7 @@ describe("resolveCurrentMissionId", () => {
 		await rm(tempDir, { recursive: true, force: true });
 	});
 
-	test("returns null when overstory dir has no pointer file", async () => {
+	test("returns null when haru dir has no pointer file", async () => {
 		const result = await resolveCurrentMissionId(tempDir);
 		expect(result).toBeNull();
 	});

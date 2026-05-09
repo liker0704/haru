@@ -1,5 +1,5 @@
 /**
- * CLI command: ov monitor start|stop|status
+ * CLI command: ha monitor start|stop|status
  *
  * Manages the persistent Tier 2 monitor agent lifecycle. The monitor runs
  * at the project root (NOT in a worktree), continuously patrols the agent
@@ -9,7 +9,7 @@
  * Unlike regular agents spawned by sling, the monitor:
  * - Has no worktree (operates on the main working tree)
  * - Has no task assignment (it monitors, not implements)
- * - Has no overlay CLAUDE.md (context comes via ov status + mail)
+ * - Has no overlay CLAUDE.md (context comes via ha status + mail)
  * - Persists across patrol cycles
  */
 
@@ -39,10 +39,10 @@ const MONITOR_NAME = "monitor";
 
 /**
  * Build the tmux session name for the monitor.
- * Includes the project name to prevent cross-project collisions (overstory-pcef).
+ * Includes the project name to prevent cross-project collisions (haru-pcef).
  */
 function monitorTmuxSession(projectName: string): string {
-	return `overstory-${projectName}-${MONITOR_NAME}`;
+	return `haru-${projectName}-${MONITOR_NAME}`;
 }
 
 /**
@@ -54,7 +54,7 @@ export function buildMonitorBeacon(): string {
 	const parts = [
 		`[OVERSTORY] ${MONITOR_NAME} (monitor/tier-2) ${timestamp}`,
 		"Depth: 0 | Parent: none | Role: continuous fleet patrol",
-		`Startup: run mulch prime, check fleet (ov status --json), check mail (ov mail check --agent ${MONITOR_NAME}), then begin patrol loop`,
+		`Startup: run mulch prime, check fleet (ha status --json), check mail (ha mail check --agent ${MONITOR_NAME}), then begin patrol loop`,
 	];
 	return parts.join(" — ");
 }
@@ -75,7 +75,7 @@ async function startMonitor(opts: { json: boolean; attach: boolean }): Promise<v
 
 	if (isRunningAsRoot()) {
 		throw new AgentError(
-			"Cannot spawn agents as root (UID 0). The claude CLI rejects --permission-mode bypassPermissions when run as root, causing the tmux session to die immediately. Run overstory as a non-root user.",
+			"Cannot spawn agents as root (UID 0). The claude CLI rejects --permission-mode bypassPermissions when run as root, causing the tmux session to die immediately. Run haru as a non-root user.",
 		);
 	}
 
@@ -148,7 +148,7 @@ async function startMonitor(opts: { json: boolean; attach: boolean }): Promise<v
 		}
 
 		// Spawn tmux session at project root with Claude Code (interactive mode).
-		// Pass file path (not content) to avoid tmux "command too long" (overstory#45).
+		// Pass file path (not content) to avoid tmux "command too long" (haru#45).
 		const agentDefPath = join(projectRoot, ".overstory", "agent-defs", "monitor.md");
 		const agentDefFile = Bun.file(agentDefPath);
 		let appendSystemPromptFile: string | undefined;
@@ -164,12 +164,12 @@ async function startMonitor(opts: { json: boolean; attach: boolean }): Promise<v
 			appendSystemPromptFile,
 			env: {
 				...runtime.buildEnv(resolvedModel),
-				OVERSTORY_AGENT_NAME: MONITOR_NAME,
+				HARU_AGENT_NAME: MONITOR_NAME,
 			},
 		});
 		const pid = await createSession(tmuxSession, projectRoot, spawnCmd, {
 			...runtime.buildEnv(resolvedModel),
-			OVERSTORY_AGENT_NAME: MONITOR_NAME,
+			HARU_AGENT_NAME: MONITOR_NAME,
 		});
 
 		// Record session BEFORE sending the beacon so that hook-triggered
@@ -384,7 +384,7 @@ export function createMonitorCommand(): Command {
 }
 
 /**
- * Entry point for `ov monitor <subcommand>`.
+ * Entry point for `ha monitor <subcommand>`.
  */
 export async function monitorCommand(args: string[]): Promise<void> {
 	const cmd = createMonitorCommand();

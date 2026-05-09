@@ -1,4 +1,4 @@
-// Codex runtime adapter for overstory's AgentRuntime interface.
+// Codex runtime adapter for haru's AgentRuntime interface.
 // Implements the AgentRuntime contract for the OpenAI `codex` CLI.
 //
 // Key differences from Claude/Pi adapters:
@@ -49,7 +49,7 @@ export class CodexRuntime implements AgentRuntime {
 	readonly instructionPath = "AGENTS.md";
 
 	/**
-	 * Anthropic aliases used by overstory manifests that Codex CLI does not
+	 * Anthropic aliases used by haru manifests that Codex CLI does not
 	 * accept as --model values.
 	 */
 	private static readonly SKIP_MODEL_FLAG = new Set(["sonnet", "opus", "haiku", "default"]);

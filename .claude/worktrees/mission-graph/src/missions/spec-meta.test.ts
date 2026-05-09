@@ -20,7 +20,7 @@ import {
 let tempDir: string;
 
 beforeEach(async () => {
-	tempDir = await mkdtemp(join(tmpdir(), "overstory-spec-meta-test-"));
+	tempDir = await mkdtemp(join(tmpdir(), "haru-spec-meta-test-"));
 });
 
 afterEach(async () => {

@@ -1,8 +1,8 @@
 /**
- * CLI command: ov clean [--all] [--mail] [--sessions] [--metrics]
+ * CLI command: ha clean [--all] [--mail] [--sessions] [--metrics]
  *   [--logs] [--worktrees] [--branches] [--agents] [--specs]
  *
- * Nuclear cleanup of overstory runtime state.
+ * Nuclear cleanup of haru runtime state.
  * --all does everything. Individual flags allow selective cleanup.
  *
  * Execution order for --all (processes → filesystem → databases):
@@ -10,9 +10,9 @@
  *      - Check domains approaching governance limits
  *      - Run mulch prune --dry-run (report stale record counts)
  *      - Run mulch doctor (report health issues)
- *   1. Kill all overstory tmux sessions
+ *   1. Kill all haru tmux sessions
  *   2. Remove all worktrees
- *   3. Delete orphaned overstory/* branches
+ *   3. Delete orphaned haru/* branches
  *   4. Delete SQLite databases (mail.db, metrics.db)
  *   5. Wipe sessions.db, merge-queue.db
  *   6. Clear directory contents (logs/, agents/, specs/)
@@ -145,18 +145,18 @@ interface CleanResult {
 }
 
 /**
- * Kill overstory tmux sessions registered in THIS project's SessionStore.
+ * Kill haru tmux sessions registered in THIS project's SessionStore.
  *
  * Project-scoped: only kills tmux sessions whose names appear in the
  * project's sessions.db (or sessions.json). This prevents cross-project
  * kills during dogfooding, where `bun test` might run inside a live swarm.
  *
- * Falls back to killing all "overstory-{projectName}-" prefixed tmux sessions
+ * Falls back to killing all "haru-{projectName}-" prefixed tmux sessions
  * only if the SessionStore is unavailable (graceful degradation for broken state).
  */
 async function killAllTmuxSessions(overstoryDir: string, projectName: string): Promise<number> {
 	let killed = 0;
-	const projectPrefix = `overstory-${projectName}-`;
+	const projectPrefix = `haru-${projectName}-`;
 	try {
 		const tmuxSessions = await listSessions();
 		const overStorySessions = tmuxSessions.filter((s) => s.name.startsWith(projectPrefix));
@@ -168,7 +168,7 @@ async function killAllTmuxSessions(overstoryDir: string, projectName: string): P
 		const registeredNames = loadRegisteredTmuxNames(overstoryDir);
 
 		// If we got registered names, only kill those. Otherwise fall back to all
-		// overstory-{projectName}-* sessions.
+		// haru-{projectName}-* sessions.
 		const toKill =
 			registeredNames !== null
 				? overStorySessions.filter((s) => registeredNames.has(s.name))
@@ -192,7 +192,7 @@ async function killAllTmuxSessions(overstoryDir: string, projectName: string): P
  * Load the set of tmux session names registered in this project's SessionStore.
  *
  * Returns null if the SessionStore cannot be opened (signals the caller to
- * fall back to the legacy "kill all overstory-*" behavior).
+ * fall back to the legacy "kill all haru-*" behavior).
  */
 function loadRegisteredTmuxNames(overstoryDir: string): Set<string> | null {
 	try {
@@ -218,13 +218,13 @@ function loadRegisteredTmuxNames(overstoryDir: string): Set<string> | null {
 }
 
 /**
- * Remove all overstory worktrees (force remove with branch deletion).
+ * Remove all haru worktrees (force remove with branch deletion).
  */
 async function cleanAllWorktrees(root: string): Promise<number> {
 	let cleaned = 0;
 	try {
 		const worktrees = await listWorktrees(root);
-		const overstoryWts = worktrees.filter((wt) => wt.branch.startsWith("overstory/"));
+		const overstoryWts = worktrees.filter((wt) => wt.branch.startsWith("haru/"));
 		for (const wt of overstoryWts) {
 			try {
 				await removeWorktree(root, wt.path, { force: true, forceBranch: true });
@@ -240,13 +240,13 @@ async function cleanAllWorktrees(root: string): Promise<number> {
 }
 
 /**
- * Delete orphaned overstory/* branch refs not tied to a worktree.
+ * Delete orphaned haru/* branch refs not tied to a worktree.
  */
 async function deleteOrphanedBranches(root: string): Promise<number> {
 	let deleted = 0;
 	try {
 		const proc = Bun.spawn(
-			["git", "for-each-ref", "refs/heads/overstory/", "--format=%(refname:short)"],
+			["git", "for-each-ref", "refs/heads/haru/", "--format=%(refname:short)"],
 			{ cwd: root, stdout: "pipe", stderr: "pipe" },
 		);
 		const stdout = await new Response(proc.stdout).text();
@@ -561,7 +561,7 @@ async function cleanSingleAgent(
 }
 
 /**
- * Entry point for `ov clean [flags]`.
+ * Entry point for `ha clean [flags]`.
  *
  * @param opts - Command options
  */

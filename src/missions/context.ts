@@ -40,12 +40,12 @@ function buildMissionPlanningContract(): string {
 		"## Workstream Handoff Contract",
 		"",
 		"Treat `plan/workstreams.json` as a runtime-consumed contract, not a loose planning note.",
-		"Before declaring the mission ready for `ov mission handoff`, ensure every dispatchable workstream satisfies all of these rules:",
+		"Before declaring the mission ready for `ha mission handoff`, ensure every dispatchable workstream satisfies all of these rules:",
 		"",
 		'- The file stays valid JSON with top-level shape `{ "version": 1, "workstreams": [...] }`.',
 		"- Each workstream object uses only the runtime fields below:",
 		"  - `id`: stable kebab-case workstream identifier",
-		"  - `taskId`: non-empty task identifier; if the final canonical tracker ID is not known yet, choose a stable provisional ID and let `ov mission handoff` canonicalize it before dispatch",
+		"  - `taskId`: non-empty task identifier; if the final canonical tracker ID is not known yet, choose a stable provisional ID and let `ha mission handoff` canonicalize it before dispatch",
 		"  - `objective`: concise execution objective",
 		"  - `fileScope`: array of repo-relative files or globs owned by that workstream",
 		"  - `dependsOn`: array of workstream `id` strings",
@@ -214,15 +214,15 @@ export async function materializeMissionRolePrompt(opts: {
 		"## Runtime Notes",
 		"",
 		"- You are mission-scoped.",
-		`- Your canonical CLI agent name is \`${agentName}\`. Use that exact name for ov mail/ov status commands even when your capability is \`${capability}\`.`,
+		`- Your canonical CLI agent name is \`${agentName}\`. Use that exact name for ha mail/ha status commands even when your capability is \`${capability}\`.`,
 		"- Update mission artifacts directly under the paths above.",
-		"- Use ov mail for coordination and operator questions.",
+		"- Use ha mail for coordination and operator questions.",
 		"",
 		...(siblingNames && Object.keys(siblingNames).length > 0
 			? [
 					"## Sibling Agent Names",
 					"",
-					"Use these exact names for `--to` in `ov mail send` commands:",
+					"Use these exact names for `--to` in `ha mail send` commands:",
 					"",
 					...Object.entries(siblingNames).map(([role, name]) => `- ${role}: \`${name}\``),
 					"",
@@ -281,7 +281,7 @@ export function buildMissionRoleBeacon(opts: {
 }): string {
 	return [
 		`Read your mission context at ${opts.contextPath}.`,
-		`Check mail with: ov mail check --agent ${opts.agentName}.`,
+		`Check mail with: ha mail check --agent ${opts.agentName}.`,
 		`Begin mission ${opts.missionId} immediately.`,
 	].join(" ");
 }

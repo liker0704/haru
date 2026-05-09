@@ -21,7 +21,7 @@ import { parseTranscriptUsage } from "./transcript.ts";
 let tempDir: string;
 
 beforeEach(async () => {
-	tempDir = await mkdtemp(join(tmpdir(), "overstory-transcript-test-"));
+	tempDir = await mkdtemp(join(tmpdir(), "haru-transcript-test-"));
 });
 
 afterEach(async () => {
@@ -479,5 +479,5 @@ describe("getPricingForModel", () => {
 	});
 });
 
-// estimateCost re-export removed from transcript.ts (overstory-aa00).
+// estimateCost re-export removed from transcript.ts (haru-aa00).
 // estimateCost is now imported directly from pricing.ts everywhere.

@@ -12,7 +12,7 @@ function makeMission(overrides?: Partial<Mission>): Mission {
 	return {
 		id: "mission-test-001",
 		slug: "test-mission",
-		objective: "Implement the full review contour for missions in the overstory system",
+		objective: "Implement the full review contour for missions in the haru system",
 		runId: "run-001",
 		state: "completed",
 		phase: "done",

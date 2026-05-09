@@ -17,7 +17,7 @@ let dbPath: string;
 let checkpoints: CheckpointStore;
 
 beforeEach(async () => {
-	tempDir = await mkdtemp(join(tmpdir(), "overstory-checkpoints-test-"));
+	tempDir = await mkdtemp(join(tmpdir(), "haru-checkpoints-test-"));
 	dbPath = join(tempDir, "sessions.db");
 	const store = createMissionStore(dbPath);
 	checkpoints = store.checkpoints;

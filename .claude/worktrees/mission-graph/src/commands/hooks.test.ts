@@ -1,5 +1,5 @@
 /**
- * Tests for overstory hooks install/uninstall/status command.
+ * Tests for haru hooks install/uninstall/status command.
  *
  * Uses real temp directories and real filesystem (no mocks needed).
  * Each test gets an isolated temp directory with minimal .overstory/
@@ -22,13 +22,13 @@ const SAMPLE_HOOKS = {
 		SessionStart: [
 			{
 				matcher: "",
-				hooks: [{ type: "command", command: "ov prime --agent orchestrator" }],
+				hooks: [{ type: "command", command: "ha prime --agent orchestrator" }],
 			},
 		],
 		Stop: [
 			{
 				matcher: "",
-				hooks: [{ type: "command", command: "ov log session-end --agent orchestrator" }],
+				hooks: [{ type: "command", command: "ha log session-end --agent orchestrator" }],
 			},
 		],
 	},
@@ -106,7 +106,7 @@ describe("hooks install", () => {
 		const content = await Bun.file(targetPath).text();
 		const parsed = JSON.parse(content) as Record<string, unknown>;
 		expect(parsed.hooks).toBeDefined();
-		expect(content).toContain("ov prime");
+		expect(content).toContain("ha prime");
 	});
 
 	test("preserves existing non-hooks keys in settings.local.json", async () => {
@@ -182,7 +182,7 @@ describe("hooks install", () => {
 		// Existing user hook is preserved
 		expect(content).toContain("user-hook");
 		// Overstory hooks are added
-		expect(content).toContain("ov prime");
+		expect(content).toContain("ha prime");
 	});
 
 	test("throws when .overstory/hooks.json does not exist", async () => {
@@ -254,7 +254,7 @@ describe("hooks uninstall", () => {
 });
 
 describe("hooks install merge behavior", () => {
-	test("--force merges overstory hooks into existing user hooks", async () => {
+	test("--force merges haru hooks into existing user hooks", async () => {
 		await Bun.write(
 			join(tempDir, ".overstory", "hooks.json"),
 			`${JSON.stringify(SAMPLE_HOOKS, null, "\t")}\n`,
@@ -284,7 +284,7 @@ describe("hooks install merge behavior", () => {
 		// User's PreToolUse hook preserved
 		expect(content).toContain("user-write-hook");
 		// Overstory's SessionStart hook added
-		expect(content).toContain("ov prime");
+		expect(content).toContain("ha prime");
 		// Both event types present
 		expect(parsed.hooks.PreToolUse).toBeDefined();
 		expect(parsed.hooks.SessionStart).toBeDefined();
@@ -361,7 +361,7 @@ describe("hooks install merge behavior", () => {
 		const parsed = JSON.parse(content) as { hooks: Record<string, unknown[]> };
 		expect(parsed.hooks.SessionStart).toBeDefined();
 		expect(parsed.hooks.Stop).toBeDefined();
-		expect(content).toContain("ov prime");
+		expect(content).toContain("ha prime");
 	});
 
 	describe("mergeHooksByEventType unit tests", () => {
@@ -424,7 +424,7 @@ describe("hooks status", () => {
 		const output = await captureStdout(() => hooksCommand(["status"]));
 		expect(output).toContain("present");
 		expect(output).toContain("no");
-		expect(output).toContain("ov hooks install");
+		expect(output).toContain("ha hooks install");
 	});
 
 	test("reports installed:true when hooks present in .claude/", async () => {

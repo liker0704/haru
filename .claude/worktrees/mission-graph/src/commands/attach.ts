@@ -1,5 +1,5 @@
 /**
- * CLI command: ov attach [agent-name]
+ * CLI command: ha attach [agent-name]
  *
  * Attach to a running agent's tmux session.
  * If no agent name given, lists active agents to pick from.
@@ -45,7 +45,7 @@ async function attachCommand(agentName: string | undefined): Promise<void> {
 					`  ${pad(s.agentName, 30)} ${pad(s.capability, 14)} ${pad(s.runtime ?? "claude", 10)} ${s.state}`,
 				);
 			}
-			console.log(`\nUsage: ov attach <agent-name>`);
+			console.log(`\nUsage: ha attach <agent-name>`);
 			return;
 		}
 
@@ -64,7 +64,7 @@ async function attachCommand(agentName: string | undefined): Promise<void> {
 				}
 				return;
 			}
-			printWarning(`No running agent '${agentName}'. Use 'ov attach' to list.`);
+			printWarning(`No running agent '${agentName}'. Use 'ha attach' to list.`);
 			return;
 		}
 

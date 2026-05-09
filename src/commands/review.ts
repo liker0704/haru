@@ -1,5 +1,5 @@
 /**
- * CLI command: ov review <subcommand> [options]
+ * CLI command: ha review <subcommand> [options]
  *
  * Deterministic quality review of agent sessions, handoffs, and spec files.
  * Data sources: SessionStore, EventStore, MailStore, checkpoint files, spec files.

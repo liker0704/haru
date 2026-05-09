@@ -13,7 +13,7 @@ interface ToolSpec {
 
 /**
  * External dependency checks.
- * Validates that required CLI tools (git, bun, tmux, tracker, mulch, overstory)
+ * Validates that required CLI tools (git, bun, tmux, tracker, mulch, haru)
  * and optional tools (cn) are available, including short alias availability.
  */
 export const checkDependencies: DoctorCheckFn = async (
@@ -45,8 +45,8 @@ export const checkDependencies: DoctorCheckFn = async (
 			name: "ov",
 			versionFlag: "--version",
 			required: true,
-			alias: "overstory",
-			installHint: "@os-eco/overstory-cli",
+			alias: "haru",
+			installHint: "@hana/haru-cli",
 		},
 		{
 			name: "cn",
@@ -96,7 +96,7 @@ async function checkBdCgoSupport(): Promise<DoctorCheck> {
 
 	let tempDir: string | undefined;
 	try {
-		tempDir = await mkdtemp(join(tmpdir(), "overstory-bd-cgo-"));
+		tempDir = await mkdtemp(join(tmpdir(), "haru-bd-cgo-"));
 		const proc = Bun.spawn(["bd", "status"], {
 			cwd: tempDir,
 			stdout: "pipe",
@@ -115,7 +115,7 @@ async function checkBdCgoSupport(): Promise<DoctorCheck> {
 				details: [
 					"The installed bd binary lacks CGO support required by its Dolt backend.",
 					"Workaround: rebuild bd from source with CGO_ENABLED=1 and ICU headers.",
-					"See: https://github.com/jayminwest/overstory/issues/10",
+					"See: https://github.com/jayminwest/haru/issues/10",
 				],
 				fixable: true,
 			};

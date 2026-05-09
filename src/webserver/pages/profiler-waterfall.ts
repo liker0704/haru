@@ -238,9 +238,7 @@ export function renderWaterfall(trace: ProfilerTrace, slug: string): string {
 	const rowsHtml: string[] = [];
 	for (let i = 0; i < laneCount; i++) {
 		const spansInLane = agentSpans.filter((_, idx) => lanes[idx] === i);
-		const barsHtml = spansInLane
-			.map((span) => renderAgentBar(span, trace, slug))
-			.join("");
+		const barsHtml = spansInLane.map((span) => renderAgentBar(span, trace, slug)).join("");
 		rowsHtml.push(`<div class="wf-row">${barsHtml}</div>`);
 	}
 
@@ -390,12 +388,15 @@ function renderAgentBar(span: ProfilerSpan, trace: ProfilerTrace, slug: string):
 	}
 
 	const state = String(span.attributes["ov.agent.state"] ?? "completed");
-	const barClass = span.stateSegments && span.stateSegments.length > 1 ? "wf-bar-segmented" : `wf-bar-state-${state}`;
+	const barClass =
+		span.stateSegments && span.stateSegments.length > 1
+			? "wf-bar-segmented"
+			: `wf-bar-state-${state}`;
 
 	return `<div class="${barClass} wf-bar" style="left:${leftPct.toFixed(2)}%;width:${Math.max(widthPct, 0.5).toFixed(2)}%" title="${esc(String(span.agentName))}" hx-get="/project/${esc(slug)}/profiler/span/${esc(span.spanId)}?run=${esc(trace.runId)}" hx-target="#span-detail" hx-swap="innerHTML">${segmentsHtml}<span class="wf-bar-label">${esc(barLabel)}</span></div>`;
 }
 
-function renderSpanRow(span: ProfilerSpan, trace: ProfilerTrace, slug: string): string {
+function _renderSpanRow(span: ProfilerSpan, trace: ProfilerTrace, slug: string): string {
 	const indent = span.depth * 16;
 	const label = span.kind === "session" ? span.agentName : span.name.replace(/^(tool|turn):/, "");
 

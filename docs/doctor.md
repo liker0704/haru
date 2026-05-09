@@ -1,25 +1,25 @@
 # Doctor System
 
-This document is the contributor guide for Overstory's `ov doctor` health check
+This document is the contributor guide for Overstory's `ha doctor` health check
 system. It covers the 11 check categories, the `DoctorCheckFn` interface, how
 `--fix` closures work, CLI usage, integration with the health scoring system, and
 instructions for adding a new category.
 
 ---
 
-## 1. What `ov doctor` Does
+## 1. What `ha doctor` Does
 
-`ov doctor` runs a set of modular health checks across Overstory's subsystems and
+`ha doctor` runs a set of modular health checks across Overstory's subsystems and
 reports any problems. Each check produces a `pass`, `warn`, or `fail` status with
 a human-readable message and optional auto-fix.
 
 Typical use cases:
 
 ```
-ov doctor                         # Run all categories
-ov doctor --category dependencies # Run one category
-ov doctor --fix                   # Run checks and auto-fix fixable issues
-ov doctor --json                  # JSON output for scripting
+ha doctor                         # Run all categories
+ha doctor --category dependencies # Run one category
+ha doctor --fix                   # Run checks and auto-fix fixable issues
+ha doctor --json                  # JSON output for scripting
 ```
 
 ---
@@ -98,7 +98,7 @@ Detects whether required and optional CLI tools are available on `PATH`.
 | `tmux` | Yes | — |
 | `sd` or `bd` (task tracker) | Yes | — |
 | `mulch` | Yes | `ml` |
-| `ov` | Yes | `overstory` |
+| `ov` | Yes | `haru` |
 | `cn` | No | — |
 
 Each tool is probed with its `--version` flag via `Bun.spawn`. A non-zero exit
@@ -193,7 +193,7 @@ export interface ConsistencyCheckDeps {
 }
 ```
 
-**`--fix` support:** None. Consistency issues require `ov clean` or manual
+**`--fix` support:** None. Consistency issues require `ha clean` or manual
 intervention.
 
 ### 4.6 `agents`
@@ -232,7 +232,7 @@ Detects:
 If `merge-queue.db` does not exist, the check passes — this is normal for new
 installations or projects with no merges yet.
 
-**`--fix` support:** None. Stale entries require `ov clean --merge-queue`.
+**`--fix` support:** None. Stale entries require `ha clean --merge-queue`.
 
 ### 4.8 `logs`
 
@@ -244,7 +244,7 @@ Checks disk usage in `.overstory/logs/` and detects oversized log files.
   at `src/doctor/logs.ts:5`)
 - Lists individual log files that are disproportionately large
 
-**`--fix` support:** None. Log rotation requires manual `ov clean --logs` or
+**`--fix` support:** None. Log rotation requires manual `ha clean --logs` or
 external log management.
 
 ### 4.9 `version`
@@ -302,29 +302,29 @@ environment variable changes.
 
 ```bash
 # Run all checks (human-readable)
-ov doctor
+ha doctor
 
 # Run checks with verbose detail output
-ov doctor --verbose
+ha doctor --verbose
 
 # Run a single category
-ov doctor --category dependencies
-ov doctor --category config
-ov doctor --category structure
-ov doctor --category databases
-ov doctor --category consistency
-ov doctor --category agents
-ov doctor --category merge
-ov doctor --category logs
-ov doctor --category version
-ov doctor --category ecosystem
-ov doctor --category providers
+ha doctor --category dependencies
+ha doctor --category config
+ha doctor --category structure
+ha doctor --category databases
+ha doctor --category consistency
+ha doctor --category agents
+ha doctor --category merge
+ha doctor --category logs
+ha doctor --category version
+ha doctor --category ecosystem
+ha doctor --category providers
 
 # Auto-fix fixable issues, then show results
-ov doctor --fix
+ha doctor --fix
 
 # JSON output
-ov doctor --json
+ha doctor --json
 ```
 
 The `--fix` flag calls each check's `fix()` closure sequentially after all checks
@@ -337,7 +337,7 @@ separate section below the check results.
 
 **Source:** `src/health/signals.ts:34`
 
-Doctor check results feed directly into the `ov health` scoring system. The
+Doctor check results feed directly into the `ha health` scoring system. The
 `collectSignals()` function accepts a `doctorChecks` parameter:
 
 ```typescript
@@ -345,10 +345,10 @@ const doctorFailCount = doctorChecks.filter((c) => c.status === "fail").length;
 const doctorWarnCount = doctorChecks.filter((c) => c.status === "warn").length;
 ```
 
-These counts become the `doctor_failures` scoring factor in `ov health`, which
+These counts become the `doctor_failures` scoring factor in `ha health`, which
 carries a weight of 0.18 and reduces the overall health score by 15 points per
 failure and 5 points per warning. A `doctor_failures` score below 55 triggers a
-`critical` recommendation from `ov next-improvement`.
+`critical` recommendation from `ha next-improvement`.
 
 To run doctor checks as part of health signal collection, pass the results:
 

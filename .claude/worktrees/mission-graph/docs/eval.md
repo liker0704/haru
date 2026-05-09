@@ -6,14 +6,14 @@ a step-by-step walkthrough for writing custom scenarios.
 
 ---
 
-## 1. What `ov eval` Does
+## 1. What `ha eval` Does
 
 The eval framework runs end-to-end orchestration tests against disposable
 fixture repos. Each **scenario** defines a repo template, config overrides,
 startup actions, and assertions. The runner:
 
 1. Creates a temporary fixture repo from the scenario's template.
-2. Initializes overstory (`ov init`) in the fixture.
+2. Initializes haru (`ha init`) in the fixture.
 3. Applies config overrides and runs startup actions.
 4. Starts a coordinator and polls for completion.
 5. Collects metrics from the fixture's SQLite databases.
@@ -183,44 +183,44 @@ Data sources:
 
 ## 7. CLI Usage
 
-### `ov eval run <scenario>`
+### `ha eval run <scenario>`
 
 Run a scenario against a temporary fixture repo.
 
 ```bash
-ov eval run evals/dispatch-smoke
-ov eval run evals/dispatch-smoke --json
-ov eval run evals/dispatch-smoke --timeout 120000
+ha eval run evals/dispatch-smoke
+ha eval run evals/dispatch-smoke --json
+ha eval run evals/dispatch-smoke --timeout 120000
 ```
 
 Exits with code 1 if any assertion fails.
 
-### `ov eval show <run-id>`
+### `ha eval show <run-id>`
 
 Display results of a previous eval run.
 
 ```bash
-ov eval show a1b2c3d4-...
-ov eval show a1b2c3d4-... --json
+ha eval show a1b2c3d4-...
+ha eval show a1b2c3d4-... --json
 ```
 
-### `ov eval list`
+### `ha eval list`
 
 List all past eval runs, sorted by start time (newest first).
 
 ```bash
-ov eval list
-ov eval list --json
+ha eval list
+ha eval list --json
 ```
 
-### `ov eval compare <run-a> <run-b>`
+### `ha eval compare <run-a> <run-b>`
 
 Compare two eval runs side-by-side. Shows metric deltas (B - A) and assertion
 regressions/improvements.
 
 ```bash
-ov eval compare a1b2c3d4-... e5f6g7h8-...
-ov eval compare a1b2c3d4-... e5f6g7h8-... --json
+ha eval compare a1b2c3d4-... e5f6g7h8-...
+ha eval compare a1b2c3d4-... e5f6g7h8-... --json
 ```
 
 ---
@@ -241,8 +241,8 @@ After each run, artifacts are written to:
   events.jsonl        # Raw events from the fixture's events.db (NDJSON)
 ```
 
-The `summary.json` file is the canonical artifact -- `ov eval show` and
-`ov eval compare` both read from it.
+The `summary.json` file is the canonical artifact -- `ha eval show` and
+`ha eval compare` both read from it.
 
 ---
 
@@ -257,15 +257,15 @@ loadScenario(scenarioPath)
 runEval(config)
         |
         +-- 1. Copy repo-template (if exists) or init empty git repo
-        +-- 2. ov init --yes --skip-mulch --skip-seeds --skip-canopy
+        +-- 2. ha init --yes --skip-mulch --skip-seeds --skip-canopy
         +-- 3. Apply config_overrides to .overstory/config.yaml
         +-- 4. Run startup_actions (sequentially)
-        +-- 5. ov coordinator start --no-attach
-        +-- 6. Poll ov coordinator check-complete (every 5s, up to timeout)
+        +-- 5. ha coordinator start --no-attach
+        +-- 6. Poll ha coordinator check-complete (every 5s, up to timeout)
         +-- 7. collectMetrics() from fixture SQLite databases
         +-- 8. evaluateAssertions(scenario.assertions, metrics)
         +-- 9. Build EvalResult { passed, timedOut, metrics, assertions }
-        +-- 10. Cleanup: ov coordinator stop, rm fixture dir
+        +-- 10. Cleanup: ha coordinator stop, rm fixture dir
 ```
 
 The runner always cleans up -- even on timeout or error, the coordinator is
@@ -320,12 +320,12 @@ assertions:
 ### Step 4: Add a repo template (optional)
 
 Create `evals/my-scenario/repo-template/` with files that should exist in the
-fixture repo before `ov init` runs. This directory is copied verbatim into the
+fixture repo before `ha init` runs. This directory is copied verbatim into the
 fixture. If omitted, an empty git repo with a single `README.md` commit is
 created.
 
 ### Step 5: Run it
 
 ```bash
-ov eval run evals/my-scenario
+ha eval run evals/my-scenario
 ```

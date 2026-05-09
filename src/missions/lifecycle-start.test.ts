@@ -12,13 +12,12 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { access } from "node:fs/promises";
-import type { StartPersistentAgentResult } from "../agents/persistent-root.ts";
-import type { MissionCommandDeps } from "./lifecycle-types.ts";
-import { mkdtemp, rm } from "node:fs/promises";
+import { access, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { StartPersistentAgentResult } from "../agents/persistent-root.ts";
 import { missionResumeAll, missionStart } from "./lifecycle-start.ts";
+import type { MissionCommandDeps } from "./lifecycle-types.ts";
 import { createMissionStore } from "./store.ts";
 
 let tempDir: string;
@@ -34,13 +33,9 @@ beforeEach(async () => {
 	// Minimal config.yaml so loadConfig() succeeds
 	await Bun.write(
 		join(projectRoot, ".overstory", "config.yaml"),
-		[
-			"version: 1",
-			"watchdog:",
-			"  tier0Enabled: false",
-			"mission:",
-			"  maxConcurrent: 1",
-		].join("\n"),
+		["version: 1", "watchdog:", "  tier0Enabled: false", "mission:", "  maxConcurrent: 1"].join(
+			"\n",
+		),
 	);
 });
 
@@ -50,25 +45,26 @@ afterEach(async () => {
 
 /** Minimal stub for startMissionCoordinator / startMissionAnalyst injected via deps. */
 function makeRoleStub(sessionId: string) {
-	return async (_opts: unknown) => ({
-		session: {
-			id: sessionId,
-			agentName: "stub",
-			tmuxSession: null,
-			pid: null,
-			worktreePath: null,
-			state: "active" as const,
-			depth: 0,
+	return async (_opts: unknown) =>
+		({
+			session: {
+				id: sessionId,
+				agentName: "stub",
+				tmuxSession: null,
+				pid: null,
+				worktreePath: null,
+				state: "active" as const,
+				depth: 0,
+				runId: null,
+				runtimeSessionId: null,
+				capability: null,
+				branchName: null,
+				createdAt: new Date().toISOString(),
+				updatedAt: new Date().toISOString(),
+			},
 			runId: null,
-			runtimeSessionId: null,
-			capability: null,
-			branchName: null,
-			createdAt: new Date().toISOString(),
-			updatedAt: new Date().toISOString(),
-		},
-		runId: null,
-		pid: 0,
-	} as unknown as StartPersistentAgentResult);
+			pid: 0,
+		}) as unknown as StartPersistentAgentResult;
 }
 
 describe("missionStart", () => {

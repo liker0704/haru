@@ -67,7 +67,7 @@ describe("checkDependencies", () => {
 		expect(toolNames).toContain("tmux availability");
 		expect(toolNames).toContain("sd availability");
 		expect(toolNames).toContain("mulch availability");
-		expect(toolNames).toContain("ov availability");
+		expect(toolNames).toContain("ha availability");
 		expect(toolNames).toContain("cn availability");
 	});
 
@@ -202,9 +202,9 @@ describe("checkDependencies", () => {
 			expect(mlAlias?.category).toBe("dependencies");
 			expect(["pass", "warn"]).toContain(mlAlias?.status ?? "");
 		}
-		const ovCheck = checks.find((c) => c.name === "ov availability");
+		const ovCheck = checks.find((c) => c.name === "ha availability");
 		if (ovCheck?.status === "pass") {
-			const ovAlias = checks.find((c) => c.name === "overstory alias");
+			const ovAlias = checks.find((c) => c.name === "haru alias");
 			expect(ovAlias).toBeDefined();
 			expect(["pass", "warn"]).toContain(ovAlias?.status ?? "");
 		}
@@ -230,9 +230,9 @@ describe("checkDependencies", () => {
 		}
 	});
 
-	test("includes ov availability check", async () => {
+	test("includes ha availability check", async () => {
 		const checks = await checkDependencies(mockConfig, "/tmp/.overstory");
-		const ovCheck = checks.find((c) => c.name === "ov availability");
+		const ovCheck = checks.find((c) => c.name === "ha availability");
 		expect(ovCheck).toBeDefined();
 		expect(ovCheck?.category).toBe("dependencies");
 	});
