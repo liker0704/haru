@@ -52,6 +52,11 @@ four-phase flow. The `full` tier adds `align` and `decide` phases for maximum
 rigor. New missions start in assess mode (`tier=null`) until the coordinator
 selects a tier.
 
+> **Note:** `align` and `decide` in the `full` tier are auto-advance phases
+> with no dedicated cell file (see `src/missions/graph.ts:46`). They progress
+> automatically without async or human gates, distinct from gated phases like
+> `understand` and `plan`.
+
 ### Graph Execution Engine
 
 The graph execution engine is the runtime controller for phase transitions. It

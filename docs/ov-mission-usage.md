@@ -8,6 +8,18 @@ Related references:
 - [Design / RFC context](./ov-mission.md)
 - [Implementation / acceptance contract](./ov-mission-implementation.md)
 
+## Your Identity
+
+You are **operator**. The coordinator and other mission agents send messages to
+`operator`. Always check mail as:
+
+```bash
+ov mail check --agent operator
+```
+
+Do NOT check other agents' mail (`--agent coordinator`, `--agent mission-analyst`,
+etc.) — that is their private inter-agent communication.
+
 ## When To Use `ov mission`
 
 Use `ov mission` for larger tasks where you want the system to:
@@ -334,6 +346,27 @@ handoff and early execution. Use 900s (15 min) for steady-state monitoring.
 
 Answer agent questions promptly via `ov mission answer` or `ov mail reply` —
 agents block until they get a response.
+
+### What NOT to Do
+
+- Don't read other agents' mail (`--agent coordinator`, `--agent mission-analyst`)
+- Don't `ov mail list` to snoop on inter-agent communication
+- Don't nudge agents unless they're clearly stuck (15+ min no progress)
+- Don't interfere with execution — the mission is autonomous
+
+### Status Interpretation
+
+`ov status` reports several fields you should be able to read at a glance:
+
+| Field | Meaning |
+|-------|---------|
+| `Agents: N active` | Running agent count |
+| `> name [capability] working \| task \| duration` | Individual agent |
+| `Worktrees: N` | Git worktrees in use |
+| `Merge queue: N pending` | Branches waiting to merge |
+| `Mission: name (state/phase)` | Current state |
+| `Pending: question` | YOU need to answer something |
+| `frozen` | Mission paused waiting for input |
 
 ### Linking GitHub Issues
 

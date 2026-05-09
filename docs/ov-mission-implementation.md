@@ -1,5 +1,7 @@
 # `ov mission` Implementation Guide
 
+> **Status:** Historical delivery record. Sections §3-§16 describe the original PR sequence for Epic #13 (now shipped). Section §21 is current and reflects the live `TIER_PHASES` and cell registry.
+
 This document turns the agreed `ov mission` RFC into a concrete implementation
 plan and implementation reference for Overstory.
 
@@ -111,11 +113,11 @@ persistent-root abstraction while keeping existing behavior intact.
 
 ### Primary files
 
-- [`src/commands/coordinator.ts`](/home/liker/projects/os-eco/overstory/src/commands/coordinator.ts)
-- [`src/types.ts`](/home/liker/projects/os-eco/overstory/src/types.ts)
-- [`src/sessions/store.ts`](/home/liker/projects/os-eco/overstory/src/sessions/store.ts)
-- [`src/commands/status.ts`](/home/liker/projects/os-eco/overstory/src/commands/status.ts)
-- [`src/commands/agents.ts`](/home/liker/projects/os-eco/overstory/src/commands/agents.ts)
+- [`src/commands/coordinator.ts`](/home/liker2/projects/os-eco/overstory/src/commands/coordinator.ts)
+- [`src/types.ts`](/home/liker2/projects/os-eco/overstory/src/types.ts)
+- [`src/sessions/store.ts`](/home/liker2/projects/os-eco/overstory/src/sessions/store.ts)
+- [`src/commands/status.ts`](/home/liker2/projects/os-eco/overstory/src/commands/status.ts)
+- [`src/commands/agents.ts`](/home/liker2/projects/os-eco/overstory/src/commands/agents.ts)
 - runtime capability allowlists or guards if they key off capabilities
 
 ### Step-by-step
@@ -184,10 +186,10 @@ layout without yet implementing the full mission workflow.
 
 ### Primary files
 
-- [`src/sessions/store.ts`](/home/liker/projects/os-eco/overstory/src/sessions/store.ts)
+- [`src/sessions/store.ts`](/home/liker2/projects/os-eco/overstory/src/sessions/store.ts)
 - new mission-store module near existing session/run stores
-- [`src/types.ts`](/home/liker/projects/os-eco/overstory/src/types.ts)
-- [`docs/ov-mission.md`](/home/liker/projects/os-eco/overstory/docs/ov-mission.md)
+- [`src/types.ts`](/home/liker2/projects/os-eco/overstory/src/types.ts)
+- [`docs/ov-mission.md`](/home/liker2/projects/os-eco/overstory/docs/ov-mission.md)
 
 ### Required schema
 
@@ -270,9 +272,9 @@ Add the user-facing mission command family before full execution logic exists.
 
 ### Primary files
 
-- new [`src/commands/mission.ts`](/home/liker/projects/os-eco/overstory/src/commands)
+- new [`src/commands/mission.ts`](/home/liker2/projects/os-eco/overstory/src/commands)
 - command registration / CLI wiring
-- [`src/commands/coordinator.ts`](/home/liker/projects/os-eco/overstory/src/commands/coordinator.ts)
+- [`src/commands/coordinator.ts`](/home/liker2/projects/os-eco/overstory/src/commands/coordinator.ts)
 
 ### Required commands
 
@@ -335,7 +337,7 @@ Make workstreams real runtime entities instead of a second planning namespace.
 ### Primary files
 
 - new mission planning helpers
-- [`src/commands/sling.ts`](/home/liker/projects/os-eco/overstory/src/commands/sling.ts)
+- [`src/commands/sling.ts`](/home/liker2/projects/os-eco/overstory/src/commands/sling.ts)
 - tracker integration layer used today by coordinator/sling
 - mission artifact generation code
 
@@ -393,17 +395,17 @@ runtime and persistence substrate exists.
 
 ### New prompt files
 
-- [`agents/coordinator-mission.md`](/home/liker/projects/os-eco/overstory/agents)
-- [`agents/mission-analyst.md`](/home/liker/projects/os-eco/overstory/agents)
-- [`agents/execution-director.md`](/home/liker/projects/os-eco/overstory/agents)
-- [`agents/lead-mission.md`](/home/liker/projects/os-eco/overstory/agents)
+- [`agents/coordinator-mission.md`](/home/liker2/projects/os-eco/overstory/agents)
+- [`agents/mission-analyst.md`](/home/liker2/projects/os-eco/overstory/agents)
+- [`agents/execution-director.md`](/home/liker2/projects/os-eco/overstory/agents)
+- [`agents/lead-mission.md`](/home/liker2/projects/os-eco/overstory/agents)
 
 ### Step-by-step
 
 1. Materialize the prompt skeletons from the RFC into real files.
 2. Keep existing:
-   - [`agents/coordinator.md`](/home/liker/projects/os-eco/overstory/agents/coordinator.md)
-   - [`agents/lead.md`](/home/liker/projects/os-eco/overstory/agents/lead.md)
+   - [`agents/coordinator.md`](/home/liker2/projects/os-eco/overstory/agents/coordinator.md)
+   - [`agents/lead.md`](/home/liker2/projects/os-eco/overstory/agents/lead.md)
    unchanged for the fast path.
 3. Add mission-mode prompt selection logic.
 4. Add artifact writers for:
@@ -482,7 +484,7 @@ execution motion after handoff.
 
 - persistent-root lifecycle
 - mission handoff logic
-- [`src/commands/sling.ts`](/home/liker/projects/os-eco/overstory/src/commands/sling.ts)
+- [`src/commands/sling.ts`](/home/liker2/projects/os-eco/overstory/src/commands/sling.ts)
 - mission command layer
 - status/dashboard surfaces
 
@@ -530,8 +532,8 @@ Implement the typed mission protocol on top of existing mail infrastructure.
 
 ### Primary files
 
-- [`src/mail/client.ts`](/home/liker/projects/os-eco/overstory/src/mail/client.ts)
-- mail types in [`src/types.ts`](/home/liker/projects/os-eco/overstory/src/types.ts)
+- [`src/mail/client.ts`](/home/liker2/projects/os-eco/overstory/src/mail/client.ts)
+- mail types in [`src/types.ts`](/home/liker2/projects/os-eco/overstory/src/types.ts)
 - mission command/runtime code
 
 ### Required protocol types
@@ -583,7 +585,7 @@ Prevent stale local execution after brief refreshes or mission reopen/refreeze.
 - spec generation code
 - `.overstory/specs/`
 - new spec metadata helper
-- [`agents/lead.md`](/home/liker/projects/os-eco/overstory/agents/lead.md) as behavioral reference
+- [`agents/lead.md`](/home/liker2/projects/os-eco/overstory/agents/lead.md) as behavioral reference
 
 ### `v1` chosen model
 
@@ -644,8 +646,8 @@ Implement mission-layer pause semantics without changing `AgentState` in `v1`.
 
 - mission runtime coordination layer
 - `MissionStore`
-- [`src/commands/status.ts`](/home/liker/projects/os-eco/overstory/src/commands/status.ts)
-- [`src/commands/dashboard.ts`](/home/liker/projects/os-eco/overstory/src/commands/dashboard.ts)
+- [`src/commands/status.ts`](/home/liker2/projects/os-eco/overstory/src/commands/status.ts)
+- [`src/commands/dashboard.ts`](/home/liker2/projects/os-eco/overstory/src/commands/dashboard.ts)
 
 ### Step-by-step
 
@@ -679,8 +681,8 @@ Surface mission lifecycle cleanly without overloading agent health.
 
 ### Primary files
 
-- [`src/commands/status.ts`](/home/liker/projects/os-eco/overstory/src/commands/status.ts)
-- [`src/commands/dashboard.ts`](/home/liker/projects/os-eco/overstory/src/commands/dashboard.ts)
+- [`src/commands/status.ts`](/home/liker2/projects/os-eco/overstory/src/commands/status.ts)
+- [`src/commands/dashboard.ts`](/home/liker2/projects/os-eco/overstory/src/commands/dashboard.ts)
 
 ### Step-by-step
 
@@ -712,7 +714,7 @@ Preserve enough retained mission evidence for later analysis and improvement.
 
 ### Primary files
 
-- [`src/events/store.ts`](/home/liker/projects/os-eco/overstory/src/events/store.ts)
+- [`src/events/store.ts`](/home/liker2/projects/os-eco/overstory/src/events/store.ts)
 - mission command/runtime layer
 - bundle export helper
 - mission artifact directory
@@ -760,9 +762,9 @@ Extend the existing deterministic review system to support mission-level review.
 
 ### Primary files
 
-- [`src/review/types.ts`](/home/liker/projects/os-eco/overstory/src/review/types.ts)
-- [`src/review/store.ts`](/home/liker/projects/os-eco/overstory/src/review/store.ts)
-- [`src/review/staleness.ts`](/home/liker/projects/os-eco/overstory/src/review/staleness.ts)
+- [`src/review/types.ts`](/home/liker2/projects/os-eco/overstory/src/review/types.ts)
+- [`src/review/store.ts`](/home/liker2/projects/os-eco/overstory/src/review/store.ts)
+- [`src/review/staleness.ts`](/home/liker2/projects/os-eco/overstory/src/review/staleness.ts)
 - review analyzers
 - review command/reporting surfaces
 
@@ -861,19 +863,23 @@ This is the practical “where code will move” checklist.
 
 ### Very likely to change
 
-- [`src/types.ts`](/home/liker/projects/os-eco/overstory/src/types.ts)
-- [`src/sessions/store.ts`](/home/liker/projects/os-eco/overstory/src/sessions/store.ts)
-- [`src/commands/coordinator.ts`](/home/liker/projects/os-eco/overstory/src/commands/coordinator.ts)
-- [`src/commands/sling.ts`](/home/liker/projects/os-eco/overstory/src/commands/sling.ts)
-- [`src/commands/status.ts`](/home/liker/projects/os-eco/overstory/src/commands/status.ts)
-- [`src/commands/dashboard.ts`](/home/liker/projects/os-eco/overstory/src/commands/dashboard.ts)
-- [`src/events/store.ts`](/home/liker/projects/os-eco/overstory/src/events/store.ts)
-- [`src/mail/client.ts`](/home/liker/projects/os-eco/overstory/src/mail/client.ts)
-- [`src/review/types.ts`](/home/liker/projects/os-eco/overstory/src/review/types.ts)
-- [`src/review/store.ts`](/home/liker/projects/os-eco/overstory/src/review/store.ts)
-- [`src/review/staleness.ts`](/home/liker/projects/os-eco/overstory/src/review/staleness.ts)
+- [`src/types.ts`](/home/liker2/projects/os-eco/overstory/src/types.ts)
+- [`src/sessions/store.ts`](/home/liker2/projects/os-eco/overstory/src/sessions/store.ts)
+- [`src/commands/coordinator.ts`](/home/liker2/projects/os-eco/overstory/src/commands/coordinator.ts)
+- [`src/commands/sling.ts`](/home/liker2/projects/os-eco/overstory/src/commands/sling.ts)
+- [`src/commands/status.ts`](/home/liker2/projects/os-eco/overstory/src/commands/status.ts)
+- [`src/commands/dashboard.ts`](/home/liker2/projects/os-eco/overstory/src/commands/dashboard.ts)
+- [`src/events/store.ts`](/home/liker2/projects/os-eco/overstory/src/events/store.ts)
+- [`src/mail/client.ts`](/home/liker2/projects/os-eco/overstory/src/mail/client.ts)
+- [`src/review/types.ts`](/home/liker2/projects/os-eco/overstory/src/review/types.ts)
+- [`src/review/store.ts`](/home/liker2/projects/os-eco/overstory/src/review/store.ts)
+- [`src/review/staleness.ts`](/home/liker2/projects/os-eco/overstory/src/review/staleness.ts)
 
 ### New files likely needed
+
+> **Historical predictions** — the actual delivered file set is broader than what was anticipated below. The shipped agent prompt set includes 10 files, with tier-specific coordinator splits and a planned-tier analyst variant added during implementation.
+
+Originally predicted:
 
 - `src/commands/mission.ts`
 - mission store/helper module
@@ -884,10 +890,23 @@ This is the practical “where code will move” checklist.
 - `agents/execution-director.md`
 - `agents/lead-mission.md`
 
+Actually delivered (mission-related agent prompts):
+
+- `agents/coordinator-mission.md`
+- `agents/coordinator-mission-assess.md`
+- `agents/coordinator-mission-direct.md`
+- `agents/coordinator-mission-planned.md`
+- `agents/coordinator-mission-full.md`
+- `agents/mission-analyst.md`
+- `agents/mission-analyst-planned.md`
+- `agents/execution-director.md`
+- `agents/lead-mission.md`
+- `agents/lead.md` (extended for mission mode)
+
 ### Existing prompt files that must remain intact
 
-- [`agents/coordinator.md`](/home/liker/projects/os-eco/overstory/agents/coordinator.md)
-- [`agents/lead.md`](/home/liker/projects/os-eco/overstory/agents/lead.md)
+- [`agents/coordinator.md`](/home/liker2/projects/os-eco/overstory/agents/coordinator.md)
+- [`agents/lead.md`](/home/liker2/projects/os-eco/overstory/agents/lead.md)
 - other current worker prompts used by fast path
 
 ---
