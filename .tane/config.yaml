@@ -1,4 +1,4 @@
-project: overstory
+project: haru
 version: 1
 emitDir: agents
 emitDirByTag:

@@ -1,9 +1,9 @@
-// Cursor CLI runtime adapter for overstory's AgentRuntime interface.
+// Cursor CLI runtime adapter for haru's AgentRuntime interface.
 // Implements the AgentRuntime contract for the `agent` binary (Cursor's CLI agent).
 //
 // Key characteristics:
 // - TUI: `agent` maintains an interactive TUI in tmux
-// - Instruction file: .cursor/rules/overstory.md (Cursor's native rules system)
+// - Instruction file: .cursor/rules/haru.md (Cursor's native rules system)
 // - No hooks: Cursor CLI has no hook/guard mechanism (like Copilot/Gemini)
 // - Permission: `--yolo` flag for bypass mode
 // - Headless: `agent -p "prompt"` for one-shot calls
@@ -27,7 +27,7 @@ import type {
  * Implements AgentRuntime for the `agent` binary (Cursor's coding agent CLI).
  * The CLI binary is `agent`, not `cursor`.
  *
- * Instructions are delivered via `.cursor/rules/overstory.md` (Cursor's
+ * Instructions are delivered via `.cursor/rules/haru.md` (Cursor's
  * native rules system), which the CLI reads automatically from the workspace.
  *
  * No hook/guard deployment — the `_hooks` parameter in `deployConfig`
@@ -41,7 +41,7 @@ export class CursorRuntime implements AgentRuntime {
 	readonly stability = "experimental" as const;
 
 	/** Relative path to the instruction file within a worktree. */
-	readonly instructionPath = ".cursor/rules/overstory.md";
+	readonly instructionPath = ".cursor/rules/haru.md";
 
 	/**
 	 * Build the shell command string to spawn an interactive Cursor agent.
@@ -91,7 +91,7 @@ export class CursorRuntime implements AgentRuntime {
 	/**
 	 * Deploy per-agent instructions to a worktree.
 	 *
-	 * Writes the overlay to `.cursor/rules/overstory.md` in the worktree
+	 * Writes the overlay to `.cursor/rules/haru.md` in the worktree
 	 * (Cursor's native rules system). Creates the `.cursor/rules/` directory
 	 * if it doesn't exist.
 	 *

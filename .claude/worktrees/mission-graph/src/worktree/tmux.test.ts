@@ -62,19 +62,19 @@ describe("createSession", () => {
 		spawnSpy.mockImplementation(() => {
 			callCount++;
 			if (callCount === 1) {
-				// which overstory — return a bin path
-				return mockSpawnResult("/usr/local/bin/overstory\n", "", 0);
+				// which haru — return a bin path
+				return mockSpawnResult("/usr/local/bin/haru\n", "", 0);
 			}
 			if (callCount === 2) {
 				// tmux new-session
 				return mockSpawnResult("", "", 0);
 			}
-			// tmux display-message -p -t overstory-auth:^.{top-left} '#{pane_pid}'
+			// tmux display-message -p -t haru-auth:^.{top-left} '#{pane_pid}'
 			return mockSpawnResult("42\n", "", 0);
 		});
 
 		const pid = await createSession(
-			"overstory-auth",
+			"haru-auth",
 			"/repo/worktrees/auth",
 			"claude --task 'do work'",
 		);
@@ -87,8 +87,8 @@ describe("createSession", () => {
 		spawnSpy.mockImplementation(() => {
 			callCount++;
 			if (callCount === 1) {
-				// which overstory
-				return mockSpawnResult("/usr/local/bin/overstory\n", "", 0);
+				// which haru
+				return mockSpawnResult("/usr/local/bin/haru\n", "", 0);
 			}
 			if (callCount === 2) {
 				return mockSpawnResult("", "", 0);
@@ -98,7 +98,7 @@ describe("createSession", () => {
 
 		await createSession("my-session", "/work/dir", "echo hello");
 
-		// Call 0 is 'which overstory', call 1 is 'tmux new-session'
+		// Call 0 is 'which haru', call 1 is 'tmux new-session'
 		const tmuxCallArgs = spawnSpy.mock.calls[1] as unknown[];
 		const cmd = tmuxCallArgs[0] as string[];
 		expect(cmd[0]).toBe("tmux");
@@ -121,8 +121,8 @@ describe("createSession", () => {
 		spawnSpy.mockImplementation(() => {
 			callCount++;
 			if (callCount === 1) {
-				// which overstory
-				return mockSpawnResult("/usr/local/bin/overstory\n", "", 0);
+				// which haru
+				return mockSpawnResult("/usr/local/bin/haru\n", "", 0);
 			}
 			if (callCount === 2) {
 				return mockSpawnResult("", "", 0);
@@ -132,7 +132,7 @@ describe("createSession", () => {
 
 		await createSession("test-agent", "/tmp", "ls");
 
-		// 3 calls: which overstory, tmux new-session, tmux display-message
+		// 3 calls: which haru, tmux new-session, tmux display-message
 		expect(spawnSpy).toHaveBeenCalledTimes(3);
 		const thirdCallArgs = spawnSpy.mock.calls[2] as unknown[];
 		const cmd = thirdCallArgs[0] as string[];
@@ -151,8 +151,8 @@ describe("createSession", () => {
 		spawnSpy.mockImplementation(() => {
 			callCount++;
 			if (callCount === 1) {
-				// which overstory
-				return mockSpawnResult("/usr/local/bin/overstory\n", "", 0);
+				// which haru
+				return mockSpawnResult("/usr/local/bin/haru\n", "", 0);
 			}
 			return mockSpawnResult("", "duplicate session: my-session", 1);
 		});
@@ -165,8 +165,8 @@ describe("createSession", () => {
 		spawnSpy.mockImplementation(() => {
 			callCount++;
 			if (callCount === 1) {
-				// which overstory
-				return mockSpawnResult("/usr/local/bin/overstory\n", "", 0);
+				// which haru
+				return mockSpawnResult("/usr/local/bin/haru\n", "", 0);
 			}
 			if (callCount === 2) {
 				// new-session succeeds
@@ -184,8 +184,8 @@ describe("createSession", () => {
 		spawnSpy.mockImplementation(() => {
 			callCount++;
 			if (callCount === 1) {
-				// which overstory
-				return mockSpawnResult("/usr/local/bin/overstory\n", "", 0);
+				// which haru
+				return mockSpawnResult("/usr/local/bin/haru\n", "", 0);
 			}
 			if (callCount === 2) {
 				return mockSpawnResult("", "", 0);
@@ -202,8 +202,8 @@ describe("createSession", () => {
 		spawnSpy.mockImplementation(() => {
 			callCount++;
 			if (callCount === 1) {
-				// which overstory
-				return mockSpawnResult("/usr/local/bin/overstory\n", "", 0);
+				// which haru
+				return mockSpawnResult("/usr/local/bin/haru\n", "", 0);
 			}
 			return mockSpawnResult("", "duplicate session: agent-foo", 1);
 		});
@@ -219,17 +219,17 @@ describe("createSession", () => {
 		}
 	});
 
-	test("still creates session when which ov and which overstory both fail (uses fallback)", async () => {
+	test("still creates session when which ha and which haru both fail (uses fallback)", async () => {
 		let callCount = 0;
 		spawnSpy.mockImplementation(() => {
 			callCount++;
 			if (callCount === 1) {
-				// which ov fails
-				return mockSpawnResult("", "ov not found", 1);
+				// which ha fails
+				return mockSpawnResult("", "ha not found", 1);
 			}
 			if (callCount === 2) {
-				// which overstory fails
-				return mockSpawnResult("", "overstory not found", 1);
+				// which haru fails
+				return mockSpawnResult("", "haru not found", 1);
 			}
 			if (callCount === 3) {
 				// tmux new-session
@@ -243,7 +243,7 @@ describe("createSession", () => {
 		expect(pid).toBe(5555);
 
 		// The tmux command should contain the original command
-		// Call 0: which ov, Call 1: which overstory, Call 2: tmux new-session
+		// Call 0: which ov, Call 1: which haru, Call 2: tmux new-session
 		const tmuxCallArgs = spawnSpy.mock.calls[2] as unknown[];
 		const cmd = tmuxCallArgs[0] as string[];
 		const tmuxCmd = cmd[7] as string;
@@ -255,8 +255,8 @@ describe("createSession", () => {
 		spawnSpy.mockImplementation(() => {
 			callCount++;
 			if (callCount === 1) {
-				// which overstory
-				return mockSpawnResult("/usr/local/bin/overstory\n", "", 0);
+				// which haru
+				return mockSpawnResult("/usr/local/bin/haru\n", "", 0);
 			}
 			if (callCount === 2) {
 				// tmux new-session
@@ -281,8 +281,8 @@ describe("createSession", () => {
 		spawnSpy.mockImplementation(() => {
 			callCount++;
 			if (callCount === 1) {
-				// which overstory
-				return mockSpawnResult("/usr/local/bin/overstory\n", "", 0);
+				// which haru
+				return mockSpawnResult("/usr/local/bin/haru\n", "", 0);
 			}
 			if (callCount === 2) {
 				// tmux new-session
@@ -311,15 +311,15 @@ describe("listSessions", () => {
 
 	test("parses session list output", async () => {
 		spawnSpy.mockImplementation(() =>
-			mockSpawnResult("overstory-auth:42\noverstory-data:99\n", "", 0),
+			mockSpawnResult("haru-auth:42\noverstory-data:99\n", "", 0),
 		);
 
 		const sessions = await listSessions();
 
 		expect(sessions).toHaveLength(2);
-		expect(sessions[0]?.name).toBe("overstory-auth");
+		expect(sessions[0]?.name).toBe("haru-auth");
 		expect(sessions[0]?.pid).toBe(42);
-		expect(sessions[1]?.name).toBe("overstory-data");
+		expect(sessions[1]?.name).toBe("haru-data");
 		expect(sessions[1]?.pid).toBe(99);
 	});
 
@@ -399,7 +399,7 @@ describe("getPanePid", () => {
 	test("returns PID from tmux display-message", async () => {
 		spawnSpy.mockImplementation(() => mockSpawnResult("42\n", "", 0));
 
-		const pid = await getPanePid("overstory-auth");
+		const pid = await getPanePid("haru-auth");
 
 		expect(pid).toBe(42);
 		const callArgs = spawnSpy.mock.calls[0] as unknown[];
@@ -409,7 +409,7 @@ describe("getPanePid", () => {
 			"display-message",
 			"-p",
 			"-t",
-			"overstory-auth:^.{top-left}",
+			"haru-auth:^.{top-left}",
 			"#{pane_pid}",
 		]);
 	});
@@ -723,7 +723,7 @@ describe("killSession", () => {
 
 		killSpy.mockImplementation(() => true);
 
-		await killSession("overstory-auth");
+		await killSession("haru-auth");
 
 		// Should have called: tmux display-message, pgrep, tmux kill-session
 		expect(cmds[0]).toEqual([
@@ -731,12 +731,12 @@ describe("killSession", () => {
 			"display-message",
 			"-p",
 			"-t",
-			"overstory-auth:^.{top-left}",
+			"haru-auth:^.{top-left}",
 			"#{pane_pid}",
 		]);
 		expect(cmds[1]).toEqual(["pgrep", "-P", "500"]);
 		const lastCmd = cmds[cmds.length - 1];
-		expect(lastCmd).toEqual(["tmux", "kill-session", "-t", "overstory-auth"]);
+		expect(lastCmd).toEqual(["tmux", "kill-session", "-t", "haru-auth"]);
 
 		// Should have sent SIGTERM to root PID 500
 		expect(killSpy).toHaveBeenCalledWith(500, "SIGTERM");
@@ -758,7 +758,7 @@ describe("killSession", () => {
 			return mockSpawnResult("", "", 0);
 		});
 
-		await killSession("overstory-auth");
+		await killSession("haru-auth");
 
 		// Should go straight to tmux kill-session (no pgrep calls)
 		expect(cmds).toHaveLength(2);
@@ -779,7 +779,7 @@ describe("killSession", () => {
 			}
 			if (cmd[0] === "tmux" && cmd[1] === "kill-session") {
 				// Session already gone after process cleanup
-				return mockSpawnResult("", "can't find session: overstory-auth", 1);
+				return mockSpawnResult("", "can't find session: haru-auth", 1);
 			}
 			return mockSpawnResult("", "", 0);
 		});
@@ -787,7 +787,7 @@ describe("killSession", () => {
 		killSpy.mockImplementation(() => true);
 
 		// Should not throw — session disappearing is expected
-		await killSession("overstory-auth");
+		await killSession("haru-auth");
 	});
 
 	test("throws AgentError on unexpected tmux kill-session failure", async () => {
@@ -843,7 +843,7 @@ describe("isSessionAlive", () => {
 	test("returns true when session exists (exit 0)", async () => {
 		spawnSpy.mockImplementation(() => mockSpawnResult("", "", 0));
 
-		const alive = await isSessionAlive("overstory-auth");
+		const alive = await isSessionAlive("haru-auth");
 
 		expect(alive).toBe(true);
 	});
@@ -881,7 +881,7 @@ describe("checkSessionState", () => {
 
 	test("returns alive when tmux has-session succeeds", async () => {
 		spawnSpy.mockReturnValue(mockSpawnResult("", "", 0));
-		const state = await checkSessionState("overstory-test-coordinator");
+		const state = await checkSessionState("haru-test-coordinator");
 		expect(state).toBe("alive");
 	});
 
@@ -889,21 +889,21 @@ describe("checkSessionState", () => {
 		spawnSpy.mockReturnValue(
 			mockSpawnResult("", "no server running on /tmp/tmux-1000/default\n", 1),
 		);
-		const state = await checkSessionState("overstory-test-coordinator");
+		const state = await checkSessionState("haru-test-coordinator");
 		expect(state).toBe("no_server");
 	});
 
 	test("returns no_server when tmux reports no sessions", async () => {
 		spawnSpy.mockReturnValue(mockSpawnResult("", "no sessions\n", 1));
-		const state = await checkSessionState("overstory-test-coordinator");
+		const state = await checkSessionState("haru-test-coordinator");
 		expect(state).toBe("no_server");
 	});
 
 	test("returns dead when session not found", async () => {
 		spawnSpy.mockReturnValue(
-			mockSpawnResult("", "can't find session: overstory-test-coordinator\n", 1),
+			mockSpawnResult("", "can't find session: haru-test-coordinator\n", 1),
 		);
-		const state = await checkSessionState("overstory-test-coordinator");
+		const state = await checkSessionState("haru-test-coordinator");
 		expect(state).toBe("dead");
 	});
 
@@ -911,7 +911,7 @@ describe("checkSessionState", () => {
 		spawnSpy.mockReturnValue(
 			mockSpawnResult("", "error connecting to /tmp/tmux-1000/default\n", 1),
 		);
-		const state = await checkSessionState("overstory-test-coordinator");
+		const state = await checkSessionState("haru-test-coordinator");
 		expect(state).toBe("no_server");
 	});
 });
@@ -930,7 +930,7 @@ describe("sendKeys", () => {
 	test("passes correct args to tmux send-keys", async () => {
 		spawnSpy.mockImplementation(() => mockSpawnResult("", "", 0));
 
-		await sendKeys("overstory-auth", "echo hello world");
+		await sendKeys("haru-auth", "echo hello world");
 
 		expect(spawnSpy).toHaveBeenCalledTimes(1);
 		const callArgs = spawnSpy.mock.calls[0] as unknown[];
@@ -939,7 +939,7 @@ describe("sendKeys", () => {
 			"tmux",
 			"send-keys",
 			"-t",
-			"overstory-auth:^.{top-left}",
+			"haru-auth:^.{top-left}",
 			"echo hello world",
 			"Enter",
 		]);
@@ -948,7 +948,7 @@ describe("sendKeys", () => {
 	test("flattens newlines in keys to spaces", async () => {
 		spawnSpy.mockImplementation(() => mockSpawnResult("", "", 0));
 
-		await sendKeys("overstory-agent", "line1\nline2\nline3");
+		await sendKeys("haru-agent", "line1\nline2\nline3");
 
 		expect(spawnSpy).toHaveBeenCalledTimes(1);
 		const callArgs = spawnSpy.mock.calls[0] as unknown[];
@@ -957,7 +957,7 @@ describe("sendKeys", () => {
 			"tmux",
 			"send-keys",
 			"-t",
-			"overstory-agent:^.{top-left}",
+			"haru-agent:^.{top-left}",
 			"line1 line2 line3",
 			"Enter",
 		]);
@@ -986,7 +986,7 @@ describe("sendKeys", () => {
 	test("sends Enter with empty string (follow-up submission)", async () => {
 		spawnSpy.mockImplementation(() => mockSpawnResult("", "", 0));
 
-		await sendKeys("overstory-agent", "");
+		await sendKeys("haru-agent", "");
 
 		expect(spawnSpy).toHaveBeenCalledTimes(1);
 		const callArgs = spawnSpy.mock.calls[0] as unknown[];
@@ -995,7 +995,7 @@ describe("sendKeys", () => {
 			"tmux",
 			"send-keys",
 			"-t",
-			"overstory-agent:^.{top-left}",
+			"haru-agent:^.{top-left}",
 			"",
 			"Enter",
 		]);
@@ -1005,21 +1005,21 @@ describe("sendKeys", () => {
 		spawnSpy.mockImplementation(() =>
 			mockSpawnResult("", "no server running on /tmp/tmux-0/default\n", 1),
 		);
-		await expect(sendKeys("overstory-agent-fake", "hello")).rejects.toThrow(
+		await expect(sendKeys("haru-agent-fake", "hello")).rejects.toThrow(
 			/Tmux server is not running/,
 		);
 	});
 
 	test("throws descriptive error when session not found", async () => {
 		spawnSpy.mockImplementation(() =>
-			mockSpawnResult("", "cant find session: overstory-agent-fake\n", 1),
+			mockSpawnResult("", "cant find session: haru-agent-fake\n", 1),
 		);
-		await expect(sendKeys("overstory-agent-fake", "hello")).rejects.toThrow(/does not exist/);
+		await expect(sendKeys("haru-agent-fake", "hello")).rejects.toThrow(/does not exist/);
 	});
 
 	test("throws generic error for other failures", async () => {
 		spawnSpy.mockImplementation(() => mockSpawnResult("", "some other error\n", 1));
-		await expect(sendKeys("overstory-agent-fake", "hello")).rejects.toThrow(/Failed to send keys/);
+		await expect(sendKeys("haru-agent-fake", "hello")).rejects.toThrow(/Failed to send keys/);
 	});
 
 	test("retries on transient 'can't find pane' error", async () => {
@@ -1034,7 +1034,7 @@ describe("sendKeys", () => {
 			return mockSpawnResult("", "", 0);
 		});
 
-		await sendKeys("overstory-retry-agent", "hello world");
+		await sendKeys("haru-retry-agent", "hello world");
 		expect(spawnSpy).toHaveBeenCalledTimes(2);
 	});
 
@@ -1049,7 +1049,7 @@ describe("sendKeys", () => {
 	test("throws after exhausting retries on transient error", async () => {
 		spawnSpy.mockImplementation(() => mockSpawnResult("", "can't find pane\n", 1));
 
-		await expect(sendKeys("overstory-exhaust", "hello", 2)).rejects.toThrow(/not found after/);
+		await expect(sendKeys("haru-exhaust", "hello", 2)).rejects.toThrow(/not found after/);
 		// Initial + 2 retries = 3 calls
 		expect(spawnSpy).toHaveBeenCalledTimes(3);
 	});
@@ -1069,7 +1069,7 @@ describe("capturePaneContent", () => {
 	test("returns trimmed content on success", async () => {
 		spawnSpy.mockImplementation(() => mockSpawnResult("  Welcome to Claude Code!  \n\n", "", 0));
 
-		const content = await capturePaneContent("overstory-agent");
+		const content = await capturePaneContent("haru-agent");
 
 		expect(content).toBe("Welcome to Claude Code!");
 	});
@@ -1161,7 +1161,7 @@ describe("waitForTuiReady", () => {
 			mockSpawnResult('Try "help" to get started\nbypass permissions', "", 0),
 		);
 
-		const ready = await waitForTuiReady("overstory-agent", claudeDetectReady, 5_000, 500);
+		const ready = await waitForTuiReady("haru-agent", claudeDetectReady, 5_000, 500);
 
 		expect(ready).toBe(true);
 		// Should not have needed to sleep (content found on first poll)
@@ -1185,7 +1185,7 @@ describe("waitForTuiReady", () => {
 			return mockSpawnResult("", "", 0);
 		});
 
-		const ready = await waitForTuiReady("overstory-agent", claudeDetectReady, 10_000, 500);
+		const ready = await waitForTuiReady("haru-agent", claudeDetectReady, 10_000, 500);
 
 		expect(ready).toBe(true);
 		// Should have slept 3 times (3 empty capture-pane polls before content appeared)
@@ -1196,7 +1196,7 @@ describe("waitForTuiReady", () => {
 		// Pane always empty
 		spawnSpy.mockImplementation(() => mockSpawnResult("", "", 0));
 
-		const ready = await waitForTuiReady("overstory-agent", claudeDetectReady, 2_000, 500);
+		const ready = await waitForTuiReady("haru-agent", claudeDetectReady, 2_000, 500);
 
 		expect(ready).toBe(false);
 		// 2000ms / 500ms = 4 polls, 4 sleeps
@@ -1215,7 +1215,7 @@ describe("waitForTuiReady", () => {
 		// Return content immediately with both indicators
 		spawnSpy.mockImplementation(() => mockSpawnResult('Try "help"\nshift+tab', "", 0));
 
-		const ready = await waitForTuiReady("overstory-agent", claudeDetectReady);
+		const ready = await waitForTuiReady("haru-agent", claudeDetectReady);
 
 		expect(ready).toBe(true);
 	});
@@ -1271,7 +1271,7 @@ describe("waitForTuiReady", () => {
 			return mockSpawnResult("", "", 0);
 		});
 
-		const ready = await waitForTuiReady("overstory-agent", claudeDetectReady, 1_000, 500);
+		const ready = await waitForTuiReady("haru-agent", claudeDetectReady, 1_000, 500);
 
 		expect(ready).toBe(false);
 	});
@@ -1287,7 +1287,7 @@ describe("waitForTuiReady", () => {
 			return mockSpawnResult("", "", 0);
 		});
 
-		const ready = await waitForTuiReady("overstory-agent", claudeDetectReady, 1_000, 500);
+		const ready = await waitForTuiReady("haru-agent", claudeDetectReady, 1_000, 500);
 
 		expect(ready).toBe(false);
 	});
@@ -1309,7 +1309,7 @@ describe("waitForTuiReady", () => {
 			return mockSpawnResult("", "", 0);
 		});
 
-		const ready = await waitForTuiReady("overstory-agent", claudeDetectReady, 10_000, 500);
+		const ready = await waitForTuiReady("haru-agent", claudeDetectReady, 10_000, 500);
 
 		expect(ready).toBe(true);
 		// Should have slept at least twice (2 polls with only prompt before both appeared)
@@ -1338,7 +1338,7 @@ describe("waitForTuiReady", () => {
 			return mockSpawnResult("", "", 0);
 		});
 
-		const ready = await waitForTuiReady("overstory-agent", claudeDetectReady, 10_000, 500);
+		const ready = await waitForTuiReady("haru-agent", claudeDetectReady, 10_000, 500);
 
 		expect(ready).toBe(true);
 		// sendKeys should have been called once to confirm the trust dialog
@@ -1348,7 +1348,7 @@ describe("waitForTuiReady", () => {
 			"tmux",
 			"send-keys",
 			"-t",
-			"overstory-agent:^.{top-left}",
+			"haru-agent:^.{top-left}",
 			"",
 			"Enter",
 		]);
@@ -1377,7 +1377,7 @@ describe("waitForTuiReady", () => {
 			return mockSpawnResult("", "", 0);
 		});
 
-		const ready = await waitForTuiReady("overstory-agent", claudeDetectReady, 10_000, 500);
+		const ready = await waitForTuiReady("haru-agent", claudeDetectReady, 10_000, 500);
 
 		expect(ready).toBe(true);
 		expect(sendKeysCalls).toHaveLength(2);
@@ -1385,14 +1385,14 @@ describe("waitForTuiReady", () => {
 			"tmux",
 			"send-keys",
 			"-t",
-			"overstory-agent:^.{top-left}",
+			"haru-agent:^.{top-left}",
 			"2",
 		]);
 		expect(sendKeysCalls[1]).toEqual([
 			"tmux",
 			"send-keys",
 			"-t",
-			"overstory-agent:^.{top-left}",
+			"haru-agent:^.{top-left}",
 			"",
 			"Enter",
 		]);
@@ -1421,7 +1421,7 @@ describe("waitForTuiReady", () => {
 			return mockSpawnResult("", "", 0);
 		});
 
-		const ready = await waitForTuiReady("overstory-agent", claudeDetectReady, 10_000, 500);
+		const ready = await waitForTuiReady("haru-agent", claudeDetectReady, 10_000, 500);
 
 		expect(ready).toBe(true);
 		expect(sendKeysCalls).toHaveLength(4);
@@ -1429,14 +1429,14 @@ describe("waitForTuiReady", () => {
 			"tmux",
 			"send-keys",
 			"-t",
-			"overstory-agent:^.{top-left}",
+			"haru-agent:^.{top-left}",
 			"2",
 		]);
 		expect(sendKeysCalls[1]).toEqual([
 			"tmux",
 			"send-keys",
 			"-t",
-			"overstory-agent:^.{top-left}",
+			"haru-agent:^.{top-left}",
 			"",
 			"Enter",
 		]);
@@ -1444,14 +1444,14 @@ describe("waitForTuiReady", () => {
 			"tmux",
 			"send-keys",
 			"-t",
-			"overstory-agent:^.{top-left}",
+			"haru-agent:^.{top-left}",
 			"2",
 		]);
 		expect(sendKeysCalls[3]).toEqual([
 			"tmux",
 			"send-keys",
 			"-t",
-			"overstory-agent:^.{top-left}",
+			"haru-agent:^.{top-left}",
 			"",
 			"Enter",
 		]);
@@ -1479,7 +1479,7 @@ describe("waitForTuiReady", () => {
 			return mockSpawnResult("", "", 0);
 		});
 
-		const ready = await waitForTuiReady("overstory-agent", claudeDetectReady, 10_000, 500);
+		const ready = await waitForTuiReady("haru-agent", claudeDetectReady, 10_000, 500);
 
 		expect(ready).toBe(true);
 		// sendKeys must be called exactly once — dialogHandled prevents duplicate Enter sends

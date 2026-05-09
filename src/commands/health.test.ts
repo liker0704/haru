@@ -1,5 +1,5 @@
 /**
- * Tests for `ov health`.
+ * Tests for `ha health`.
  *
  * Tests executeHealth() directly to avoid spawning CLI processes.
  * Uses a temp directory with a minimal .overstory/ structure so loadConfig()

@@ -1,7 +1,7 @@
-.mulch/expertise/*.jsonl merge=union
+.kura/expertise/*.jsonl merge=union
 
-.seeds/issues.jsonl merge=union
-.seeds/templates.jsonl merge=union
+.suji/issues.jsonl merge=union
+.suji/templates.jsonl merge=union
 
-.canopy/prompts.jsonl merge=union
-.canopy/schemas.jsonl merge=union
+.tane/prompts.jsonl merge=union
+.tane/schemas.jsonl merge=union

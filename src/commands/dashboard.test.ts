@@ -1,5 +1,5 @@
 /**
- * Tests for overstory dashboard command.
+ * Tests for haru dashboard command.
  *
  * We only test help output and validation since the dashboard runs an infinite
  * polling loop. The actual rendering cannot be tested without complex mocking
@@ -488,7 +488,7 @@ describe("renderAgentPanel", () => {
 						capability: "builder",
 						runtime: "claude",
 						worktreePath: "/tmp/wt/headless",
-						branchName: "overstory/headless/task-1",
+						branchName: "haru/headless/task-1",
 						taskId: "task-h1",
 						tmuxSession: "", // headless
 						state: "working" as const,
@@ -533,7 +533,7 @@ describe("renderAgentPanel", () => {
 						capability: "builder",
 						runtime: "claude",
 						worktreePath: "/tmp/wt/dead-headless",
-						branchName: "overstory/dead-headless/task-2",
+						branchName: "haru/dead-headless/task-2",
 						taskId: "task-h2",
 						tmuxSession: "", // headless
 						state: "working" as const,

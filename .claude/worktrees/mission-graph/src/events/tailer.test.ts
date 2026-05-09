@@ -23,7 +23,7 @@ import { findLatestStdoutLog, startEventTailer } from "./tailer.ts";
 
 /** Create a temp directory to use as a fake .overstory/ root. */
 async function createTempDir(): Promise<string> {
-	return mkdtemp(join(tmpdir(), "overstory-tailer-test-"));
+	return mkdtemp(join(tmpdir(), "haru-tailer-test-"));
 }
 
 /**

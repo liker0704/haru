@@ -1,5 +1,5 @@
 /**
- * CLI command: ov supervisor start|stop|status
+ * CLI command: ha supervisor start|stop|status
  *
  * Manages per-project supervisor agent lifecycle. The supervisor is a persistent
  * agent that runs at the project root (NOT in a worktree), assigned to a specific
@@ -54,7 +54,7 @@ export function buildSupervisorBeacon(opts: {
 	const parts = [
 		`[OVERSTORY] ${opts.name} (supervisor) ${timestamp} task:${opts.taskId}`,
 		`Depth: ${opts.depth} | Parent: ${opts.parent} | Role: per-project supervisor`,
-		`Startup: run mulch prime, check mail (ov mail check --agent ${opts.name}), read task (${cli} show ${opts.taskId}), then begin supervising`,
+		`Startup: run mulch prime, check mail (ha mail check --agent ${opts.name}), read task (${cli} show ${opts.taskId}), then begin supervising`,
 	];
 	return parts.join(" — ");
 }
@@ -94,7 +94,7 @@ async function startSupervisor(opts: {
 
 	if (isRunningAsRoot()) {
 		throw new AgentError(
-			"Cannot spawn agents as root (UID 0). The claude CLI rejects --permission-mode bypassPermissions when run as root, causing the tmux session to die immediately. Run overstory as a non-root user.",
+			"Cannot spawn agents as root (UID 0). The claude CLI rejects --permission-mode bypassPermissions when run as root, causing the tmux session to die immediately. Run haru as a non-root user.",
 		);
 	}
 
@@ -169,8 +169,8 @@ async function startSupervisor(opts: {
 
 		// Spawn tmux session at project root with Claude Code (interactive mode).
 		// Inject the supervisor base definition via --append-system-prompt.
-		// Pass file path (not content) to avoid tmux "command too long" (overstory#45).
-		const tmuxSession = `overstory-${config.project.name}-supervisor-${opts.name}`;
+		// Pass file path (not content) to avoid tmux "command too long" (haru#45).
+		const tmuxSession = `haru-${config.project.name}-supervisor-${opts.name}`;
 		const agentDefPath = join(projectRoot, ".overstory", "agent-defs", "supervisor.md");
 		const agentDefFile = Bun.file(agentDefPath);
 		let appendSystemPromptFile: string | undefined;
@@ -186,14 +186,14 @@ async function startSupervisor(opts: {
 			appendSystemPromptFile,
 			env: {
 				...runtime.buildEnv(resolvedModel),
-				OVERSTORY_AGENT_NAME: opts.name,
-				OVERSTORY_TASK_ID: opts.task,
+				HARU_AGENT_NAME: opts.name,
+				HARU_TASK_ID: opts.task,
 			},
 		});
 		const pid = await createSession(tmuxSession, projectRoot, spawnCmd, {
 			...runtime.buildEnv(resolvedModel),
-			OVERSTORY_AGENT_NAME: opts.name,
-			OVERSTORY_TASK_ID: opts.task,
+			HARU_AGENT_NAME: opts.name,
+			HARU_TASK_ID: opts.task,
 		});
 
 		// Wait for Claude Code TUI to render before sending input
@@ -453,7 +453,7 @@ async function statusSupervisor(opts: { name?: string; json: boolean }): Promise
 }
 
 /**
- * Create the Commander command for `ov supervisor`.
+ * Create the Commander command for `ha supervisor`.
  */
 export function createSupervisorCommand(): Command {
 	const cmd = new Command("supervisor").description("[DEPRECATED] Per-project supervisor agent");
@@ -475,7 +475,7 @@ export function createSupervisorCommand(): Command {
 				json?: boolean;
 			}) => {
 				console.error(
-					"[DEPRECATED] ov supervisor is deprecated. Use 'ov sling --capability lead' instead.",
+					"[DEPRECATED] ha supervisor is deprecated. Use 'ha sling --capability lead' instead.",
 				);
 				await startSupervisor({
 					task: opts.task,
@@ -509,7 +509,7 @@ export function createSupervisorCommand(): Command {
 }
 
 /**
- * Entry point for `ov supervisor <subcommand>`.
+ * Entry point for `ha supervisor <subcommand>`.
  */
 export async function supervisorCommand(args: string[]): Promise<void> {
 	const cmd = createSupervisorCommand();

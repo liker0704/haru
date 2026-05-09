@@ -281,10 +281,10 @@ describe("PiRuntime", () => {
 				"",
 				"[Extensions]",
 				"  project",
-				"    overstory-guard.ts",
+				"    haru-guard.ts",
 				"",
 				"────────────────────────────────",
-				"~/Projects/os-eco/overstory (main)",
+				"~/Projects/os-eco/haru (main)",
 				"0.0%/200k (auto)         (anthropic) claude-opus-4-6 • high",
 			].join("\n");
 			const state = runtime.detectReady(pane);
@@ -340,8 +340,8 @@ describe("PiRuntime", () => {
 		test("result is safe to spread", () => {
 			const model: ResolvedModel = { model: "sonnet" };
 			const env = runtime.buildEnv(model);
-			const combined = { ...env, OVERSTORY_AGENT_NAME: "builder-1" };
-			expect(combined).toEqual({ OVERSTORY_AGENT_NAME: "builder-1" });
+			const combined = { ...env, HARU_AGENT_NAME: "builder-1" };
+			expect(combined).toEqual({ HARU_AGENT_NAME: "builder-1" });
 		});
 	});
 
@@ -349,7 +349,7 @@ describe("PiRuntime", () => {
 		let tempDir: string;
 
 		beforeEach(async () => {
-			tempDir = await mkdtemp(join(tmpdir(), "overstory-pi-test-"));
+			tempDir = await mkdtemp(join(tmpdir(), "haru-pi-test-"));
 		});
 
 		afterEach(async () => {
@@ -370,7 +370,7 @@ describe("PiRuntime", () => {
 			expect(content).toBe("# Pi Agent Overlay\nThis is the overlay content.");
 		});
 
-		test("deploys guard extension to .pi/extensions/overstory-guard.ts", async () => {
+		test("deploys guard extension to .pi/extensions/haru-guard.ts", async () => {
 			const worktreePath = join(tempDir, "worktree");
 
 			await runtime.deployConfig(
@@ -379,7 +379,7 @@ describe("PiRuntime", () => {
 				{ agentName: "test-builder", capability: "builder", worktreePath },
 			);
 
-			const guardPath = join(worktreePath, ".pi", "extensions", "overstory-guard.ts");
+			const guardPath = join(worktreePath, ".pi", "extensions", "haru-guard.ts");
 			const exists = await Bun.file(guardPath).exists();
 			expect(exists).toBe(true);
 		});
@@ -393,7 +393,7 @@ describe("PiRuntime", () => {
 				{ agentName: "my-pi-agent", capability: "builder", worktreePath },
 			);
 
-			const guardPath = join(worktreePath, ".pi", "extensions", "overstory-guard.ts");
+			const guardPath = join(worktreePath, ".pi", "extensions", "haru-guard.ts");
 			const content = await Bun.file(guardPath).text();
 			expect(content).toContain("my-pi-agent");
 			expect(content).toContain(worktreePath);
@@ -469,7 +469,7 @@ describe("PiRuntime", () => {
 				worktreePath,
 			});
 
-			const guardPath = join(worktreePath, ".pi", "extensions", "overstory-guard.ts");
+			const guardPath = join(worktreePath, ".pi", "extensions", "haru-guard.ts");
 			const settingsPath = join(worktreePath, ".pi", "settings.json");
 
 			expect(await Bun.file(guardPath).exists()).toBe(true);
@@ -487,7 +487,7 @@ describe("PiRuntime", () => {
 
 			const claudeMdExists = await Bun.file(join(worktreePath, ".claude", "CLAUDE.md")).exists();
 			const guardExists = await Bun.file(
-				join(worktreePath, ".pi", "extensions", "overstory-guard.ts"),
+				join(worktreePath, ".pi", "extensions", "haru-guard.ts"),
 			).exists();
 			const settingsExists = await Bun.file(join(worktreePath, ".pi", "settings.json")).exists();
 
@@ -501,7 +501,7 @@ describe("PiRuntime", () => {
 		let tempDir: string;
 
 		beforeEach(async () => {
-			tempDir = await mkdtemp(join(tmpdir(), "overstory-pi-transcript-test-"));
+			tempDir = await mkdtemp(join(tmpdir(), "haru-pi-transcript-test-"));
 		});
 
 		afterEach(async () => {

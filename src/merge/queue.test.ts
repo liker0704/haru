@@ -12,7 +12,7 @@ describe("createMergeQueue", () => {
 	let queuePath: string;
 
 	beforeEach(async () => {
-		tempDir = await mkdtemp(join(tmpdir(), "overstory-merge-queue-test-"));
+		tempDir = await mkdtemp(join(tmpdir(), "haru-merge-queue-test-"));
 		// The database file should NOT exist initially — createMergeQueue handles this
 		queuePath = join(tempDir, "merge-queue.db");
 	});
@@ -31,7 +31,7 @@ describe("createMergeQueue", () => {
 		}>,
 	) {
 		return {
-			branchName: overrides?.branchName ?? "overstory/test-agent/bead-123",
+			branchName: overrides?.branchName ?? "haru/test-agent/bead-123",
 			taskId: overrides?.taskId ?? "bead-123",
 			agentName: overrides?.agentName ?? "test-agent",
 			filesModified: overrides?.filesModified ?? ["src/test.ts"],
@@ -54,7 +54,7 @@ describe("createMergeQueue", () => {
 			const entry = queue.enqueue(makeInput());
 			const after = new Date().toISOString();
 
-			expect(entry.branchName).toBe("overstory/test-agent/bead-123");
+			expect(entry.branchName).toBe("haru/test-agent/bead-123");
 			expect(entry.taskId).toBe("bead-123");
 			expect(entry.agentName).toBe("test-agent");
 			expect(entry.filesModified).toEqual(["src/test.ts"]);
@@ -67,7 +67,7 @@ describe("createMergeQueue", () => {
 		test("preserves all input fields on the returned entry", () => {
 			const queue = createMergeQueue(queuePath);
 			const input = makeInput({
-				branchName: "overstory/builder-1/bead-xyz",
+				branchName: "haru/builder-1/bead-xyz",
 				taskId: "bead-xyz",
 				agentName: "builder-1",
 				filesModified: ["src/a.ts", "src/b.ts"],
@@ -75,7 +75,7 @@ describe("createMergeQueue", () => {
 
 			const entry = queue.enqueue(input);
 
-			expect(entry.branchName).toBe("overstory/builder-1/bead-xyz");
+			expect(entry.branchName).toBe("haru/builder-1/bead-xyz");
 			expect(entry.taskId).toBe("bead-xyz");
 			expect(entry.agentName).toBe("builder-1");
 			expect(entry.filesModified).toEqual(["src/a.ts", "src/b.ts"]);
@@ -84,7 +84,7 @@ describe("createMergeQueue", () => {
 		test("persists workstreamId round-trip", () => {
 			const queue = createMergeQueue(queuePath);
 			const input = makeInput({
-				branchName: "overstory/ws1/task-1",
+				branchName: "haru/ws1/task-1",
 				workstreamId: "ws-1-foundation",
 			});
 
@@ -375,7 +375,7 @@ describe("createMergeQueue", () => {
 				)
 			`);
 			db.exec(
-				"INSERT INTO merge_queue (branch_name, bead_id, agent_name, files_modified, status, enqueued_at) VALUES ('overstory/test/bead-1', 'bead-1', 'test', '[\"src/a.ts\"]', 'pending', '2026-01-01T00:00:00.000')",
+				"INSERT INTO merge_queue (branch_name, bead_id, agent_name, files_modified, status, enqueued_at) VALUES ('haru/test/bead-1', 'bead-1', 'test', '[\"src/a.ts\"]', 'pending', '2026-01-01T00:00:00.000')",
 			);
 			db.close();
 
@@ -385,11 +385,11 @@ describe("createMergeQueue", () => {
 
 			expect(entries).toHaveLength(1);
 			expect(entries[0]?.taskId).toBe("bead-1");
-			expect(entries[0]?.branchName).toBe("overstory/test/bead-1");
+			expect(entries[0]?.branchName).toBe("haru/test/bead-1");
 
 			// New inserts should also work
 			const newEntry = queue.enqueue({
-				branchName: "overstory/test/bead-2",
+				branchName: "haru/test/bead-2",
 				taskId: "bead-2",
 				agentName: "test",
 				filesModified: ["src/b.ts"],
@@ -403,7 +403,7 @@ describe("createMergeQueue", () => {
 			// Create with current schema (has task_id)
 			const queue1 = createMergeQueue(queuePath);
 			queue1.enqueue({
-				branchName: "overstory/test/bead-1",
+				branchName: "haru/test/bead-1",
 				taskId: "bead-1",
 				agentName: "test",
 				filesModified: [],

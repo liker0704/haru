@@ -1,5 +1,5 @@
 /**
- * Tests for the `overstory spec` command.
+ * Tests for the `haru spec` command.
  *
  * Uses real filesystem (temp dirs) for all tests. No mocks.
  * Philosophy: "never mock what you can use for real" (mx-252b16).

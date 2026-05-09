@@ -24,7 +24,7 @@ import {
 let tempDir: string;
 
 beforeEach(async () => {
-	tempDir = await mkdtemp(join(tmpdir(), "overstory-artifact-staleness-test-"));
+	tempDir = await mkdtemp(join(tmpdir(), "haru-artifact-staleness-test-"));
 });
 
 afterEach(async () => {

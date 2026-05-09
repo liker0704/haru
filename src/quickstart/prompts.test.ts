@@ -92,10 +92,10 @@ describe("printWelcome", () => {
 	beforeEach(captureStart);
 	afterEach(() => captureStop());
 
-	test("includes overstory brand name", () => {
+	test("includes haru brand name", () => {
 		printWelcome();
 		const out = captureStop();
-		expect(out).toContain("overstory");
+		expect(out).toContain("haru");
 	});
 });
 

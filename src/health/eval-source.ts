@@ -45,8 +45,8 @@ export function createEvalSource(overstoryDir: string): RecommendationSource {
 						whyNow: `${failedAssertions.length} assertion(s) failed in eval run ${evalResult.runId}: ${kinds}. Failing assertions indicate the swarm is not meeting quality targets.`,
 						expectedImpact:
 							"Passing all assertions restores confidence in swarm correctness and unlocks clean eval runs.",
-						action: `Run \`ov eval show ${evalResult.runId}\` to review failed assertions and diagnose root causes.`,
-						verificationStep: `Re-run \`ov eval run\` and confirm all assertions pass.`,
+						action: `Run \`ha eval show ${evalResult.runId}\` to review failed assertions and diagnose root causes.`,
+						verificationStep: `Re-run \`ha eval run\` and confirm all assertions pass.`,
 						priority: "high",
 						factor: "eval_assertions",
 						source: "eval-results",
@@ -61,7 +61,7 @@ export function createEvalSource(overstoryDir: string): RecommendationSource {
 						title: "Investigate eval stall rate",
 						whyNow: `Eval run ${evalResult.runId} had a stall rate of ${pct}%, above the 20% threshold. High stall rates waste agent budget and slow eval runs.`,
 						expectedImpact: "Reducing stall rate improves eval throughput and lowers cost per run.",
-						action: `Run \`ov eval show ${evalResult.runId}\` and inspect stalled agents. Check watchdog thresholds and provider rate limits.`,
+						action: `Run \`ha eval show ${evalResult.runId}\` and inspect stalled agents. Check watchdog thresholds and provider rate limits.`,
 						verificationStep: "Re-run eval and confirm stall rate drops below 20%.",
 						priority: "medium",
 						factor: "eval_stall_rate",
@@ -77,7 +77,7 @@ export function createEvalSource(overstoryDir: string): RecommendationSource {
 						whyNow: `Eval run ${evalResult.runId} timed out before completing. Timeouts prevent full assertion coverage and may mask regressions.`,
 						expectedImpact:
 							"Completing eval runs within timeout ensures full assertion coverage and reliable quality signals.",
-						action: `Run \`ov eval show ${evalResult.runId}\` to identify slow agents. Consider increasing eval timeout or reducing scenario complexity.`,
+						action: `Run \`ha eval show ${evalResult.runId}\` to identify slow agents. Consider increasing eval timeout or reducing scenario complexity.`,
 						verificationStep: "Re-run eval and confirm it completes within the timeout.",
 						priority: "high",
 						factor: "eval_timeout",
@@ -94,9 +94,9 @@ export function createEvalSource(overstoryDir: string): RecommendationSource {
 						expectedImpact:
 							"Eliminating file scope overlaps reduces merge conflicts and speeds the merge pipeline.",
 						action:
-							"Review agent file scopes in the eval scenario for overlap. Use `ov worktree list` to identify concurrent agents editing the same files.",
+							"Review agent file scopes in the eval scenario for overlap. Use `ha worktree list` to identify concurrent agents editing the same files.",
 						verificationStep:
-							"Re-run eval and confirm merge conflict count is 0. Check merge_quality factor in `ov health`.",
+							"Re-run eval and confirm merge conflict count is 0. Check merge_quality factor in `ha health`.",
 						priority: "medium",
 						factor: "eval_merge_conflicts",
 						source: "eval-results",

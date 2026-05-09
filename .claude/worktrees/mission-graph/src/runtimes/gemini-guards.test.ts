@@ -140,7 +140,7 @@ describe("generateGeminiHooks", () => {
 			const result = generateGeminiHooks(builderHooks);
 			const shellEntries = h(result, "BeforeTool").filter((e) => e.matcher === "run_shell_command");
 			const hasBoundaryGuard = shellEntries.some((e) =>
-				e.hooks.some((hook) => hook.command.includes("OVERSTORY_WORKTREE_PATH")),
+				e.hooks.some((hook) => hook.command.includes("HARU_WORKTREE_PATH")),
 			);
 			expect(hasBoundaryGuard).toBe(true);
 		});
@@ -156,13 +156,13 @@ describe("generateGeminiHooks", () => {
 	});
 
 	describe("lifecycle hooks", () => {
-		test("SessionStart runs ov prime and ov mail check", () => {
+		test("SessionStart runs ha prime and ha mail check", () => {
 			const result = generateGeminiHooks(builderHooks);
 			const commands = h(result, "SessionStart").flatMap((e) =>
 				e.hooks.map((hook) => hook.command),
 			);
-			expect(commands.some((c) => c.includes("ov prime --agent test-builder"))).toBe(true);
-			expect(commands.some((c) => c.includes("ov mail check --inject --agent test-builder"))).toBe(
+			expect(commands.some((c) => c.includes("ha prime --agent test-builder"))).toBe(true);
+			expect(commands.some((c) => c.includes("ha mail check --inject --agent test-builder"))).toBe(
 				true,
 			);
 		});
@@ -170,20 +170,20 @@ describe("generateGeminiHooks", () => {
 		test("BeforeAgent runs mail check", () => {
 			const result = generateGeminiHooks(builderHooks);
 			const commands = h(result, "BeforeAgent").flatMap((e) => e.hooks.map((hook) => hook.command));
-			expect(commands.some((c) => c.includes("ov mail check --inject"))).toBe(true);
+			expect(commands.some((c) => c.includes("ha mail check --inject"))).toBe(true);
 		});
 
 		test("SessionEnd runs session-end log and ml learn", () => {
 			const result = generateGeminiHooks(builderHooks);
 			const commands = h(result, "SessionEnd").flatMap((e) => e.hooks.map((hook) => hook.command));
-			expect(commands.some((c) => c.includes("ov log session-end"))).toBe(true);
+			expect(commands.some((c) => c.includes("ha log session-end"))).toBe(true);
 			expect(commands.some((c) => c.includes("ml learn"))).toBe(true);
 		});
 
-		test("PreCompress runs ov prime --compact", () => {
+		test("PreCompress runs ha prime --compact", () => {
 			const result = generateGeminiHooks(builderHooks);
 			const commands = h(result, "PreCompress").flatMap((e) => e.hooks.map((hook) => hook.command));
-			expect(commands.some((c) => c.includes("ov prime --agent test-builder --compact"))).toBe(
+			expect(commands.some((c) => c.includes("ha prime --agent test-builder --compact"))).toBe(
 				true,
 			);
 		});
@@ -192,14 +192,14 @@ describe("generateGeminiHooks", () => {
 			const result = generateGeminiHooks(builderHooks);
 			const wildcardEntries = h(result, "BeforeTool").filter((e) => !e.matcher);
 			const commands = wildcardEntries.flatMap((e) => e.hooks.map((hook) => hook.command));
-			expect(commands.some((c) => c.includes("ov log tool-start"))).toBe(true);
+			expect(commands.some((c) => c.includes("ha log tool-start"))).toBe(true);
 		});
 
 		test("AfterTool includes tool-end logging and mail check", () => {
 			const result = generateGeminiHooks(builderHooks);
 			const commands = h(result, "AfterTool").flatMap((e) => e.hooks.map((hook) => hook.command));
-			expect(commands.some((c) => c.includes("ov log tool-end"))).toBe(true);
-			expect(commands.some((c) => c.includes("ov mail check --inject"))).toBe(true);
+			expect(commands.some((c) => c.includes("ha log tool-end"))).toBe(true);
+			expect(commands.some((c) => c.includes("ha mail check --inject"))).toBe(true);
 		});
 	});
 
@@ -235,7 +235,7 @@ describe("generateGeminiHooks", () => {
 			const result = generateGeminiHooks(builderHooks);
 			const shellEntries = h(result, "BeforeTool").filter((e) => e.matcher === "run_shell_command");
 			const hasBranchGuard = shellEntries.some((e) =>
-				e.hooks.some((hook) => hook.command.includes("overstory/test-builder/")),
+				e.hooks.some((hook) => hook.command.includes("haru/test-builder/")),
 			);
 			expect(hasBranchGuard).toBe(true);
 		});
@@ -246,7 +246,7 @@ describe("generateGeminiHooks", () => {
 			const result = generateGeminiHooks(builderHooks);
 			const shellEntries = h(result, "BeforeTool").filter((e) => e.matcher === "run_shell_command");
 			const hasTrackerGuard = shellEntries.some((e) =>
-				e.hooks.some((hook) => hook.command.includes("OVERSTORY_TASK_ID")),
+				e.hooks.some((hook) => hook.command.includes("HARU_TASK_ID")),
 			);
 			expect(hasTrackerGuard).toBe(true);
 		});

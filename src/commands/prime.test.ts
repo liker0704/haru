@@ -7,7 +7,7 @@ import type { AgentSession } from "../types.ts";
 import { loadCachedProjectContext, primeCommand, renderCompactContext } from "./prime.ts";
 
 /**
- * Tests for `overstory prime` command.
+ * Tests for `haru prime` command.
  *
  * Uses real filesystem (temp directories) and process.stdout spy to test
  * the prime command end-to-end.
@@ -156,9 +156,9 @@ recentTasks:
 					capability: "builder",
 					runtime: "claude",
 					worktreePath: join(tempDir, ".overstory", "worktrees", "active-builder"),
-					branchName: "overstory/active-builder/task-001",
+					branchName: "haru/active-builder/task-001",
 					taskId: "task-001",
-					tmuxSession: "overstory-active-builder",
+					tmuxSession: "haru-active-builder",
 					state: "working",
 					pid: 12345,
 					parentAgent: null,
@@ -199,9 +199,9 @@ recentTasks:
 					capability: "builder",
 					runtime: "claude",
 					worktreePath: join(tempDir, ".overstory", "worktrees", "completed-builder"),
-					branchName: "overstory/completed-builder/task-002",
+					branchName: "haru/completed-builder/task-002",
 					taskId: "task-002",
-					tmuxSession: "overstory-completed-builder",
+					tmuxSession: "haru-completed-builder",
 					state: "completed",
 					pid: null,
 					parentAgent: null,
@@ -245,7 +245,7 @@ recentTasks:
 						timestamp: new Date().toISOString(),
 						progressSummary: "Implemented initial tests for prime command",
 						filesModified: ["src/commands/prime.test.ts"],
-						currentBranch: "overstory/recovery-agent/task-003",
+						currentBranch: "haru/recovery-agent/task-003",
 						pendingWork: "Add tests for edge cases",
 						mulchDomains: ["typescript", "testing"],
 					},
@@ -274,7 +274,7 @@ recentTasks: []
 			expect(out).toContain("Progress so far:** Implemented initial tests for prime command");
 			expect(out).toContain("Files modified:** src/commands/prime.test.ts");
 			expect(out).toContain("Pending work:** Add tests for edge cases");
-			expect(out).toContain("Branch:** overstory/recovery-agent/task-003");
+			expect(out).toContain("Branch:** haru/recovery-agent/task-003");
 		});
 
 		test("--compact skips Expertise section", async () => {
@@ -368,7 +368,7 @@ recentTasks: []
 
 	describe("Gitignore auto-heal", () => {
 		const expectedGitignore = `# Wildcard+whitelist: ignore everything, whitelist tracked files
-# Auto-healed by ov prime on each session start
+# Auto-healed by ha prime on each session start
 *
 !.gitignore
 !config.yaml
@@ -420,7 +420,7 @@ sessions.db
 		});
 
 		test("does not overwrite .overstory/.gitignore if already correct", async () => {
-			// Write the correct OVERSTORY_GITIGNORE content
+			// Write the correct HARU_GITIGNORE content
 			const gitignorePath = join(tempDir, ".overstory", ".gitignore");
 			await Bun.write(gitignorePath, expectedGitignore);
 
@@ -586,9 +586,9 @@ describe("primeCommand --audience option", () => {
 				capability: "builder",
 				runtime: "claude",
 				worktreePath: join(tempDir, ".overstory", "worktrees", "aud-builder"),
-				branchName: "overstory/aud-builder/task-aud",
+				branchName: "haru/aud-builder/task-aud",
 				taskId: "task-aud",
-				tmuxSession: "overstory-aud-builder",
+				tmuxSession: "haru-aud-builder",
 				state: "working",
 				pid: 9999,
 				parentAgent: null,

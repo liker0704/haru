@@ -32,7 +32,7 @@ export const checkStructure: DoctorCheckFn = async (
 		category: "structure",
 		status: overstoryDirExists ? "pass" : "fail",
 		message: overstoryDirExists ? "Directory exists" : "Directory missing",
-		details: overstoryDirExists ? undefined : ["Run 'ov init' to create it"],
+		details: overstoryDirExists ? undefined : ["Run 'ha init' to create it"],
 		fixable: !overstoryDirExists,
 	});
 

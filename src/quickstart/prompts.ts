@@ -64,9 +64,9 @@ export function printStepResult(status: StepStatus, message: string): void {
 	}
 }
 
-/** Print the welcome banner with overstory branding. */
+/** Print the welcome banner with haru branding. */
 export function printWelcome(): void {
-	process.stdout.write(`\n${brand.bold("  overstory")}\n`);
+	process.stdout.write(`\n${brand.bold("  haru")}\n`);
 	process.stdout.write(`${muted("  Multi-agent orchestration for Claude Code")}\n\n`);
 }
 

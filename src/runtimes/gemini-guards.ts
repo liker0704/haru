@@ -1,4 +1,4 @@
-// Gemini/Qwen CLI hook generator for overstory guard deployment.
+// Gemini/Qwen CLI hook generator for haru guard deployment.
 // Generates hooks config compatible with Gemini CLI (v0.26.0+) and Qwen Code.
 //
 // Reuses guard constants from guard-rules.ts and guard generation functions from
@@ -95,8 +95,8 @@ const GEMINI_INTERACTIVE_TOOLS = ["ask_user", "enter_plan_mode"];
  */
 const GEMINI_TEAM_TOOLS = ["complete_task", "write_todos"];
 
-/** Env var guard — no-op when not running as overstory agent. */
-const ENV_GUARD = '[ -z "$OVERSTORY_AGENT_NAME" ] && exit 0;';
+/** Env var guard — no-op when not running as haru agent. */
+const ENV_GUARD = '[ -z "$HARU_AGENT_NAME" ] && exit 0;';
 
 /** Capabilities that must never modify project files. */
 const NON_IMPLEMENTATION_CAPABILITIES = new Set([
@@ -160,7 +160,7 @@ function buildGeminiBashGuardScript(agentName: string): string {
 		"read -r INPUT;",
 		'CMD=$(echo "$INPUT" | sed \'s/.*"command": *"\\([^"]*\\)".*/\\1/\');',
 		"if echo \"$CMD\" | grep -qE '\\bgit\\s+push\\b'; then",
-		'  echo \'{"decision":"deny","reason":"git push is blocked — use ov merge to integrate changes, push manually when ready"}\';',
+		'  echo \'{"decision":"deny","reason":"git push is blocked — use ha merge to integrate changes, push manually when ready"}\';',
 		"  exit 0;",
 		"fi;",
 		"if echo \"$CMD\" | grep -qE 'git\\s+reset\\s+--hard'; then",
@@ -169,8 +169,8 @@ function buildGeminiBashGuardScript(agentName: string): string {
 		"fi;",
 		"if echo \"$CMD\" | grep -qE 'git\\s+checkout\\s+-b\\s'; then",
 		`  BRANCH=$(echo "$CMD" | sed 's/.*git\\s*checkout\\s*-b\\s*\\([^ ]*\\).*/\\1/');`,
-		`  if ! echo "$BRANCH" | grep -qE '^overstory/${agentName}/'; then`,
-		`    echo '{"decision":"deny","reason":"Branch must follow overstory/${agentName}/{task-id} convention"}';`,
+		`  if ! echo "$BRANCH" | grep -qE '^haru/${agentName}/'; then`,
+		`    echo '{"decision":"deny","reason":"Branch must follow haru/${agentName}/{task-id} convention"}';`,
 		"    exit 0;",
 		"  fi;",
 		"fi;",
@@ -184,12 +184,12 @@ function buildGeminiBashGuardScript(agentName: string): string {
 function buildGeminiPathBoundaryScript(filePathField: string): string {
 	const script = [
 		ENV_GUARD,
-		'[ -z "$OVERSTORY_WORKTREE_PATH" ] && exit 0;',
+		'[ -z "$HARU_WORKTREE_PATH" ] && exit 0;',
 		"read -r INPUT;",
 		`FILE_PATH=$(echo "$INPUT" | sed -n 's/.*"${filePathField}": *"\\([^"]*\\)".*/\\1/p');`,
 		'[ -z "$FILE_PATH" ] && exit 0;',
 		'case "$FILE_PATH" in /*) ;; *) FILE_PATH="$(pwd)/$FILE_PATH" ;; esac;',
-		'case "$FILE_PATH" in "$OVERSTORY_WORKTREE_PATH"/*) exit 0 ;; "$OVERSTORY_WORKTREE_PATH") exit 0 ;; esac;',
+		'case "$FILE_PATH" in "$HARU_WORKTREE_PATH"/*) exit 0 ;; "$HARU_WORKTREE_PATH") exit 0 ;; esac;',
 		'echo \'{"decision":"deny","reason":"Path boundary violation: file is outside your assigned worktree. All writes must target files within your worktree."}\';',
 	].join(" ");
 	return script;
@@ -248,7 +248,7 @@ function buildGeminiBashPathBoundaryGuardScript(): string {
 
 	const script = [
 		ENV_GUARD,
-		'[ -z "$OVERSTORY_WORKTREE_PATH" ] && exit 0;',
+		'[ -z "$HARU_WORKTREE_PATH" ] && exit 0;',
 		"read -r INPUT;",
 		'CMD=$(echo "$INPUT" | sed \'s/.*"command": *"\\([^"]*\\)".*/\\1/\');',
 		`if ! echo "$CMD" | grep -qE '${fileModifyPattern}'; then exit 0; fi;`,
@@ -256,8 +256,8 @@ function buildGeminiBashPathBoundaryGuardScript(): string {
 		'[ -z "$PATHS" ] && exit 0;',
 		'echo "$PATHS" | while IFS= read -r P; do',
 		'  case "$P" in',
-		'    "$OVERSTORY_WORKTREE_PATH"/*) ;;',
-		'    "$OVERSTORY_WORKTREE_PATH") ;;',
+		'    "$HARU_WORKTREE_PATH"/*) ;;',
+		'    "$HARU_WORKTREE_PATH") ;;',
 		"    /dev/*) ;;",
 		"    /tmp/*) ;;",
 		'    *) echo \'{"decision":"deny","reason":"Bash path boundary violation: command targets a path outside your worktree. All file modifications must stay within your assigned worktree."}\'; exit 0; ;;',
@@ -273,20 +273,20 @@ function buildGeminiBashPathBoundaryGuardScript(): string {
 function buildGeminiTrackerCloseGuardScript(): string {
 	const script = [
 		ENV_GUARD,
-		'[ -z "$OVERSTORY_TASK_ID" ] && exit 0;',
+		'[ -z "$HARU_TASK_ID" ] && exit 0;',
 		"read -r INPUT;",
 		'CMD=$(echo "$INPUT" | sed \'s/.*"command": *"\\([^"]*\\)".*/\\1/\');',
 		"if echo \"$CMD\" | grep -qE '^\\s*(sd|bd)\\s+close\\s'; then",
 		"  ISSUE_ID=$(echo \"$CMD\" | sed -E 's/^[[:space:]]*(sd|bd)[[:space:]]+close[[:space:]]+([^ ]+).*/\\2/');",
-		'  if [ "$ISSUE_ID" != "$OVERSTORY_TASK_ID" ]; then',
-		'    echo "{\\"decision\\":\\"deny\\",\\"reason\\":\\"Cannot close issue $ISSUE_ID — agents may only close their own task ($OVERSTORY_TASK_ID). Report completion via worker_done mail to your parent instead.\\"}";',
+		'  if [ "$ISSUE_ID" != "$HARU_TASK_ID" ]; then',
+		'    echo "{\\"decision\\":\\"deny\\",\\"reason\\":\\"Cannot close issue $ISSUE_ID — agents may only close their own task ($HARU_TASK_ID). Report completion via worker_done mail to your parent instead.\\"}";',
 		"    exit 0;",
 		"  fi;",
 		"fi;",
 		"if echo \"$CMD\" | grep -qE '^\\s*(sd|bd)\\s+update\\s.*--status'; then",
 		"  ISSUE_ID=$(echo \"$CMD\" | sed -E 's/^[[:space:]]*(sd|bd)[[:space:]]+update[[:space:]]+([^ ]+).*/\\2/');",
-		'  if [ "$ISSUE_ID" != "$OVERSTORY_TASK_ID" ]; then',
-		'    echo "{\\"decision\\":\\"deny\\",\\"reason\\":\\"Cannot update issue $ISSUE_ID — agents may only update their own task ($OVERSTORY_TASK_ID).\\"}";',
+		'  if [ "$ISSUE_ID" != "$HARU_TASK_ID" ]; then',
+		'    echo "{\\"decision\\":\\"deny\\",\\"reason\\":\\"Cannot update issue $ISSUE_ID — agents may only update their own task ($HARU_TASK_ID).\\"}";',
 		"    exit 0;",
 		"  fi;",
 		"fi;",
@@ -339,7 +339,7 @@ export function generateGeminiHooks(
 		beforeToolGuards.push(
 			denyGuard(
 				tool,
-				`${tool} requires human interaction — agents run non-interactively. Use ov mail (--type question) to escalate`,
+				`${tool} requires human interaction — agents run non-interactively. Use ha mail (--type question) to escalate`,
 			),
 		);
 	}
@@ -349,7 +349,7 @@ export function generateGeminiHooks(
 		beforeToolGuards.push(
 			denyGuard(
 				tool,
-				`Overstory agents must use 'ov sling' for delegation — ${tool} is not allowed`,
+				`Overstory agents must use 'ha sling' for delegation — ${tool} is not allowed`,
 			),
 		);
 	}
@@ -402,11 +402,11 @@ export function generateGeminiHooks(
 			hooks: [
 				{
 					type: "command",
-					command: `${PATH_PREFIX} ${ENV_GUARD} ov prime --agent ${agentName}`,
+					command: `${PATH_PREFIX} ${ENV_GUARD} ha prime --agent ${agentName}`,
 				},
 				{
 					type: "command",
-					command: `${PATH_PREFIX} ${ENV_GUARD} ov mail check --inject --agent ${agentName}`,
+					command: `${PATH_PREFIX} ${ENV_GUARD} ha mail check --inject --agent ${agentName}`,
 				},
 			],
 		},
@@ -417,7 +417,7 @@ export function generateGeminiHooks(
 			hooks: [
 				{
 					type: "command",
-					command: `${PATH_PREFIX} ${ENV_GUARD} ov mail check --inject --agent ${agentName}`,
+					command: `${PATH_PREFIX} ${ENV_GUARD} ha mail check --inject --agent ${agentName}`,
 				},
 			],
 		},
@@ -429,7 +429,7 @@ export function generateGeminiHooks(
 			hooks: [
 				{
 					type: "command",
-					command: `${PATH_PREFIX} ${ENV_GUARD} ov log tool-start --agent ${agentName} --stdin`,
+					command: `${PATH_PREFIX} ${ENV_GUARD} ha log tool-start --agent ${agentName} --stdin`,
 				},
 			],
 		},
@@ -441,11 +441,11 @@ export function generateGeminiHooks(
 			hooks: [
 				{
 					type: "command",
-					command: `${PATH_PREFIX} ${ENV_GUARD} ov log tool-end --agent ${agentName} --stdin`,
+					command: `${PATH_PREFIX} ${ENV_GUARD} ha log tool-end --agent ${agentName} --stdin`,
 				},
 				{
 					type: "command",
-					command: `${PATH_PREFIX} ${ENV_GUARD} ov mail check --inject --agent ${agentName} --debounce 500`,
+					command: `${PATH_PREFIX} ${ENV_GUARD} ha mail check --inject --agent ${agentName} --debounce 500`,
 				},
 			],
 		},
@@ -453,7 +453,7 @@ export function generateGeminiHooks(
 			hooks: [
 				{
 					type: "command",
-					command: `${PATH_PREFIX} ${ENV_GUARD} ov mail check --inject --agent ${agentName} --debounce 30000`,
+					command: `${PATH_PREFIX} ${ENV_GUARD} ha mail check --inject --agent ${agentName} --debounce 30000`,
 				},
 			],
 		},
@@ -473,7 +473,7 @@ export function generateGeminiHooks(
 			hooks: [
 				{
 					type: "command",
-					command: `${PATH_PREFIX} ${ENV_GUARD} ov log session-end --agent ${agentName} --stdin`,
+					command: `${PATH_PREFIX} ${ENV_GUARD} ha log session-end --agent ${agentName} --stdin`,
 				},
 				{
 					type: "command",
@@ -488,7 +488,7 @@ export function generateGeminiHooks(
 			hooks: [
 				{
 					type: "command",
-					command: `${PATH_PREFIX} ${ENV_GUARD} ov prime --agent ${agentName} --compact`,
+					command: `${PATH_PREFIX} ${ENV_GUARD} ha prime --agent ${agentName} --compact`,
 				},
 			],
 		},

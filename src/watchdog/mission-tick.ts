@@ -204,7 +204,7 @@ async function checkAndRecoverDeadAgents(mission: Mission, opts: MissionTickOpts
 				sessionStore.updateState(session.agentName, "zombie");
 			}
 
-			// Try to resume the dead agent via ov resume
+			// Try to resume the dead agent via ha resume
 			let resumed = false;
 			try {
 				if (existsSync(session.worktreePath)) {
@@ -404,7 +404,7 @@ async function processMission(mission: Mission, opts: MissionTickOpts): Promise<
 					null,
 				);
 				// Reset destination gate state on loop-back to prevent stale
-				// resolved_at from filtering out events (overstory-5fd9).
+				// resolved_at from filtering out events (haru-5fd9).
 				missionStore.resetGateState(mission.id, advanceEdge.to);
 				missionStore.updateCurrentNode(mission.id, advanceEdge.to);
 			} else {
@@ -537,7 +537,7 @@ async function processMission(mission: Mission, opts: MissionTickOpts): Promise<
 			return; // Within grace, agent is working
 		}
 
-		// Reuse early-eval result — same params, no need to evaluate twice (overstory-df60).
+		// Reuse early-eval result — same params, no need to evaluate twice (haru-df60).
 		const evalResult = earlyEval;
 
 		if (evalResult.unknown) {
@@ -575,7 +575,7 @@ async function processMission(mission: Mission, opts: MissionTickOpts): Promise<
 					evalResult.trigger,
 					null,
 				);
-				// Reset destination gate state on loop-back (overstory-5fd9).
+				// Reset destination gate state on loop-back (haru-5fd9).
 				missionStore.resetGateState(mission.id, advanceEdge.to);
 				missionStore.updateCurrentNode(mission.id, advanceEdge.to);
 			} else {

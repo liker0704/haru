@@ -6,24 +6,24 @@ recommendation engine, CLI commands, and instructions for adding new signals.
 
 ---
 
-## 1. What `ov health` and `ov next-improvement` Do
+## 1. What `ha health` and `ha next-improvement` Do
 
-**`ov health`** computes an overall operational health score (0--100) for the
+**`ha health`** computes an overall operational health score (0--100) for the
 swarm by collecting signals from SessionStore, MetricsStore, and DoctorChecks.
 It breaks the score into weighted factors with per-factor explanations and
 assigns a letter grade (A through F).
 
-**`ov next-improvement`** uses the same signals and score computation, then
+**`ha next-improvement`** uses the same signals and score computation, then
 selects the single highest-priority improvement recommendation. The
 recommendation is deterministic and rule-based -- no LLM required.
 
 Together they enable a status-next-resolve-verify loop:
 
 ```
-ov health              # See overall score and factor breakdown
-ov next-improvement    # Get the top recommendation
+ha health              # See overall score and factor breakdown
+ha next-improvement    # Get the top recommendation
 # ... fix the issue ...
-ov health              # Verify the score improved
+ha health              # Verify the score improved
 ```
 
 ---
@@ -197,12 +197,12 @@ change) and a `verificationStep` to confirm the improvement worked.
 
 ## 5. CLI Usage
 
-### `ov health`
+### `ha health`
 
 ```bash
-ov health                           # Human-readable score + factor breakdown
-ov health --json                    # JSON output
-ov health --compare snapshot.json   # Compare against a previous snapshot
+ha health                           # Human-readable score + factor breakdown
+ha health --json                    # JSON output
+ha health --compare snapshot.json   # Compare against a previous snapshot
 ```
 
 Output includes:
@@ -211,12 +211,12 @@ Output includes:
 - Factor breakdown sorted worst-first, with per-factor score bars.
 - Optional delta against a previous snapshot.
 
-### `ov next-improvement`
+### `ha next-improvement`
 
 ```bash
-ov next-improvement                 # Top recommendation
-ov next-improvement --all           # All fired recommendations
-ov next-improvement --json          # JSON output
+ha next-improvement                 # Top recommendation
+ha next-improvement --all           # All fired recommendations
+ha next-improvement --json          # JSON output
 ```
 
 Output for each recommendation includes: title, factor, priority, why now,
@@ -228,8 +228,8 @@ expected impact, action, and verification step.
 |------|---------|-------------|
 | `--json` | Both | JSON output |
 | `--run <id>` | Both | Scope to a specific run (informational) |
-| `--compare <path>` | `ov health` | Compare against a snapshot JSON file |
-| `--all` | `ov next-improvement` | Show all recommendations |
+| `--compare <path>` | `ha health` | Compare against a snapshot JSON file |
+| `--all` | `ha next-improvement` | Show all recommendations |
 
 ---
 
@@ -246,7 +246,7 @@ export interface HealthSnapshot {
 ```
 
 Snapshots can be saved to `.overstory/health/` and used for historical
-comparison via `ov health --compare <path>`.
+comparison via `ha health --compare <path>`.
 
 ---
 
@@ -313,8 +313,8 @@ In `src/health/recommendations.ts`, add a rule to the `RULES` array:
 		title: "Fix quality gate failures",
 		whyNow: `${f.details}. Failing quality gates block agent completion.`,
 		expectedImpact: "Higher completion rate and fewer wasted agent sessions.",
-		action: "Run `ov doctor --category quality-gates` to diagnose failures.",
-		verificationStep: "Re-run `ov health` and confirm quality_gates score improved.",
+		action: "Run `ha doctor --category quality-gates` to diagnose failures.",
+		verificationStep: "Re-run `ha health` and confirm quality_gates score improved.",
 	}),
 },
 ```

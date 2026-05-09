@@ -27,7 +27,7 @@ describe("mailCommand", () => {
 	let stderrOutput: string;
 
 	beforeEach(async () => {
-		tempDir = await mkdtemp(join(tmpdir(), "overstory-mail-cmd-test-"));
+		tempDir = await mkdtemp(join(tmpdir(), "haru-mail-cmd-test-"));
 		await mkdir(join(tempDir, ".overstory"), { recursive: true });
 
 		// Seed some messages via the store directly
@@ -181,7 +181,7 @@ describe("mailCommand", () => {
 		});
 
 		test("reply with flags before positional ID extracts correct ID", async () => {
-			// Regression test for overstory-6nq: flags before the positional ID
+			// Regression test for haru-6nq: flags before the positional ID
 			// caused the flag VALUE (e.g. 'scout') to be treated as the message ID.
 			const store = createMailStore(join(tempDir, ".overstory", "mail.db"));
 			const client = createMailClient(store);
@@ -211,7 +211,7 @@ describe("mailCommand", () => {
 
 	describe("read", () => {
 		test("read with flags before positional ID extracts correct ID", async () => {
-			// Regression test for overstory-6nq: same fragile pattern existed in handleRead.
+			// Regression test for haru-6nq: same fragile pattern existed in handleRead.
 			const store = createMailStore(join(tempDir, ".overstory", "mail.db"));
 			const client = createMailClient(store);
 			const msgs = client.list({ to: "builder-1" });
@@ -926,7 +926,7 @@ describe("mailCommand", () => {
 					worktreePath: "/worktrees/orchestrator",
 					branchName: "main",
 					taskId: "bead-001",
-					tmuxSession: "overstory-test-orchestrator",
+					tmuxSession: "haru-test-orchestrator",
 					state: "working" as const,
 					pid: 12345,
 					parentAgent: null,
@@ -950,7 +950,7 @@ describe("mailCommand", () => {
 					worktreePath: "/worktrees/builder-1",
 					branchName: "builder-1",
 					taskId: "bead-002",
-					tmuxSession: "overstory-test-builder-1",
+					tmuxSession: "haru-test-builder-1",
 					state: "working" as const,
 					pid: 12346,
 					parentAgent: "orchestrator",
@@ -974,7 +974,7 @@ describe("mailCommand", () => {
 					worktreePath: "/worktrees/builder-2",
 					branchName: "builder-2",
 					taskId: "bead-003",
-					tmuxSession: "overstory-test-builder-2",
+					tmuxSession: "haru-test-builder-2",
 					state: "working" as const,
 					pid: 12347,
 					parentAgent: "orchestrator",
@@ -998,7 +998,7 @@ describe("mailCommand", () => {
 					worktreePath: "/worktrees/scout-1",
 					branchName: "scout-1",
 					taskId: "bead-004",
-					tmuxSession: "overstory-test-scout-1",
+					tmuxSession: "haru-test-scout-1",
 					state: "working" as const,
 					pid: 12348,
 					parentAgent: "orchestrator",
@@ -1324,7 +1324,7 @@ describe("mailCommand", () => {
 					worktreePath: `/worktrees/${session.agentName}`,
 					branchName: session.agentName,
 					taskId: `bead-${idx}`,
-					tmuxSession: `overstory-test-${session.agentName}`,
+					tmuxSession: `haru-test-${session.agentName}`,
 					state: "working" as const,
 					pid: 10000 + idx,
 					parentAgent: session.parentAgent,

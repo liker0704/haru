@@ -1,9 +1,9 @@
 /**
- * CLI command: ov coordinator start|stop|status
+ * CLI command: ha coordinator start|stop|status
  *
  * Manages the persistent coordinator agent lifecycle. The coordinator runs
  * at the project root (NOT in a worktree), receives work via mail and tasks,
- * and dispatches agents via ov sling.
+ * and dispatches agents via ha sling.
  *
  * Unlike regular agents spawned by sling, the coordinator:
  * - Has no worktree (operates on the main working tree)
@@ -57,10 +57,10 @@ const ASK_DEFAULT_TIMEOUT_S = 120;
 
 /**
  * Build the tmux session name for the coordinator.
- * Includes the project name to prevent cross-project collisions (overstory-pcef).
+ * Includes the project name to prevent cross-project collisions (haru-pcef).
  */
 function coordinatorTmuxSession(projectName: string): string {
-	return `overstory-${projectName}-${COORDINATOR_NAME}`;
+	return `haru-${projectName}-${COORDINATOR_NAME}`;
 }
 
 /** Dependency injection for testing. Uses real implementations when omitted. */
@@ -177,7 +177,7 @@ async function removeAutoPullPid(projectRoot: string): Promise<void> {
 
 /**
  * Default watchdog implementation for production use.
- * Starts/stops the watchdog daemon via `ov watch --background`.
+ * Starts/stops the watchdog daemon via `ha watch --background`.
  */
 function createDefaultWatchdog(projectRoot: string): NonNullable<CoordinatorDeps["_watchdog"]> {
 	return {
@@ -251,7 +251,7 @@ function createDefaultWatchdog(projectRoot: string): NonNullable<CoordinatorDeps
 
 /**
  * Default monitor implementation for production use.
- * Starts/stops the monitor agent via `ov monitor start/stop`.
+ * Starts/stops the monitor agent via `ha monitor start/stop`.
  */
 function createDefaultMonitor(projectRoot: string): NonNullable<CoordinatorDeps["_monitor"]> {
 	return {
@@ -363,9 +363,9 @@ export function buildCoordinatorBeacon(cliName = "bd"): string {
 	const parts = [
 		`[OVERSTORY] ${COORDINATOR_NAME} (coordinator) ${timestamp}`,
 		"Depth: 0 | Parent: none | Role: persistent orchestrator",
-		"HIERARCHY: You ONLY spawn leads (ov sling --capability lead). Leads spawn scouts, builders, reviewers. NEVER spawn non-lead agents directly.",
+		"HIERARCHY: You ONLY spawn leads (ha sling --capability lead). Leads spawn scouts, builders, reviewers. NEVER spawn non-lead agents directly.",
 		"DELEGATION: For any exploration/scouting, spawn a lead who will spawn scouts. Do NOT explore the codebase yourself beyond initial planning.",
-		`Startup: run mulch prime, check mail (ov mail check --agent ${COORDINATOR_NAME}), check ${cliName} ready, check ov group status, then begin work`,
+		`Startup: run mulch prime, check mail (ha mail check --agent ${COORDINATOR_NAME}), check ${cliName} ready, check ha group status, then begin work`,
 	];
 	return parts.join(" — ");
 }
@@ -394,7 +394,7 @@ async function startCoordinator(
 
 	if (isRunningAsRoot()) {
 		throw new AgentError(
-			"Cannot spawn agents as root (UID 0). The claude CLI rejects --permission-mode bypassPermissions when run as root, causing the tmux session to die immediately. Run overstory as a non-root user.",
+			"Cannot spawn agents as root (UID 0). The claude CLI rejects --permission-mode bypassPermissions when run as root, causing the tmux session to die immediately. Run haru as a non-root user.",
 		);
 	}
 
@@ -635,7 +635,7 @@ async function statusCoordinator(
  * Send a fire-and-forget message to the running coordinator.
  *
  * Sends a mail message (from: operator, type: dispatch) and auto-nudges the
- * coordinator via tmux sendKeys. Replaces the two-step `ov mail send + ov nudge` pattern.
+ * coordinator via tmux sendKeys. Replaces the two-step `ha mail send + ha nudge` pattern.
  */
 async function sendToCoordinator(
 	body: string,
@@ -924,7 +924,7 @@ export interface TriggerResult {
 	detail: string;
 }
 
-/** Result of `ov coordinator check-complete`. */
+/** Result of `ha coordinator check-complete`. */
 export interface CheckCompleteResult {
 	complete: boolean;
 	triggers: {
@@ -980,7 +980,7 @@ export async function checkComplete(
 
 				// Also check the merge queue — agents may be "completed" but branches
 				// not yet merged. This prevents premature issue closure when a builder
-				// finishes but its lead hasn't merged yet (overstory-5c08).
+				// finishes but its lead hasn't merged yet (haru-5c08).
 				if (allDone) {
 					const mergeQueuePath = join(config.project.root, ".overstory", "merge-queue.db");
 					const mergeQueueFile = Bun.file(mergeQueuePath);
@@ -1082,7 +1082,7 @@ export async function checkComplete(
 }
 
 /**
- * Create the Commander command for `ov coordinator`.
+ * Create the Commander command for `ha coordinator`.
  */
 export function createCoordinatorCommand(deps: CoordinatorDeps = {}): Command {
 	const cmd = new Command("coordinator").description("Manage the persistent coordinator agent");
@@ -1211,7 +1211,7 @@ export function createCoordinatorCommand(deps: CoordinatorDeps = {}): Command {
 }
 
 /**
- * Entry point for `ov coordinator <subcommand>`.
+ * Entry point for `ha coordinator <subcommand>`.
  *
  * @param args - CLI arguments after "coordinator"
  * @param deps - Optional dependency injection for testing (tmux)

@@ -74,13 +74,13 @@ describe("generatePiGuardExtension", () => {
 
 		test("team tools use delegation block reason", () => {
 			const generated = generatePiGuardExtension(builderHooks());
-			expect(generated).toContain("Overstory agents must use 'ov sling' for delegation");
+			expect(generated).toContain("Overstory agents must use 'ha sling' for delegation");
 		});
 
 		test("interactive tools use human-interaction block reason", () => {
 			const generated = generatePiGuardExtension(builderHooks());
 			expect(generated).toContain(
-				"requires human interaction — use ov mail (--type question) to escalate",
+				"requires human interaction — use ha mail (--type question) to escalate",
 			);
 		});
 	});
@@ -258,9 +258,9 @@ describe("generatePiGuardExtension", () => {
 			const generated = generatePiGuardExtension(builderHooks("my-agent"));
 			// These strings intentionally contain literal ${...} — they appear in the generated code
 			// as template literal expressions, not as interpolations in this test file.
-			expect(generated).toContain("overstory/$" + "{AGENT_NAME}/");
+			expect(generated).toContain("haru/$" + "{AGENT_NAME}/");
 			expect(generated).toContain(
-				"Branch must follow overstory/$" + "{AGENT_NAME}/{task-id} convention",
+				"Branch must follow haru/$" + "{AGENT_NAME}/{task-id} convention",
 			);
 		});
 
@@ -347,7 +347,7 @@ describe("generatePiGuardExtension", () => {
 			expect(generated).toContain('pi.on("tool_call",');
 		});
 
-		test("generated code contains pi.exec ov log tool-start in tool_call handler", () => {
+		test("generated code contains pi.exec ha log tool-start in tool_call handler", () => {
 			const generated = generatePiGuardExtension(builderHooks());
 			expect(generated).toContain(
 				'pi.exec("ov", ["log", "tool-start", "--agent", AGENT_NAME, "--tool-name", event.toolName])',
@@ -359,7 +359,7 @@ describe("generatePiGuardExtension", () => {
 			expect(generated).toContain('pi.on("tool_execution_end",');
 		});
 
-		test("generated code contains pi.exec ov log tool-end in tool_execution_end handler", () => {
+		test("generated code contains pi.exec ha log tool-end in tool_execution_end handler", () => {
 			const generated = generatePiGuardExtension(builderHooks());
 			expect(generated).toContain(
 				'pi.exec("ov", ["log", "tool-end", "--agent", AGENT_NAME, "--tool-name", event.toolName])',
@@ -371,7 +371,7 @@ describe("generatePiGuardExtension", () => {
 			expect(generated).toContain('pi.on("session_shutdown",');
 		});
 
-		test("generated code awaits pi.exec ov log session-end in session_shutdown handler", () => {
+		test("generated code awaits pi.exec ha log session-end in session_shutdown handler", () => {
 			const generated = generatePiGuardExtension(builderHooks());
 			expect(generated).toContain(
 				'await pi.exec("ov", ["log", "session-end", "--agent", AGENT_NAME])',
@@ -403,7 +403,7 @@ describe("generatePiGuardExtension", () => {
 			expect(generated).toContain('pi.on("agent_end",');
 		});
 
-		test("generated code awaits pi.exec ov log session-end in agent_end handler", () => {
+		test("generated code awaits pi.exec ha log session-end in agent_end handler", () => {
 			const generated = generatePiGuardExtension(builderHooks());
 			// agent_end handler must await (not fire-and-forget) so it completes
 			// before Pi moves on, ensuring the SessionStore is updated.

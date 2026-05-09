@@ -44,7 +44,7 @@ export async function addActiveMission(overstoryDir: string, missionId: string):
 		return;
 	}
 	const updated = [...existing, missionId];
-	await Bun.write(currentMissionPointerPath(overstoryDir), updated.join("\n") + "\n");
+	await Bun.write(currentMissionPointerPath(overstoryDir), `${updated.join("\n")}\n`);
 }
 
 export async function removeActiveMission(overstoryDir: string, missionId: string): Promise<void> {
@@ -58,7 +58,7 @@ export async function removeActiveMission(overstoryDir: string, missionId: strin
 		}
 		return;
 	}
-	await Bun.write(currentMissionPointerPath(overstoryDir), updated.join("\n") + "\n");
+	await Bun.write(currentMissionPointerPath(overstoryDir), `${updated.join("\n")}\n`);
 }
 
 export async function readCurrentMissionPointer(overstoryDir: string): Promise<string | null> {

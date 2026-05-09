@@ -1,5 +1,5 @@
 /**
- * CLI command: ov dashboard [--interval <ms>] [--all]
+ * CLI command: ha dashboard [--interval <ms>] [--all]
  *
  * Rich terminal dashboard using raw ANSI escape codes (zero runtime deps).
  * Polls existing data sources and renders multi-panel layout with agent status,

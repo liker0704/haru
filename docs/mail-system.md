@@ -15,7 +15,7 @@ inspectable, crash-safe message queue backed by SQLite.
 
 Key properties:
 - **Durable**: messages survive process restarts
-- **Inspectable**: `ov mail list`, `ov mail read`, `ov mail check` expose all messages
+- **Inspectable**: `ha mail list`, `ha mail read`, `ha mail check` expose all messages
 - **Crash-safe**: claim/ack semantics ensure messages are not lost on agent crash
 - **Low latency**: ~1-5ms per query (synchronous `bun:sqlite`)
 - **Concurrent**: WAL mode allows many agents to read/write simultaneously
@@ -87,7 +87,7 @@ CREATE INDEX idx_messages_mission ON messages(to_agent, mission_id, state);
 ```
 
 A separate `mail_check_state` table (migration v4) tracks per-agent last-check
-timestamps for debounce in `ov mail check --inject`.
+timestamps for debounce in `ha mail check --inject`.
 
 ### Migrations
 
@@ -259,7 +259,7 @@ export interface MailClient {
 | `claim()` | Same as `checkClaimed()` with configurable lease timeout. |
 
 The `checkInject()` method is used exclusively by the `UserPromptSubmit` hook
-(`ov mail check --inject`). It claims messages and returns a formatted string for
+(`ha mail check --inject`). It claims messages and returns a formatted string for
 injection into the agent's context, plus the message IDs so the hook can ack
 them after successful stdout output (`src/mail/client.ts:357`).
 
@@ -281,11 +281,11 @@ DLQ is a view over the same `messages` table filtered by `state = 'dead_letter'`
 CLI commands:
 
 ```bash
-ov mail dlq                           # List dead-lettered messages
-ov mail dlq --agent my-agent          # Filter by recipient agent
-ov mail retry <msg-id>                # Replay single message back to queued
-ov mail purge --dlq                   # Delete all dead-letter messages
-ov mail purge --dlq --older-than 24h  # Delete DLQ messages older than 24h
+ha mail dlq                           # List dead-lettered messages
+ha mail dlq --agent my-agent          # Filter by recipient agent
+ha mail retry <msg-id>                # Replay single message back to queued
+ha mail purge --dlq                   # Delete all dead-letter messages
+ha mail purge --dlq --older-than 24h  # Delete DLQ messages older than 24h
 ```
 
 `replayDlqBatch()` resets messages atomically: clears `state` to `queued`,

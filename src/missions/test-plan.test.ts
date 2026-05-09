@@ -64,8 +64,8 @@ describe("parseTestPlan", () => {
 		expect(file.path).toBe("src/resilience/store.test.ts");
 		expect(file.interfaceRef).toBe("ResilienceStore");
 		expect(file.cases).toHaveLength(2);
-		expect(file.cases[0]!.id).toBe("T-1");
-		expect(file.cases[1]!.type).toBe("integration");
+		expect(file.cases[0]?.id).toBe("T-1");
+		expect(file.cases[1]?.type).toBe("integration");
 	});
 
 	test("throws on wrong version", () => {
@@ -113,7 +113,7 @@ suites:
 		// We accept either throwing or returning empty files
 		try {
 			const plan = parseTestPlan(yaml);
-			expect(plan.suites[0]!.files).toHaveLength(0);
+			expect(plan.suites[0]?.files).toHaveLength(0);
 		} catch {
 			// acceptable if YAML parser doesn't support []
 		}
@@ -139,7 +139,7 @@ suites:
 `;
 		const plan = parseTestPlan(yaml);
 		expect(plan.missionId).toBe("mission: with colon");
-		expect(plan.suites[0]!.files[0]!.cases[0]!.description).toBe(
+		expect(plan.suites[0]?.files[0]?.cases[0]?.description).toBe(
 			"should handle url: http://example.com",
 		);
 	});

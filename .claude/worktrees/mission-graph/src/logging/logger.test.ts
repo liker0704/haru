@@ -11,7 +11,7 @@ describe("createLogger", () => {
 	let logDir: string;
 
 	beforeEach(async () => {
-		tempDir = await mkdtemp(join(tmpdir(), "overstory-logger-test-"));
+		tempDir = await mkdtemp(join(tmpdir(), "haru-logger-test-"));
 		logDir = join(tempDir, "logs");
 	});
 

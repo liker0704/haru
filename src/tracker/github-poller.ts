@@ -3,7 +3,7 @@
  *
  * Background daemon that polls GitHub Issues for issues with the configured
  * readyLabel, claims them, and dispatches them to the coordinator via mail.
- * Started by `ov coordinator start --auto-pull` or when coordinator.autoPull
+ * Started by `ha coordinator start --auto-pull` or when coordinator.autoPull
  * is true in config.yaml.
  *
  * Runs as a standalone process:

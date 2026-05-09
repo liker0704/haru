@@ -8,7 +8,7 @@ import type { SessionMetrics } from "../types.ts";
 import { metricsCommand } from "./metrics.ts";
 
 /**
- * Tests for `overstory metrics` command.
+ * Tests for `haru metrics` command.
  *
  * Uses real bun:sqlite (temp files) to test the metrics command end-to-end.
  * Captures process.stdout.write to verify output formatting.

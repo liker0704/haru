@@ -91,7 +91,7 @@ export function openSessionStore(overstoryDir: string): {
 
 	// If the DB already existed AND has data, it is authoritative -- no migration needed.
 	// If the DB file exists but is empty (e.g., created by init before any sessions were
-	// recorded), fall through to check sessions.json for importable records (overstory-036f).
+	// recorded), fall through to check sessions.json for importable records (haru-036f).
 	if (dbExists && store.count() > 0) {
 		return { store, migrated: false };
 	}

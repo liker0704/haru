@@ -2,13 +2,13 @@
 
 Last Updated: 2026-04-05
 
-Guide for AI agents (orchestrator sessions) monitoring `ov mission` runs.
+Guide for AI agents (orchestrator sessions) monitoring `ha mission` runs.
 
 ## Identity
 
 You are **operator**. Coordinator sends messages to `operator`. Always check mail as:
 ```bash
-ov mail check --agent operator
+ha mail check --agent operator
 ```
 
 Do NOT check other agents' mail (coordinator, mission-analyst, etc.) — that's their private communication.
@@ -16,7 +16,7 @@ Do NOT check other agents' mail (coordinator, mission-analyst, etc.) — that's 
 ## Starting a Mission
 
 ```bash
-ov mission start \
+ha mission start \
   --slug "feature-name" \
   --objective "Description. Read full spec via: gh issue view <N>." \
   --no-attach
@@ -30,12 +30,12 @@ ov mission start \
 
 Poll every 2-3 minutes:
 ```bash
-sleep 120 && ov mail check --agent operator && echo "===" && ov status 2>&1 | grep -E "Agents:|>|Mission:|Pending:|Phase|Exec|Worktrees|Merge"
+sleep 120 && ha mail check --agent operator && echo "===" && ha status 2>&1 | grep -E "Agents:|>|Mission:|Pending:|Phase|Exec|Worktrees|Merge"
 ```
 
 **What to watch:**
-- `ov mail check --agent operator` — coordinator sends questions here, must answer to unfreeze
-- `ov status` — agent count, phase, pending state
+- `ha mail check --agent operator` — coordinator sends questions here, must answer to unfreeze
+- `ha status` — agent count, phase, pending state
 - Mission phases vary by tier (see Tier-Specific Phases below)
 - When `Pending: question` + `frozen` — coordinator is waiting for your answer
 
@@ -53,7 +53,7 @@ Mission phases depend on the tier configured for the mission (see `src/missions/
 
 When coordinator sends a question (mission freezes):
 ```bash
-ov mission answer --body "Your answer here"
+ha mission answer --body "Your answer here"
 ```
 
 This unfreezes the mission. Common questions:
@@ -64,7 +64,7 @@ This unfreezes the mission. Common questions:
 ## What NOT to Do
 
 - Don't read other agents' mail (`--agent coordinator`, `--agent mission-analyst`)
-- Don't `ov mail list` to snoop on inter-agent communication
+- Don't `ha mail list` to snoop on inter-agent communication
 - Don't nudge agents unless they're clearly stuck (15+ min no progress)
 - Don't interfere with execution — the mission is autonomous
 

@@ -48,9 +48,9 @@ describe("loadRecentActions", () => {
 
 		const records = loadRecentActions(eventStore, 60_000);
 		expect(records).toHaveLength(1);
-		expect(records[0]!.action).toBe("pause_spawning");
-		expect(records[0]!.ruleId).toBe("rule-1");
-		expect(records[0]!.triggered).toBe(true);
+		expect(records[0]?.action).toBe("pause_spawning");
+		expect(records[0]?.ruleId).toBe("rule-1");
+		expect(records[0]?.triggered).toBe(true);
 	});
 
 	test("events outside window → not returned", async () => {

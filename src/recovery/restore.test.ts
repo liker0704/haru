@@ -29,9 +29,9 @@ function makeSession(overrides: Partial<AgentSession> = {}): AgentSession {
 		capability: "builder",
 		runtime: "claude",
 		worktreePath: "/tmp/nonexistent-worktree/test-agent",
-		branchName: "overstory/test-agent/task-1",
+		branchName: "haru/test-agent/task-1",
 		taskId: "task-1",
-		tmuxSession: "overstory-test-agent",
+		tmuxSession: "haru-test-agent",
 		state: "working",
 		pid: null,
 		parentAgent: null,
@@ -383,19 +383,19 @@ describe("restoreBundle", () => {
 
 		const mq = createMergeQueue(mergeQueueDbPath);
 		mq.enqueue({
-			branchName: "overstory/agent-a/task-1",
+			branchName: "haru/agent-a/task-1",
 			taskId: "task-1",
 			agentName: "agent-a",
 			filesModified: ["src/foo.ts"],
 		});
 		mq.enqueue({
-			branchName: "overstory/agent-b/task-2",
+			branchName: "haru/agent-b/task-2",
 			taskId: "task-2",
 			agentName: "agent-b",
 			filesModified: ["src/bar.ts"],
 		});
 		// Mark one as merged (should not be re-queued)
-		mq.updateStatus("overstory/agent-b/task-2", "merged");
+		mq.updateStatus("haru/agent-b/task-2", "merged");
 		mq.close();
 
 		const snapshot = await createSnapshot(sourceDir);
@@ -410,7 +410,7 @@ describe("restoreBundle", () => {
 
 		// Only the pending entry should be restored
 		expect(entries).toHaveLength(1);
-		expect(entries[0]?.branchName).toBe("overstory/agent-a/task-1");
+		expect(entries[0]?.branchName).toBe("haru/agent-a/task-1");
 	});
 
 	test("metadata files are restored into target .overstory/", async () => {

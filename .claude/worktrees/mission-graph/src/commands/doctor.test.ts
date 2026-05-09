@@ -1,5 +1,5 @@
 /**
- * Tests for `overstory doctor` command.
+ * Tests for `haru doctor` command.
  *
  * Uses temp directories with real config.yaml to test the doctor scaffold.
  * All check modules return empty arrays (stubs), so tests verify the scaffold

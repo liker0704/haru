@@ -1,5 +1,5 @@
 /**
- * Tests for `overstory trace` command.
+ * Tests for `haru trace` command.
  *
  * Uses real bun:sqlite (temp files) to test the trace command end-to-end.
  * Captures process.stdout.write to verify output formatting.
@@ -542,7 +542,7 @@ describe("traceCommand", () => {
 				runtime: "claude",
 				worktreePath: "/tmp/wt",
 				branchName: "feat/task",
-				taskId: "overstory-rj1k",
+				taskId: "haru-rj1k",
 				tmuxSession: "tmux-001",
 				state: "completed",
 				pid: null,
@@ -567,7 +567,7 @@ describe("traceCommand", () => {
 			eventStore.insert(makeEvent({ agentName: "builder-for-task" }));
 			eventStore.close();
 
-			await traceCommand(["overstory-rj1k", "--json"]);
+			await traceCommand(["haru-rj1k", "--json"]);
 			const out = output();
 
 			const parsed = JSON.parse(out.trim()) as { events: Record<string, unknown>[] };

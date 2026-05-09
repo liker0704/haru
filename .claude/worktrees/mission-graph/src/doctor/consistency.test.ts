@@ -18,7 +18,7 @@ const mockIsProcessAlive = mock((_pid: number) => true);
  * Create a minimal temp git repo for worktree tests.
  */
 function createTempGitRepo(): string {
-	const dir = mkdtempSync(join(tmpdir(), "overstory-test-"));
+	const dir = mkdtempSync(join(tmpdir(), "haru-test-"));
 	const git = (args: string[]) => {
 		const proc = Bun.spawnSync(["git", ...args], { cwd: dir, stdout: "ignore", stderr: "pipe" });
 		if (proc.exitCode !== 0) {
@@ -145,7 +145,7 @@ describe("checkConsistency", () => {
 	test("detects orphaned worktrees", async () => {
 		// Create a worktree but don't add it to SessionStore
 		const worktreePath = join(overstoryDir, "worktrees", "orphan-agent");
-		createWorktree(repoRoot, worktreePath, "overstory/orphan-agent/test-123");
+		createWorktree(repoRoot, worktreePath, "haru/orphan-agent/test-123");
 
 		const checks = await checkConsistency(config, overstoryDir, mockDeps);
 
@@ -159,7 +159,7 @@ describe("checkConsistency", () => {
 
 	test("detects orphaned tmux sessions", async () => {
 		// Mock a tmux session that isn't in SessionStore
-		mockListSessions.mockResolvedValue([{ name: "overstory-testproject-orphan", pid: 9999 }]);
+		mockListSessions.mockResolvedValue([{ name: "haru-testproject-orphan", pid: 9999 }]);
 
 		const checks = await checkConsistency(config, overstoryDir, mockDeps);
 
@@ -173,7 +173,7 @@ describe("checkConsistency", () => {
 	test("ignores tmux sessions from other projects", async () => {
 		// Mock tmux sessions from different projects
 		mockListSessions.mockResolvedValue([
-			{ name: "overstory-otherproject-agent1", pid: 9999 },
+			{ name: "haru-otherproject-agent1", pid: 9999 },
 			{ name: "my-custom-session", pid: 8888 },
 		]);
 
@@ -196,9 +196,9 @@ describe("checkConsistency", () => {
 			capability: "builder",
 			runtime: "claude",
 			worktreePath: join(overstoryDir, "worktrees", "dead-agent"),
-			branchName: "overstory/dead-agent/test-123",
+			branchName: "haru/dead-agent/test-123",
 			taskId: "test-123",
-			tmuxSession: "overstory-testproject-dead-agent",
+			tmuxSession: "haru-testproject-dead-agent",
 			state: "working",
 			pid: 99999, // Non-existent PID
 			parentAgent: null,
@@ -238,9 +238,9 @@ describe("checkConsistency", () => {
 			capability: "builder",
 			runtime: "claude",
 			worktreePath: join(overstoryDir, "worktrees", "live-agent"),
-			branchName: "overstory/live-agent/test-123",
+			branchName: "haru/live-agent/test-123",
 			taskId: "test-123",
-			tmuxSession: "overstory-testproject-live-agent",
+			tmuxSession: "haru-testproject-live-agent",
 			state: "working",
 			pid: 12345,
 			parentAgent: null,
@@ -279,9 +279,9 @@ describe("checkConsistency", () => {
 			capability: "builder",
 			runtime: "claude",
 			worktreePath: missingWorktreePath,
-			branchName: "overstory/missing-agent/test-123",
+			branchName: "haru/missing-agent/test-123",
 			taskId: "test-123",
-			tmuxSession: "overstory-testproject-missing-agent",
+			tmuxSession: "haru-testproject-missing-agent",
 			state: "working",
 			pid: null,
 			parentAgent: null,
@@ -313,7 +313,7 @@ describe("checkConsistency", () => {
 		const store = createSessionStore(dbPath);
 
 		const worktreePath = join(overstoryDir, "worktrees", "agent-without-tmux");
-		createWorktree(repoRoot, worktreePath, "overstory/agent-without-tmux/test-123");
+		createWorktree(repoRoot, worktreePath, "haru/agent-without-tmux/test-123");
 
 		store.upsert({
 			id: "session-1",
@@ -321,9 +321,9 @@ describe("checkConsistency", () => {
 			capability: "builder",
 			runtime: "claude",
 			worktreePath,
-			branchName: "overstory/agent-without-tmux/test-123",
+			branchName: "haru/agent-without-tmux/test-123",
 			taskId: "test-123",
-			tmuxSession: "overstory-testproject-agent-without-tmux",
+			tmuxSession: "haru-testproject-agent-without-tmux",
 			state: "working",
 			pid: null,
 			parentAgent: null,
@@ -358,7 +358,7 @@ describe("checkConsistency", () => {
 		const store = createSessionStore(dbPath);
 
 		const worktreePath = join(overstoryDir, "worktrees", "consistent-agent");
-		createWorktree(repoRoot, worktreePath, "overstory/consistent-agent/test-123");
+		createWorktree(repoRoot, worktreePath, "haru/consistent-agent/test-123");
 
 		store.upsert({
 			id: "session-1",
@@ -366,9 +366,9 @@ describe("checkConsistency", () => {
 			capability: "builder",
 			runtime: "claude",
 			worktreePath,
-			branchName: "overstory/consistent-agent/test-123",
+			branchName: "haru/consistent-agent/test-123",
 			taskId: "test-123",
-			tmuxSession: "overstory-testproject-consistent-agent",
+			tmuxSession: "haru-testproject-consistent-agent",
 			state: "working",
 			pid: 12345,
 			parentAgent: null,
@@ -388,7 +388,7 @@ describe("checkConsistency", () => {
 
 		// Mock matching tmux session
 		mockListSessions.mockResolvedValue([
-			{ name: "overstory-testproject-consistent-agent", pid: 12345 },
+			{ name: "haru-testproject-consistent-agent", pid: 12345 },
 		]);
 
 		// Mock PID as alive
@@ -424,7 +424,7 @@ describe("checkConsistency", () => {
 	});
 
 	test("fails early if SessionStore cannot be opened", async () => {
-		// Use a bad overstory directory path
+		// Use a bad haru directory path
 		const badOverstoryDir = "/nonexistent/.overstory";
 
 		const checks = await checkConsistency(config, badOverstoryDir, mockDeps);
@@ -445,9 +445,9 @@ describe("checkConsistency", () => {
 			capability: "builder",
 			runtime: "claude",
 			worktreePath: join(overstoryDir, "worktrees", "builder-1"),
-			branchName: "overstory/builder-1/test-123",
+			branchName: "haru/builder-1/test-123",
 			taskId: "test-123",
-			tmuxSession: "overstory-testproject-builder-1",
+			tmuxSession: "haru-testproject-builder-1",
 			state: "working",
 			pid: null,
 			parentAgent: "lead-1",
@@ -470,9 +470,9 @@ describe("checkConsistency", () => {
 			capability: "builder",
 			runtime: "claude",
 			worktreePath: join(overstoryDir, "worktrees", "builder-2"),
-			branchName: "overstory/builder-2/test-456",
+			branchName: "haru/builder-2/test-456",
 			taskId: "test-456",
-			tmuxSession: "overstory-testproject-builder-2",
+			tmuxSession: "haru-testproject-builder-2",
 			state: "working",
 			pid: null,
 			parentAgent: "lead-1",
@@ -512,9 +512,9 @@ describe("checkConsistency", () => {
 				capability: "builder",
 				runtime: "claude",
 				worktreePath: join(overstoryDir, "worktrees", `builder-${i}`),
-				branchName: `overstory/builder-${i}/test-${i}`,
+				branchName: `haru/builder-${i}/test-${i}`,
 				taskId: `test-${i}`,
-				tmuxSession: `overstory-testproject-builder-${i}`,
+				tmuxSession: `haru-testproject-builder-${i}`,
 				state: "working",
 				pid: null,
 				parentAgent: "lead-1",
@@ -538,9 +538,9 @@ describe("checkConsistency", () => {
 			capability: "reviewer",
 			runtime: "claude",
 			worktreePath: join(overstoryDir, "worktrees", "reviewer-1"),
-			branchName: "overstory/reviewer-1/test-r1",
+			branchName: "haru/reviewer-1/test-r1",
 			taskId: "test-r1",
-			tmuxSession: "overstory-testproject-reviewer-1",
+			tmuxSession: "haru-testproject-reviewer-1",
 			state: "working",
 			pid: null,
 			parentAgent: "lead-1",
@@ -578,9 +578,9 @@ describe("checkConsistency", () => {
 				capability: "builder",
 				runtime: "claude",
 				worktreePath: join(overstoryDir, "worktrees", `builder-${i}`),
-				branchName: `overstory/builder-${i}/test-${i}`,
+				branchName: `haru/builder-${i}/test-${i}`,
 				taskId: `test-${i}`,
-				tmuxSession: `overstory-testproject-builder-${i}`,
+				tmuxSession: `haru-testproject-builder-${i}`,
 				state: "working",
 				pid: null,
 				parentAgent: "lead-1",
@@ -603,9 +603,9 @@ describe("checkConsistency", () => {
 				capability: "reviewer",
 				runtime: "claude",
 				worktreePath: join(overstoryDir, "worktrees", `reviewer-${i}`),
-				branchName: `overstory/reviewer-${i}/test-r${i}`,
+				branchName: `haru/reviewer-${i}/test-r${i}`,
 				taskId: `test-r${i}`,
-				tmuxSession: `overstory-testproject-reviewer-${i}`,
+				tmuxSession: `haru-testproject-reviewer-${i}`,
 				state: "working",
 				pid: null,
 				parentAgent: "lead-1",
@@ -652,9 +652,9 @@ describe("checkConsistency", () => {
 			capability: "builder",
 			runtime: "claude",
 			worktreePath: join(overstoryDir, "worktrees", "builder-1"),
-			branchName: "overstory/builder-1/test-1",
+			branchName: "haru/builder-1/test-1",
 			taskId: "test-1",
-			tmuxSession: "overstory-testproject-builder-1",
+			tmuxSession: "haru-testproject-builder-1",
 			state: "working",
 			pid: null,
 			parentAgent: "lead-1",
@@ -677,9 +677,9 @@ describe("checkConsistency", () => {
 			capability: "reviewer",
 			runtime: "claude",
 			worktreePath: join(overstoryDir, "worktrees", "reviewer-1"),
-			branchName: "overstory/reviewer-1/test-r1",
+			branchName: "haru/reviewer-1/test-r1",
 			taskId: "test-r1",
-			tmuxSession: "overstory-testproject-reviewer-1",
+			tmuxSession: "haru-testproject-reviewer-1",
 			state: "working",
 			pid: null,
 			parentAgent: "lead-1",
@@ -703,9 +703,9 @@ describe("checkConsistency", () => {
 			capability: "builder",
 			runtime: "claude",
 			worktreePath: join(overstoryDir, "worktrees", "builder-2"),
-			branchName: "overstory/builder-2/test-2",
+			branchName: "haru/builder-2/test-2",
 			taskId: "test-2",
-			tmuxSession: "overstory-testproject-builder-2",
+			tmuxSession: "haru-testproject-builder-2",
 			state: "working",
 			pid: null,
 			parentAgent: "lead-2",

@@ -60,12 +60,12 @@ function makeConfig(overrides: Partial<OverstoryConfig> = {}): OverstoryConfig {
 }
 
 // Dummy overstoryDir — provider checks don't use the filesystem
-const OVERSTORY_DIR = join(tmpdir(), ".overstory");
+const HARU_DIR = join(tmpdir(), ".overstory");
 
 describe("checkProviders", () => {
 	test("all checks have required DoctorCheck fields", async () => {
 		const config = makeConfig();
-		const checks = await checkProviders(config, OVERSTORY_DIR);
+		const checks = await checkProviders(config, HARU_DIR);
 
 		expect(checks).toBeArray();
 		for (const check of checks) {
@@ -84,7 +84,7 @@ describe("checkProviders", () => {
 			const config = makeConfig({
 				providers: { anthropic: { type: "native" } },
 			});
-			const checks = await checkProviders(config, OVERSTORY_DIR);
+			const checks = await checkProviders(config, HARU_DIR);
 
 			const check = checks.find((c) => c.name === "providers-configured");
 			expect(check).toBeDefined();
@@ -93,7 +93,7 @@ describe("checkProviders", () => {
 
 		test("empty providers returns warn for providers-configured", async () => {
 			const config = makeConfig({ providers: {} });
-			const checks = await checkProviders(config, OVERSTORY_DIR);
+			const checks = await checkProviders(config, HARU_DIR);
 
 			const check = checks.find((c) => c.name === "providers-configured");
 			expect(check).toBeDefined();
@@ -107,7 +107,7 @@ describe("checkProviders", () => {
 					openrouter: { type: "gateway", baseUrl: "https://openrouter.ai/api/v1" },
 				},
 			});
-			const checks = await checkProviders(config, OVERSTORY_DIR);
+			const checks = await checkProviders(config, HARU_DIR);
 
 			const check = checks.find((c) => c.name === "providers-configured");
 			expect(check?.status).toBe("pass");
@@ -128,7 +128,7 @@ describe("checkProviders", () => {
 					},
 				},
 			});
-			const checks = await checkProviders(config, OVERSTORY_DIR);
+			const checks = await checkProviders(config, HARU_DIR);
 
 			const check = checks.find((c) => c.name === "provider-reachable-fake");
 			expect(check).toBeDefined();
@@ -154,7 +154,7 @@ describe("checkProviders", () => {
 						},
 					},
 				});
-				const checks = await checkProviders(config, OVERSTORY_DIR);
+				const checks = await checkProviders(config, HARU_DIR);
 
 				const check = checks.find((c) => c.name === "provider-reachable-localtest");
 				expect(check).toBeDefined();
@@ -170,7 +170,7 @@ describe("checkProviders", () => {
 					nourl: { type: "gateway" }, // no baseUrl
 				},
 			});
-			const checks = await checkProviders(config, OVERSTORY_DIR);
+			const checks = await checkProviders(config, HARU_DIR);
 
 			const reachCheck = checks.find((c) => c.name === "provider-reachable-nourl");
 			expect(reachCheck).toBeUndefined();
@@ -178,7 +178,7 @@ describe("checkProviders", () => {
 	});
 
 	describe("provider-auth-token-{name} check", () => {
-		const ENV_KEY = "OVERSTORY_TEST_FAKE_PROVIDER_TOKEN_XYZ";
+		const ENV_KEY = "HARU_TEST_FAKE_PROVIDER_TOKEN_XYZ";
 
 		beforeAll(() => {
 			// Ensure env var is unset before tests
@@ -198,7 +198,7 @@ describe("checkProviders", () => {
 					},
 				},
 			});
-			const checks = await checkProviders(config, OVERSTORY_DIR);
+			const checks = await checkProviders(config, HARU_DIR);
 
 			const check = checks.find((c) => c.name === "provider-auth-token-testgateway");
 			expect(check).toBeDefined();
@@ -218,7 +218,7 @@ describe("checkProviders", () => {
 					},
 				},
 			});
-			const checks = await checkProviders(config, OVERSTORY_DIR);
+			const checks = await checkProviders(config, HARU_DIR);
 
 			const check = checks.find((c) => c.name === "provider-auth-token-testgateway");
 			expect(check).toBeDefined();
@@ -233,7 +233,7 @@ describe("checkProviders", () => {
 			const config = makeConfig({
 				providers: { anthropic: { type: "native" } },
 			});
-			const checks = await checkProviders(config, OVERSTORY_DIR);
+			const checks = await checkProviders(config, HARU_DIR);
 
 			const authCheck = checks.find((c) => c.name?.startsWith("provider-auth-token-"));
 			expect(authCheck).toBeUndefined();
@@ -248,7 +248,7 @@ describe("checkProviders", () => {
 					openrouter: { type: "gateway", baseUrl: "https://openrouter.ai/api/v1" },
 				},
 			});
-			const checks = await checkProviders(config, OVERSTORY_DIR);
+			const checks = await checkProviders(config, HARU_DIR);
 
 			const check = checks.find((c) => c.name === "tool-use-compat" && c.status === "warn");
 			expect(check).toBeDefined();
@@ -263,7 +263,7 @@ describe("checkProviders", () => {
 					openrouter: { type: "gateway", baseUrl: "https://openrouter.ai/api/v1" },
 				},
 			});
-			const checks = await checkProviders(config, OVERSTORY_DIR);
+			const checks = await checkProviders(config, HARU_DIR);
 
 			const warnChecks = checks.filter((c) => c.name === "tool-use-compat" && c.status === "warn");
 			expect(warnChecks.length).toBe(0);
@@ -273,7 +273,7 @@ describe("checkProviders", () => {
 			const config = makeConfig({
 				models: { builder: "sonnet" }, // alias, not provider-prefixed
 			});
-			const checks = await checkProviders(config, OVERSTORY_DIR);
+			const checks = await checkProviders(config, HARU_DIR);
 
 			const passCheck = checks.find((c) => c.name === "tool-use-compat" && c.status === "pass");
 			expect(passCheck).toBeDefined();
@@ -290,7 +290,7 @@ describe("checkProviders", () => {
 					openrouter: { type: "gateway", baseUrl: "https://openrouter.ai/api/v1" },
 				},
 			});
-			const checks = await checkProviders(config, OVERSTORY_DIR);
+			const checks = await checkProviders(config, HARU_DIR);
 
 			const warnChecks = checks.filter((c) => c.name === "tool-use-compat" && c.status === "warn");
 			expect(warnChecks.length).toBe(3);
@@ -304,7 +304,7 @@ describe("checkProviders", () => {
 				// unknownprovider not in providers
 				providers: { anthropic: { type: "native" } },
 			});
-			const checks = await checkProviders(config, OVERSTORY_DIR);
+			const checks = await checkProviders(config, HARU_DIR);
 
 			const check = checks.find((c) => c.name === "model-provider-ref" && c.status === "fail");
 			expect(check).toBeDefined();
@@ -318,7 +318,7 @@ describe("checkProviders", () => {
 					openrouter: { type: "gateway", baseUrl: "https://openrouter.ai/api/v1" },
 				},
 			});
-			const checks = await checkProviders(config, OVERSTORY_DIR);
+			const checks = await checkProviders(config, HARU_DIR);
 
 			const check = checks.find((c) => c.name === "model-provider-ref" && c.status === "pass");
 			expect(check).toBeDefined();
@@ -328,7 +328,7 @@ describe("checkProviders", () => {
 			const config = makeConfig({
 				models: { builder: "sonnet", scout: "haiku" },
 			});
-			const checks = await checkProviders(config, OVERSTORY_DIR);
+			const checks = await checkProviders(config, HARU_DIR);
 
 			const check = checks.find((c) => c.name === "model-provider-refs");
 			expect(check).toBeDefined();
@@ -337,7 +337,7 @@ describe("checkProviders", () => {
 
 		test("empty models emits single pass named model-provider-refs", async () => {
 			const config = makeConfig({ models: {} });
-			const checks = await checkProviders(config, OVERSTORY_DIR);
+			const checks = await checkProviders(config, HARU_DIR);
 
 			const check = checks.find((c) => c.name === "model-provider-refs");
 			expect(check).toBeDefined();
@@ -352,7 +352,7 @@ describe("checkProviders", () => {
 					openrouter: { type: "gateway", baseUrl: "http://127.0.0.1:19873" },
 				},
 			});
-			const checks = await checkProviders(config, OVERSTORY_DIR);
+			const checks = await checkProviders(config, HARU_DIR);
 
 			const check = checks.find((c) => c.name === "gateway-api-key-reminder");
 			expect(check).toBeDefined();
@@ -364,7 +364,7 @@ describe("checkProviders", () => {
 			const config = makeConfig({
 				providers: { anthropic: { type: "native" } },
 			});
-			const checks = await checkProviders(config, OVERSTORY_DIR);
+			const checks = await checkProviders(config, HARU_DIR);
 
 			const check = checks.find((c) => c.name === "gateway-api-key-reminder");
 			expect(check).toBeUndefined();

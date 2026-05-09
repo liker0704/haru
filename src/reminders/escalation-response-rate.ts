@@ -37,7 +37,7 @@ export const escalationResponseRatePolicy: ReminderPolicy = {
 				whyNow: `Only ${(rate * 100).toFixed(0)}% of escalations received a worker_done or result reply (${responded}/${escalations.length}).`,
 				expectedImpact:
 					"Improving response rate ensures agents receive the guidance they need to proceed.",
-				action: "Check open escalations with `ov mail list` and reply to pending ones.",
+				action: "Check open escalations with `ha mail list` and reply to pending ones.",
 				verificationStep:
 					"After replying, verify response rate improves in the next evaluation window.",
 				priority: "medium",

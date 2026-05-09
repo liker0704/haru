@@ -166,10 +166,10 @@ runtime:
       mode: run
 ```
 
-Per-agent runtime override via `ov sling`:
+Per-agent runtime override via `ha sling`:
 
 ```bash
-ov sling TASK-1 --capability builder --name bob --runtime codex
+ha sling TASK-1 --capability builder --name bob --runtime codex
 ```
 
 Or via dispatch mail payload:
@@ -300,10 +300,10 @@ Claude Code hooks serve four purposes. Here's how each maps to Codex:
 
 | Hook purpose | Claude Code mechanism | Codex equivalent |
 |-------------|----------------------|-----------------|
-| **Agent priming** (SessionStart) | Shell hook runs `ov prime` | Not needed — AGENTS.md is read at startup |
-| **Mail injection** (UserPromptSubmit) | Shell hook runs `ov mail check --inject` | Parse NDJSON stream; orchestrator sends follow-up prompts via tmux or new `codex exec` |
+| **Agent priming** (SessionStart) | Shell hook runs `ha prime` | Not needed — AGENTS.md is read at startup |
+| **Mail injection** (UserPromptSubmit) | Shell hook runs `ha mail check --inject` | Parse NDJSON stream; orchestrator sends follow-up prompts via tmux or new `codex exec` |
 | **Tool guards** (PreToolUse) | Shell hook blocks dangerous tools | Codex's sandbox enforces filesystem boundaries; `--sandbox workspace-write` replaces most guards |
-| **Event logging** (PostToolUse, Stop) | Shell hook runs `ov log` | Parse NDJSON events directly from stdout |
+| **Event logging** (PostToolUse, Stop) | Shell hook runs `ha log` | Parse NDJSON events directly from stdout |
 
 The key architectural shift: instead of hooks inside the agent pushing events
 out, Overstory pulls events from the agent's stdout stream. This is actually
@@ -313,7 +313,7 @@ script generation.
 ### Mail Delivery Challenge
 
 Claude Code agents receive mail via the `UserPromptSubmit` hook that runs
-`ov mail check --inject` before each prompt. Codex has no equivalent hook.
+`ha mail check --inject` before each prompt. Codex has no equivalent hook.
 
 Options for delivering messages to a running Codex agent:
 
@@ -455,8 +455,8 @@ Overstory's orchestration needs:
 | `prompt` | Send a message to the agent | Deliver mail, follow-up instructions |
 | `steer` | Interrupt current work, redirect | Urgent orchestrator overrides |
 | `followUp` | Queue message for after current turn | Non-urgent mail delivery |
-| `abort` | Cancel current operation | `ov stop` implementation |
-| `get_state` | Query agent state | `ov status`, `ov inspect` |
+| `abort` | Cancel current operation | `ha stop` implementation |
+| `get_state` | Query agent state | `ha status`, `ha inspect` |
 | `waitForIdle` | Block until agent finishes current turn | Completion detection |
 
 ### Native Compatibility
@@ -505,7 +505,7 @@ context, and transform messages.
 Overstory would deploy a guard extension to each worktree:
 
 ```typescript
-// .pi/extensions/overstory-guard.ts
+// .pi/extensions/haru-guard.ts
 import type { Extension } from "@mariozechner/pi-coding-agent";
 
 export default (): Extension => ({
@@ -546,7 +546,7 @@ immediately.
 ### Stopping Agents
 
 ```typescript
-// ov stop implementation for Pi
+// ha stop implementation for Pi
 async function stopPiAgent(rpcClient: RpcClient): Promise<void> {
   await rpcClient.abort();   // cancel current operation
   await rpcClient.stop();    // close the RPC session
@@ -605,7 +605,7 @@ export const piRuntime: AgentRuntime = {
     const piExtDir = join(worktreePath, ".pi", "extensions");
     await mkdir(piExtDir, { recursive: true });
     await Bun.write(
-      join(piExtDir, "overstory-guard.ts"),
+      join(piExtDir, "haru-guard.ts"),
       generatePiGuardExtension(hooks)
     );
 
@@ -842,7 +842,7 @@ conflict resolution and failure triage independently of the spawn runtime.
 
 **Result:** `src/runtimes/codex.ts` ships with NDJSON stdout capture, AGENTS.md
 instruction delivery, OS-sandbox integration, and `--runtime codex` support on
-`ov sling`.
+`ha sling`.
 
 ### Phase 3: Pi Adapter
 
@@ -954,5 +954,5 @@ stabilizes. The `AgentRuntime` interface is unchanged by ACP adoption.
 
 | # | File | Line | What | Difficulty |
 |---|------|------|------|-----------|
-| 9.1 | `src/agents/hooks-deployer.ts` | 160 | `OVERSTORY_AGENT_NAME` env guard | Medium |
+| 9.1 | `src/agents/hooks-deployer.ts` | 160 | `HARU_AGENT_NAME` env guard | Medium |
 | 9.2 | `src/agents/hooks-deployer.ts` | 176 | PATH prefix for Bun in Claude Code's stripped hook environment | Medium |

@@ -15,7 +15,7 @@ describe("extractFileScope", () => {
 	let tempDir: string;
 
 	beforeEach(async () => {
-		tempDir = await mkdtemp(join(tmpdir(), "overstory-test-"));
+		tempDir = await mkdtemp(join(tmpdir(), "haru-test-"));
 	});
 
 	it("should return empty array when overlay doesn't exist", async () => {
@@ -75,7 +75,7 @@ describe("discoverAgents", () => {
 	let dbPath: string;
 
 	beforeEach(async () => {
-		tempDir = await mkdtemp(join(tmpdir(), "overstory-test-"));
+		tempDir = await mkdtemp(join(tmpdir(), "haru-test-"));
 		const overstoryDir = join(tempDir, ".overstory");
 		await Bun.write(join(overstoryDir, ".gitkeep"), "");
 		dbPath = join(overstoryDir, "sessions.db");
@@ -98,9 +98,9 @@ describe("discoverAgents", () => {
 			capability: "builder",
 			runtime: "claude",
 			worktreePath: join(tempDir, ".overstory", "worktrees", "builder-test"),
-			branchName: "overstory/builder-test/task-123",
+			branchName: "haru/builder-test/task-123",
 			taskId: "task-123",
-			tmuxSession: "overstory-test-builder",
+			tmuxSession: "haru-test-builder",
 			state: "working",
 			pid: 12345,
 			parentAgent: null,
@@ -136,9 +136,9 @@ describe("discoverAgents", () => {
 			capability: "builder",
 			runtime: "claude",
 			worktreePath: join(tempDir, ".overstory", "worktrees", "builder-test"),
-			branchName: "overstory/builder-test/task-123",
+			branchName: "haru/builder-test/task-123",
 			taskId: "task-123",
-			tmuxSession: "overstory-test-builder",
+			tmuxSession: "haru-test-builder",
 			state: "working",
 			pid: 12345,
 			parentAgent: null,
@@ -161,9 +161,9 @@ describe("discoverAgents", () => {
 			capability: "scout",
 			runtime: "claude",
 			worktreePath: join(tempDir, ".overstory", "worktrees", "scout-test"),
-			branchName: "overstory/scout-test/task-456",
+			branchName: "haru/scout-test/task-456",
 			taskId: "task-456",
-			tmuxSession: "overstory-test-scout",
+			tmuxSession: "haru-test-scout",
 			state: "working",
 			pid: 12346,
 			parentAgent: null,
@@ -199,9 +199,9 @@ describe("discoverAgents", () => {
 			capability: "builder",
 			runtime: "claude",
 			worktreePath: join(tempDir, ".overstory", "worktrees", "builder-working"),
-			branchName: "overstory/builder-working/task-123",
+			branchName: "haru/builder-working/task-123",
 			taskId: "task-123",
-			tmuxSession: "overstory-test-working",
+			tmuxSession: "haru-test-working",
 			state: "working",
 			pid: 12345,
 			parentAgent: null,
@@ -224,9 +224,9 @@ describe("discoverAgents", () => {
 			capability: "builder",
 			runtime: "claude",
 			worktreePath: join(tempDir, ".overstory", "worktrees", "builder-completed"),
-			branchName: "overstory/builder-completed/task-456",
+			branchName: "haru/builder-completed/task-456",
 			taskId: "task-456",
-			tmuxSession: "overstory-test-completed",
+			tmuxSession: "haru-test-completed",
 			state: "completed",
 			pid: null,
 			parentAgent: null,
@@ -272,7 +272,7 @@ describe("agentsCommand", () => {
 	let stdoutBuffer: string;
 
 	beforeEach(async () => {
-		tempDir = await mkdtemp(join(tmpdir(), "overstory-test-"));
+		tempDir = await mkdtemp(join(tmpdir(), "haru-test-"));
 		const overstoryDir = join(tempDir, ".overstory");
 
 		// Create config.yaml

@@ -1,5 +1,5 @@
 /**
- * Tests for `overstory feed` command.
+ * Tests for `haru feed` command.
  *
  * Uses real bun:sqlite (temp files) to test the feed command end-to-end.
  * Captures process.stdout.write to verify output formatting.

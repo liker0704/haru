@@ -55,7 +55,7 @@ describe("ReviewRecord", () => {
 		const record: ReviewRecord = {
 			id: "abc-123",
 			subjectType: "spec",
-			subjectId: "overstory-4bd6",
+			subjectId: "haru-4bd6",
 			timestamp: "2026-03-11T00:00:00.000Z",
 			dimensions: [
 				{ dimension: "clarity", score: 90, details: "Clear" },

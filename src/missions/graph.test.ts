@@ -178,25 +178,13 @@ describe("validateTransition", () => {
 	});
 
 	test("legal: execute:active → done:active (complete)", () => {
-		const result = validateTransition(
-			DEFAULT_MISSION_GRAPH,
-			"execute",
-			"active",
-			"done",
-			"active",
-		);
+		const result = validateTransition(DEFAULT_MISSION_GRAPH, "execute", "active", "done", "active");
 		expect(result.valid).toBe(true);
 		expect(result.edge?.trigger).toBe("complete");
 	});
 
 	test("legal: done:active → done:completed (phase_complete)", () => {
-		const result = validateTransition(
-			DEFAULT_MISSION_GRAPH,
-			"done",
-			"active",
-			"done",
-			"completed",
-		);
+		const result = validateTransition(DEFAULT_MISSION_GRAPH, "done", "active", "done", "completed");
 		expect(result.valid).toBe(true);
 		expect(result.edge?.trigger).toBe("phase_complete");
 	});

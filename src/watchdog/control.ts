@@ -1,8 +1,8 @@
 /**
  * Watchdog process control: start, stop, and query the background watchdog daemon.
  *
- * Extracted from commands/coordinator.ts so that both `ov coordinator start`
- * and `ov mission start` (and resume) can share the same logic.
+ * Extracted from commands/coordinator.ts so that both `ha coordinator start`
+ * and `ha mission start` (and resume) can share the same logic.
  */
 
 import { unlink } from "node:fs/promises";
@@ -54,7 +54,7 @@ export async function removeWatchdogPid(projectRoot: string): Promise<void> {
 
 /**
  * Default watchdog implementation for production use.
- * Starts/stops the watchdog daemon via `ov watch --background`.
+ * Starts/stops the watchdog daemon via `ha watch --background`.
  */
 export function createWatchdogControl(projectRoot: string): WatchdogControl {
 	return {

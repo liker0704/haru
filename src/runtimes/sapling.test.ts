@@ -539,7 +539,7 @@ describe("SaplingRuntime", () => {
 		let tempDir: string;
 
 		beforeEach(async () => {
-			tempDir = await mkdtemp(join(tmpdir(), "overstory-sapling-test-"));
+			tempDir = await mkdtemp(join(tmpdir(), "haru-sapling-test-"));
 		});
 
 		afterEach(async () => {
@@ -611,7 +611,7 @@ describe("SaplingRuntime", () => {
 		let tempDir: string;
 
 		beforeEach(async () => {
-			tempDir = await mkdtemp(join(tmpdir(), "overstory-sapling-guards-"));
+			tempDir = await mkdtemp(join(tmpdir(), "haru-sapling-guards-"));
 		});
 
 		afterEach(async () => {
@@ -921,7 +921,7 @@ describe("SaplingRuntime", () => {
 		let tempDir: string;
 
 		beforeEach(async () => {
-			tempDir = await mkdtemp(join(tmpdir(), "overstory-sapling-transcript-"));
+			tempDir = await mkdtemp(join(tmpdir(), "haru-sapling-transcript-"));
 		});
 
 		afterEach(async () => {

@@ -1,4 +1,4 @@
-// Sapling runtime adapter for overstory's AgentRuntime interface.
+// Sapling runtime adapter for haru's AgentRuntime interface.
 // Implements the AgentRuntime contract for the `sp` CLI (Sapling headless coding agent).
 //
 // Key characteristics:
@@ -93,7 +93,7 @@ const COORDINATION_CAPABILITIES = new Set([
 /**
  * Build the full guards configuration object for .sapling/guards.json.
  *
- * Translates overstory guard-rules.ts constants and HooksDef fields into a
+ * Translates haru guard-rules.ts constants and HooksDef fields into a
  * JSON-serializable format that the `sp` CLI can consume to enforce:
  * - Path boundary: all writes must target files within worktreePath.
  * - Blocked tools: NATIVE_TEAM_TOOLS and INTERACTIVE_TOOLS for all agents;
@@ -101,7 +101,7 @@ const COORDINATION_CAPABILITIES = new Set([
  * - Bash guards: DANGEROUS_BASH_PATTERNS blocklist (non-impl) or
  *   FILE_MODIFYING_BASH_PATTERNS path boundary (impl), with SAFE_BASH_PREFIXES.
  * - Quality gates: commands agents must pass before reporting completion.
- * - Event config: argv arrays for activity tracking via `ov log`.
+ * - Event config: argv arrays for activity tracking via `ha log`.
  *
  * @param hooks - Agent identity, capability, worktree path, and optional quality gates.
  * @returns JSON-serializable guards configuration object.
@@ -132,8 +132,8 @@ function buildGuardsConfig(hooks: HooksDef): Record<string, unknown> {
 		// When true, write tools are blocked in addition to the always-blocked tool set.
 		readOnly: isNonImpl,
 		// Tool names blocked for ALL agents.
-		// - nativeTeamTools: use `ov sling` for delegation instead.
-		// - interactiveTools: escalate via `ov mail --type question` instead.
+		// - nativeTeamTools: use `ha sling` for delegation instead.
+		// - interactiveTools: escalate via `ha mail --type question` instead.
 		blockedTools: [...NATIVE_TEAM_TOOLS, ...INTERACTIVE_TOOLS],
 		// Tool names blocked only for read-only (non-implementation) agents.
 		// Empty array for implementation agents (builder/merger).
@@ -142,7 +142,7 @@ function buildGuardsConfig(hooks: HooksDef): Record<string, unknown> {
 		writeToolNames: [...WRITE_TOOLS],
 		bashGuards: {
 			// Safe Bash prefixes: bypass dangerous pattern checks when matched.
-			// Includes base overstory commands, optional git add/commit for coordination,
+			// Includes base haru commands, optional git add/commit for coordination,
 			// and quality gate command prefixes.
 			safePrefixes,
 			// Dangerous Bash patterns: blocked for non-implementation agents.
@@ -371,7 +371,7 @@ export class SaplingRuntime implements AgentRuntime {
 	/**
 	 * Build the shell command string to spawn a Sapling agent in a tmux pane.
 	 *
-	 * This method exists for the TUI fallback path (e.g., `ov sling --runtime sapling`
+	 * This method exists for the TUI fallback path (e.g., `ha sling --runtime sapling`
 	 * on a host that has tmux). Under normal operation, Sapling is headless and
 	 * buildDirectSpawn() is used instead.
 	 *
@@ -478,7 +478,7 @@ export class SaplingRuntime implements AgentRuntime {
 	 *
 	 * Writes the overlay content to `SAPLING.md` in the worktree root.
 	 * Also writes `.sapling/guards.json` with the full guard configuration
-	 * derived from `hooks` — translating overstory guard-rules.ts constants
+	 * derived from `hooks` — translating haru guard-rules.ts constants
 	 * into JSON-serializable form for the `sp` CLI to enforce.
 	 *
 	 * @param worktreePath - Absolute path to the agent's git worktree
@@ -595,8 +595,8 @@ export class SaplingRuntime implements AgentRuntime {
 	 * and yields a typed AgentEvent for each complete JSON line. Malformed lines
 	 * (partial writes, non-JSON output) are silently skipped.
 	 *
-	 * The NDJSON format mirrors Pi's `--mode json` output so `ov feed`, `ov trace`,
-	 * and `ov costs` work without runtime-specific parsing.
+	 * The NDJSON format mirrors Pi's `--mode json` output so `ha feed`, `ha trace`,
+	 * and `ha costs` work without runtime-specific parsing.
 	 *
 	 * @param stream - ReadableStream<Uint8Array> from Bun.spawn stdout
 	 * @yields Parsed AgentEvent objects in emission order
@@ -649,8 +649,8 @@ export class SaplingRuntime implements AgentRuntime {
 	/**
 	 * Build runtime-specific environment variables for spawning sapling.
 	 *
-	 * Translates overstory's gateway provider env vars into what sapling expects.
-	 * Worktrees don't have .env files (gitignored), so overstory must pass
+	 * Translates haru's gateway provider env vars into what sapling expects.
+	 * Worktrees don't have .env files (gitignored), so haru must pass
 	 * provider credentials — same as it does for every other runtime.
 	 *
 	 * Key translations:

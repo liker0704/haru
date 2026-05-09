@@ -1,5 +1,5 @@
 /**
- * CLI command: ov init [--force] [--yes|-y] [--name <name>]
+ * CLI command: ha init [--force] [--yes|-y] [--name <name>]
  *
  * Scaffolds the `.overstory/` directory in the current project with:
  * - config.yaml (serialized from DEFAULT_CONFIG)
@@ -18,7 +18,7 @@ import { jsonOutput } from "../json.ts";
 import { printHint, printSuccess, printWarning } from "../logging/color.ts";
 import type { AgentManifest, OverstoryConfig } from "../types.ts";
 
-const OVERSTORY_DIR = ".overstory";
+const HARU_DIR = ".overstory";
 
 // ---- Ecosystem Bootstrap ----
 
@@ -254,7 +254,7 @@ async function detectCanonicalBranch(root: string): Promise<string> {
 function serializeConfigToYaml(config: OverstoryConfig): string {
 	const lines: string[] = [];
 	lines.push("# Overstory configuration");
-	lines.push("# See: https://github.com/overstory/overstory");
+	lines.push("# See: https://github.com/haru/haru");
 	lines.push("");
 
 	serializeObject(config as unknown as Record<string, unknown>, lines, 0);
@@ -444,7 +444,7 @@ export function buildHooksJson(): string {
 					hooks: [
 						{
 							type: "command",
-							command: "ov prime --agent orchestrator",
+							command: "ha prime --agent orchestrator",
 						},
 					],
 				},
@@ -455,7 +455,7 @@ export function buildHooksJson(): string {
 					hooks: [
 						{
 							type: "command",
-							command: "ov mail check --inject --agent orchestrator",
+							command: "ha mail check --inject --agent orchestrator",
 						},
 					],
 				},
@@ -467,7 +467,7 @@ export function buildHooksJson(): string {
 						{
 							type: "command",
 							command:
-								'read -r INPUT; CMD=$(echo "$INPUT" | sed \'s/.*"command": *"\\([^"]*\\)".*/\\1/\'); if echo "$CMD" | grep -qE \'\\bgit\\s+push\\b\'; then echo \'{"decision":"block","reason":"git push is blocked by overstory — merge locally, push manually when ready"}\'; exit 0; fi;',
+								'read -r INPUT; CMD=$(echo "$INPUT" | sed \'s/.*"command": *"\\([^"]*\\)".*/\\1/\'); if echo "$CMD" | grep -qE \'\\bgit\\s+push\\b\'; then echo \'{"decision":"block","reason":"git push is blocked by haru — merge locally, push manually when ready"}\'; exit 0; fi;',
 						},
 					],
 				},
@@ -476,7 +476,7 @@ export function buildHooksJson(): string {
 					hooks: [
 						{
 							type: "command",
-							command: `${toolNameExtract} ov log tool-start --agent orchestrator --tool-name "$TOOL_NAME"`,
+							command: `${toolNameExtract} ha log tool-start --agent orchestrator --tool-name "$TOOL_NAME"`,
 						},
 					],
 				},
@@ -487,7 +487,7 @@ export function buildHooksJson(): string {
 					hooks: [
 						{
 							type: "command",
-							command: `${toolNameExtract} ov log tool-end --agent orchestrator --tool-name "$TOOL_NAME"`,
+							command: `${toolNameExtract} ha log tool-end --agent orchestrator --tool-name "$TOOL_NAME"`,
 						},
 					],
 				},
@@ -508,7 +508,7 @@ export function buildHooksJson(): string {
 					hooks: [
 						{
 							type: "command",
-							command: "ov log session-end --agent orchestrator",
+							command: "ha log session-end --agent orchestrator",
 						},
 						{
 							type: "command",
@@ -523,7 +523,7 @@ export function buildHooksJson(): string {
 					hooks: [
 						{
 							type: "command",
-							command: "ov prime --agent orchestrator --compact",
+							command: "ha prime --agent orchestrator --compact",
 						},
 					],
 				},
@@ -598,11 +598,11 @@ CREATE TABLE IF NOT EXISTS sessions (
 /**
  * Content for .overstory/.gitignore — runtime state that should not be tracked.
  * Uses wildcard+whitelist pattern: ignore everything, whitelist tracked files.
- * Auto-healed by ov prime on each session start.
+ * Auto-healed by ha prime on each session start.
  * Config files (config.yaml, agent-manifest.json, hooks.json) remain tracked.
  */
-export const OVERSTORY_GITIGNORE = `# Wildcard+whitelist: ignore everything, whitelist tracked files
-# Auto-healed by ov prime on each session start
+export const HARU_GITIGNORE = `# Wildcard+whitelist: ignore everything, whitelist tracked files
+# Auto-healed by ha prime on each session start
 *
 !.gitignore
 !config.yaml
@@ -617,21 +617,21 @@ export const OVERSTORY_GITIGNORE = `# Wildcard+whitelist: ignore everything, whi
 /**
  * Content for .overstory/README.md — explains the directory to contributors.
  */
-export const OVERSTORY_README = `# .overstory/
+export const HARU_README = `# .overstory/
 
-This directory is managed by [overstory](https://github.com/jayminwest/overstory) — a multi-agent orchestration system for Claude Code.
+This directory is managed by [haru](https://github.com/jayminwest/haru) — a multi-agent orchestration system for Claude Code.
 
 Overstory turns a single Claude Code session into a multi-agent team by spawning worker agents in git worktrees via tmux, coordinating them through a custom SQLite mail system, and merging their work back with tiered conflict resolution.
 
 ## Key Commands
 
-- \`ov init\`          — Initialize this directory
-- \`ov status\`        — Show active agents and state
-- \`ov sling <id>\`    — Spawn a worker agent
-- \`ov mail check\`    — Check agent messages
-- \`ov merge\`         — Merge agent work back
-- \`ov dashboard\`     — Live TUI monitoring
-- \`ov doctor\`        — Run health checks
+- \`ha init\`          — Initialize this directory
+- \`ha status\`        — Show active agents and state
+- \`ha sling <id>\`    — Spawn a worker agent
+- \`ha mail check\`    — Check agent messages
+- \`ha merge\`         — Merge agent work back
+- \`ha dashboard\`     — Live TUI monitoring
+- \`ha doctor\`        — Run health checks
 
 ## Structure
 
@@ -651,7 +651,7 @@ Overstory turns a single Claude Code session into a multi-agent team by spawning
  */
 export async function writeOverstoryGitignore(overstoryPath: string): Promise<void> {
 	const gitignorePath = join(overstoryPath, ".gitignore");
-	await Bun.write(gitignorePath, OVERSTORY_GITIGNORE);
+	await Bun.write(gitignorePath, HARU_GITIGNORE);
 }
 
 /**
@@ -660,7 +660,7 @@ export async function writeOverstoryGitignore(overstoryPath: string): Promise<vo
  */
 export async function writeOverstoryReadme(overstoryPath: string): Promise<void> {
 	const readmePath = join(overstoryPath, "README.md");
-	await Bun.write(readmePath, OVERSTORY_README);
+	await Bun.write(readmePath, HARU_README);
 }
 
 export interface InitOptions {
@@ -688,7 +688,7 @@ function printCreated(relativePath: string): void {
 }
 
 /**
- * Entry point for `ov init [--force] [--yes|-y] [--name <name>]`.
+ * Entry point for `ha init [--force] [--yes|-y] [--name <name>]`.
  *
  * Scaffolds the .overstory/ directory structure in the current working directory.
  *
@@ -699,7 +699,7 @@ export async function initCommand(opts: InitOptions): Promise<void> {
 	const yes = opts.yes ?? false;
 	const projectRoot = process.cwd();
 	const spawner = opts._spawner ?? defaultSpawner;
-	const overstoryPath = join(projectRoot, OVERSTORY_DIR);
+	const overstoryPath = join(projectRoot, HARU_DIR);
 
 	// 0. Verify we're inside a git repository
 	const gitCheck = Bun.spawn(["git", "rev-parse", "--is-inside-work-tree"], {
@@ -709,7 +709,7 @@ export async function initCommand(opts: InitOptions): Promise<void> {
 	});
 	const gitCheckExit = await gitCheck.exited;
 	if (gitCheckExit !== 0) {
-		throw new ValidationError("overstory requires a git repository. Run 'git init' first.", {
+		throw new ValidationError("haru requires a git repository. Run 'git init' first.", {
 			field: "git",
 		});
 	}
@@ -732,16 +732,16 @@ export async function initCommand(opts: InitOptions): Promise<void> {
 	const projectName = opts.name ?? (await detectProjectName(projectRoot));
 	const canonicalBranch = await detectCanonicalBranch(projectRoot);
 
-	process.stdout.write(`Initializing overstory for "${projectName}"...\n\n`);
+	process.stdout.write(`Initializing haru for "${projectName}"...\n\n`);
 
 	// 3. Create directory structure
 	const dirs = [
-		OVERSTORY_DIR,
-		join(OVERSTORY_DIR, "agents"),
-		join(OVERSTORY_DIR, "agent-defs"),
-		join(OVERSTORY_DIR, "worktrees"),
-		join(OVERSTORY_DIR, "specs"),
-		join(OVERSTORY_DIR, "logs"),
+		HARU_DIR,
+		join(HARU_DIR, "agents"),
+		join(HARU_DIR, "agent-defs"),
+		join(HARU_DIR, "worktrees"),
+		join(HARU_DIR, "specs"),
+		join(HARU_DIR, "logs"),
 	];
 
 	for (const dir of dirs) {
@@ -749,7 +749,7 @@ export async function initCommand(opts: InitOptions): Promise<void> {
 		printCreated(`${dir}/`);
 	}
 
-	// 3b. Deploy agent definition .md files from overstory install directory
+	// 3b. Deploy agent definition .md files from haru install directory
 	const overstoryAgentsDir = join(import.meta.dir, "..", "..", "agents");
 	const agentDefsTarget = join(overstoryPath, "agent-defs");
 	const agentDefFiles = await readdir(overstoryAgentsDir);
@@ -759,7 +759,7 @@ export async function initCommand(opts: InitOptions): Promise<void> {
 		const source = Bun.file(join(overstoryAgentsDir, fileName));
 		const content = await source.text();
 		await Bun.write(join(agentDefsTarget, fileName), content);
-		printCreated(`${OVERSTORY_DIR}/agent-defs/${fileName}`);
+		printCreated(`${HARU_DIR}/agent-defs/${fileName}`);
 	}
 
 	// 4. Write config.yaml
@@ -771,27 +771,27 @@ export async function initCommand(opts: InitOptions): Promise<void> {
 	const configYaml = serializeConfigToYaml(config);
 	const configPath = join(overstoryPath, "config.yaml");
 	await Bun.write(configPath, configYaml);
-	printCreated(`${OVERSTORY_DIR}/config.yaml`);
+	printCreated(`${HARU_DIR}/config.yaml`);
 
 	// 5. Write agent-manifest.json
 	const manifest = buildAgentManifest();
 	const manifestPath = join(overstoryPath, "agent-manifest.json");
 	await Bun.write(manifestPath, `${JSON.stringify(manifest, null, "\t")}\n`);
-	printCreated(`${OVERSTORY_DIR}/agent-manifest.json`);
+	printCreated(`${HARU_DIR}/agent-manifest.json`);
 
 	// 6. Write hooks.json
 	const hooksContent = buildHooksJson();
 	const hooksPath = join(overstoryPath, "hooks.json");
 	await Bun.write(hooksPath, hooksContent);
-	printCreated(`${OVERSTORY_DIR}/hooks.json`);
+	printCreated(`${HARU_DIR}/hooks.json`);
 
 	// 7. Write .overstory/.gitignore for runtime state
 	await writeOverstoryGitignore(overstoryPath);
-	printCreated(`${OVERSTORY_DIR}/.gitignore`);
+	printCreated(`${HARU_DIR}/.gitignore`);
 
 	// 7b. Write .overstory/README.md
 	await writeOverstoryReadme(overstoryPath);
-	printCreated(`${OVERSTORY_DIR}/README.md`);
+	printCreated(`${HARU_DIR}/README.md`);
 
 	// 8. Migrate existing SQLite databases on --force reinit
 	if (force || yes) {
@@ -804,7 +804,7 @@ export async function initCommand(opts: InitOptions): Promise<void> {
 	// 9. Bootstrap sibling ecosystem tools
 	const toolSet = resolveToolSet(opts);
 	const toolResults: Record<string, { status: ToolStatus; path: string }> = {
-		overstory: { status: "initialized", path: overstoryPath },
+		haru: { status: "initialized", path: overstoryPath },
 	};
 
 	if (toolSet.length > 0) {
@@ -839,9 +839,9 @@ export async function initCommand(opts: InitOptions): Promise<void> {
 
 	// 12. Auto-commit scaffold files so ecosystem dirs are tracked before agents create branches.
 	// Without this, agent branches that add files to .mulch/.seeds/.canopy cause
-	// untracked-vs-tracked conflicts in ov merge (overstory-fe42).
+	// untracked-vs-tracked conflicts in ha merge (haru-fe42).
 	let scaffoldCommitted = false;
-	const pathsToAdd: string[] = [OVERSTORY_DIR];
+	const pathsToAdd: string[] = [HARU_DIR];
 
 	// Add .gitattributes if it exists
 	try {
@@ -880,7 +880,7 @@ export async function initCommand(opts: InitOptions): Promise<void> {
 		if (diffResult.exitCode !== 0) {
 			// Changes are staged — commit them
 			const commitResult = await spawner(
-				["git", "commit", "-m", "chore: initialize overstory and ecosystem tools"],
+				["git", "commit", "-m", "chore: initialize haru and ecosystem tools"],
 				{ cwd: projectRoot },
 			);
 			if (commitResult.exitCode === 0) {
@@ -905,6 +905,6 @@ export async function initCommand(opts: InitOptions): Promise<void> {
 	}
 
 	printSuccess("Initialized");
-	printHint("Next: run `ov hooks install` to enable Claude Code hooks.");
-	printHint("Then: run `ov status` to see the current state.");
+	printHint("Next: run `ha hooks install` to enable Claude Code hooks.");
+	printHint("Then: run `ha status` to see the current state.");
 }

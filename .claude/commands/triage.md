@@ -1,6 +1,6 @@
 ## intro
 
-Triage open GitHub issues on `jayminwest/overstory`: classify, prioritize, label, deduplicate, and identify issues that should be closed. Apply labels directly to GitHub issues. Return a consolidated report to the developer.
+Triage open GitHub issues on `jayminwest/haru`: classify, prioritize, label, deduplicate, and identify issues that should be closed. Apply labels directly to GitHub issues. Return a consolidated report to the developer.
 
 **Argument:** `$ARGUMENTS` — optional issue number(s) to triage (e.g., `5` or `5 8 12`). If empty, triage all open issues.
 
@@ -17,7 +17,7 @@ Use these predefined labels when classifying issues. Each issue gets exactly one
 - `area:merge` — Merge queue, tiered conflict resolution (src/merge/)
 - `area:observability` — Status, dashboard, inspect, trace, logs, feed, replay, costs, metrics, watchdog (src/events/, src/metrics/, src/logging/, src/watchdog/, src/insights/)
 - `area:coordination` — Coordinator, lead hierarchy, groups, multi-agent orchestration (src/commands/coordinator.ts, src/commands/group.ts)
-- `area:initialization` — ov init, bootstrap, config loading/validation, ov doctor (src/config.ts, src/commands/init.ts, src/doctor/)
+- `area:initialization` — ha init, bootstrap, config loading/validation, ha doctor (src/config.ts, src/commands/init.ts, src/doctor/)
 - `area:infrastructure` — Hooks, guard rules, worktree management, CLI framework (src/agents/hooks-deployer.ts, src/agents/guard-rules.ts, src/commands/hooks.ts)
 - `area:docs` — Documentation, README, examples, guides
 
@@ -46,12 +46,12 @@ Use these predefined labels when classifying issues. Each issue gets exactly one
 
 Before triaging, verify all labels from the taxonomy exist on the GitHub repo. Run:
 ```bash
-gh label list --repo jayminwest/overstory --json name
+gh label list --repo jayminwest/haru --json name
 ```
 
 For any missing labels, create them:
 ```bash
-gh label create "<label-name>" --repo jayminwest/overstory --description "<description>" --color "<hex>"
+gh label create "<label-name>" --repo jayminwest/haru --description "<description>" --color "<hex>"
 ```
 
 Use these colors:
@@ -67,7 +67,7 @@ Use these colors:
 ### 2. Fetch open issues
 
 - If `$ARGUMENTS` contains issue number(s), fetch only those
-- Otherwise: `gh issue list --repo jayminwest/overstory --state open --limit 100 --json number,title,body,author,labels,createdAt,updatedAt,comments`
+- Otherwise: `gh issue list --repo jayminwest/haru --state open --limit 100 --json number,title,body,author,labels,createdAt,updatedAt,comments`
 - If there are no open issues, say so and stop
 
 ### 3. Spawn triage team (parallel subagents)
@@ -94,7 +94,7 @@ Determine if the issue is actionable or should be closed. Flag for closure if:
 - **Too broad:** Scope is unbounded, should be split into multiple issues
 - **Duplicate:** Another open issue covers the same work (cite the duplicate)
 - **Stale:** Old issue that references code/architecture that no longer exists
-- **Wontfix:** Doesn't align with overstory's direction (agent orchestration, Bun-native, zero runtime deps)
+- **Wontfix:** Doesn't align with haru's direction (agent orchestration, Bun-native, zero runtime deps)
 
 For issues flagged for closure, draft a **suggested closing comment** (polite, specific, actionable — e.g., suggest how to refile if too vague).
 
@@ -135,7 +135,7 @@ Spawn one additional agent to cross-check all duplicate pairs identified by the 
 
 For every issue with `Action: LABEL`, apply the classified labels:
 ```bash
-gh issue edit <number> --repo jayminwest/overstory --add-label "area:<x>,priority:<x>,difficulty:<x>" [--add-label "focus:<x>"]
+gh issue edit <number> --repo jayminwest/haru --add-label "area:<x>,priority:<x>,difficulty:<x>" [--add-label "focus:<x>"]
 ```
 
 Do NOT label or modify issues with `Action: CLOSE` — those are presented to the developer for manual decision.

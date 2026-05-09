@@ -11,7 +11,7 @@ import { createReviewStore } from "../review/store.ts";
 import type { HealthRecommendation, HealthScore, RecommendationSource } from "./types.ts";
 
 /**
- * Create a RecommendationSource that reads from reviews.db in the given overstory directory.
+ * Create a RecommendationSource that reads from reviews.db in the given haru directory.
  *
  * Returns an empty array if reviews.db does not exist or any error occurs.
  */
@@ -39,8 +39,8 @@ export function createReviewSource(overstoryDir: string): RecommendationSource {
 							"No reviews have been run yet. Without baseline quality data, degraded agent output goes undetected.",
 						expectedImpact:
 							"Establish a quality baseline and surface early issues in session and spec quality.",
-						action: "Run `ov review sessions` and `ov review specs` to generate initial reviews.",
-						verificationStep: "Run `ov review sessions` and confirm review count > 0.",
+						action: "Run `ha review sessions` and `ha review specs` to generate initial reviews.",
+						verificationStep: "Run `ha review sessions` and confirm review count > 0.",
 						priority: "medium",
 						factor: "review_coverage",
 						source: "review-quality",
@@ -56,9 +56,9 @@ export function createReviewSource(overstoryDir: string): RecommendationSource {
 						expectedImpact:
 							"Higher-quality sessions improve task completion rates and reduce agent rework.",
 						action:
-							"Run `ov review sessions --verbose` to identify low-scoring sessions. Review agent specs and file scopes for clarity.",
+							"Run `ha review sessions --verbose` to identify low-scoring sessions. Review agent specs and file scopes for clarity.",
 						verificationStep:
-							"Re-run `ov review sessions` after improvements and confirm average score ≥ 60.",
+							"Re-run `ha review sessions` after improvements and confirm average score ≥ 60.",
 						priority: "high",
 						factor: "review_session_quality",
 						source: "review-quality",
@@ -74,9 +74,9 @@ export function createReviewSource(overstoryDir: string): RecommendationSource {
 						expectedImpact:
 							"Better specs reduce rework, improve completion rates, and lower agent cost.",
 						action:
-							"Run `ov review specs --verbose` to identify low-scoring specs. Rewrite ambiguous objectives and tighten file scopes.",
+							"Run `ha review specs --verbose` to identify low-scoring specs. Rewrite ambiguous objectives and tighten file scopes.",
 						verificationStep:
-							"Re-run `ov review specs` after improvements and confirm average score ≥ 60.",
+							"Re-run `ha review specs` after improvements and confirm average score ≥ 60.",
 						priority: "high",
 						factor: "review_spec_quality",
 						source: "review-quality",
@@ -102,9 +102,9 @@ export function createReviewSource(overstoryDir: string): RecommendationSource {
 						whyNow: `More than 50% of ${highestStaleType} reviews are stale. Stale reviews no longer reflect current artifact state and may mask regressions.`,
 						expectedImpact:
 							"Fresh reviews surface current quality issues and ensure recommendations are actionable.",
-						action: `Run \`ov review ${highestStaleType}s\` to refresh stale reviews.`,
+						action: `Run \`ha review ${highestStaleType}s\` to refresh stale reviews.`,
 						verificationStep:
-							"Run `ov review stale` and confirm stale count has decreased significantly.",
+							"Run `ha review stale` and confirm stale count has decreased significantly.",
 						priority: "medium",
 						factor: "review_staleness",
 						source: "review-quality",
@@ -132,7 +132,7 @@ export function createReviewSource(overstoryDir: string): RecommendationSource {
 							expectedImpact:
 								"Better coordination reduces merge conflicts, agent blocking, and wasted parallel work.",
 							action:
-								"Review agent communication patterns with `ov review sessions --verbose`. Consider splitting overlapping file scopes.",
+								"Review agent communication patterns with `ha review sessions --verbose`. Consider splitting overlapping file scopes.",
 							verificationStep:
 								"Re-run session reviews after coordination improvements and confirm coordination-fit score ≥ 50.",
 							priority: "medium",

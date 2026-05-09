@@ -4,8 +4,12 @@
 
 import type { nudgeAgent } from "../commands/nudge.ts";
 import type { stopCommand } from "../commands/stop.ts";
-import type { startExecutionDirector, stopMissionRole } from "./roles.ts";
-import { startMissionAnalyst, startMissionCoordinator } from "./roles.ts";
+import type {
+	startExecutionDirector,
+	startMissionAnalyst,
+	startMissionCoordinator,
+	stopMissionRole,
+} from "./roles.ts";
 
 export interface MissionCommandDeps {
 	startMissionCoordinator?: typeof startMissionCoordinator;

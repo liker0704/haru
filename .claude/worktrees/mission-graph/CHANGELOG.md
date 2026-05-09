@@ -9,12 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-#### Scenario-Based Eval Framework (`ov eval`)
+#### Scenario-Based Eval Framework (`ha eval`)
 - **`src/eval/`** — new evaluation subsystem for orchestration regression testing
-- **`ov eval run <scenario>`** — run YAML-defined scenarios against fixture repos with configurable timeouts
-- **`ov eval show <run-id>`** — display results of a previous eval run
-- **`ov eval list`** — list all past eval runs sorted by date
-- **`ov eval compare <a> <b>`** — side-by-side comparison of two eval runs with metrics delta and assertion diff
+- **`ha eval run <scenario>`** — run YAML-defined scenarios against fixture repos with configurable timeouts
+- **`ha eval show <run-id>`** — display results of a previous eval run
+- **`ha eval list`** — list all past eval runs sorted by date
+- **`ha eval compare <a> <b>`** — side-by-side comparison of two eval runs with metrics delta and assertion diff
 - **8 assertion kinds** — `minAgents`, `maxAgents`, `allComplete`, `noZombies`, `maxStallRate`, `maxCost`, `maxDuration`, `tasksCompleted`
 - **Built-in scenarios** — `evals/dispatch-smoke/`, `evals/merge-smoke/`, `evals/watchdog-recovery/`
 
@@ -22,54 +22,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`src/config-schema.ts`** — config schema version constants and known field registry
 - **`src/config-migrate.ts`** — version detection and migration pipeline for config evolution
 - **`src/config-validate.ts`** — strict unknown-field validation with helpful error messages
-- **`ov doctor --category config`** — integrated config version health check
+- **`ha doctor --category config`** — integrated config version health check
 
-#### Operational Health Scoring (`ov health`, `ov next-improvement`)
+#### Operational Health Scoring (`ha health`, `ha next-improvement`)
 - **`src/health/`** — weighted health scoring with signal collection from existing stores
-- **`ov health`** — operational health score with per-signal breakdown (zombie count, stall rate, merge conflicts, error rate, etc.)
-- **`ov next-improvement`** — top recommendation from health scoring engine with actionable steps
+- **`ha health`** — operational health score with per-signal breakdown (zombie count, stall rate, merge conflicts, error rate, etc.)
+- **`ha next-improvement`** — top recommendation from health scoring engine with actionable steps
 
-#### Review Contour (`ov review`)
+#### Review Contour (`ha review`)
 - **`src/review/`** — deterministic quality review across 6 dimensions (clarity, actionability, completeness, signal-to-noise, correctness-confidence, coordination-fit)
-- **`ov review sessions`** — review recent completed sessions with dimension scoring
-- **`ov review session <id>`** — detailed review of a single session
-- **`ov review handoffs`** — review session handoff quality from checkpoint data
-- **`ov review specs`** — review spec file quality (structure, sections, actionability)
-- **`ov review stale`** — staleness detection via SHA-256 hashing of watched surfaces
+- **`ha review sessions`** — review recent completed sessions with dimension scoring
+- **`ha review session <id>`** — detailed review of a single session
+- **`ha review handoffs`** — review session handoff quality from checkpoint data
+- **`ha review specs`** — review spec file quality (structure, sections, actionability)
+- **`ha review stale`** — staleness detection via SHA-256 hashing of watched surfaces
 - **`src/review/store.ts`** — SQLite-backed ReviewStore in `.overstory/reviews.db`
 
 #### GitHub Issues Tracker Backend
 - **`src/tracker/github.ts`** — GitHub Issues adapter implementing `TrackerClient` via `gh` CLI
 - **`src/tracker/github-poller.ts`** — autonomous polling loop for GitHub Issues auto-dispatch
-- **`ov coordinator start --auto-pull`** — enable autonomous issue polling for GitHub tracker
+- **`ha coordinator start --auto-pull`** — enable autonomous issue polling for GitHub tracker
 
 #### tmux Session Attach Fix
-- **`ov attach`** — now uses `tmux switch-client` when already inside a tmux session, preventing nested session errors
+- **`ha attach`** — now uses `tmux switch-client` when already inside a tmux session, preventing nested session errors
 
 ## [0.8.7] - 2026-03-10
 
 ### Added
 
 #### Cursor CLI Runtime Adapter
-- **`src/runtimes/cursor.ts`** — new runtime adapter for [Cursor CLI](https://cursor.com/docs/cli/overview) (`agent` binary), implementing the `AgentRuntime` interface with TUI spawning via tmux, `.cursor/rules/overstory.md` instruction delivery, `--yolo` permission bypass, and headless one-shot mode — thanks to **@XavierChevalier** (#104, #66)
+- **`src/runtimes/cursor.ts`** — new runtime adapter for [Cursor CLI](https://cursor.com/docs/cli/overview) (`agent` binary), implementing the `AgentRuntime` interface with TUI spawning via tmux, `.cursor/rules/haru.md` instruction delivery, `--yolo` permission bypass, and headless one-shot mode — thanks to **@XavierChevalier** (#104, #66)
 - **`src/runtimes/cursor.test.ts`** — comprehensive test suite (497 lines) covering spawn command building, overlay generation, readiness detection, and transcript parsing
 
 #### Runtime Stability Classification
 - **`stability` field on `AgentRuntime`** — new `"stable" | "beta" | "experimental"` field on the runtime interface; Claude and Sapling marked `stable`, Pi and Codex as `beta`, Copilot/Gemini/OpenCode/Cursor as `experimental`
-- Stability surfaced in `ov agents` and runtime documentation
+- Stability surfaced in `ha agents` and runtime documentation
 
 #### Per-Coordinator Run Isolation
 - **Per-coordinator session tracking** — `SessionStore` now tracks `coordinator_name` per session with auto-migration for existing databases, enabling isolated run tracking when multiple coordinators operate in the same project
-- **`OVERSTORY_TASK_ID` env var** — slung agents now receive their task ID as an environment variable; tracker `close` commands are guarded to prevent agents from closing issues outside their assigned scope
+- **`HARU_TASK_ID` env var** — slung agents now receive their task ID as an environment variable; tracker `close` commands are guarded to prevent agents from closing issues outside their assigned scope
 
 #### Dashboard Runtime Column
 - **Runtime column in dashboard agent panel** — the live TUI dashboard now shows which runtime each agent is using (e.g., `claude`, `cursor`, `sapling`) — thanks to **@mustafamagdy** (#99)
 
 ### Fixed
 
-- **Dashboard crash on SQLite lock contention** — `ov dashboard` no longer crashes when concurrent agents cause `SQLITE_BUSY`; database reads are wrapped with retry logic
+- **Dashboard crash on SQLite lock contention** — `ha dashboard` no longer crashes when concurrent agents cause `SQLITE_BUSY`; database reads are wrapped with retry logic
 - **Silent content loss in merge auto-resolve** — merge resolver Tier 2 (hunk-level) no longer silently drops non-conflicting content when resolving conflicts; the entire file is now preserved correctly
-- **`ov init` ENOENT on spawner calls** — `spawner()` calls for ecosystem tool detection are now wrapped in try/catch to prevent crashes when `mulch`/`sd`/`cn` CLIs are not installed
+- **`ha init` ENOENT on spawner calls** — `spawner()` calls for ecosystem tool detection are now wrapped in try/catch to prevent crashes when `mulch`/`sd`/`cn` CLIs are not installed
 - **Shift+tab false positive in `detectReady`** — the `hasStatusBar` check no longer matches shift+tab escape sequences as a status bar indicator, preventing premature ready detection
 - **Claude bypass dialog and Codex shared state** — Claude runtime's `detectReady()` now recognizes the "bypass" dialog phase; Codex runtime correctly handles `sharedWritableDirs` spawn option — thanks to **@Ilanbux** (#101)
 - **Tmux pane retry for WSL2 race condition** — `capturePaneContent()` and `sendKeys()` now retry on transient tmux failures caused by WSL2 timing issues — thanks to **@arosstale** (#78)
@@ -86,18 +86,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 #### Coordinator Completion Protocol
-- **`ov coordinator check-complete`** — new subcommand that evaluates configured exit triggers (`allAgentsDone`, `taskTrackerEmpty`, `onShutdownSignal`) and returns per-trigger status; complete = true only when ALL enabled triggers are met
+- **`ha coordinator check-complete`** — new subcommand that evaluates configured exit triggers (`allAgentsDone`, `taskTrackerEmpty`, `onShutdownSignal`) and returns per-trigger status; complete = true only when ALL enabled triggers are met
 - **`coordinator.exitTriggers` config** — new `coordinator` section in `config.yaml` with three boolean triggers controlling automatic coordinator shutdown (all default to `false`)
 - Exit-trigger evaluation integrated into coordinator completion protocol — the coordinator can now self-terminate when configured conditions are met
 - `allAgentsDone` trigger also checks the merge queue to prevent premature shutdown while branches are still pending merge
 
 #### Spawn Rollback
 - **`rollbackWorktree()`** — new helper in `src/worktree/manager.ts` that removes a worktree and deletes its branch (best-effort, errors swallowed)
-- **`ov sling` rollback on spawn failure** — if agent spawn fails after worktree creation, the worktree and branch are automatically rolled back to avoid orphaned resources
+- **`ha sling` rollback on spawn failure** — if agent spawn fails after worktree creation, the worktree and branch are automatically rolled back to avoid orphaned resources
 
 #### Per-Agent Cleanup
-- **`ov clean --agent <name>`** — targeted cleanup of a single agent: kills tmux session or process tree, removes worktree, deletes branch, clears agent and log directories, logs synthetic session-end event, and marks session as completed
-- **`ov stop --clean-worktree` on completed agents** — previously threw an error for completed agents; now skips the kill step and proceeds directly to worktree+branch cleanup
+- **`ha clean --agent <name>`** — targeted cleanup of a single agent: kills tmux session or process tree, removes worktree, deletes branch, clears agent and log directories, logs synthetic session-end event, and marks session as completed
+- **`ha stop --clean-worktree` on completed agents** — previously threw an error for completed agents; now skips the kill step and proceeds directly to worktree+branch cleanup
 
 #### Merge Reliability
 - **Auto-commit os-eco state files before merge** — runtime state files (`.seeds/`, `.overstory/`, `.mulch/`, `.canopy/`, `.greenhouse/`, `.claude/`, `CLAUDE.md`) are automatically committed with `chore: sync os-eco runtime state` to prevent dirty-tree merge errors
@@ -106,7 +106,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Untracked file handling** in merge resolver improved to prevent conflicts between tracked and untracked files
 
 #### Init Scaffold Commit
-- **Auto-commit scaffold files at end of `ov init`** — ecosystem directories (`.overstory/`, `.seeds/`, `.mulch/`, `.canopy/`, `.gitattributes`, `CLAUDE.md`) are committed so agent branches don't cause untracked-vs-tracked conflicts during merge
+- **Auto-commit scaffold files at end of `ha init`** — ecosystem directories (`.overstory/`, `.seeds/`, `.mulch/`, `.canopy/`, `.gitattributes`, `CLAUDE.md`) are committed so agent branches don't cause untracked-vs-tracked conflicts during merge
 
 ### Fixed
 
@@ -114,15 +114,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Stale headless agent detection** — watchdog now checks `isProcessAlive(pid)` for headless agents instead of only checking tmux session liveness
 - **Coordinator state file commit** — completion protocols now commit os-eco state files before final steps to prevent dirty-tree errors downstream
 - **Coordinator premature issue closure** — coordinator no longer closes seeds issues before the lead agent merges its branch; `allAgentsDone` trigger checks merge queue for pending branches
-- **Coordinator auto-complete on session-end** — `ov run complete` is no longer called automatically from the per-turn Stop hook, preventing premature run completion
+- **Coordinator auto-complete on session-end** — `ha run complete` is no longer called automatically from the per-turn Stop hook, preventing premature run completion
 - **Self-exiting coordinator** — session-end hook now handles coordinators that exit themselves (e.g., via exit triggers) without throwing errors
 - **`--json` flag stolen by parent Commander** — `.enablePositionalOptions()` added to the root program so subcommand `--json` flags are not consumed by the parent parser
 - **Pi runtime transcript parsing** — Pi v3 JSONL format stores token usage inside `message` events at `message.usage.{input, output, cacheRead}`, not in `message_end` events; parser now handles both formats with `cacheRead` counted toward input tokens (#82)
-- **Pi `getTranscriptDir()`** — now returns `~/.pi/agent/sessions/{encoded-project-path}/` instead of `null`, enabling `ov costs` for Pi agents (#82)
+- **Pi `getTranscriptDir()`** — now returns `~/.pi/agent/sessions/{encoded-project-path}/` instead of `null`, enabling `ha costs` for Pi agents (#82)
 
 ### Changed
 
-- CLI command count: 34 → 35 (new `check-complete` subcommand under `ov coordinator`)
+- CLI command count: 34 → 35 (new `check-complete` subcommand under `ha coordinator`)
 
 ### Testing
 
@@ -137,12 +137,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`src/runtimes/opencode.test.ts`** — test suite (325 lines) covering spawn command building, overlay generation, guard rules, and environment setup
 
 #### NDJSON Event Tailer for Headless Agents
-- **`src/events/tailer.ts`** — background NDJSON event tailer that polls `stdout.log` files from headless agents (e.g. Sapling, OpenCode), parses new lines, and writes them into `events.db` via EventStore — enabling `ov status`, `ov dashboard`, and `ov feed` to show live progress for headless agents
+- **`src/events/tailer.ts`** — background NDJSON event tailer that polls `stdout.log` files from headless agents (e.g. Sapling, OpenCode), parses new lines, and writes them into `events.db` via EventStore — enabling `ha status`, `ha dashboard`, and `ha feed` to show live progress for headless agents
 - **`src/events/tailer.test.ts`** — test suite (461 lines) covering line parsing, file tailing, stop/cleanup, and edge cases
 - **Watchdog integration** — `runDaemonTick()` now automatically starts/stops event tailers for active headless agents, with module-level tailer registry persisting across ticks
 
 #### Headless Agent Inspection
-- **`ov inspect` stdout.log fallback** — when `--no-tmux` or tmux capture fails, inspect now falls back to reading the agent's `stdout.log` NDJSON file, parsing recent events to display tool activity and progress for headless agents
+- **`ha inspect` stdout.log fallback** — when `--no-tmux` or tmux capture fails, inspect now falls back to reading the agent's `stdout.log` NDJSON file, parsing recent events to display tool activity and progress for headless agents
 
 ### Fixed
 
@@ -171,7 +171,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Dirty working tree merge guard** — `ov merge` now detects uncommitted changes to tracked files before attempting a merge and throws a clear error, preventing cascading failures through all 4 tiers with misleading empty conflict lists
+- **Dirty working tree merge guard** — `ha merge` now detects uncommitted changes to tracked files before attempting a merge and throws a clear error, preventing cascading failures through all 4 tiers with misleading empty conflict lists
 - 5 tests covering the dirty-tree detection in `resolver.test.ts`
 
 ### Changed
@@ -187,7 +187,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 #### Auto-Generated Agent Names
-- **`ov sling` no longer requires `--name`** — when omitted, generates a unique name from `{capability}-{taskId}`, with `-2`, `-3` suffixes to avoid collisions against active sessions
+- **`ha sling` no longer requires `--name`** — when omitted, generates a unique name from `{capability}-{taskId}`, with `-2`, `-3` suffixes to avoid collisions against active sessions
 - `generateAgentName()` helper exported from `src/commands/sling.ts` with collision-avoidance logic
 
 #### Direct Scout/Builder Spawn
@@ -200,8 +200,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **Codex runtime startup** — `buildSpawnCommand()` now uses interactive `codex` (not `codex exec`) so sessions stay alive in tmux; omits `--model` for Anthropic aliases that Codex CLI doesn't accept (thanks @vidhatanand)
-- **Zombie agent cleanup** — `ov stop` now cleans up zombie agents (marks them completed) instead of erroring with "already zombie"
-- **Headless stdout redirect** — `ov sling` always redirects headless agent stdout to file, preventing backpressure-induced zombie processes
+- **Zombie agent cleanup** — `ha stop` now cleans up zombie agents (marks them completed) instead of erroring with "already zombie"
+- **Headless stdout redirect** — `ha sling` always redirects headless agent stdout to file, preventing backpressure-induced zombie processes
 - **Config warning deduplication** — non-Anthropic model warnings in `validateConfig` now emit once per process instead of on every `loadConfig()` call
 - **Codex bare model refs** — `validateConfig` now accepts bare model references (e.g., `gpt-5.3-codex`) when the default runtime is `codex`, instead of requiring provider-prefixed format
 
@@ -228,7 +228,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Headless backpressure zombie** — `ov sling` now redirects headless agent stdout/stderr to log files to prevent backpressure from causing zombie processes
+- **Headless backpressure zombie** — `ha sling` now redirects headless agent stdout/stderr to log files to prevent backpressure from causing zombie processes
 - **`deployConfig` guard write** — always writes `guards.json` even when overlay is undefined, preventing missing guard files for headless runtimes
 - **Sapling model alias resolution** — correct alias expansion in both `buildEnv()` and `buildDirectSpawn()` paths
 
@@ -247,19 +247,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Guard deployment: `.sapling/guards.json` written from `guard-rules.ts` constants
 - Model alias resolution: expands `sonnet`/`opus`/`haiku` aliases via `ANTHROPIC_DEFAULT_*_MODEL` env vars
 - `buildEnv()` configures `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, provider routing
-- Registered in runtime registry as `"sapling"`, available via `ov sling --runtime sapling`
+- Registered in runtime registry as `"sapling"`, available via `ha sling --runtime sapling`
 - Sapling v0.1.5 event types added to `EventType` union and theme labels
 - 972 lines of test coverage in `src/runtimes/sapling.test.ts`
 
 #### Headless Agent Spawn Path
-- **Headless spawn** in `ov sling` — when `runtime.headless === true`, bypasses tmux entirely and spawns agents as direct Bun subprocesses
+- **Headless spawn** in `ha sling` — when `runtime.headless === true`, bypasses tmux entirely and spawns agents as direct Bun subprocesses
 - New `src/worktree/process.ts` module: `spawnHeadlessAgent()` for direct `Bun.spawn()` invocation, `HeadlessProcess` interface for PID/stdin/stdout management
 - `DirectSpawnOpts` and `AgentEvent` types added to `src/runtimes/types.ts`
 - Headless fields added to `AgentRuntime` interface
 
 #### Headless Agent Lifecycle Support
-- **`ov status`**, **`ov dashboard`**, **`ov inspect`** updated to handle tmux-less (headless) agents gracefully
-- **`ov stop`** updated with headless process termination via PID-based `killProcessTree()`
+- **`ha status`**, **`ha dashboard`**, **`ha inspect`** updated to handle tmux-less (headless) agents gracefully
+- **`ha stop`** updated with headless process termination via PID-based `killProcessTree()`
 - Health evaluation in `src/watchdog/health.ts` supports headless agent lifecycle (PID liveness instead of tmux session checks)
 
 ### Fixed
@@ -281,31 +281,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 #### Coordinator Interaction Subcommands
-- **`ov coordinator send`** — fire-and-forget message to the running coordinator via mail + auto-nudge, replacing the two-step `ov mail send` + `ov nudge` pattern
-- **`ov coordinator ask`** — synchronous request/response to the coordinator; sends a dispatch mail with a `correlationId`, auto-nudges, polls for a reply in the same thread, and exits with the reply body (configurable `--timeout`, default 120s)
-- **`ov coordinator output`** — show recent coordinator output via tmux `capture-pane` (configurable `--lines`, default 100)
+- **`ha coordinator send`** — fire-and-forget message to the running coordinator via mail + auto-nudge, replacing the two-step `ha mail send` + `ha nudge` pattern
+- **`ha coordinator ask`** — synchronous request/response to the coordinator; sends a dispatch mail with a `correlationId`, auto-nudges, polls for a reply in the same thread, and exits with the reply body (configurable `--timeout`, default 120s)
+- **`ha coordinator output`** — show recent coordinator output via tmux `capture-pane` (configurable `--lines`, default 100)
 - 334 lines of new test coverage in `src/commands/coordinator.test.ts`
 
 #### Orchestrator Agent Definition
 - **`agents/orchestrator.md`** — new base agent definition for multi-repo coordination above the coordinator level
-- Defines the orchestrator role: dispatches coordinators per sub-repo via `ov coordinator start --project`, monitors via mail, never modifies code directly
+- Defines the orchestrator role: dispatches coordinators per sub-repo via `ha coordinator start --project`, monitors via mail, never modifies code directly
 - Named failure modes: `DIRECT_SLING`, `CODE_MODIFICATION`, `SPEC_WRITING`, `OVERLAPPING_REPO_SCOPE`, `OVERLAPPING_FILE_SCOPE`, `DIRECT_MERGE`, `PREMATURE_COMPLETION`, `SILENT_FAILURE`, `POLLING_LOOP`
 - 239 lines of agent definition
 
 #### Operator Message Protocol for Coordinator
 - **`operator-messages`** section added to `agents/coordinator.md` — defines how coordinators handle synchronous human requests from the CLI
-- Reply format: always reply via `ov mail reply` with `correlationId` echo
+- Reply format: always reply via `ha mail reply` with `correlationId` echo
 - Status request format: structured `Active leads` / `Completed` / `Blockers` / `Next actions`
 - Dispatch, stop, merge, and unrecognized request handling rules
 
 #### `--project` Global Flag
-- **`ov --project <path>`** — target a different project root for any command, overriding auto-detection
+- **`ha --project <path>`** — target a different project root for any command, overriding auto-detection
 - Validates that the target path contains `.overstory/config.yaml`; throws `ConfigError` if missing
 - `setProjectRootOverride()` / `getProjectRootOverride()` / `clearProjectRootOverride()` in `src/config.ts`
 - 66 lines of new test coverage in `src/config.test.ts`
 
-#### `ov update` Command
-- **`ov update`** — refresh `.overstory/` managed files from the installed npm package without requiring a full `ov init`
+#### `ha update` Command
+- **`ha update`** — refresh `.overstory/` managed files from the installed npm package without requiring a full `ha init`
 - Refreshes: agent definitions (`agent-defs/*.md`), `agent-manifest.json`, `hooks.json`, `.gitignore`, `README.md`
 - Does NOT touch: `config.yaml`, `config.local.yaml`, SQLite databases, agent state, worktrees, specs, logs, or `.claude/settings.local.json`
 - Flags: `--agents`, `--manifest`, `--hooks`, `--dry-run`, `--json`
@@ -332,7 +332,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Sandbox support via `--sandbox` flag, `--approval-mode yolo` for auto-approval
 - Headless mode: `gemini -p "prompt"` for one-shot calls
 - Transcript parsing from `--output-format stream-json` NDJSON events
-- Registered in runtime registry as `"gemini"`, available via `ov sling --runtime gemini`
+- Registered in runtime registry as `"gemini"`, available via `ha sling --runtime gemini`
 - 537 lines of test coverage in `src/runtimes/gemini.test.ts`
 
 #### Model Alias Expansion via Environment Variables
@@ -356,18 +356,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Shell Init Delay
 - **`runtime.shellInitDelayMs`** config option — configurable delay between tmux session creation and TUI readiness polling, giving slow shells (oh-my-zsh, nvm, starship, etc.) time to initialize before the agent command starts
-- Applied to both `ov sling` and `ov coordinator start` spawn paths
+- Applied to both `ha sling` and `ha coordinator start` spawn paths
 - Validation: must be non-negative number; values above 30s trigger a warning
 
-#### `--base-branch` Flag for `ov sling`
-- **`ov sling --base-branch <branch>`** — override the base branch for worktree creation instead of using the canonical branch
+#### `--base-branch` Flag for `ha sling`
+- **`ha sling --base-branch <branch>`** — override the base branch for worktree creation instead of using the canonical branch
 - Resolution order: `--base-branch` flag > current HEAD > `config.project.canonicalBranch`
 - New `getCurrentBranch()` helper in `src/commands/sling.ts`
 
 #### Token Snapshot Run Tracking
 - **`run_id`** column added to `token_snapshots` table — snapshots are now tagged with the active run ID when recorded
 - `getLatestSnapshots()` accepts optional `runId` parameter to filter snapshots by run
-- `ov costs --live` now scopes to current run when `--run` is provided
+- `ha costs --live` now scopes to current run when `--run` is provided
 - Migration `migrateSnapshotRunIdColumn()` safely adds the column to existing databases
 
 #### Tmux Session State Detection
@@ -377,7 +377,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 #### Coordinator Zombie Detection
-- **`src/commands/coordinator.ts`** — `ov coordinator start` now detects zombie coordinator sessions (tmux pane exists but agent process has exited) and automatically reclaims them instead of blocking with "already running"
+- **`src/commands/coordinator.ts`** — `ha coordinator start` now detects zombie coordinator sessions (tmux pane exists but agent process has exited) and automatically reclaims them instead of blocking with "already running"
 - Stale sessions where tmux is dead or server is not running are now cleaned up before re-spawning
 - Handles pid-null edge case (sessions from older schema) conservatively
 
@@ -425,8 +425,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`src/runtimes/copilot.test.ts`** — comprehensive test suite (507 lines) covering spawn command building, config deployment, readiness detection, and transcript parsing
 - **Runtime registry** now includes `copilot` alongside `claude` and `pi`
 
-#### Ecosystem Bootstrap in `ov init`
-- **`ov init` now bootstraps sibling os-eco tools** — automatically runs `mulch init`, `sd init`, and `cn init` when the respective CLIs are available; adds CLAUDE.md onboarding sections for each tool
+#### Ecosystem Bootstrap in `ha init`
+- **`ha init` now bootstraps sibling os-eco tools** — automatically runs `mulch init`, `sd init`, and `cn init` when the respective CLIs are available; adds CLAUDE.md onboarding sections for each tool
 - **New flags:** `--tools <list>` (comma-separated tool selection), `--skip-mulch`, `--skip-seeds`, `--skip-canopy`, `--skip-onboard`, `--json`
 - **`src/commands/init.test.ts`** — expanded with ecosystem bootstrap tests (335 lines total)
 
@@ -438,11 +438,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`src/metrics/pricing.ts`** — extended with OpenAI (GPT-4o, GPT-4o-mini, GPT-5, o1, o3) and Google Gemini (Flash, Pro) pricing alongside existing Claude tiers
 
 #### Cost Analysis Enhancements
-- **`--bead <id>` flag for `ov costs`** — filter cost breakdown by task/bead ID via new `MetricsStore.getSessionsByTask()` method
-- **Runtime-aware transcript discovery** — `ov costs --self` now resolves transcript paths through the runtime adapter instead of hardcoding Claude Code paths
+- **`--bead <id>` flag for `ha costs`** — filter cost breakdown by task/bead ID via new `MetricsStore.getSessionsByTask()` method
+- **Runtime-aware transcript discovery** — `ha costs --self` now resolves transcript paths through the runtime adapter instead of hardcoding Claude Code paths
 
 #### Agent Discovery Improvements
-- **Runtime-aware instruction path** in `ov agents discover` — `extractFileScope()` now tries the configured runtime's `instructionPath` before falling back to `KNOWN_INSTRUCTION_PATHS`
+- **Runtime-aware instruction path** in `ha agents discover` — `extractFileScope()` now tries the configured runtime's `instructionPath` before falling back to `KNOWN_INSTRUCTION_PATHS`
 
 ### Changed
 
@@ -485,14 +485,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Pi Runtime Improvements
 - **`agent_end` handler in Pi guard extensions** — Pi agents now log `session-end` when the agentic loop completes (via `agent_end` event), preventing watchdog false-positive zombie escalation; `session_shutdown` handler kept as a safety net for crashes and force-kills
-- **`--tool-name` forwarding** in Pi guard extensions — `ov log tool-start` and `ov log tool-end` calls now correctly forward the tool name
+- **`--tool-name` forwarding** in Pi guard extensions — `ha log tool-start` and `ha log tool-end` calls now correctly forward the tool name
 
 #### Testing
 - **Tracker adapter test suites** — comprehensive tests for beads (`src/tracker/beads.test.ts`, 454 lines) and seeds (`src/tracker/seeds.test.ts`, 469 lines) backends covering CLI invocation, JSON parsing, error handling, and edge cases
 - Test suite grew from 2550 to 2607 tests across 86 files (6269 expect() calls)
 
 ### Fixed
-- **`OVERSTORY_GITIGNORE` import in `prime.ts`** — removed duplicate constant definition, now imports from `init.ts` where the canonical constant lives
+- **`HARU_GITIGNORE` import in `prime.ts`** — removed duplicate constant definition, now imports from `init.ts` where the canonical constant lives
 - **Pi agent zombie-state bug** — without the `agent_end` handler, completed Pi agents were never marked "completed" in the SessionStore, causing the watchdog to escalate them through stalled → nudge → triage → terminate
 - **Shell completions for `sling`** — added missing `--runtime` flag to shell completion definitions (PR #39, thanks [@lucabarak](https://github.com/lucabarak))
 - **`cleanupTempDir` ENOENT/EBUSY handling** — tightened catch block for ENOENT errors and added retry logic for EBUSY from SQLite WAL handles on Windows (#41)
@@ -502,7 +502,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 #### Outcome Feedback Loop
-- **Mulch outcome tracking** — sling now captures applied mulch record IDs at spawn time (saved to `.overstory/agents/{name}/applied-records.json`) and `ov log session-end` appends "success" outcomes back to those records, closing the expertise feedback loop
+- **Mulch outcome tracking** — sling now captures applied mulch record IDs at spawn time (saved to `.overstory/agents/{name}/applied-records.json`) and `ha log session-end` appends "success" outcomes back to those records, closing the expertise feedback loop
 - `MulchClient.appendOutcome()` method for programmatic outcome recording with status, duration, agent, notes, and test results fields
 
 #### Mulch Search/Prime Enrichment
@@ -534,8 +534,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 #### Pi Runtime
-- **EventStore visibility** — removed stdin-only gate on EventStore writes so Pi agents get full event tracking without stdin payload (`ov log tool-start`/`tool-end`)
-- **Tool name forwarding** — Pi guard extensions now pass `--tool-name` to `ov log` calls, fixing missing tool names in event timelines
+- **EventStore visibility** — removed stdin-only gate on EventStore writes so Pi agents get full event tracking without stdin payload (`ha log tool-start`/`tool-end`)
+- **Tool name forwarding** — Pi guard extensions now pass `--tool-name` to `ha log` calls, fixing missing tool names in event timelines
 
 #### Shell Completions
 - Added missing `--runtime` flag to sling completions
@@ -579,7 +579,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Supervisor agent soft-deprecated** — `ov supervisor` commands marked `[DEPRECATED]` with stderr warning on `start`; supervisor removed from default agent manifest and `ov init` agent-defs copy; `supervisor.md` retains deprecation notice but code is preserved for backward compatibility
+- **Supervisor agent soft-deprecated** — `ha supervisor` commands marked `[DEPRECATED]` with stderr warning on `start`; supervisor removed from default agent manifest and `ha init` agent-defs copy; `supervisor.md` retains deprecation notice but code is preserved for backward compatibility
 - `biome.json` excludes `.pi/` directory from linting (generated extension files)
 
 ### Testing
@@ -591,7 +591,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 #### Pi Runtime Adapter
-- **`src/runtimes/pi.ts`** — `PiRuntime` adapter implementing `AgentRuntime` for Mario Zechner's Pi coding agent — `buildSpawnCommand()` maps to `pi --model`, `deployConfig()` writes `.pi/extensions/overstory-guard.ts` + `.pi/settings.json`, `detectReady()` looks for Pi TUI header, `parseTranscript()` handles Pi's top-level `message_end` / `model_change` JSONL format
+- **`src/runtimes/pi.ts`** — `PiRuntime` adapter implementing `AgentRuntime` for Mario Zechner's Pi coding agent — `buildSpawnCommand()` maps to `pi --model`, `deployConfig()` writes `.pi/extensions/haru-guard.ts` + `.pi/settings.json`, `detectReady()` looks for Pi TUI header, `parseTranscript()` handles Pi's top-level `message_end` / `model_change` JSONL format
 - **`src/runtimes/pi-guards.ts`** — Pi guard extension generator (`generatePiGuardExtension()`) — produces self-contained TypeScript files for `.pi/extensions/` that enforce the same security policies as Claude Code's `settings.local.json` PreToolUse hooks (team tool blocking, write tool blocking, path boundary enforcement, dangerous bash pattern detection)
 - **`src/runtimes/types.ts`** — `RuntimeConnection` interface for RPC lifecycle: `sendPrompt()`, `followUp()`, `abort()`, `getState()`, `close()` — enables direct stdin/stdout communication with runtimes that support it (Pi JSON-RPC), bypassing tmux for mail delivery, shutdown, and health checks
 - **`src/runtimes/types.ts`** — `RpcProcessHandle` and `ConnectionState` supporting types for the RPC connection interface
@@ -604,7 +604,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Transcript Path Decoupling
 - **`transcriptPath` field on `AgentSession`** — new nullable column in sessions.db, populated by runtimes that report their transcript location directly instead of relying on `~/.claude/projects/` path inference
 - **`SessionStore.updateTranscriptPath()`** — new method to set transcript path per agent
-- **`ov log` transcript resolution** — now checks `session.transcriptPath` first before falling back to legacy `~/.claude/projects/` heuristic; discovered paths are also written back to the session store for future lookups
+- **`ha log` transcript resolution** — now checks `session.transcriptPath` first before falling back to legacy `~/.claude/projects/` heuristic; discovered paths are also written back to the session store for future lookups
 - SQLite migration (`migrateAddTranscriptPath`) adds the column to existing databases safely
 
 #### `runtime.printCommand` Config Field
@@ -635,7 +635,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`src/runtimes/claude.ts`** — `ClaudeRuntime` adapter implementing `AgentRuntime` for Claude Code CLI — delegates to existing subsystems (hooks-deployer, transcript parser) without new behavior
 - **`src/runtimes/registry.ts`** — Runtime registry with `getRuntime()` factory — lookup by name, config default, or hardcoded "claude" fallback
 - **`docs/runtime-abstraction.md`** — Design document covering coupling inventory, phased migration plan, and adapter contract rationale
-- **`--runtime <name>` flag** on `ov sling` — allows per-agent runtime override (defaults to config or "claude")
+- **`--runtime <name>` flag** on `ha sling` — allows per-agent runtime override (defaults to config or "claude")
 - **`runtime.default` config field** — new optional `OverstoryConfig.runtime.default` property for setting the default runtime adapter
 
 #### Testing
@@ -703,18 +703,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Per-Lead Agent Budget Ceiling
 - **`agents.maxAgentsPerLead` config** (default: 5) — limits how many active children a single lead agent can spawn; set to 0 for unlimited
-- **`--max-agents <n>` flag on `ov sling`** — CLI override for the per-lead ceiling when spawning under a parent
+- **`--max-agents <n>` flag on `ha sling`** — CLI override for the per-lead ceiling when spawning under a parent
 - **`checkParentAgentLimit()`** — pure-function guard that counts active children per parent and blocks spawns at the limit
 
 #### Dispatch-Level Overrides
-- **`--skip-review` flag on `ov sling`** — instructs a lead agent to skip Phase 3 review and self-verify instead (reads builder diff + runs quality gates)
-- **`--dispatch-max-agents <n>` flag on `ov sling`** — per-lead agent ceiling override injected into the overlay so the lead knows its budget
+- **`--skip-review` flag on `ha sling`** — instructs a lead agent to skip Phase 3 review and self-verify instead (reads builder diff + runs quality gates)
+- **`--dispatch-max-agents <n>` flag on `ha sling`** — per-lead agent ceiling override injected into the overlay so the lead knows its budget
 - **`formatDispatchOverrides()`** in overlay system — generates a `## Dispatch Overrides` section in lead overlays when `skipReview` or `maxAgentsOverride` are set
 - **`dispatch-overrides` section in `agents/lead.md`** — documents the override protocol so leads know to check their overlay before following the default three-phase workflow
 - **`DispatchPayload` extended** with `skipScouts`, `skipReview`, and `maxAgents` optional fields
 
 #### Duplicate Lead Prevention
-- **`checkDuplicateLead()`** — prevents two lead agents from concurrently working the same task ID, avoiding the duplicate work stream anti-pattern (overstory-gktc postmortem)
+- **`checkDuplicateLead()`** — prevents two lead agents from concurrently working the same task ID, avoiding the duplicate work stream anti-pattern (haru-gktc postmortem)
 
 #### Mail Refactoring
 - **`shouldAutoNudge()` and `isDispatchNudge()`** exported from mail.ts for testability — previously inlined logic now unit-testable
@@ -736,7 +736,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **`ov trace` description** — changed from "agent/bead" to "agent or task" for consistency with terminology normalization
+- **`ha trace` description** — changed from "agent/bead" to "agent or task" for consistency with terminology normalization
 
 ### Testing
 - 2283 tests across 79 files (5749 `expect()` calls)
@@ -746,10 +746,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 #### New CLI Commands
-- **`ov ecosystem`** — dashboard showing all installed os-eco tools (overstory, mulch, seeds, canopy) with version info, update status (current vs latest from npm), and overstory doctor health summary; supports `--json` output
-- **`ov upgrade`** — upgrade overstory (or all ecosystem tools with `--all`) to their latest npm versions via `bun install -g`; `--check` flag compares versions without installing; supports `--json` output
+- **`ha ecosystem`** — dashboard showing all installed os-eco tools (haru, mulch, seeds, canopy) with version info, update status (current vs latest from npm), and haru doctor health summary; supports `--json` output
+- **`ha upgrade`** — upgrade haru (or all ecosystem tools with `--all`) to their latest npm versions via `bun install -g`; `--check` flag compares versions without installing; supports `--json` output
 
-#### `ov doctor` Enhancements
+#### `ha doctor` Enhancements
 - **`--fix` flag** — auto-fix capability for doctor checks; fixable checks now include repair closures that are executed when `--fix` is passed, with human-readable action summaries
 - **Fix closures added to all check modules** — structure, databases, merge-queue, and ecosystem checks now return fix functions that can recreate missing directories, reinitialize databases, and reinstall tools
 - **`ecosystem` check category** — new 10th doctor category validating that os-eco CLI tools (ml, sd, cn) are on PATH and report valid semver versions; fix closures reinstall via `bun install -g`
@@ -791,7 +791,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-#### `ov init` Enhancements
+#### `ha init` Enhancements
 - **`--yes` / `-y` flag** — skip interactive confirmation prompts for scripted/automated initialization (contributed by @lucabarak via PR #37)
 - **`--name <name>` flag** — explicitly set the project name instead of auto-detecting from git remote or directory name
 
@@ -827,9 +827,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`printSuccess()` / `printWarning()` / `printError()` / `printHint()` helpers** (`src/logging/color.ts`) — branded message formatters with consistent color/icon treatment (brand checkmark, yellow `!`, red cross, dim indent)
 
 #### Enhanced CLI Help & Error Experience
-- **Custom branded help screen** — `ov --help` now shows a styled layout with colored command names, dim arguments, and version header instead of Commander.js defaults
-- **`--version --json` flag** — `ov -v --json` outputs machine-readable JSON (`{ name, version, runtime, platform }`)
-- **Unknown command fuzzy matching** — typos like `ov stauts` now suggest the closest match via Levenshtein edit distance ("Did you mean 'status'?")
+- **Custom branded help screen** — `ha --help` now shows a styled layout with colored command names, dim arguments, and version header instead of Commander.js defaults
+- **`--version --json` flag** — `ha -v --json` outputs machine-readable JSON (`{ name, version, runtime, platform }`)
+- **Unknown command fuzzy matching** — typos like `ha stauts` now suggest the closest match via Levenshtein edit distance ("Did you mean 'status'?")
 
 #### TUI Trust Dialog Handling
 - **Auto-confirm workspace trust dialog** — `waitForTuiReady` now detects "trust this folder" prompts and sends Enter automatically, preventing agents from stalling on first-time workspace access
@@ -864,7 +864,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Replace `--dangerously-skip-permissions` with `--permission-mode bypassPermissions`** across all agent spawn paths (coordinator, supervisor, sling, monitor) — adapts to updated Claude Code CLI flag naming
 
 #### Status Output
-- **Remove remaining emoji from `ov status` output** — section headers (Agents, Worktrees, Mail, Merge queue, Sessions recorded) and deprecation warning now use plain text; alive markers use colored `>`/`x` instead of `●`/`○`
+- **Remove remaining emoji from `ha status` output** — section headers (Agents, Worktrees, Mail, Merge queue, Sessions recorded) and deprecation warning now use plain text; alive markers use colored `>`/`x` instead of `●`/`○`
 
 ### Changed
 
@@ -881,7 +881,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 #### CLI Alias Migration
-- **`overstory` → `ov` across all CLI-facing text** — every user-facing string, error message, help text, and command comment across all `src/commands/*.ts` files now references `ov` instead of `overstory`
+- **`haru` → `ov` across all CLI-facing text** — every user-facing string, error message, help text, and command comment across all `src/commands/*.ts` files now references `ov` instead of `haru`
 - **`mulch` → `ml` in agent definitions and overlay** — all 8 base agent definitions (`agents/*.md`), overlay template (`templates/overlay.md.tmpl`), and overlay generator (`src/agents/overlay.ts`) updated to use the `ml` short alias
 - **Templates and hooks updated** — `templates/CLAUDE.md.tmpl`, `templates/hooks.json.tmpl`, and deployed agent defs all reference `ov`/`ml` aliases
 - **Canopy prompts re-emitted** — all canopy-managed prompts regenerated with alias-aware content
@@ -894,11 +894,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Sling Reliability
 - **Auto-dispatch mail before tmux session** — `buildAutoDispatch()` sends dispatch mail to the agent's mailbox before creating the tmux session, eliminating the race where coordinator dispatch arrives after the agent boots and sits idle
-- **Beacon verification loop** — after beacon send, sling polls the tmux pane up to 5 times (2s intervals) to detect if the agent is still on the welcome screen; if so, resends the beacon automatically (fixes overstory-3271)
+- **Beacon verification loop** — after beacon send, sling polls the tmux pane up to 5 times (2s intervals) to detect if the agent is still on the welcome screen; if so, resends the beacon automatically (fixes haru-3271)
 - **`capturePaneContent()` exported from tmux.ts** — new helper for reading tmux pane text, used by beacon verification
 
 #### Binary Detection
-- **`detectOverstoryBinDir()` tries both `ov` and `overstory`** — loops through both command names when resolving the binary directory, ensuring compatibility regardless of how the tool was installed
+- **`detectOverstoryBinDir()` tries both `ov` and `haru`** — loops through both command names when resolving the binary directory, ensuring compatibility regardless of how the tool was installed
 
 #### Claude Code Skills
 - **`/release` skill** — prepares releases by analyzing changes, bumping versions, updating CHANGELOG/README/CLAUDE.md
@@ -909,7 +909,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Test suite: 2151 tests across 76 files (5424 expect() calls)
 
 ### Fixed
-- **Mail dispatch race for newly slung agents** — dispatch mail is now written to SQLite before tmux session creation, ensuring it exists when the agent's SessionStart hook fires `ov mail check`
+- **Mail dispatch race for newly slung agents** — dispatch mail is now written to SQLite before tmux session creation, ensuring it exists when the agent's SessionStart hook fires `ha mail check`
 - **`process.exit(1)` replaced with `process.exitCode = 1`** — CLI entry point no longer calls `process.exit()` directly, allowing Bun to clean up gracefully (async handlers, open file descriptors)
 - **Remaining `beadId` → `taskId` references** — completed rename in `trace.ts`, `trace.test.ts`, `spec.ts`, `worktree.test.ts`, and canopy prompts for coordinator/supervisor
 - **Post-merge quality gate failures** — fixed lint and type errors introduced during multi-agent merge sessions
@@ -921,7 +921,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Seeds Preservation for Lead Branches
 - **`preserveSeedsChanges()` in worktree manager** — extracts `.seeds/` diffs from lead agent branches and applies them to the canonical branch via patch before worktree cleanup, preventing loss of issue files created by leads whose branches are never merged through the normal merge pipeline
-- Integrated into `overstory worktree clean` — automatically preserves seeds changes before removing completed worktrees
+- Integrated into `haru worktree clean` — automatically preserves seeds changes before removing completed worktrees
 
 #### Merge Union Gitattribute Support
 - **`resolveConflictsUnion()` in merge resolver** — new auto-resolve strategy for files with `merge=union` gitattribute that keeps all lines from both sides (canonical + incoming), relying on dedup-on-read to handle duplicates
@@ -941,7 +941,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Single quote escaping in blockGuard shell commands** — fixed shell escaping in blockGuard patterns that could cause guard failures when arguments contained single quotes
 - **Dashboard version from package.json** — dashboard now reads version dynamically from `package.json` instead of a hardcoded value
-- **Seeds config project name** — renamed project from "seeds" to "overstory" in `.seeds/config.yaml` and fixed 71 misnamed issue IDs
+- **Seeds config project name** — renamed project from "seeds" to "haru" in `.seeds/config.yaml` and fixed 71 misnamed issue IDs
 
 ## [0.6.4] - 2026-02-24
 
@@ -976,14 +976,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 #### Interactive Tool Blocking for Agents
-- **PreToolUse guards block interactive tools** — `AskUserQuestion`, `EnterPlanMode`, and `EnterWorktree` are now blocked for all overstory agents via hooks-deployer, preventing indefinite hangs in non-interactive tmux sessions; agents must use `overstory mail --type question` to escalate instead
+- **PreToolUse guards block interactive tools** — `AskUserQuestion`, `EnterPlanMode`, and `EnterWorktree` are now blocked for all haru agents via hooks-deployer, preventing indefinite hangs in non-interactive tmux sessions; agents must use `haru mail --type question` to escalate instead
 
 #### Doctor Ecosystem CLI Checks
-- **Expanded `overstory doctor` dependency checks** — now validates all ecosystem CLIs (overstory, mulch, seeds, canopy) with alias availability checks (`ov`, `ml`) and install hints (`npm install -g @os-eco/<pkg>`)
-- Short alias detection: when a primary tool passes, doctor also checks if its short alias (e.g., `ov` for `overstory`, `ml` for `mulch`) is available, with actionable fix hints
+- **Expanded `haru doctor` dependency checks** — now validates all ecosystem CLIs (haru, mulch, seeds, canopy) with alias availability checks (`ov`, `ml`) and install hints (`npm install -g @os-eco/<pkg>`)
+- Short alias detection: when a primary tool passes, doctor also checks if its short alias (e.g., `ov` for `haru`, `ml` for `mulch`) is available, with actionable fix hints
 
 #### CLI Improvements
-- **`ov` short alias** — `overstory` CLI is now also available as `ov` via `package.json` bin entry
+- **`ov` short alias** — `haru` CLI is now also available as `ov` via `package.json` bin entry
 - **`/prioritize` skill** — new Claude Code command that analyzes open GitHub Issues and Seeds issues, cross-references with codebase health, and recommends the top ~5 issues to tackle next
 - **Skill headers** — all Claude Code slash commands now include descriptive headers for better discoverability
 
@@ -1013,12 +1013,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 #### Sling Guard Improvements
-- **`--skip-task-check` flag for `overstory sling`** — skips task existence validation and issue claiming, designed for leads spawning builders with worktree-created issues that don't exist in the canonical tracker yet
+- **`--skip-task-check` flag for `haru sling`** — skips task existence validation and issue claiming, designed for leads spawning builders with worktree-created issues that don't exist in the canonical tracker yet
 - **Bead lock parent bypass** — parent agent can now delegate its own task ID to a child without triggering the concurrent-work lock (sling allows spawn when the lock holder matches `--parent`)
 - Lead agent `--skip-task-check` added to default sling template in `agents/lead.md`
 
 #### Lead Agent Spec Writing
-- Leads now use `overstory spec write <id> --body "..." --agent $OVERSTORY_AGENT_NAME` instead of Write/Edit tools for creating spec files — enforces read-only tool posture while still enabling spec creation
+- Leads now use `haru spec write <id> --body "..." --agent $HARU_AGENT_NAME` instead of Write/Edit tools for creating spec files — enforces read-only tool posture while still enabling spec creation
 
 #### Testing
 - Test suite grew from 2087 to 2090 tests across 75 files (5137 expect() calls)
@@ -1031,7 +1031,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Hardcoded 'orchestrator' replaced with 'coordinator'** — overlay template default parent address, agent definitions (builder, merger, monitor, scout), and test assertions all updated to use `coordinator` as the default parent/mail recipient
 
 ### Changed
-- Lead agent definition: Write/Edit tools removed from capabilities, replaced with `overstory spec write` CLI command
+- Lead agent definition: Write/Edit tools removed from capabilities, replaced with `haru spec write` CLI command
 - Agent definitions (builder, merger, monitor, scout) updated to reference "coordinator" instead of "orchestrator" in mail examples and constraints
 
 ## [0.6.1] - 2026-02-23
@@ -1044,7 +1044,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Hooks Deployer Merge Behavior
 - `deployHooks()` now preserves existing `settings.local.json` content when deploying hooks — merges with non-hooks keys (permissions, env, `$schema`, etc.) instead of overwriting the entire file
-- `isOverstoryHookEntry()` exported for detecting overstory-managed hook entries — enables stripping stale overstory hooks while preserving user-defined hooks
+- `isOverstoryHookEntry()` exported for detecting haru-managed hook entries — enables stripping stale haru hooks while preserving user-defined hooks
 - Overstory hooks placed before user hooks per event type so security guards always run first
 
 #### Testing
@@ -1093,7 +1093,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Hooks-deployer safe prefixes updated for tracker CLI commands
 
 #### Hooks Improvements
-- `mergeHooksByEventType()` — `overstory hooks install --force` now merges hooks per event type with deduplication instead of wholesale replacement, preserving user-added hooks
+- `mergeHooksByEventType()` — `haru hooks install --force` now merges hooks per event type with deduplication instead of wholesale replacement, preserving user-added hooks
 
 #### Testing
 - Test suite grew from 2026 to 2075 tests across 75 files (5128 expect() calls)
@@ -1106,7 +1106,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Doctor dependency checks updated to detect the active tracker CLI (`bd` or `sd`)
 
 ### Fixed
-- `overstory hooks install --force` now merges hooks by event type instead of replacing the entire settings file — preserves non-overstory hooks
+- `haru hooks install --force` now merges hooks by event type instead of replacing the entire settings file — preserves non-haru hooks
 - `detectCanonicalBranch()` now accepts any branch name (removed restrictive regex)
 - `bead_id` → `task_id` SQLite column migration for existing databases (metrics, merge-queue, sessions, events)
 - `config.seeds` → `config.taskTracker` bootstrap path in `sling.ts`
@@ -1120,7 +1120,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 #### New CLI Commands
-- `overstory stop <agent-name>` — explicitly terminate a running agent by killing its tmux session, marking the session as completed in SessionStore, with optional `--clean-worktree` to remove the agent's worktree (17 tests, DI pattern via `StopDeps`)
+- `haru stop <agent-name>` — explicitly terminate a running agent by killing its tmux session, marking the session as completed in SessionStore, with optional `--clean-worktree` to remove the agent's worktree (17 tests, DI pattern via `StopDeps`)
 
 #### Sling Guard Features
 - **Bead lock** — `checkBeadLock()` pure function prevents concurrent agents from working the same bead ID, enforced in `slingCommand` before spawning
@@ -1155,13 +1155,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Provider environment variables now threaded through all agent spawn commands (`sling`, `coordinator`, `supervisor`, `monitor`) — gateway `authTokenEnv` values are passed to spawned agent processes
 
 #### Mulch Integration
-- Auto-infer mulch domains from file scope in `overstory sling` — `inferDomainsFromFiles()` maps file paths to domains (e.g., `src/commands/*.ts` → `cli`, `src/agents/*.ts` → `agents`) instead of always using configured defaults
+- Auto-infer mulch domains from file scope in `haru sling` — `inferDomainsFromFiles()` maps file paths to domains (e.g., `src/commands/*.ts` → `cli`, `src/agents/*.ts` → `agents`) instead of always using configured defaults
 - Outcome flags for `MulchClient.record()` — `--outcome-status`, `--outcome-duration`, `--outcome-test-results`, `--outcome-agent` for structured outcome tracking
 - File-scoped search in `MulchClient.search()` — `--file` and `--sort-by-score` options for targeted expertise queries
 - PostToolUse Bash hook in hooks template and init — runs `mulch diff` after git commits to auto-detect expertise changes
 
 #### Agent Definition Updates
-- Builder completion protocol includes outcome data flags (`--outcome-status success --outcome-agent $OVERSTORY_AGENT_NAME`)
+- Builder completion protocol includes outcome data flags (`--outcome-status success --outcome-agent $HARU_AGENT_NAME`)
 - Lead and supervisor agents get file-scoped mulch search capability (`mulch search <query> --file <path>`)
 - Overlay quality gates include outcome flags for mulch recording
 
@@ -1192,10 +1192,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `resolveModel()` signature updated to accept `ModelRef` (provider-qualified strings like `openrouter/openai/gpt-5.3`) alongside simple `ModelAlias` values
 
 #### Costs Command
-- `--self` flag for `overstory costs` — parse the current orchestrator session's Claude Code transcript directly, bypassing metrics.db, useful for real-time cost visibility without agent infrastructure
+- `--self` flag for `haru costs` — parse the current orchestrator session's Claude Code transcript directly, bypassing metrics.db, useful for real-time cost visibility without agent infrastructure
 
 #### Metrics
-- `run_id` column added to `metrics.db` sessions table — enables `overstory costs --run <id>` filtering to work correctly; includes automatic migration for existing databases
+- `run_id` column added to `metrics.db` sessions table — enables `haru costs --run <id>` filtering to work correctly; includes automatic migration for existing databases
 
 #### Watchdog
 - Phase-aware `buildCompletionMessage()` in watchdog daemon — generates targeted completion nudge messages based on worker capability composition (single-capability batches get phase-specific messages like "Ready for next phase", mixed batches get a summary with breakdown)
@@ -1209,14 +1209,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Safety Guards
 - Root-user pre-flight guard on all agent spawn commands (`sling`, `coordinator start`, `supervisor start`, `monitor start`) — blocks spawning when running as UID 0, since the `claude` CLI rejects `--dangerously-skip-permissions` as root causing tmux sessions to die immediately
-- Unmerged branch safety check in `overstory worktree clean` — skips worktrees with unmerged branches by default, warns about skipped branches, and requires `--force` to delete them
+- Unmerged branch safety check in `haru worktree clean` — skips worktrees with unmerged branches by default, warns about skipped branches, and requires `--force` to delete them
 
 #### Init Improvements
-- `.overstory/README.md` generation during `overstory init` — explains the directory to contributors who encounter `.overstory/` in a project, whitelisted in `.gitignore`
+- `.overstory/README.md` generation during `haru init` — explains the directory to contributors who encounter `.overstory/` in a project, whitelisted in `.gitignore`
 
 #### Tier 2 Monitor Config Gating
-- `overstory monitor start` now gates on `watchdog.tier2Enabled` config flag — throws a clear error when Tier 2 is disabled instead of silently proceeding
-- `overstory coordinator start --monitor` respects `tier2Enabled` — skips monitor auto-start with a message when disabled
+- `haru monitor start` now gates on `watchdog.tier2Enabled` config flag — throws a clear error when Tier 2 is disabled instead of silently proceeding
+- `haru coordinator start --monitor` respects `tier2Enabled` — skips monitor auto-start with a message when disabled
 
 #### Tmux Error Handling
 - `sendKeys` now distinguishes "tmux server not running" from "session not found" — provides actionable error messages for each case (e.g., root-user hint for server-not-running)
@@ -1235,8 +1235,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 #### Run Scoping
-- `overstory status` now scopes to the current run by default with `--all` flag to show all runs — `gatherStatus()` filters sessions by `runId` when present
-- `overstory dashboard` now scopes all panels to the current run by default with `--all` flag to show data across all runs
+- `haru status` now scopes to the current run by default with `--all` flag to show all runs — `gatherStatus()` filters sessions by `runId` when present
+- `haru dashboard` now scopes all panels to the current run by default with `--all` flag to show data across all runs
 
 #### Config Local Overrides
 - `config.local.yaml` support for machine-specific configuration overrides — values in `config.local.yaml` are deep-merged over `config.yaml`, allowing per-machine settings (model overrides, paths, watchdog intervals) without modifying the tracked config file (PR #9)
@@ -1257,8 +1257,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Test suite grew from 1848 to 1868 tests across 73 files (4771 expect() calls)
 
 ### Fixed
-- `overstory sling` now uses `resolveModel()` for config-level model overrides — previously ignored `models:` config section when spawning agents
-- `overstory doctor` dependency check now detects `bd` CGO/Dolt backend failures — catches cases where `bd` binary exists but crashes due to missing CGO dependencies (PR #11)
+- `haru sling` now uses `resolveModel()` for config-level model overrides — previously ignored `models:` config section when spawning agents
+- `haru doctor` dependency check now detects `bd` CGO/Dolt backend failures — catches cases where `bd` binary exists but crashes due to missing CGO dependencies (PR #11)
 - Biome line width formatting in `src/doctor/consistency.ts`
 
 ## [0.5.4] - 2026-02-17
@@ -1266,31 +1266,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 #### Reviewer Coverage Enforcement
-- Reviewer-coverage doctor check in `overstory doctor` — warns when leads spawn builders without corresponding reviewers, reports partial coverage ratios per lead
-- `merge_ready` reviewer validation in `overstory mail send` — advisory warning when sending `merge_ready` without reviewer sessions for the sender's builders
+- Reviewer-coverage doctor check in `haru doctor` — warns when leads spawn builders without corresponding reviewers, reports partial coverage ratios per lead
+- `merge_ready` reviewer validation in `haru mail send` — advisory warning when sending `merge_ready` without reviewer sessions for the sender's builders
 
 #### Scout-First Workflow Enforcement
-- Scout-before-builder warning in `overstory sling` — warns when a lead spawns a builder without having spawned any scouts first
+- Scout-before-builder warning in `haru sling` — warns when a lead spawns a builder without having spawned any scouts first
 - `parentHasScouts()` helper exported from sling for testability
 
 #### Run Auto-Completion
-- `overstory coordinator stop` now auto-completes the active run (reads `current-run.txt`, marks run completed, cleans up)
-- `overstory log session-end` auto-completes the run when the coordinator exits (handles tmux window close without explicit stop)
+- `haru coordinator stop` now auto-completes the active run (reads `current-run.txt`, marks run completed, cleans up)
+- `haru log session-end` auto-completes the run when the coordinator exits (handles tmux window close without explicit stop)
 
 #### Gitignore Wildcard+Whitelist Model
 - `.overstory/.gitignore` flipped from explicit blocklist to wildcard `*` + whitelist pattern — ignore everything, whitelist only tracked files (`config.yaml`, `agent-manifest.json`, `hooks.json`, `groups.json`, `agent-defs/`)
-- `overstory prime` auto-heals `.overstory/.gitignore` on each session start — ensures existing projects get the updated gitignore
-- `OVERSTORY_GITIGNORE` constant and `writeOverstoryGitignore()` exported from init.ts for reuse
+- `haru prime` auto-heals `.overstory/.gitignore` on each session start — ensures existing projects get the updated gitignore
+- `HARU_GITIGNORE` constant and `writeOverstoryGitignore()` exported from init.ts for reuse
 
 #### Testing
 - Test suite grew from 1812 to 1848 tests across 73 files (4726 expect() calls)
 
 ### Changed
 - Lead agent definition (`agents/lead.md`) — scouts made mandatory (not optional), Phase 3 review made MANDATORY with stronger language, added `SCOUT_SKIP` failure mode, expanded cost awareness section explaining why scouts and reviewers are investments not overhead
-- `overstory init` .gitignore now always overwrites (supports `--force` reinit and auto-healing)
+- `haru init` .gitignore now always overwrites (supports `--force` reinit and auto-healing)
 
 ### Fixed
-- Hooks template (`templates/hooks.json.tmpl`) — removed fragile `read -r INPUT; echo "$INPUT" |` stdin relay pattern; `overstory log` now reads stdin directly via `--stdin` flag
+- Hooks template (`templates/hooks.json.tmpl`) — removed fragile `read -r INPUT; echo "$INPUT" |` stdin relay pattern; `haru log` now reads stdin directly via `--stdin` flag
 - `readStdinJson()` in log command — reads all stdin chunks for large payloads instead of only the first line
 - Doctor gitignore structure check updated for wildcard+whitelist model
 
@@ -1302,7 +1302,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `models:` section in `config.yaml` — override the default model (`sonnet`, `opus`, `haiku`) for any agent role (coordinator, supervisor, monitor, etc.)
 - `resolveModel()` helper in agent manifest — resolution chain: config override > manifest default > fallback
 - Supervisor and monitor entries added to `agent-manifest.json` with model and capability metadata
-- `overstory init` now seeds the default `models:` section in generated `config.yaml`
+- `haru init` now seeds the default `models:` section in generated `config.yaml`
 
 #### Testing
 - Test suite grew from 1805 to 1812 tests across 73 files (4638 expect() calls)
@@ -1312,17 +1312,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 #### New Flags
-- `--into <branch>` flag for `overstory merge` — target a specific branch instead of always merging to canonicalBranch
+- `--into <branch>` flag for `haru merge` — target a specific branch instead of always merging to canonicalBranch
 
 #### Session Branch Tracking
-- `overstory prime` now records the orchestrator's starting branch to `.overstory/session-branch.txt` at session start
-- `overstory merge` reads `session-branch.txt` as the default merge target when `--into` is not specified — resolution chain: `--into` flag > `session-branch.txt` > config `canonicalBranch`
+- `haru prime` now records the orchestrator's starting branch to `.overstory/session-branch.txt` at session start
+- `haru merge` reads `session-branch.txt` as the default merge target when `--into` is not specified — resolution chain: `--into` flag > `session-branch.txt` > config `canonicalBranch`
 
 #### Testing
 - Test suite grew from 1793 to 1805 tests across 73 files (4615 expect() calls)
 
 ### Changed
-- Git push blocking for agents now blocks ALL `git push` commands (previously only blocked push to canonical branches) — agents should use `overstory merge` instead
+- Git push blocking for agents now blocks ALL `git push` commands (previously only blocked push to canonical branches) — agents should use `haru merge` instead
 - Init-deployed hooks now include a PreToolUse Bash guard that blocks `git push` for the orchestrator's project
 
 ### Fixed
@@ -1333,7 +1333,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 #### New CLI Commands
-- `overstory agents discover` — discover and query agents by capability, state, file scope, and parent with `--capability`, `--state`, `--parent` filters and `--json` output
+- `haru agents discover` — discover and query agents by capability, state, file scope, and parent with `--capability`, `--state`, `--parent` filters and `--json` output
 
 #### New Subsystems
 - Session insight analyzer (`src/insights/analyzer.ts`) — analyzes EventStore data from completed sessions to extract structured patterns about tool usage, file edits, and errors for automatic mulch expertise recording
@@ -1356,9 +1356,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 #### New CLI Commands
-- `overstory feed` — unified real-time event stream across all agents with `--follow` mode for continuous polling, agent/run filtering, and JSON output
-- `overstory logs` — query NDJSON log files across agents with level filtering (`--level`), time range queries (`--since`/`--until`), and `--follow` tail mode
-- `overstory costs --live` — real-time token usage display for active agents
+- `haru feed` — unified real-time event stream across all agents with `--follow` mode for continuous polling, agent/run filtering, and JSON output
+- `haru logs` — query NDJSON log files across agents with level filtering (`--level`), time range queries (`--since`/`--until`), and `--follow` tail mode
+- `haru costs --live` — real-time token usage display for active agents
 
 #### New Flags
 - `--monitor` flag for `coordinator start/stop/status` — manage the Tier 2 monitor agent alongside the coordinator
@@ -1383,9 +1383,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 #### New CLI Commands & Flags
-- `overstory --completions <shell>` — shell completion generation for bash, zsh, and fish
+- `haru --completions <shell>` — shell completion generation for bash, zsh, and fish
 - `--quiet` / `-q` global flag — suppress non-error output across all commands
-- `overstory mail send --to @all` — broadcast messaging with group addresses (`@all`, `@builders`, `@scouts`, `@reviewers`, `@leads`, `@mergers`, etc.)
+- `haru mail send --to @all` — broadcast messaging with group addresses (`@all`, `@builders`, `@scouts`, `@reviewers`, `@leads`, `@mergers`, etc.)
 
 #### Output Control
 - Central `NO_COLOR` convention support (`src/logging/color.ts`) — respects `NO_COLOR`, `FORCE_COLOR`, and `TERM=dumb` environment variables per https://no-color.org
@@ -1405,8 +1405,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 #### New CLI Commands
-- `overstory doctor` — comprehensive health check system with 9 check modules (dependencies, config, structure, databases, consistency, agents, merge-queue, version, logs) and formatted output with pass/warn/fail status
-- `overstory inspect <agent>` — deep per-agent inspection aggregating session data, metrics, events, and live tmux capture with `--follow` polling mode
+- `haru doctor` — comprehensive health check system with 9 check modules (dependencies, config, structure, databases, consistency, agents, merge-queue, version, logs) and formatted output with pass/warn/fail status
+- `haru inspect <agent>` — deep per-agent inspection aggregating session data, metrics, events, and live tmux capture with `--follow` polling mode
 
 #### New Flags
 - `--watchdog` flag for `coordinator start` — auto-starts the watchdog daemon alongside the coordinator
@@ -1416,7 +1416,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Observability Improvements
 - Automated failure recording in watchdog via mulch — records failure patterns for future reference
 - Mulch learn extraction in `log session-end` — captures session insights automatically
-- Mulch health checks in `overstory clean` — validates mulch installation and domain health during cleanup
+- Mulch health checks in `haru clean` — validates mulch installation and domain health during cleanup
 
 #### Testing
 - Test suite grew from 1435 to 1612 tests across 66 files (3958 expect() calls)
@@ -1430,9 +1430,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 #### New CLI Commands
-- `overstory run` command — orchestration run lifecycle management (`list`, `show`, `complete` subcommands) with RunStore backed by sessions.db
-- `overstory trace` command — agent/bead timeline viewing for debugging and post-mortem observability
-- `overstory clean` command — cleanup worktrees, sessions, and artifacts with auto-cleanup on agent teardown
+- `haru run` command — orchestration run lifecycle management (`list`, `show`, `complete` subcommands) with RunStore backed by sessions.db
+- `haru trace` command — agent/bead timeline viewing for debugging and post-mortem observability
+- `haru clean` command — cleanup worktrees, sessions, and artifacts with auto-cleanup on agent teardown
 
 #### Observability & Persistence
 - Run tracking via `run_id` integrated into sling and clean commands
@@ -1441,8 +1441,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Phase 2 CLI query commands and Phase 3 event persistence for the observability pipeline
 
 #### Agent Improvements
-- Project-scoped tmux naming (`overstory-{projectName}-{agentName}`) to prevent cross-project session collisions
-- `ENV_GUARD` on all hooks — prevents hooks from firing outside overstory-managed worktrees
+- Project-scoped tmux naming (`haru-{projectName}-{agentName}`) to prevent cross-project session collisions
+- `ENV_GUARD` on all hooks — prevents hooks from firing outside haru-managed worktrees
 - Mulch-informed lead decomposition — leader agents use mulch expertise when breaking down tasks
 - Mulch conflict pattern recording — merge resolver records conflict patterns to mulch for future reference
 
@@ -1460,7 +1460,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fix `isCanonicalRoot` guard blocking all worktree overlays when dogfooding overstory on itself
+- Fix `isCanonicalRoot` guard blocking all worktree overlays when dogfooding haru on itself
 - Fix auto-nudge tmux corruption and deploy coordinator hooks correctly
 - Fix 4 P1 issues: orchestrator nudge routing, bash guard bypass, hook capture isolation, overlay guard
 - Fix 4 P1/P2 issues: ENV_GUARD enforcement, persistent agent state, project-scoped tmux kills, auto-nudge coordinator
@@ -1475,7 +1475,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 #### Coordinator & Supervisor Agents
-- `overstory coordinator` command — persistent orchestrator that runs at project root, decomposes objectives into subtasks, dispatches agents via sling, and tracks batches via task groups
+- `haru coordinator` command — persistent orchestrator that runs at project root, decomposes objectives into subtasks, dispatches agents via sling, and tracks batches via task groups
   - `start` / `stop` / `status` subcommands
   - `--attach` / `--no-attach` with TTY-aware auto-detection for tmux sessions
   - Scout-delegated spec generation for complex tasks
@@ -1483,7 +1483,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 7 base agent types (added coordinator + supervisor to existing scout, builder, reviewer, lead, merger)
 
 #### Task Groups & Session Lifecycle
-- `overstory group` command — batch coordination (`create` / `status` / `add` / `remove` / `list`) with auto-close when all member beads issues complete, mail notification to coordinator on auto-close
+- `haru group` command — batch coordination (`create` / `status` / `add` / `remove` / `list`) with auto-close when all member beads issues complete, mail notification to coordinator on auto-close
 - Session checkpoint save/restore for compaction survivability (`prime --compact` restores from checkpoint)
 - Handoff orchestration (initiate/resume/complete) for crash recovery
 
@@ -1493,14 +1493,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - JSON payload column with schema migration handling 3 upgrade paths
 
 #### Agent Nudging
-- `overstory nudge` command with retry (3x), debounce (500ms), and `--force` to skip debounce
+- `haru nudge` command with retry (3x), debounce (500ms), and `--force` to skip debounce
 - Auto-nudge on urgent/high priority mail send
 
 #### Structural Tool Enforcement
 - PreToolUse hooks mechanically block file-modifying tools (Write/Edit/NotebookEdit) for non-implementation agents (scout, reviewer, coordinator, supervisor)
 - PreToolUse Bash guards block dangerous git operations (`push`, `reset --hard`, `clean -f`, etc.) for all agents
 - Whitelist git add/commit for coordinator/supervisor capabilities while keeping git push blocked
-- Block Claude Code native team/task tools (Task, TeamCreate, etc.) for all overstory agents — enforces overstory sling delegation
+- Block Claude Code native team/task tools (Task, TeamCreate, etc.) for all haru agents — enforces haru sling delegation
 
 #### Watchdog Improvements
 - ZFC principle: tmux liveness as primary signal, pid check as secondary, sessions.json as tertiary
@@ -1520,14 +1520,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix beacon sendKeys multiline bug (increase initial sleep, follow-up Enter after 500ms)
 
 #### CLI Improvements
-- `--verbose` flag for `overstory status`
-- `--json` flag for `overstory sling`
-- `--background` flag for `overstory watch`
+- `--verbose` flag for `haru status`
+- `--json` flag for `haru sling`
+- `--background` flag for `haru watch`
 - Help text for unknown subcommands
 - `SUPPORTED_CAPABILITIES` constant and `Capability` type
 
 #### Init & Deployment
-- `overstory init` now deploys agent definitions (copies `agents/*.md` to `.overstory/agent-defs/`) via `import.meta.dir` resolution
+- `haru init` now deploys agent definitions (copies `agents/*.md` to `.overstory/agent-defs/`) via `import.meta.dir` resolution
 - E2E lifecycle test validates full init → config → manifest → overlay pipeline on throwaway external projects
 
 #### Testing Improvements
@@ -1562,17 +1562,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- CLI entry point with command router (`overstory <command>`)
-- `overstory init` — initialize `.overstory/` in a target project
-- `overstory sling` — spawn worker agents in git worktrees via tmux
-- `overstory prime` — load context for orchestrator or agent sessions
-- `overstory status` — show active agents, worktrees, and project state
-- `overstory mail` — SQLite-based inter-agent messaging (send/check/list/read/reply)
-- `overstory merge` — merge agent branches with 4-tier conflict resolution
-- `overstory worktree` — manage git worktrees (list/clean)
-- `overstory log` — hook event logging (NDJSON + human-readable)
-- `overstory watch` — watchdog daemon with health monitoring and AI-assisted triage
-- `overstory metrics` — session metrics storage and reporting
+- CLI entry point with command router (`haru <command>`)
+- `haru init` — initialize `.overstory/` in a target project
+- `haru sling` — spawn worker agents in git worktrees via tmux
+- `haru prime` — load context for orchestrator or agent sessions
+- `haru status` — show active agents, worktrees, and project state
+- `haru mail` — SQLite-based inter-agent messaging (send/check/list/read/reply)
+- `haru merge` — merge agent branches with 4-tier conflict resolution
+- `haru worktree` — manage git worktrees (list/clean)
+- `haru log` — hook event logging (NDJSON + human-readable)
+- `haru watch` — watchdog daemon with health monitoring and AI-assisted triage
+- `haru metrics` — session metrics storage and reporting
 - Agent manifest system with 5 base agent types (scout, builder, reviewer, lead, merger)
 - Two-layer agent definition: base `.md` files (HOW) + dynamic overlays (WHAT)
 - Persistent agent identity and CV system
@@ -1585,50 +1585,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Biome configuration for formatting and linting
 - TypeScript strict mode with `noUncheckedIndexedAccess`
 
-[Unreleased]: https://github.com/jayminwest/overstory/compare/v0.8.7...HEAD
-[0.8.7]: https://github.com/jayminwest/overstory/compare/v0.8.6...v0.8.7
-[0.8.6]: https://github.com/jayminwest/overstory/compare/v0.8.5...v0.8.6
-[0.8.5]: https://github.com/jayminwest/overstory/compare/v0.8.4...v0.8.5
-[0.8.4]: https://github.com/jayminwest/overstory/compare/v0.8.3...v0.8.4
-[0.8.3]: https://github.com/jayminwest/overstory/compare/v0.8.2...v0.8.3
-[0.8.2]: https://github.com/jayminwest/overstory/compare/v0.8.1...v0.8.2
-[0.8.1]: https://github.com/jayminwest/overstory/compare/v0.8.0...v0.8.1
-[0.8.0]: https://github.com/jayminwest/overstory/compare/v0.7.9...v0.8.0
-[0.7.9]: https://github.com/jayminwest/overstory/compare/v0.7.8...v0.7.9
-[0.7.8]: https://github.com/jayminwest/overstory/compare/v0.7.7...v0.7.8
-[0.7.7]: https://github.com/jayminwest/overstory/compare/v0.7.6...v0.7.7
-[0.7.6]: https://github.com/jayminwest/overstory/compare/v0.7.5...v0.7.6
-[0.7.5]: https://github.com/jayminwest/overstory/compare/v0.7.4...v0.7.5
-[0.7.4]: https://github.com/jayminwest/overstory/compare/v0.7.3...v0.7.4
-[0.7.3]: https://github.com/jayminwest/overstory/compare/v0.7.2...v0.7.3
-[0.7.2]: https://github.com/jayminwest/overstory/compare/v0.7.1...v0.7.2
-[0.7.1]: https://github.com/jayminwest/overstory/compare/v0.7.0...v0.7.1
-[0.7.0]: https://github.com/jayminwest/overstory/compare/v0.6.12...v0.7.0
-[0.6.12]: https://github.com/jayminwest/overstory/compare/v0.6.11...v0.6.12
-[0.6.11]: https://github.com/jayminwest/overstory/compare/v0.6.10...v0.6.11
-[0.6.10]: https://github.com/jayminwest/overstory/compare/v0.6.9...v0.6.10
-[0.6.9]: https://github.com/jayminwest/overstory/compare/v0.6.8...v0.6.9
-[0.6.8]: https://github.com/jayminwest/overstory/compare/v0.6.7...v0.6.8
-[0.6.7]: https://github.com/jayminwest/overstory/compare/v0.6.6...v0.6.7
-[0.6.6]: https://github.com/jayminwest/overstory/compare/v0.6.5...v0.6.6
-[0.6.5]: https://github.com/jayminwest/overstory/compare/v0.6.4...v0.6.5
-[0.6.4]: https://github.com/jayminwest/overstory/compare/v0.6.3...v0.6.4
-[0.6.3]: https://github.com/jayminwest/overstory/compare/v0.6.2...v0.6.3
-[0.6.2]: https://github.com/jayminwest/overstory/compare/v0.6.1...v0.6.2
-[0.6.1]: https://github.com/jayminwest/overstory/compare/v0.6.0...v0.6.1
-[0.6.0]: https://github.com/jayminwest/overstory/compare/v0.5.9...v0.6.0
-[0.5.9]: https://github.com/jayminwest/overstory/compare/v0.5.8...v0.5.9
-[0.5.8]: https://github.com/jayminwest/overstory/compare/v0.5.7...v0.5.8
-[0.5.7]: https://github.com/jayminwest/overstory/compare/v0.5.6...v0.5.7
-[0.5.6]: https://github.com/jayminwest/overstory/compare/v0.5.5...v0.5.6
-[0.5.5]: https://github.com/jayminwest/overstory/compare/v0.5.4...v0.5.5
-[0.5.4]: https://github.com/jayminwest/overstory/compare/v0.5.3...v0.5.4
-[0.5.3]: https://github.com/jayminwest/overstory/compare/v0.5.2...v0.5.3
-[0.5.2]: https://github.com/jayminwest/overstory/compare/v0.5.1...v0.5.2
-[0.5.1]: https://github.com/jayminwest/overstory/compare/v0.5.0...v0.5.1
-[0.5.0]: https://github.com/jayminwest/overstory/compare/v0.4.1...v0.5.0
-[0.4.1]: https://github.com/jayminwest/overstory/compare/v0.4.0...v0.4.1
-[0.4.0]: https://github.com/jayminwest/overstory/compare/v0.3.0...v0.4.0
-[0.3.0]: https://github.com/jayminwest/overstory/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/jayminwest/overstory/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/jayminwest/overstory/releases/tag/v0.1.0
+[Unreleased]: https://github.com/jayminwest/haru/compare/v0.8.7...HEAD
+[0.8.7]: https://github.com/jayminwest/haru/compare/v0.8.6...v0.8.7
+[0.8.6]: https://github.com/jayminwest/haru/compare/v0.8.5...v0.8.6
+[0.8.5]: https://github.com/jayminwest/haru/compare/v0.8.4...v0.8.5
+[0.8.4]: https://github.com/jayminwest/haru/compare/v0.8.3...v0.8.4
+[0.8.3]: https://github.com/jayminwest/haru/compare/v0.8.2...v0.8.3
+[0.8.2]: https://github.com/jayminwest/haru/compare/v0.8.1...v0.8.2
+[0.8.1]: https://github.com/jayminwest/haru/compare/v0.8.0...v0.8.1
+[0.8.0]: https://github.com/jayminwest/haru/compare/v0.7.9...v0.8.0
+[0.7.9]: https://github.com/jayminwest/haru/compare/v0.7.8...v0.7.9
+[0.7.8]: https://github.com/jayminwest/haru/compare/v0.7.7...v0.7.8
+[0.7.7]: https://github.com/jayminwest/haru/compare/v0.7.6...v0.7.7
+[0.7.6]: https://github.com/jayminwest/haru/compare/v0.7.5...v0.7.6
+[0.7.5]: https://github.com/jayminwest/haru/compare/v0.7.4...v0.7.5
+[0.7.4]: https://github.com/jayminwest/haru/compare/v0.7.3...v0.7.4
+[0.7.3]: https://github.com/jayminwest/haru/compare/v0.7.2...v0.7.3
+[0.7.2]: https://github.com/jayminwest/haru/compare/v0.7.1...v0.7.2
+[0.7.1]: https://github.com/jayminwest/haru/compare/v0.7.0...v0.7.1
+[0.7.0]: https://github.com/jayminwest/haru/compare/v0.6.12...v0.7.0
+[0.6.12]: https://github.com/jayminwest/haru/compare/v0.6.11...v0.6.12
+[0.6.11]: https://github.com/jayminwest/haru/compare/v0.6.10...v0.6.11
+[0.6.10]: https://github.com/jayminwest/haru/compare/v0.6.9...v0.6.10
+[0.6.9]: https://github.com/jayminwest/haru/compare/v0.6.8...v0.6.9
+[0.6.8]: https://github.com/jayminwest/haru/compare/v0.6.7...v0.6.8
+[0.6.7]: https://github.com/jayminwest/haru/compare/v0.6.6...v0.6.7
+[0.6.6]: https://github.com/jayminwest/haru/compare/v0.6.5...v0.6.6
+[0.6.5]: https://github.com/jayminwest/haru/compare/v0.6.4...v0.6.5
+[0.6.4]: https://github.com/jayminwest/haru/compare/v0.6.3...v0.6.4
+[0.6.3]: https://github.com/jayminwest/haru/compare/v0.6.2...v0.6.3
+[0.6.2]: https://github.com/jayminwest/haru/compare/v0.6.1...v0.6.2
+[0.6.1]: https://github.com/jayminwest/haru/compare/v0.6.0...v0.6.1
+[0.6.0]: https://github.com/jayminwest/haru/compare/v0.5.9...v0.6.0
+[0.5.9]: https://github.com/jayminwest/haru/compare/v0.5.8...v0.5.9
+[0.5.8]: https://github.com/jayminwest/haru/compare/v0.5.7...v0.5.8
+[0.5.7]: https://github.com/jayminwest/haru/compare/v0.5.6...v0.5.7
+[0.5.6]: https://github.com/jayminwest/haru/compare/v0.5.5...v0.5.6
+[0.5.5]: https://github.com/jayminwest/haru/compare/v0.5.4...v0.5.5
+[0.5.4]: https://github.com/jayminwest/haru/compare/v0.5.3...v0.5.4
+[0.5.3]: https://github.com/jayminwest/haru/compare/v0.5.2...v0.5.3
+[0.5.2]: https://github.com/jayminwest/haru/compare/v0.5.1...v0.5.2
+[0.5.1]: https://github.com/jayminwest/haru/compare/v0.5.0...v0.5.1
+[0.5.0]: https://github.com/jayminwest/haru/compare/v0.4.1...v0.5.0
+[0.4.1]: https://github.com/jayminwest/haru/compare/v0.4.0...v0.4.1
+[0.4.0]: https://github.com/jayminwest/haru/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/jayminwest/haru/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/jayminwest/haru/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/jayminwest/haru/releases/tag/v0.1.0

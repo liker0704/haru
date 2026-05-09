@@ -114,7 +114,7 @@ describe("createReviewSource", () => {
 		const store = createReviewStore(path.join(tempDir, "reviews.db"));
 		store.insert({
 			subjectType: "spec",
-			subjectId: "overstory-1234",
+			subjectId: "haru-1234",
 			dimensions: [
 				{ dimension: "clarity", score: 30, details: "very unclear" },
 				{ dimension: "actionability", score: 30, details: "not actionable" },

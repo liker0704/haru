@@ -13,11 +13,11 @@
 # Mission System Audit
 
 Date: 2026-04-02
-Scope: Full audit of `ov mission` workflow — code, architecture, documentation, tests, gaps.
+Scope: Full audit of `ha mission` workflow — code, architecture, documentation, tests, gaps.
 
 ## Executive Summary
 
-The mission system is a **13,580 LOC** subsystem across **40 source files** (+767 LOC in watchdog integration) that orchestrates long-running multi-agent objectives through a graph execution engine. It is the most complex subsystem in overstory.
+The mission system is a **13,580 LOC** subsystem across **40 source files** (+767 LOC in watchdog integration) that orchestrates long-running multi-agent objectives through a graph execution engine. It is the most complex subsystem in haru.
 
 **Verdict:** The system is architecturally sound but has significant implementation gaps:
 - A dual control path (CLI advisory vs engine enforcing) that can desync state
@@ -92,7 +92,7 @@ The mission system is a **13,580 LOC** subsystem across **40 source files** (+76
 
 ### CLI Surface
 
-17 subcommands under `ov mission`: `start`, `stop`, `complete`, `pause`, `resume`, `answer`, `update`, `list`, `show`, `status`, `output`, `artifacts`, `graph`, `handoff`, `refresh-briefs`, `bundle`, `extract-learnings`, `holdout`, `workstream-complete`.
+17 subcommands under `ha mission`: `start`, `stop`, `complete`, `pause`, `resume`, `answer`, `update`, `list`, `show`, `status`, `output`, `artifacts`, `graph`, `handoff`, `refresh-briefs`, `bundle`, `extract-learnings`, `holdout`, `workstream-complete`.
 
 ---
 
@@ -203,7 +203,7 @@ Two of the six phases (`align` and `decide`) exist in the graph with auto-advanc
 Real lifecycle: `understand → plan → execute → done` (4 phases).
 Declared lifecycle: `understand → align → decide → plan → execute → done` (6 phases).
 
-**Impact:** Misleading graph output, unnecessary graph complexity (12 extra edges for phantom phases), operator confusion when `ov mission graph` shows phases that do nothing.
+**Impact:** Misleading graph output, unnecessary graph complexity (12 extra edges for phantom phases), operator confusion when `ha mission graph` shows phases that do nothing.
 
 **Recommendation:** Either implement `align`/`decide` or remove them from the graph entirely. If they're planned for future use, document that clearly and remove the auto-advance handlers.
 

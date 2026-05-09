@@ -8,16 +8,16 @@
 
 | # | Feature | Status |
 |---|---------|--------|
-| 1 | ov rate-limits (src/headroom/) | PASS |
-| 2 | ov health-policy (src/health/) | PASS |
-| 3 | ov context generate/show (src/commands/) | PASS |
-| 4 | ov next-improvement --all (src/health/) | PASS |
-| 5 | ov health quality signals (src/health/) | PASS |
-| 6 | ov adaptive (src/commands/) | PASS |
-| 7 | ov compat (src/commands/) | PASS |
-| 8 | ov export (src/commands/) | PASS |
-| 9 | ov workflow (src/commands/) | PASS |
-| 10 | ov quickstart (src/commands/) | PASS |
+| 1 | ha rate-limits (src/headroom/) | PASS |
+| 2 | ha health-policy (src/health/) | PASS |
+| 3 | ha context generate/show (src/commands/) | PASS |
+| 4 | ha next-improvement --all (src/health/) | PASS |
+| 5 | ha health quality signals (src/health/) | PASS |
+| 6 | ha adaptive (src/commands/) | PASS |
+| 7 | ha compat (src/commands/) | PASS |
+| 8 | ha export (src/commands/) | PASS |
+| 9 | ha workflow (src/commands/) | PASS |
+| 10 | ha quickstart (src/commands/) | PASS |
 | 11 | createReminderSource (src/reminders/) | PASS |
 | 12 | artifact-status classify (src/artifact-status/) | PASS |
 | 13 | temporal-smoke eval (evals/) | PASS |
@@ -26,7 +26,7 @@
 
 ## Detailed Results
 
-### 1. ov rate-limits (src/headroom/)
+### 1. ha rate-limits (src/headroom/)
 
 **Status:** PASS
 
@@ -45,7 +45,7 @@ claude: ANTHROPIC_API_KEY not set
 
 ---
 
-### 2. ov health-policy (src/health/)
+### 2. ha health-policy (src/health/)
 
 **Status:** PASS
 
@@ -72,7 +72,7 @@ timestamp: 2026-03-24T12:54:45.704Z
 
 ---
 
-### 3. ov context generate/show (src/commands/)
+### 3. ha context generate/show (src/commands/)
 
 **Status:** PASS
 
@@ -101,7 +101,7 @@ Project context generated → .overstory/project-context.json
 
 ---
 
-### 4. ov next-improvement --all (src/health/)
+### 4. ha next-improvement --all (src/health/)
 
 **Status:** PASS
 
@@ -119,7 +119,7 @@ recommendations:
       estimatedImpact: 0
       rankReason: Highest estimated impact on overall score
       whyNow: Session average review score is 50/100, below the 60-point threshold.
-      action: Run `ov review sessions --verbose` to identify low-scoring sessions.
+      action: Run `ha review sessions --verbose` to identify low-scoring sessions.
 
   [1] title: Improve coordination patterns
       priority: medium
@@ -128,14 +128,14 @@ recommendations:
       estimatedImpact: 0
       rankReason: Ranked #2 by estimated impact
       whyNow: Average coordination-fit score across recent session reviews is 30/100.
-      action: Review agent communication patterns with `ov review sessions --verbose`.
+      action: Review agent communication patterns with `ha review sessions --verbose`.
 ```
 
 **Notes:** Valid JSON with 2 recommendations. Both have estimatedImpact field (value 0). Includes priority, source, rankReason fields. Pass criteria met: multiple results with estimatedImpact field.
 
 ---
 
-### 5. ov health quality signals (src/health/)
+### 5. ha health quality signals (src/health/)
 
 **Status:** PASS
 
@@ -168,7 +168,7 @@ policyStatus:
 
 ---
 
-### 6. ov adaptive (src/commands/)
+### 6. ha adaptive (src/commands/)
 
 **Status:** PASS
 
@@ -181,13 +181,13 @@ policyStatus:
 
 ---
 
-### 7. ov compat (src/commands/)
+### 7. ha compat (src/commands/)
 
 **Status:** PASS
 
 **Evidence:**
 ```
-Usage: ov compat [options] [command]
+Usage: ha compat [options] [command]
 
 Compatibility analysis tools
 
@@ -199,13 +199,13 @@ Commands:
 
 ---
 
-### 8. ov export (src/commands/)
+### 8. ha export (src/commands/)
 
 **Status:** PASS
 
 **Evidence:**
 ```
-Usage: ov export [options] [command]
+Usage: ha export [options] [command]
 
 Observability export pipeline management
 
@@ -217,13 +217,13 @@ Commands:
 
 ---
 
-### 9. ov workflow (src/commands/)
+### 9. ha workflow (src/commands/)
 
 **Status:** PASS
 
 **Evidence:**
 ```
-Usage: ov workflow [options] [command]
+Usage: ha workflow [options] [command]
 
 Import and sync workflows from a claude-code-workflow task directory
 
@@ -235,13 +235,13 @@ Commands:
 
 ---
 
-### 10. ov quickstart (src/commands/)
+### 10. ha quickstart (src/commands/)
 
 **Status:** PASS
 
 **Evidence:**
 ```
-Usage: ov quickstart [options]
+Usage: ha quickstart [options]
 
 Guided first-run wizard for new users
 

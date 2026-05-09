@@ -2,7 +2,7 @@
 
 ## Getting Started
 - [Onboarding](onboarding.md) — operator setup, first mission, agent overview
-- [Mission Usage](ov-mission-usage.md) — operator guide for missions
+- [Mission Usage](haru-mission-usage.md) — operator guide for missions
 - [CLI Reference (CLAUDE.md)](../CLAUDE.md#cli-quick-reference) — all 55 commands
 
 ## Architecture
@@ -13,8 +13,8 @@
 - [Code Review (snapshot 2026-04-05)](architecture/review.md)
 
 ## Subsystem Guides
-- [Mission System (RFC)](ov-mission.md) — design rationale
-- [Mission Implementation Plan (historical)](ov-mission-implementation.md)
+- [Mission System (RFC)](haru-mission.md) — design rationale
+- [Mission Implementation Plan (historical)](haru-mission-implementation.md)
 - [Runtime Adapters](runtime-adapters.md) — adding a new runtime
 - [Runtime Abstraction (design)](runtime-abstraction.md)
 - [Canopy Prompt Architecture](canopy-prompt-architecture.md)

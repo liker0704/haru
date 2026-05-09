@@ -3,7 +3,7 @@
  *
  * A workstream is a single unit of mission work that maps 1:1 to a tracker task.
  * Workstreams are defined in {artifactRoot}/plan/workstreams.json and consumed
- * by the Execution Director to dispatch leads via ov sling.
+ * by the Execution Director to dispatch leads via ha sling.
  */
 
 import { readFile } from "node:fs/promises";

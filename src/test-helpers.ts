@@ -9,9 +9,9 @@ import { join } from "node:path";
  */
 const GIT_TEST_ENV = {
 	GIT_AUTHOR_NAME: "Overstory Test",
-	GIT_AUTHOR_EMAIL: "test@overstory.dev",
+	GIT_AUTHOR_EMAIL: "test@haru.dev",
 	GIT_COMMITTER_NAME: "Overstory Test",
-	GIT_COMMITTER_EMAIL: "test@overstory.dev",
+	GIT_COMMITTER_EMAIL: "test@haru.dev",
 };
 
 /** Cached template repo path. Created lazily on first call. */
@@ -24,7 +24,7 @@ let _templateDir: string | null = null;
 async function getTemplateRepo(): Promise<string> {
 	if (_templateDir) return _templateDir;
 
-	const dir = await mkdtemp(join(tmpdir(), "overstory-template-"));
+	const dir = await mkdtemp(join(tmpdir(), "haru-template-"));
 	await runGitInDir(dir, ["init", "-b", "main"]);
 	await Bun.write(join(dir, ".gitkeep"), "");
 	await runGitInDir(dir, ["add", ".gitkeep"]);
@@ -45,14 +45,14 @@ async function getTemplateRepo(): Promise<string> {
  */
 export async function createTempGitRepo(): Promise<string> {
 	const template = await getTemplateRepo();
-	const dir = await mkdtemp(join(tmpdir(), "overstory-test-"));
+	const dir = await mkdtemp(join(tmpdir(), "haru-test-"));
 	// Clone into the empty dir. Avoid --local (hardlinks trigger EFAULT in Bun's rm).
 	await runGitInDir(".", ["clone", template, dir]);
 	// Set git identity at repo level so code that doesn't use GIT_TEST_ENV
 	// (e.g., resolver's runGit) can still commit. Locally this is covered by
 	// ~/.gitconfig, but CI runners have no global git identity.
 	await runGitInDir(dir, ["config", "user.name", "Overstory Test"]);
-	await runGitInDir(dir, ["config", "user.email", "test@overstory.dev"]);
+	await runGitInDir(dir, ["config", "user.email", "test@haru.dev"]);
 	return dir;
 }
 

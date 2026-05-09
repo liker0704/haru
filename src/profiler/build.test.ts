@@ -26,7 +26,7 @@ function makeSession(overrides: Partial<AgentSession> = {}): AgentSession {
 		capability: "builder",
 		runtime: "claude",
 		worktreePath: "/tmp/wt",
-		branchName: "overstory/builder-1/task-1",
+		branchName: "haru/builder-1/task-1",
 		taskId: "task-1",
 		tmuxSession: "ov-test-builder-1",
 		state: "completed",

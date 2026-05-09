@@ -1,8 +1,8 @@
 /**
- * CLI command: ov update [--agents] [--manifest] [--hooks] [--dry-run] [--json]
+ * CLI command: ha update [--agents] [--manifest] [--hooks] [--dry-run] [--json]
  *
  * Refreshes .overstory/ managed files from the installed npm package without
- * requiring a full `ov init`. Distinct from `ov upgrade` (which updates the
+ * requiring a full `ha init`. Distinct from `ha upgrade` (which updates the
  * npm package itself).
  *
  * Managed files refreshed:
@@ -25,8 +25,8 @@ import { printHint, printSuccess } from "../logging/color.ts";
 import {
 	buildAgentManifest,
 	buildHooksJson,
-	OVERSTORY_GITIGNORE,
-	OVERSTORY_README,
+	HARU_GITIGNORE,
+	HARU_README,
 	writeOverstoryGitignore,
 	writeOverstoryReadme,
 } from "./init.ts";
@@ -51,7 +51,7 @@ interface UpdateResult {
 }
 
 /**
- * Entry point for `ov update [flags]`.
+ * Entry point for `ha update [flags]`.
  */
 export async function executeUpdate(opts: UpdateOptions): Promise<void> {
 	const json = opts.json ?? false;
@@ -63,7 +63,7 @@ export async function executeUpdate(opts: UpdateOptions): Promise<void> {
 	// Verify .overstory/config.yaml exists (already initialized)
 	const configFile = Bun.file(join(overstoryDir, "config.yaml"));
 	if (!(await configFile.exists())) {
-		throw new ValidationError("Not initialized. Run 'ov init' first to set up .overstory/.", {
+		throw new ValidationError("Not initialized. Run 'ha init' first to set up .overstory/.", {
 			field: "config.yaml",
 		});
 	}
@@ -171,7 +171,7 @@ export async function executeUpdate(opts: UpdateOptions): Promise<void> {
 		let needsUpdate = true;
 		if (await gitignoreFile.exists()) {
 			const existing = await gitignoreFile.text();
-			if (existing === OVERSTORY_GITIGNORE) {
+			if (existing === HARU_GITIGNORE) {
 				needsUpdate = false;
 			}
 		}
@@ -192,7 +192,7 @@ export async function executeUpdate(opts: UpdateOptions): Promise<void> {
 		let needsUpdate = true;
 		if (await readmeFile.exists()) {
 			const existing = await readmeFile.text();
-			if (existing === OVERSTORY_README) {
+			if (existing === HARU_README) {
 				needsUpdate = false;
 			}
 		}
@@ -230,7 +230,7 @@ export async function executeUpdate(opts: UpdateOptions): Promise<void> {
 		anyChanged = true;
 		printSuccess(prefix, "hooks.json");
 		if (!dryRun) {
-			printHint("If hooks are deployed, run 'ov hooks install --force' to redeploy");
+			printHint("If hooks are deployed, run 'ha hooks install --force' to redeploy");
 		}
 	}
 

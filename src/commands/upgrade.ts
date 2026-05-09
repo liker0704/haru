@@ -1,9 +1,9 @@
 /**
- * CLI command: ov upgrade [--check] [--all] [--json]
+ * CLI command: ha upgrade [--check] [--all] [--json]
  *
- * Upgrades overstory (and optionally all os-eco tools) to their latest npm versions.
+ * Upgrades haru (and optionally all os-eco tools) to their latest npm versions.
  * --check: Compare current vs latest without installing.
- * --all:   Upgrade all 4 ecosystem tools (overstory, mulch, seeds, canopy).
+ * --all:   Upgrade all 4 ecosystem tools (haru, mulch, seeds, canopy).
  * --json:  Output result as JSON envelope.
  */
 
@@ -11,10 +11,10 @@ import { Command } from "commander";
 import { jsonError, jsonOutput } from "../json.ts";
 import { muted, printError, printHint, printSuccess, printWarning } from "../logging/color.ts";
 
-const OVERSTORY_PACKAGE = "@os-eco/overstory-cli";
+const HARU_PACKAGE = "@hana/haru-cli";
 
 const ALL_PACKAGES = [
-	"@os-eco/overstory-cli",
+	"@hana/haru-cli",
 	"@os-eco/mulch-cli",
 	"@os-eco/seeds-cli",
 	"@os-eco/canopy-cli",
@@ -97,10 +97,7 @@ async function executeUpgradeSingle(opts: UpgradeOptions): Promise<void> {
 	let current: string;
 	let latest: string;
 	try {
-		[current, latest] = await Promise.all([
-			getCurrentVersion(),
-			fetchLatestVersion(OVERSTORY_PACKAGE),
-		]);
+		[current, latest] = await Promise.all([getCurrentVersion(), fetchLatestVersion(HARU_PACKAGE)]);
 	} catch (err) {
 		const msg = err instanceof Error ? err.message : String(err);
 		if (json) {
@@ -121,7 +118,7 @@ async function executeUpgradeSingle(opts: UpgradeOptions): Promise<void> {
 			printSuccess("Already up to date", current);
 		} else {
 			printWarning(`Update available: ${current} → ${latest}`);
-			printHint("Run 'ov upgrade' to install the latest version");
+			printHint("Run 'ha upgrade' to install the latest version");
 			process.exitCode = 1;
 		}
 		return;
@@ -137,12 +134,10 @@ async function executeUpgradeSingle(opts: UpgradeOptions): Promise<void> {
 	}
 
 	if (!json) {
-		process.stdout.write(
-			`${muted(`Upgrading ${OVERSTORY_PACKAGE} from ${current} to ${latest}...`)}\n`,
-		);
+		process.stdout.write(`${muted(`Upgrading ${HARU_PACKAGE} from ${current} to ${latest}...`)}\n`);
 	}
 
-	const exitCode = await runInstall(OVERSTORY_PACKAGE);
+	const exitCode = await runInstall(HARU_PACKAGE);
 
 	if (exitCode !== 0) {
 		if (json) {
@@ -249,7 +244,7 @@ export async function executeUpgrade(opts: UpgradeOptions): Promise<void> {
 
 export function createUpgradeCommand(): Command {
 	return new Command("upgrade")
-		.description("Upgrade overstory to the latest version from npm")
+		.description("Upgrade haru to the latest version from npm")
 		.option("--check", "Check for updates without installing")
 		.option("--all", "Upgrade all os-eco ecosystem tools")
 		.option("--json", "Output as JSON")

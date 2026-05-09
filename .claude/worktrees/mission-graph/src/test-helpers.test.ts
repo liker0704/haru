@@ -118,7 +118,7 @@ describe("cleanupTempDir", () => {
 	});
 
 	test("does not throw when directory does not exist", async () => {
-		await cleanupTempDir("/tmp/overstory-nonexistent-test-dir-12345");
+		await cleanupTempDir("/tmp/haru-nonexistent-test-dir-12345");
 		// No error thrown = pass
 	});
 });

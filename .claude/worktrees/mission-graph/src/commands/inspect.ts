@@ -1,5 +1,5 @@
 /**
- * CLI command: ov inspect <agent-name>
+ * CLI command: ha inspect <agent-name>
  *
  * Deep per-agent inspection aggregating data from EventStore, SessionStore,
  * MetricsStore, and tmux capture-pane.

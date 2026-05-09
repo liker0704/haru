@@ -1,5 +1,5 @@
 /**
- * CLI command: ov snapshot [--agent <name>] [--run <id>] [--mission <id>] [--output <dir>] [--json]
+ * CLI command: ha snapshot [--agent <name>] [--run <id>] [--mission <id>] [--output <dir>] [--json]
  *
  * Creates a SwarmSnapshot of all agent state and exports it as a recovery bundle.
  */
@@ -114,7 +114,7 @@ export async function executeSnapshot(opts: SnapshotCommandOptions): Promise<voi
 }
 
 /**
- * Create the `ov snapshot` command.
+ * Create the `ha snapshot` command.
  */
 export function createSnapshotCommand(): Command {
 	return new Command("snapshot")

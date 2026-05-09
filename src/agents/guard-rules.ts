@@ -1,5 +1,5 @@
 /**
- * Shared guard rule constants for overstory agent hook generation.
+ * Shared guard rule constants for haru agent hook generation.
  *
  * Pure data module — named exports only, no logic. These constants are the
  * single source of truth for tool names, bash patterns, and safe prefixes
@@ -7,8 +7,8 @@
  */
 
 /**
- * Claude Code native team/task tools that bypass overstory orchestration.
- * All overstory agents must use `overstory sling` for delegation, not these.
+ * Claude Code native team/task tools that bypass haru orchestration.
+ * All haru agents must use `haru sling` for delegation, not these.
  */
 export const NATIVE_TEAM_TOOLS = [
 	"Agent",
@@ -27,7 +27,7 @@ export const NATIVE_TEAM_TOOLS = [
 /**
  * Tools that require human interaction and block indefinitely in non-interactive
  * tmux sessions. Agents run non-interactively and must never call these tools.
- * Use overstory mail (--type question) to escalate to the orchestrator instead.
+ * Use haru mail (--type question) to escalate to the orchestrator instead.
  */
 export const INTERACTIVE_TOOLS = ["AskUserQuestion", "EnterPlanMode", "EnterWorktree"];
 
@@ -87,8 +87,8 @@ export const DANGEROUS_BASH_PATTERNS = [
  * This whitelist is checked BEFORE the blocklist.
  */
 export const SAFE_BASH_PREFIXES = [
-	"ov ",
-	"overstory ",
+	"ha ",
+	"haru ",
 	"bd ",
 	"sd ",
 	"git status",

@@ -1,5 +1,5 @@
 /**
- * CLI command: ov rate-limits [--live] [--interval <ms>] [--runtime <name>] [--json]
+ * CLI command: ha rate-limits [--live] [--interval <ms>] [--runtime <name>] [--json]
  *
  * Shows rate-limit headroom from headroom.db.
  * Data source: headroom.db via createHeadroomStore().
@@ -121,7 +121,7 @@ export function printRateLimits(snapshots: HeadroomSnapshot[]): void {
 	if (withMessages.length > 0) {
 		w("\n");
 		for (const s of withMessages) {
-			w(`${color.dim(s.runtime + ":")} ${s.message}\n`);
+			w(`${color.dim(`${s.runtime}:`)} ${s.message}\n`);
 		}
 	}
 }
@@ -178,7 +178,7 @@ async function executeRateLimits(opts: RateLimitsOpts): Promise<void> {
 		if (json) {
 			jsonOutput("rate-limits", { snapshots: [] });
 		} else {
-			process.stdout.write(color.dim("No headroom data available...") + "\n");
+			process.stdout.write(`${color.dim("No headroom data available...")}\n`);
 		}
 		return;
 	}

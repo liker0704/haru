@@ -1,5 +1,5 @@
 /**
- * Tests for overstory group command.
+ * Tests for haru group command.
  *
  * Uses real temp directories for groups.json I/O. Does NOT mock bd CLI --
  * tests focus on the JSON storage layer and validation logic.

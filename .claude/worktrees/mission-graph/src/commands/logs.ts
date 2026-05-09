@@ -1,5 +1,5 @@
 /**
- * CLI command: ov logs [--agent <name>] [--level <level>] [--since <time>] [--until <time>] [--limit <n>] [--follow] [--json]
+ * CLI command: ha logs [--agent <name>] [--level <level>] [--since <time>] [--until <time>] [--limit <n>] [--follow] [--json]
  *
  * Queries NDJSON log files from .overstory/logs/{agent-name}/{session-timestamp}/events.ndjson
  * and presents a unified timeline view.

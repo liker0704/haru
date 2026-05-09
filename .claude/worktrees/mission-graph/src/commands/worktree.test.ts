@@ -10,7 +10,7 @@ import { createWorktree } from "../worktree/manager.ts";
 import { worktreeCommand } from "./worktree.ts";
 
 /**
- * Tests for `overstory worktree` command.
+ * Tests for `haru worktree` command.
  *
  * Uses real git worktrees in temp repos to test list and clean subcommands.
  * Captures process.stdout.write to verify output formatting.
@@ -68,9 +68,9 @@ describe("worktreeCommand", () => {
 			capability: "builder",
 			runtime: "claude",
 			worktreePath: join(tempDir, ".overstory", "worktrees", "test-agent"),
-			branchName: "overstory/test-agent/task-1",
+			branchName: "haru/test-agent/task-1",
 			taskId: "task-1",
-			tmuxSession: "overstory-test-agent-fake", // FAKE tmux session name
+			tmuxSession: "haru-test-agent-fake", // FAKE tmux session name
 			state: "working",
 			pid: 12345,
 			parentAgent: null,
@@ -133,15 +133,15 @@ describe("worktreeCommand", () => {
 	});
 
 	describe("worktree list", () => {
-		test("no overstory worktrees returns empty message", async () => {
+		test("no haru worktrees returns empty message", async () => {
 			await worktreeCommand(["list"]);
 			const out = output();
 
 			expect(out).toContain("No agent worktrees found");
 		});
 
-		test("with overstory worktrees lists them with agent info", async () => {
-			// Create a real git worktree with overstory/ prefix branch
+		test("with haru worktrees lists them with agent info", async () => {
+			// Create a real git worktree with haru/ prefix branch
 			const worktreesDir = join(tempDir, ".overstory", "worktrees");
 			await mkdir(worktreesDir, { recursive: true });
 
@@ -151,7 +151,7 @@ describe("worktreeCommand", () => {
 				"add",
 				worktreePath,
 				"-b",
-				"overstory/test-agent/task-1",
+				"haru/test-agent/task-1",
 			]);
 
 			// Write sessions.db to associate worktree with agent
@@ -162,9 +162,9 @@ describe("worktreeCommand", () => {
 					capability: "builder",
 					runtime: "claude",
 					worktreePath,
-					branchName: "overstory/test-agent/task-1",
+					branchName: "haru/test-agent/task-1",
 					taskId: "task-1",
-					tmuxSession: "overstory-test-agent",
+					tmuxSession: "haru-test-agent",
 					state: "working",
 					pid: 12345,
 					parentAgent: null,
@@ -186,7 +186,7 @@ describe("worktreeCommand", () => {
 			const out = output();
 
 			expect(out).toContain("Agent worktrees: 1");
-			expect(out).toContain("overstory/test-agent/task-1");
+			expect(out).toContain("haru/test-agent/task-1");
 			expect(out).toContain("Agent: test-agent");
 			expect(out).toContain("State: working");
 			expect(out).toContain("Task: task-1");
@@ -204,7 +204,7 @@ describe("worktreeCommand", () => {
 				"add",
 				worktreePath,
 				"-b",
-				"overstory/test-agent/task-1",
+				"haru/test-agent/task-1",
 			]);
 
 			// Write sessions.db
@@ -215,9 +215,9 @@ describe("worktreeCommand", () => {
 					capability: "builder",
 					runtime: "claude",
 					worktreePath,
-					branchName: "overstory/test-agent/task-1",
+					branchName: "haru/test-agent/task-1",
 					taskId: "task-1",
-					tmuxSession: "overstory-test-agent",
+					tmuxSession: "haru-test-agent",
 					state: "working",
 					pid: 12345,
 					parentAgent: null,
@@ -255,7 +255,7 @@ describe("worktreeCommand", () => {
 			expect(parsed.command).toBe("worktree list");
 			expect(parsed.worktrees).toHaveLength(1);
 			expect(parsed.worktrees[0]?.path).toBe(worktreePath);
-			expect(parsed.worktrees[0]?.branch).toBe("overstory/test-agent/task-1");
+			expect(parsed.worktrees[0]?.branch).toBe("haru/test-agent/task-1");
 			expect(parsed.worktrees[0]?.agentName).toBe("test-agent");
 			expect(parsed.worktrees[0]?.state).toBe("working");
 			expect(parsed.worktrees[0]?.taskId).toBe("task-1");
@@ -272,13 +272,13 @@ describe("worktreeCommand", () => {
 				"add",
 				worktreePath,
 				"-b",
-				"overstory/orphan-agent/task-2",
+				"haru/orphan-agent/task-2",
 			]);
 
 			await worktreeCommand(["list"]);
 			const out = output();
 
-			expect(out).toContain("overstory/orphan-agent/task-2");
+			expect(out).toContain("haru/orphan-agent/task-2");
 			expect(out).toContain("Agent: ?");
 			expect(out).toContain("State: unknown");
 			expect(out).toContain("Task: ?");
@@ -286,7 +286,7 @@ describe("worktreeCommand", () => {
 	});
 
 	describe("worktree clean", () => {
-		test("no overstory worktrees returns empty message", async () => {
+		test("no haru worktrees returns empty message", async () => {
 			await worktreeCommand(["clean"]);
 			const out = output();
 
@@ -304,7 +304,7 @@ describe("worktreeCommand", () => {
 				"add",
 				worktreePath,
 				"-b",
-				"overstory/completed-agent/task-done",
+				"haru/completed-agent/task-done",
 			]);
 
 			// Write sessions.db with completed state
@@ -315,9 +315,9 @@ describe("worktreeCommand", () => {
 					capability: "builder",
 					runtime: "claude",
 					worktreePath,
-					branchName: "overstory/completed-agent/task-done",
+					branchName: "haru/completed-agent/task-done",
 					taskId: "task-done",
-					tmuxSession: "overstory-completed-agent",
+					tmuxSession: "haru-completed-agent",
 					state: "completed",
 					pid: 12345,
 					parentAgent: null,
@@ -339,7 +339,7 @@ describe("worktreeCommand", () => {
 			const out = output();
 
 			expect(out).toContain("Removed");
-			expect(out).toContain("overstory/completed-agent/task-done");
+			expect(out).toContain("haru/completed-agent/task-done");
 			expect(out).toContain("Cleaned 1 worktree");
 
 			// Verify the worktree directory is gone
@@ -347,7 +347,7 @@ describe("worktreeCommand", () => {
 			expect(worktreeExists).toBe(false);
 
 			// Verify the branch is deleted
-			const branchListProc = Bun.spawn(["git", "branch", "--list", "overstory/completed-agent/*"], {
+			const branchListProc = Bun.spawn(["git", "branch", "--list", "haru/completed-agent/*"], {
 				cwd: tempDir,
 				stdout: "pipe",
 			});
@@ -366,7 +366,7 @@ describe("worktreeCommand", () => {
 				"add",
 				worktreePath,
 				"-b",
-				"overstory/done-agent/task-x",
+				"haru/done-agent/task-x",
 			]);
 
 			writeSessionsToStore([
@@ -376,9 +376,9 @@ describe("worktreeCommand", () => {
 					capability: "builder",
 					runtime: "claude",
 					worktreePath,
-					branchName: "overstory/done-agent/task-x",
+					branchName: "haru/done-agent/task-x",
 					taskId: "task-x",
-					tmuxSession: "overstory-done-agent",
+					tmuxSession: "haru-done-agent",
 					state: "completed",
 					pid: 12345,
 					parentAgent: null,
@@ -405,7 +405,7 @@ describe("worktreeCommand", () => {
 				pruned: number;
 			};
 
-			expect(parsed.cleaned).toEqual(["overstory/done-agent/task-x"]);
+			expect(parsed.cleaned).toEqual(["haru/done-agent/task-x"]);
 			expect(parsed.failed).toEqual([]);
 			expect(parsed.pruned).toBe(1); // The zombie session was pruned
 		});
@@ -420,9 +420,9 @@ describe("worktreeCommand", () => {
 					capability: "builder",
 					runtime: "claude",
 					worktreePath: nonExistentPath,
-					branchName: "overstory/ghost-agent/task-ghost",
+					branchName: "haru/ghost-agent/task-ghost",
 					taskId: "task-ghost",
-					tmuxSession: "overstory-ghost-agent",
+					tmuxSession: "haru-ghost-agent",
 					state: "zombie",
 					pid: null,
 					parentAgent: null,
@@ -470,7 +470,7 @@ describe("worktreeCommand", () => {
 				"add",
 				worktreePath,
 				"-b",
-				"overstory/stalled-agent/task-stuck",
+				"haru/stalled-agent/task-stuck",
 			]);
 
 			writeSessionsToStore([
@@ -480,9 +480,9 @@ describe("worktreeCommand", () => {
 					capability: "builder",
 					runtime: "claude",
 					worktreePath,
-					branchName: "overstory/stalled-agent/task-stuck",
+					branchName: "haru/stalled-agent/task-stuck",
 					taskId: "task-stuck",
-					tmuxSession: "overstory-stalled-agent",
+					tmuxSession: "haru-stalled-agent",
 					state: "stalled",
 					pid: 12345,
 					parentAgent: null,
@@ -534,18 +534,18 @@ describe("worktreeCommand", () => {
 					id: "session-1",
 					agentName: "completed-agent",
 					worktreePath: completedPath,
-					branchName: "overstory/completed-agent/task-done",
+					branchName: "haru/completed-agent/task-done",
 					taskId: "task-done",
-					tmuxSession: "overstory-completed-agent-fake",
+					tmuxSession: "haru-completed-agent-fake",
 					state: "completed",
 				}),
 				makeSession({
 					id: "session-2",
 					agentName: "working-agent",
 					worktreePath: workingPath,
-					branchName: "overstory/working-agent/task-wip",
+					branchName: "haru/working-agent/task-wip",
 					taskId: "task-wip",
-					tmuxSession: "overstory-working-agent-fake",
+					tmuxSession: "haru-working-agent-fake",
 					state: "working",
 					pid: 12346,
 				}),
@@ -596,7 +596,7 @@ describe("worktreeCommand", () => {
 					id: "session-1",
 					agentName: "completed-agent",
 					worktreePath: completedPath,
-					branchName: "overstory/completed-agent/task-done",
+					branchName: "haru/completed-agent/task-done",
 					taskId: "task-done",
 					state: "completed",
 				}),
@@ -604,7 +604,7 @@ describe("worktreeCommand", () => {
 					id: "session-2",
 					agentName: "working-agent",
 					worktreePath: workingPath,
-					branchName: "overstory/working-agent/task-wip",
+					branchName: "haru/working-agent/task-wip",
 					taskId: "task-wip",
 					state: "working",
 				}),
@@ -612,7 +612,7 @@ describe("worktreeCommand", () => {
 					id: "session-3",
 					agentName: "stalled-agent",
 					worktreePath: stalledPath,
-					branchName: "overstory/stalled-agent/task-stuck",
+					branchName: "haru/stalled-agent/task-stuck",
 					taskId: "task-stuck",
 					state: "stalled",
 				}),
@@ -635,10 +635,10 @@ describe("worktreeCommand", () => {
 			await mkdir(worktreesDir, { recursive: true });
 
 			const path1 = join(worktreesDir, "agent-1");
-			await runGitInDir(tempDir, ["worktree", "add", path1, "-b", "overstory/agent-1/task-1"]);
+			await runGitInDir(tempDir, ["worktree", "add", path1, "-b", "haru/agent-1/task-1"]);
 
 			const path2 = join(worktreesDir, "agent-2");
-			await runGitInDir(tempDir, ["worktree", "add", path2, "-b", "overstory/agent-2/task-2"]);
+			await runGitInDir(tempDir, ["worktree", "add", path2, "-b", "haru/agent-2/task-2"]);
 
 			writeSessionsToStore([
 				{
@@ -647,9 +647,9 @@ describe("worktreeCommand", () => {
 					capability: "builder",
 					runtime: "claude",
 					worktreePath: path1,
-					branchName: "overstory/agent-1/task-1",
+					branchName: "haru/agent-1/task-1",
 					taskId: "task-1",
-					tmuxSession: "overstory-agent-1",
+					tmuxSession: "haru-agent-1",
 					state: "completed",
 					pid: 12345,
 					parentAgent: null,
@@ -671,9 +671,9 @@ describe("worktreeCommand", () => {
 					capability: "builder",
 					runtime: "claude",
 					worktreePath: path2,
-					branchName: "overstory/agent-2/task-2",
+					branchName: "haru/agent-2/task-2",
 					taskId: "task-2",
-					tmuxSession: "overstory-agent-2",
+					tmuxSession: "haru-agent-2",
 					state: "completed",
 					pid: 12346,
 					parentAgent: null,
@@ -717,7 +717,7 @@ describe("worktreeCommand", () => {
 					id: "session-u",
 					agentName: "unmerged-agent",
 					worktreePath: wtPath,
-					branchName: "overstory/unmerged-agent/task-unmerged",
+					branchName: "haru/unmerged-agent/task-unmerged",
 					taskId: "task-unmerged",
 					state: "completed",
 				}),
@@ -730,7 +730,7 @@ describe("worktreeCommand", () => {
 			expect(existsSync(wtPath)).toBe(true);
 			// Warning should be printed
 			expect(out).toContain("Skipped 1 worktree");
-			expect(out).toContain("overstory/unmerged-agent/task-unmerged");
+			expect(out).toContain("haru/unmerged-agent/task-unmerged");
 			expect(out).toContain("--force");
 		});
 
@@ -754,7 +754,7 @@ describe("worktreeCommand", () => {
 					id: "session-f",
 					agentName: "unmerged-agent",
 					worktreePath: wtPath,
-					branchName: "overstory/unmerged-agent/task-force",
+					branchName: "haru/unmerged-agent/task-force",
 					taskId: "task-force",
 					state: "completed",
 				}),
@@ -765,7 +765,7 @@ describe("worktreeCommand", () => {
 
 			// Worktree should be removed
 			expect(existsSync(wtPath)).toBe(false);
-			expect(out).toContain("overstory/unmerged-agent/task-force");
+			expect(out).toContain("haru/unmerged-agent/task-force");
 		});
 
 		test("without --force, removes worktrees whose branches ARE merged", async () => {
@@ -823,7 +823,7 @@ describe("worktreeCommand", () => {
 					id: "session-j",
 					agentName: "unmerged-json-agent",
 					worktreePath: wtPath,
-					branchName: "overstory/unmerged-json-agent/task-json",
+					branchName: "haru/unmerged-json-agent/task-json",
 					taskId: "task-json",
 					state: "completed",
 				}),
@@ -841,7 +841,7 @@ describe("worktreeCommand", () => {
 			};
 
 			expect(parsed.cleaned).toEqual([]);
-			expect(parsed.skipped).toEqual(["overstory/unmerged-json-agent/task-json"]);
+			expect(parsed.skipped).toEqual(["haru/unmerged-json-agent/task-json"]);
 		});
 
 		test("lead worktree with .seeds/ changes preserves them to canonical before cleanup", async () => {

@@ -16,7 +16,7 @@ import { buildHandoffDocument, extractRecentTurns } from "./swap.ts";
 let tmpDir: string;
 
 beforeEach(async () => {
-	tmpDir = await mkdtemp(join(tmpdir(), "overstory-swap-test-"));
+	tmpDir = await mkdtemp(join(tmpdir(), "haru-swap-test-"));
 });
 
 afterEach(async () => {
@@ -103,7 +103,7 @@ describe("JSONL path derivation", () => {
 		const oldResult = worktreePath.replace(/\//g, "-");
 		// Old result keeps the dot: -home-user-projects-foo-.overstory-...
 		expect(oldResult).toContain(".");
-		// New result replaces it: -home-user-projects-foo--overstory-...
+		// New result replaces it: -home-user-projects-foo--haru-...
 		const newResult = worktreePath.replace(/[/.]/g, "-");
 		expect(newResult).not.toContain(".");
 	});
@@ -142,7 +142,7 @@ describe("buildHandoffDocument", () => {
 
 		expect(doc).toContain("rate limit swap");
 		expect(doc).toContain("Do NOT restart from scratch");
-		expect(doc).toContain("ov mail check");
+		expect(doc).toContain("ha mail check");
 	});
 
 	test("includes git context when provided", () => {

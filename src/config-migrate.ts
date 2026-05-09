@@ -37,16 +37,14 @@ export function migrateDeprecatedWatchdogKeys(parsed: Record<string, unknown>): 
 	// Old tier1Enabled -> new tier0Enabled (mechanical daemon)
 	wd.tier0Enabled = wd.tier1Enabled;
 	delete wd.tier1Enabled;
-	process.stderr.write(
-		"[overstory] DEPRECATED: watchdog.tier1Enabled → use watchdog.tier0Enabled\n",
-	);
+	process.stderr.write("[haru] DEPRECATED: watchdog.tier1Enabled → use watchdog.tier0Enabled\n");
 
 	// Old tier1IntervalMs -> new tier0IntervalMs (mechanical daemon)
 	if ("tier1IntervalMs" in wd) {
 		wd.tier0IntervalMs = wd.tier1IntervalMs;
 		delete wd.tier1IntervalMs;
 		process.stderr.write(
-			"[overstory] DEPRECATED: watchdog.tier1IntervalMs → use watchdog.tier0IntervalMs\n",
+			"[haru] DEPRECATED: watchdog.tier1IntervalMs → use watchdog.tier0IntervalMs\n",
 		);
 	}
 
@@ -54,9 +52,7 @@ export function migrateDeprecatedWatchdogKeys(parsed: Record<string, unknown>): 
 	if ("tier2Enabled" in wd) {
 		wd.tier1Enabled = wd.tier2Enabled;
 		delete wd.tier2Enabled;
-		process.stderr.write(
-			"[overstory] DEPRECATED: watchdog.tier2Enabled → use watchdog.tier1Enabled\n",
-		);
+		process.stderr.write("[haru] DEPRECATED: watchdog.tier2Enabled → use watchdog.tier1Enabled\n");
 	}
 }
 
@@ -79,7 +75,7 @@ export function migrateDeprecatedTaskTrackerKeys(parsed: Record<string, unknown>
 			enabled: beadsConfig.enabled ?? true,
 		};
 		process.stderr.write(
-			"[overstory] DEPRECATED: beads: -> use taskTracker: { backend: beads, enabled: true }\n",
+			"[haru] DEPRECATED: beads: -> use taskTracker: { backend: beads, enabled: true }\n",
 		);
 	} else if (parsed.taskTracker === undefined && parsed.seeds !== undefined) {
 		const seedsConfig = parsed.seeds as Record<string, unknown>;
@@ -88,7 +84,7 @@ export function migrateDeprecatedTaskTrackerKeys(parsed: Record<string, unknown>
 			enabled: seedsConfig.enabled ?? true,
 		};
 		process.stderr.write(
-			"[overstory] DEPRECATED: seeds: -> use taskTracker: { backend: seeds, enabled: true }\n",
+			"[haru] DEPRECATED: seeds: -> use taskTracker: { backend: seeds, enabled: true }\n",
 		);
 	}
 

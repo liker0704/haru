@@ -6,6 +6,6 @@ Run brownfield codebase discovery. Spawns scout agents that explore the codebase
 
 ## steps
 
-1. Run: ov discover $ARGUMENTS
-2. Monitor progress with: ov status
+1. Run: ha discover $ARGUMENTS
+2. Monitor progress with: ha status
 3. When scouts complete, review results with: ml prime

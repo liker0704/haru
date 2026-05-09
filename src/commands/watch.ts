@@ -1,5 +1,5 @@
 /**
- * CLI command: overstory watch [--interval <ms>] [--background]
+ * CLI command: haru watch [--interval <ms>] [--background]
  *
  * Starts the Tier 0 mechanical watchdog daemon. Foreground mode shows real-time status.
  * Background mode spawns a detached process via Bun.spawn and writes a PID file.
@@ -81,8 +81,8 @@ async function removePidFile(pidFilePath: string): Promise<void> {
 }
 
 /**
- * Resolve the path to the overstory binary for re-launching.
- * Uses `which overstory` first, then falls back to process.argv.
+ * Resolve the path to the haru binary for re-launching.
+ * Uses `which haru` first, then falls back to process.argv.
  */
 async function resolveOverstoryBin(): Promise<string> {
 	try {
@@ -98,7 +98,7 @@ async function resolveOverstoryBin(): Promise<string> {
 			}
 		}
 	} catch {
-		// which not available or overstory not on PATH
+		// which not available or haru not on PATH
 	}
 
 	// Fallback: use the script that's currently running (process.argv[1])
@@ -107,10 +107,7 @@ async function resolveOverstoryBin(): Promise<string> {
 		return scriptPath;
 	}
 
-	throw new OverstoryError(
-		"Cannot resolve overstory binary path for background launch",
-		"WATCH_ERROR",
-	);
+	throw new OverstoryError("Cannot resolve haru binary path for background launch", "WATCH_ERROR");
 }
 
 /**
@@ -160,10 +157,10 @@ async function runWatch(opts: {
 			childArgs.push("--interval", opts.interval);
 		}
 
-		// Resolve the overstory binary path
+		// Resolve the haru binary path
 		const overstoryBin = await resolveOverstoryBin();
 
-		// Spawn a detached background process running `overstory watch` (without --background)
+		// Spawn a detached background process running `haru watch` (without --background)
 		const child = Bun.spawn(["bun", "run", overstoryBin, ...childArgs], {
 			cwd,
 			detached: true,
@@ -240,7 +237,7 @@ export function createWatchCommand(): Command {
 }
 
 /**
- * Entry point for `overstory watch [--interval <ms>] [--background]`.
+ * Entry point for `haru watch [--interval <ms>] [--background]`.
  */
 export async function watchCommand(args: string[]): Promise<void> {
 	const cmd = createWatchCommand();

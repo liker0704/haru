@@ -23,7 +23,7 @@ let store: MissionStore;
 const MISSION_ID = "mission-001";
 
 beforeEach(async () => {
-	tempDir = await mkdtemp(join(tmpdir(), "overstory-pause-test-"));
+	tempDir = await mkdtemp(join(tmpdir(), "haru-pause-test-"));
 	store = createMissionStore(join(tempDir, "sessions.db"));
 	const mission: InsertMission = {
 		id: MISSION_ID,

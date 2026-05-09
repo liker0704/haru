@@ -1,5 +1,5 @@
 /**
- * CLI command: ov compact [domain] [--analyze] [--apply] [--auto] [--dry-run]
+ * CLI command: ha compact [domain] [--analyze] [--apply] [--auto] [--dry-run]
  *
  * Compact mulch expertise records — merge related entries, consolidate
  * tactical notes, and enforce governance limits.

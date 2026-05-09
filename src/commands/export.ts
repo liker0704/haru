@@ -78,7 +78,7 @@ export function createExportCommand(): Command {
 					endTime: now,
 					durationMs: 0,
 					status: "ok",
-					attributes: { "test.source": "ov export test" },
+					attributes: { "test.source": "ha export test" },
 					events: [],
 					resource: {
 						agentName: "cli",

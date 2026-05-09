@@ -193,7 +193,7 @@ export async function exportBundle(opts: BundleOptions): Promise<BundleResult> {
 	return { outputDir, manifest, filesWritten };
 }
 
-// === ov mission bundle (CLI handler) ===
+// === ha mission bundle (CLI handler) ===
 
 interface BundleOpts {
 	missionId?: string;

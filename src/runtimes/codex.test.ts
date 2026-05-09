@@ -355,8 +355,8 @@ describe("CodexRuntime", () => {
 		test("result is safe to spread", () => {
 			const model: ResolvedModel = { model: "gpt-5-codex" };
 			const env = runtime.buildEnv(model);
-			const combined = { ...env, OVERSTORY_AGENT_NAME: "builder-1" };
-			expect(combined).toEqual({ OVERSTORY_AGENT_NAME: "builder-1" });
+			const combined = { ...env, HARU_AGENT_NAME: "builder-1" };
+			expect(combined).toEqual({ HARU_AGENT_NAME: "builder-1" });
 		});
 	});
 
@@ -364,7 +364,7 @@ describe("CodexRuntime", () => {
 		let tempDir: string;
 
 		beforeEach(async () => {
-			tempDir = await mkdtemp(join(tmpdir(), "overstory-codex-test-"));
+			tempDir = await mkdtemp(join(tmpdir(), "haru-codex-test-"));
 		});
 
 		afterEach(async () => {
@@ -405,7 +405,7 @@ describe("CodexRuntime", () => {
 			expect(settingsExists).toBe(false);
 
 			// No .pi/extensions/ (Pi guard extensions)
-			const piGuardPath = join(worktreePath, ".pi", "extensions", "overstory-guard.ts");
+			const piGuardPath = join(worktreePath, ".pi", "extensions", "haru-guard.ts");
 			const piGuardExists = await Bun.file(piGuardPath).exists();
 			expect(piGuardExists).toBe(false);
 		});
@@ -482,7 +482,7 @@ describe("CodexRuntime", () => {
 		let tempDir: string;
 
 		beforeEach(async () => {
-			tempDir = await mkdtemp(join(tmpdir(), "overstory-codex-transcript-test-"));
+			tempDir = await mkdtemp(join(tmpdir(), "haru-codex-transcript-test-"));
 		});
 
 		afterEach(async () => {
@@ -704,7 +704,7 @@ describe("CodexRuntime integration: spawn command structure", () => {
 			model: "gpt-5-codex",
 			permissionMode: "bypass",
 			cwd: "/project/.overstory/worktrees/builder-1",
-			env: { OVERSTORY_AGENT_NAME: "builder-1" },
+			env: { HARU_AGENT_NAME: "builder-1" },
 		});
 		expect(cmd).toBe(
 			"codex --no-alt-screen --full-auto --model gpt-5-codex 'Read AGENTS.md for your task assignment and begin immediately.'",
@@ -718,7 +718,7 @@ describe("CodexRuntime integration: spawn command structure", () => {
 			permissionMode: "bypass",
 			cwd: "/project",
 			appendSystemPrompt: baseDefinition,
-			env: { OVERSTORY_AGENT_NAME: "coordinator" },
+			env: { HARU_AGENT_NAME: "coordinator" },
 		});
 		expect(cmd).toContain("codex --no-alt-screen --full-auto --model gpt-5-codex");
 		expect(cmd).toContain("# Coordinator");
@@ -732,7 +732,7 @@ describe("CodexRuntime integration: spawn command structure", () => {
 			permissionMode: "bypass",
 			cwd: "/project",
 			appendSystemPromptFile: "/project/.overstory/agent-defs/coordinator.md",
-			env: { OVERSTORY_AGENT_NAME: "coordinator" },
+			env: { HARU_AGENT_NAME: "coordinator" },
 		});
 		expect(cmd).toContain("codex --no-alt-screen --full-auto --model gpt-5-codex");
 		expect(cmd).toContain("$(cat '/project/.overstory/agent-defs/coordinator.md')");
@@ -768,8 +768,8 @@ describe("CodexRuntime integration: buildEnv matches provider pattern", () => {
 		const model: ResolvedModel = { model: "gpt-5-codex" };
 		const env = runtime.buildEnv(model);
 		expect(env).toEqual({});
-		const combined = { ...env, OVERSTORY_AGENT_NAME: "builder-1" };
-		expect(combined).toEqual({ OVERSTORY_AGENT_NAME: "builder-1" });
+		const combined = { ...env, HARU_AGENT_NAME: "builder-1" };
+		expect(combined).toEqual({ HARU_AGENT_NAME: "builder-1" });
 	});
 });
 

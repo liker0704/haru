@@ -1,4 +1,4 @@
-// Gemini CLI runtime adapter for overstory's AgentRuntime interface.
+// Gemini CLI runtime adapter for haru's AgentRuntime interface.
 // Implements the AgentRuntime contract for Google's `gemini` CLI.
 //
 // Key characteristics:

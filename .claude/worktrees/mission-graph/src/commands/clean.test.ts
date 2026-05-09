@@ -1,5 +1,5 @@
 /**
- * Tests for the `overstory clean` command.
+ * Tests for the `haru clean` command.
  *
  * Uses real filesystem (temp dirs), real git repos, real SQLite.
  * No mocks. tmux operations are tested indirectly — when no tmux
@@ -154,9 +154,9 @@ describe("--all", () => {
 			capability: "builder",
 			runtime: "claude",
 			worktreePath: "/tmp/wt",
-			branchName: "overstory/test/task",
+			branchName: "haru/test/task",
 			taskId: "task-1",
-			tmuxSession: "overstory-test-agent",
+			tmuxSession: "haru-test-agent",
 			state: "completed",
 			pid: 12345,
 			parentAgent: null,
@@ -304,9 +304,9 @@ describe("individual flags", () => {
 			capability: "builder",
 			runtime: "claude",
 			worktreePath: "/tmp/wt",
-			branchName: "overstory/test/task",
+			branchName: "haru/test/task",
 			taskId: "task-1",
-			tmuxSession: "overstory-test-agent",
+			tmuxSession: "haru-test-agent",
 			state: "completed",
 			pid: 12345,
 			parentAgent: null,
@@ -431,9 +431,9 @@ describe("synthetic session-end events", () => {
 			capability: "builder",
 			runtime: "claude",
 			worktreePath: "/tmp/wt",
-			branchName: "overstory/test-builder/task-1",
+			branchName: "haru/test-builder/task-1",
 			taskId: "task-1",
-			tmuxSession: "overstory-test-builder",
+			tmuxSession: "haru-test-builder",
 			state: "working",
 			pid: 12345,
 			parentAgent: null,
@@ -688,9 +688,9 @@ describe("--agent", () => {
 			capability: "builder",
 			runtime: "claude",
 			worktreePath: join(tempDir, ".overstory", "worktrees", "test-builder"),
-			branchName: "overstory/test-builder/task-1",
+			branchName: "haru/test-builder/task-1",
 			taskId: "task-1",
-			tmuxSession: "overstory-test-project-test-builder",
+			tmuxSession: "haru-test-project-test-builder",
 			state: "working",
 			pid: 99999,
 			parentAgent: null,

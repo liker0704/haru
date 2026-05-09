@@ -1,5 +1,5 @@
 /**
- * Canonical visual theme for overstory CLI output.
+ * Canonical visual theme for haru CLI output.
  *
  * Single source of truth for state colors, event labels, agent palette,
  * separators, and header rendering. All observability commands import from here.

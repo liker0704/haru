@@ -7,8 +7,8 @@ Thanks for your interest in contributing to Overstory! This guide covers everyth
 1. **Fork** the repository on GitHub
 2. **Clone** your fork locally:
    ```bash
-   git clone https://github.com/<your-username>/overstory.git
-   cd overstory
+   git clone https://github.com/<your-username>/haru.git
+   cd haru
    ```
 3. **Install** dependencies:
    ```bash
@@ -104,7 +104,7 @@ describe("my-feature", () => {
   let testDir: string;
 
   beforeEach(async () => {
-    testDir = await mkdtemp(join(tmpdir(), "overstory-test-"));
+    testDir = await mkdtemp(join(tmpdir(), "haru-test-"));
   });
 
   afterEach(async () => {
@@ -151,7 +151,7 @@ Prefix with `fix:`, `feat:`, or `docs:` when the category is clear. Plain descri
 
 ## Reporting Issues
 
-Use [GitHub Issues](https://github.com/jayminwest/overstory/issues) for bug reports and feature requests. For security vulnerabilities, see [SECURITY.md](SECURITY.md).
+Use [GitHub Issues](https://github.com/jayminwest/haru/issues) for bug reports and feature requests. For security vulnerabilities, see [SECURITY.md](SECURITY.md).
 
 ## License
 

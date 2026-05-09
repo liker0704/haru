@@ -101,13 +101,13 @@ describe("createLangfuseExporter", () => {
 
 		const call = calls[0];
 		expect(call).toBeDefined();
-		expect(call!.url).toBe(`${TEST_ENDPOINT}/api/public/ingestion`);
+		expect(call?.url).toBe(`${TEST_ENDPOINT}/api/public/ingestion`);
 
-		const body = JSON.parse(call!.options.body as string) as { batch: unknown[] };
+		const body = JSON.parse(call?.options.body as string) as { batch: unknown[] };
 		expect(body.batch).toBeDefined();
 		expect(Array.isArray(body.batch)).toBe(true);
 
-		const authHeader = (call!.options.headers as Record<string, string>)["Authorization"];
+		const authHeader = (call?.options.headers as Record<string, string>).Authorization;
 		expect(authHeader).toBe(`Basic ${btoa("pk-test:sk-test")}`);
 	});
 
@@ -126,15 +126,15 @@ describe("createLangfuseExporter", () => {
 		});
 		await exporter.export([span]);
 
-		const body = JSON.parse(calls[0]!.options.body as string) as {
+		const body = JSON.parse(calls[0]?.options.body as string) as {
 			batch: Array<{ type: string; body: Record<string, unknown> }>;
 		};
 		const genItem = body.batch.find((item) => item.type === "generation-create");
 		expect(genItem).toBeDefined();
-		expect(genItem!.body.promptTokens).toBe(100);
-		expect(genItem!.body.completionTokens).toBe(50);
-		expect(genItem!.body.model).toBe("claude-3");
-		expect(genItem!.body.completionStartTime).toBeDefined();
+		expect(genItem?.body.promptTokens).toBe(100);
+		expect(genItem?.body.completionTokens).toBe(50);
+		expect(genItem?.body.model).toBe("claude-3");
+		expect(genItem?.body.completionStartTime).toBeDefined();
 	});
 
 	it("maps non-turn spans to span-create + span-update", async () => {
@@ -145,7 +145,7 @@ describe("createLangfuseExporter", () => {
 		const span = makeSpan({ kind: "tool", endTime: "2024-01-01T00:00:01.000Z" });
 		await exporter.export([span]);
 
-		const body = JSON.parse(calls[0]!.options.body as string) as { batch: Array<{ type: string }> };
+		const body = JSON.parse(calls[0]?.options.body as string) as { batch: Array<{ type: string }> };
 		const types = body.batch.map((item) => item.type);
 		expect(types).toContain("span-create");
 		expect(types).toContain("span-update");
@@ -163,7 +163,7 @@ describe("createLangfuseExporter", () => {
 		];
 		await exporter.export(spans);
 
-		const body = JSON.parse(calls[0]!.options.body as string) as {
+		const body = JSON.parse(calls[0]?.options.body as string) as {
 			batch: Array<{ type: string; body: { id?: string } }>;
 		};
 		const traceCreates = body.batch.filter((item) => item.type === "trace-create");
@@ -292,12 +292,12 @@ describe("createLangfuseExporter", () => {
 		const span = makeSpan({ status: "error", kind: "tool", endTime: null });
 		await exporter.export([span]);
 
-		const body = JSON.parse(calls[0]!.options.body as string) as {
+		const body = JSON.parse(calls[0]?.options.body as string) as {
 			batch: Array<{ type: string; body: Record<string, unknown> }>;
 		};
 		const spanCreate = body.batch.find((item) => item.type === "span-create");
 		expect(spanCreate).toBeDefined();
-		expect(spanCreate!.body.level).toBe("ERROR");
+		expect(spanCreate?.body.level).toBe("ERROR");
 	});
 
 	it("includes correlation keys in trace metadata", async () => {
@@ -317,12 +317,12 @@ describe("createLangfuseExporter", () => {
 		});
 		await exporter.export([span]);
 
-		const body = JSON.parse(calls[0]!.options.body as string) as {
+		const body = JSON.parse(calls[0]?.options.body as string) as {
 			batch: Array<{ type: string; body: { metadata?: Record<string, unknown> } }>;
 		};
 		const traceCreate = body.batch.find((item) => item.type === "trace-create");
 		expect(traceCreate).toBeDefined();
-		const meta = traceCreate!.body.metadata;
+		const meta = traceCreate?.body.metadata;
 		expect(meta?.agentName).toBe("my-agent");
 		expect(meta?.runId).toBe("run-42");
 		expect(meta?.taskId).toBe("task-007");

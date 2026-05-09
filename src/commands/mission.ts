@@ -1,7 +1,7 @@
 /**
- * CLI command: ov mission <subcommand>
+ * CLI command: ha mission <subcommand>
  *
- * Long-running objective tracking for overstory mission mode.
+ * Long-running objective tracking for haru mission mode.
  * This file contains only Commander subcommand registration and argument
  * parsing. Domain logic lives in src/missions/ modules.
  */
@@ -116,12 +116,7 @@ export function createMissionCommand(): Command {
 		.option("--mission <id-or-slug>", "Target a specific mission")
 		.option("--json", "Output as JSON")
 		.action(
-			async (opts: {
-				slug?: string;
-				objective?: string;
-				mission?: string;
-				json?: boolean;
-			}) => {
+			async (opts: { slug?: string; objective?: string; mission?: string; json?: boolean }) => {
 				const cwd = process.cwd();
 				const config = await loadConfig(cwd);
 				const overstoryDir = join(config.project.root, ".overstory");

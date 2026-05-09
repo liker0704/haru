@@ -32,7 +32,7 @@ import { startMissionAnalyst, startMissionCoordinator, stopMissionRole } from ".
 import { removeActiveMission, writeMissionRuntimePointers } from "./runtime-context.ts";
 import { createMissionStore } from "./store.ts";
 
-// === ov mission start ===
+// === ha mission start ===
 
 interface StartOpts {
 	slug?: string;
@@ -80,7 +80,7 @@ export async function missionStart(
 					`Maximum concurrent missions reached (${activeMissions.length} active, limit ${maxConcurrent})`,
 				);
 				printHint(`Active missions: ${listing}`);
-				printHint("Stop one first with: ov mission stop");
+				printHint("Stop one first with: ha mission stop");
 			}
 			process.exitCode = 1;
 			return;
@@ -154,7 +154,7 @@ export async function missionStart(
 		// Bind coordinator session to the mission record
 		missionStore.bindCoordinatorSession(mission.id, coordResult.session.id);
 
-		// Analyst spawn is deferred — lazy start via `ov mission tier set` when
+		// Analyst spawn is deferred — lazy start via `ha mission tier set` when
 		// tier is set to planned or full. In assess mode only the coordinator runs.
 
 		// --- Dispatch objective to coordinator (assess mode) ---
@@ -166,8 +166,8 @@ export async function missionStart(
 					"",
 					"No objective was provided at start. Begin by asking the operator what they want to accomplish.",
 					"Once you understand the objective, set the mission identity:",
-					`  ov mission update --slug <short-name> --objective '<real objective>'`,
-					"Then assess complexity and set mission tier: ov mission tier set <direct|planned|full>",
+					`  ha mission update --slug <short-name> --objective '<real objective>'`,
+					"Then assess complexity and set mission tier: ha mission tier set <direct|planned|full>",
 				]
 			: [
 					`Mission ID: ${mission.id}`,
@@ -176,7 +176,7 @@ export async function missionStart(
 					`Context file: ${coordPrompt.contextPath}`,
 					"",
 					"You are in assess mode. Read the objective, scan the codebase, and select a tier.",
-					"Run: ov mission tier set <direct|planned|full>",
+					"Run: ha mission tier set <direct|planned|full>",
 				];
 		const dispatchId = await sendMissionDispatchMail({
 			overstoryDir,

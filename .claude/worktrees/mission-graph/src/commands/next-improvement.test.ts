@@ -1,5 +1,5 @@
 /**
- * Tests for `ov next-improvement`.
+ * Tests for `ha next-improvement`.
  *
  * Tests executeNextImprovement() directly to avoid spawning CLI processes.
  * Uses a temp directory with a minimal .overstory/ structure.

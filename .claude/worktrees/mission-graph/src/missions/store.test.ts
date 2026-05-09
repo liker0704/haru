@@ -18,7 +18,7 @@ let dbPath: string;
 let store: MissionStore;
 
 beforeEach(async () => {
-	tempDir = await mkdtemp(join(tmpdir(), "overstory-missions-test-"));
+	tempDir = await mkdtemp(join(tmpdir(), "haru-missions-test-"));
 	dbPath = join(tempDir, "sessions.db");
 	store = createMissionStore(dbPath);
 });

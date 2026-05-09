@@ -1,8 +1,8 @@
 /**
- * CLI command: ov ecosystem
+ * CLI command: ha ecosystem
  *
  * Shows a summary dashboard of all installed os-eco tools: version, update
- * status (latest vs outdated), and doctor health (overstory only).
+ * status (latest vs outdated), and doctor health (haru only).
  */
 
 import { Command } from "commander";
@@ -11,7 +11,7 @@ import { accent, brand, color, muted } from "../logging/color.ts";
 import { thickSeparator } from "../logging/theme.ts";
 
 const TOOLS = [
-	{ name: "overstory", cli: "ov", npm: "@os-eco/overstory-cli" },
+	{ name: "haru", cli: "ov", npm: "@hana/haru-cli" },
 	{ name: "mulch", cli: "ml", npm: "@os-eco/mulch-cli" },
 	{ name: "seeds", cli: "sd", npm: "@os-eco/seeds-cli" },
 	{ name: "canopy", cli: "cn", npm: "@os-eco/canopy-cli" },
@@ -135,7 +135,7 @@ async function checkTool(tool: { name: string; cli: string; npm: string }): Prom
 		});
 
 	const doctorPromise =
-		tool.name === "overstory"
+		tool.name === "haru"
 			? getDoctorSummary().then((d) => {
 					doctorSummary = d;
 				})
@@ -204,7 +204,7 @@ function printHumanOutput(results: ToolResult[]): void {
 		}
 		process.stdout.write(`    ${versionLine}\n`);
 
-		// Doctor summary (overstory only)
+		// Doctor summary (haru only)
 		if (tool.doctorSummary !== undefined) {
 			process.stdout.write(`    Doctor:  ${formatDoctorLine(tool.doctorSummary)}\n`);
 		}

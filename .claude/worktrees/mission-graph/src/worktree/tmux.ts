@@ -1,10 +1,10 @@
 /**
- * Tmux session management for overstory agent workers.
+ * Tmux session management for haru agent workers.
  *
  * All operations use Bun.spawn to call the tmux CLI directly.
- * Session naming convention: `overstory-{projectName}-{agentName}`.
+ * Session naming convention: `haru-{projectName}-{agentName}`.
  * The project name prefix prevents cross-project tmux session collisions
- * and enables project-scoped cleanup (overstory-pcef).
+ * and enables project-scoped cleanup (haru-pcef).
  */
 
 import { existsSync, unlinkSync } from "node:fs";
@@ -46,10 +46,10 @@ export function removeAgentEnvFile(cwd: string): void {
 }
 
 /**
- * Detect the directory containing the overstory binary.
+ * Detect the directory containing the haru binary.
  *
  * Tries `which ov` first (the short alias), then falls back to
- * `which overstory` (the original name). Both are registered in
+ * `which haru` (the original name). Both are registered in
  * package.json bin, but depending on how the tool was installed
  * (bun link, npm link, global install), only one may be on PATH.
  *
@@ -57,7 +57,7 @@ export function removeAgentEnvFile(cwd: string): void {
  */
 async function detectOverstoryBinDir(): Promise<string | null> {
 	// Try both command names — the alias migration may leave only one resolvable
-	for (const cmdName of ["ov", "overstory"]) {
+	for (const cmdName of ["ov", "haru"]) {
 		try {
 			const proc = Bun.spawn(["which", cmdName], {
 				stdout: "pipe",
@@ -75,10 +75,10 @@ async function detectOverstoryBinDir(): Promise<string | null> {
 		}
 	}
 
-	// Fallback: if process.argv[1] points to overstory's own entry point (src/index.ts),
+	// Fallback: if process.argv[1] points to haru's own entry point (src/index.ts),
 	// derive the bin dir from the bun binary that's running it
 	const scriptPath = process.argv[1];
-	if (scriptPath?.includes("overstory")) {
+	if (scriptPath?.includes("haru")) {
 		const bunPath = process.argv[0];
 		if (bunPath) {
 			return dirname(resolve(bunPath));
@@ -118,7 +118,7 @@ function primaryPaneTarget(name: string): string {
 /**
  * Create a new detached tmux session running the given command.
  *
- * @param name - Session name (e.g., "overstory-myproject-auth-login")
+ * @param name - Session name (e.g., "haru-myproject-auth-login")
  * @param cwd - Working directory for the session
  * @param command - Command to execute inside the session
  * @param env - Optional environment variables to export in the session
@@ -135,8 +135,8 @@ export async function createSession(
 	// Build environment exports for the tmux session
 	const exports: string[] = [];
 
-	// Ensure PATH includes the overstory binary directory
-	// so that hooks calling `overstory` inside the session can find it
+	// Ensure PATH includes the haru binary directory
+	// so that hooks calling `haru` inside the session can find it
 	const overstoryBinDir = await detectOverstoryBinDir();
 	if (overstoryBinDir) {
 		exports.push(`export PATH="${overstoryBinDir}:$PATH"`);
@@ -461,7 +461,7 @@ export async function killSession(name: string): Promise<void> {
  * Detect the current tmux session name.
  *
  * Returns the session name if running inside tmux, null otherwise.
- * Used by `overstory prime` to register the orchestrator's tmux session
+ * Used by `haru prime` to register the orchestrator's tmux session
  * so agents can nudge the orchestrator when they have results.
  */
 export async function getCurrentSessionName(): Promise<string | null> {
@@ -647,7 +647,7 @@ export async function ensureTmuxAvailable(): Promise<void> {
 	const { exitCode } = await runCommand(["tmux", "-V"]);
 	if (exitCode !== 0) {
 		throw new AgentError(
-			"tmux is not installed or not on PATH. Install tmux to use overstory agent orchestration.",
+			"tmux is not installed or not on PATH. Install tmux to use haru agent orchestration.",
 		);
 	}
 }
@@ -667,7 +667,7 @@ export async function ensureTmuxAvailable(): Promise<void> {
 export async function sendKeys(name: string, keys: string, maxRetries = 3): Promise<void> {
 	// Flatten newlines to spaces — multiline text via tmux send-keys causes
 	// Claude Code's TUI to receive embedded Enter keystrokes which prevent
-	// the final "Enter" from triggering message submission (overstory-y2ob).
+	// the final "Enter" from triggering message submission (haru-y2ob).
 	const flatKeys = keys.replace(/\n/g, " ");
 
 	for (let attempt = 0; attempt <= maxRetries; attempt++) {

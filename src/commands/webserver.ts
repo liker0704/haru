@@ -83,7 +83,7 @@ async function discoverWebserverProjects(opts: { scanPath?: string[] }): Promise
 }
 
 export function createWebserverCommand(): Command {
-	const cmd = new Command("webserver").description("Manage the overstory HTTP webserver");
+	const cmd = new Command("webserver").description("Manage the haru HTTP webserver");
 
 	cmd
 		.command("start")
@@ -113,7 +113,7 @@ export function createWebserverCommand(): Command {
 	cmd
 		.command("register")
 		.description("Register a project with the webserver")
-		.argument("<path>", "Path to the overstory project")
+		.argument("<path>", "Path to the haru project")
 		.action(async (path: string) => {
 			await registerWebserverProject(path);
 		});
@@ -121,7 +121,7 @@ export function createWebserverCommand(): Command {
 	cmd
 		.command("discover")
 		.description("Scan directories and refresh the project registry")
-		.option("--scan-path <dir...>", "Directories to scan for overstory projects")
+		.option("--scan-path <dir...>", "Directories to scan for haru projects")
 		.action(async (opts: { scanPath?: string[] }) => {
 			await discoverWebserverProjects(opts);
 		});
@@ -130,7 +130,7 @@ export function createWebserverCommand(): Command {
 }
 
 /**
- * Entry point for `ov webserver <subcommand>`.
+ * Entry point for `ha webserver <subcommand>`.
  */
 export async function webserverCommand(args: string[]): Promise<void> {
 	const cmd = createWebserverCommand();

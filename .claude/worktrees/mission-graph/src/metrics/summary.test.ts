@@ -19,7 +19,7 @@ let dbPath: string;
 let store: MetricsStore;
 
 beforeEach(async () => {
-	tempDir = await mkdtemp(join(tmpdir(), "overstory-metrics-test-"));
+	tempDir = await mkdtemp(join(tmpdir(), "haru-metrics-test-"));
 	dbPath = join(tempDir, "metrics.db");
 	store = createMetricsStore(dbPath);
 });

@@ -79,7 +79,7 @@ export async function resolveBackend(
  */
 export function trackerCliName(backend: TrackerBackend): string {
 	if (backend === "github") return "gh";
-	return backend === "seeds" ? "sd" : "bd";
+	return backend === "seeds" ? "su" : "bd";
 }
 
 // Re-export types for convenience

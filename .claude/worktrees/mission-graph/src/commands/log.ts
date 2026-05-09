@@ -1,5 +1,5 @@
 /**
- * CLI command: ov log <event> --agent <name> [--stdin]
+ * CLI command: ha log <event> --agent <name> [--stdin]
  *
  * Called by Pre/PostToolUse and Stop hooks.
  * Events: tool-start, tool-end, session-end.
@@ -116,14 +116,14 @@ async function transitionToCompleted(
 
 			if (PERSISTENT_CAPABILITIES.has(session.capability)) {
 				// Check if coordinator self-exited by verifying the run is already completed.
-				// If `ov run complete` was called before session-end, the run status is 'completed'
+				// If `ha run complete` was called before session-end, the run status is 'completed'
 				// and we should transition the coordinator session to completed too.
 				if (session.capability === "coordinator" && session.runId) {
 					const runStore = createRunStore(join(overstoryDir, "sessions.db"));
 					try {
 						const run = runStore.getRun(session.runId);
 						if (run && run.status === "completed") {
-							// Self-exit: coordinator called ov run complete before session ended
+							// Self-exit: coordinator called ha run complete before session ended
 							store.updateState(agentName, "completed");
 							store.updateLastActivity(agentName);
 							return;
@@ -712,7 +712,7 @@ async function runLog(opts: {
 					// NOTE: We intentionally do NOT auto-complete the run here for coordinator agents.
 					// The coordinator's Stop hook fires on every turn boundary, not just at true session exit,
 					// so auto-completing the run here would kill the session after the first turn.
-					// Run completion is handled by: `ov coordinator stop`, `ov run complete` (self-exit),
+					// Run completion is handled by: `ha coordinator stop`, `ha run complete` (self-exit),
 					// or the watchdog daemon detecting a dead coordinator process.
 
 					try {
@@ -876,7 +876,7 @@ export function createLogCommand(): Command {
 }
 
 /**
- * Entry point for `ov log <event> --agent <name>`.
+ * Entry point for `ha log <event> --agent <name>`.
  */
 export async function logCommand(args: string[]): Promise<void> {
 	const cmd = createLogCommand();

@@ -95,7 +95,7 @@ merge:
 
 		test("--dry-run shows branch info without merging (verify still on defaultBranch after)", async () => {
 			await setupProject(repoDir, defaultBranch);
-			const branchName = "overstory/test-agent/bead-123";
+			const branchName = "haru/test-agent/bead-123";
 			await createCleanFeatureBranch(repoDir, branchName);
 
 			let output = "";
@@ -121,7 +121,7 @@ merge:
 
 		test("--dry-run --json outputs JSON with branchName and status:pending", async () => {
 			await setupProject(repoDir, defaultBranch);
-			const branchName = "overstory/test-agent/bead-456";
+			const branchName = "haru/test-agent/bead-456";
 			await createCleanFeatureBranch(repoDir, branchName);
 
 			let output = "";
@@ -144,7 +144,7 @@ merge:
 
 		test("merges a clean branch successfully (verify feature file exists after)", async () => {
 			await setupProject(repoDir, defaultBranch);
-			const branchName = "overstory/builder/bead-789";
+			const branchName = "haru/builder/bead-789";
 			await createCleanFeatureBranch(repoDir, branchName);
 
 			const originalWrite = process.stdout.write.bind(process.stdout);
@@ -166,7 +166,7 @@ merge:
 
 		test("--json outputs JSON with success:true and tier:clean-merge", async () => {
 			await setupProject(repoDir, defaultBranch);
-			const branchName = "overstory/builder/bead-abc";
+			const branchName = "haru/builder/bead-abc";
 			await createCleanFeatureBranch(repoDir, branchName);
 
 			let output = "";
@@ -187,9 +187,9 @@ merge:
 			expect(parsed.tier).toBe("clean-merge");
 		});
 
-		test("parses agent name from overstory/my-builder/bead-abc convention (use --dry-run)", async () => {
+		test("parses agent name from haru/my-builder/bead-abc convention (use --dry-run)", async () => {
 			await setupProject(repoDir, defaultBranch);
-			const branchName = "overstory/my-builder/bead-xyz";
+			const branchName = "haru/my-builder/bead-xyz";
 			await createCleanFeatureBranch(repoDir, branchName);
 
 			let output = "";
@@ -254,8 +254,8 @@ merge:
 
 		test("--all --dry-run lists pending entries from merge-queue.json", async () => {
 			await setupProject(repoDir, defaultBranch);
-			const branch1 = "overstory/agent1/bead-001";
-			const branch2 = "overstory/agent2/bead-002";
+			const branch1 = "haru/agent1/bead-001";
+			const branch2 = "haru/agent2/bead-002";
 			await createCleanFeatureBranch(repoDir, branch1);
 			await createCleanFeatureBranch(repoDir, branch2);
 
@@ -296,8 +296,8 @@ merge:
 
 		test("--all merges multiple pending entries (write merge-queue.json with entries, verify counts)", async () => {
 			await setupProject(repoDir, defaultBranch);
-			const branch1 = "overstory/builder1/bead-100";
-			const branch2 = "overstory/builder2/bead-200";
+			const branch1 = "haru/builder1/bead-100";
+			const branch2 = "haru/builder2/bead-200";
 			await createCleanFeatureBranch(repoDir, branch1);
 			await createCleanFeatureBranch(repoDir, branch2);
 
@@ -343,7 +343,7 @@ merge:
 
 		test("--all --json reports successCount and failCount", async () => {
 			await setupProject(repoDir, defaultBranch);
-			const branch1 = "overstory/builder3/bead-300";
+			const branch1 = "haru/builder3/bead-300";
 			await createCleanFeatureBranch(repoDir, branch1);
 
 			// Enqueue entry via createMergeQueue
@@ -388,7 +388,7 @@ merge:
 			await runGitInDir(repoDir, ["checkout", defaultBranch]);
 
 			// Create a feature branch off defaultBranch
-			const branchName = "overstory/builder/bead-into-test";
+			const branchName = "haru/builder/bead-into-test";
 			await runGitInDir(repoDir, ["checkout", "-b", branchName]);
 			await commitFile(repoDir, `src/${branchName}.ts`, "feature for develop");
 			await runGitInDir(repoDir, ["checkout", defaultBranch]);
@@ -434,12 +434,12 @@ merge:
 			await runGitInDir(repoDir, ["checkout", defaultBranch]);
 
 			// Create feature branches
-			const branch1 = "overstory/agent1/bead-into-all-1";
+			const branch1 = "haru/agent1/bead-into-all-1";
 			await runGitInDir(repoDir, ["checkout", "-b", branch1]);
 			await commitFile(repoDir, `src/${branch1}.ts`, "feature 1");
 			await runGitInDir(repoDir, ["checkout", defaultBranch]);
 
-			const branch2 = "overstory/agent2/bead-into-all-2";
+			const branch2 = "haru/agent2/bead-into-all-2";
 			await runGitInDir(repoDir, ["checkout", "-b", branch2]);
 			await commitFile(repoDir, `src/${branch2}.ts`, "feature 2");
 			await runGitInDir(repoDir, ["checkout", defaultBranch]);
@@ -485,7 +485,7 @@ merge:
 
 		test("defaults to canonicalBranch when --into and session-branch.txt are absent", async () => {
 			await setupProject(repoDir, defaultBranch);
-			const branchName = "overstory/builder/bead-default-target";
+			const branchName = "haru/builder/bead-default-target";
 			await createCleanFeatureBranch(repoDir, branchName);
 
 			let output = "";
@@ -522,7 +522,7 @@ merge:
 			await Bun.write(join(repoDir, ".overstory", "session-branch.txt"), "feature/session-work\n");
 
 			// Create a feature branch to merge
-			const branchName = "overstory/builder/bead-session-branch";
+			const branchName = "haru/builder/bead-session-branch";
 			await runGitInDir(repoDir, ["checkout", "-b", branchName]);
 			await commitFile(repoDir, `src/${branchName}.ts`, "feature for session branch");
 			await runGitInDir(repoDir, ["checkout", defaultBranch]);
@@ -569,7 +569,7 @@ merge:
 			await Bun.write(join(repoDir, ".overstory", "session-branch.txt"), "session-branch-target\n");
 
 			// Create a feature branch to merge
-			const branchName = "overstory/builder/bead-override-test";
+			const branchName = "haru/builder/bead-override-test";
 			await runGitInDir(repoDir, ["checkout", "-b", branchName]);
 			await commitFile(repoDir, `src/${branchName}.ts`, "feature content");
 			await runGitInDir(repoDir, ["checkout", defaultBranch]);
@@ -608,7 +608,7 @@ merge:
 			await commitFile(repoDir, "src/shared.ts", "default branch content");
 
 			// Create feature branch and modify the same file
-			const branchName = "overstory/builder-conflict/bead-999";
+			const branchName = "haru/builder-conflict/bead-999";
 			await runGitInDir(repoDir, ["checkout", "-b", branchName]);
 			await commitFile(repoDir, "src/shared.ts", "feature branch content");
 			await runGitInDir(repoDir, ["checkout", defaultBranch]);

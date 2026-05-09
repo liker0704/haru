@@ -231,8 +231,8 @@ describe("CopilotRuntime", () => {
 		test("env is safe to spread into session env", () => {
 			const model: ResolvedModel = { model: "sonnet" };
 			const env = runtime.buildEnv(model);
-			const combined = { ...env, OVERSTORY_AGENT_NAME: "builder-1" };
-			expect(combined).toEqual({ OVERSTORY_AGENT_NAME: "builder-1" });
+			const combined = { ...env, HARU_AGENT_NAME: "builder-1" };
+			expect(combined).toEqual({ HARU_AGENT_NAME: "builder-1" });
 		});
 	});
 
@@ -240,7 +240,7 @@ describe("CopilotRuntime", () => {
 		let tempDir: string;
 
 		beforeEach(async () => {
-			tempDir = await mkdtemp(join(tmpdir(), "overstory-copilot-test-"));
+			tempDir = await mkdtemp(join(tmpdir(), "haru-copilot-test-"));
 		});
 
 		afterEach(async () => {
@@ -315,7 +315,7 @@ describe("CopilotRuntime", () => {
 		let tempDir: string;
 
 		beforeEach(async () => {
-			tempDir = await mkdtemp(join(tmpdir(), "overstory-copilot-transcript-test-"));
+			tempDir = await mkdtemp(join(tmpdir(), "haru-copilot-transcript-test-"));
 		});
 
 		afterEach(async () => {

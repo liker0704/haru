@@ -733,7 +733,7 @@ export function createMergeResolver(options: {
 				]);
 				if (stashCode !== 0) {
 					throw new MergeError(
-						`Working tree has uncommitted changes to tracked files: ${remainingDirty.join(", ")}. Commit or stash changes before running ov merge.`,
+						`Working tree has uncommitted changes to tracked files: ${remainingDirty.join(", ")}. Commit or stash changes before running ha merge.`,
 						{ branchName: entry.branchName },
 					);
 				}

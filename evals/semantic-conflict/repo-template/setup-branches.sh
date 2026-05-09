@@ -4,7 +4,7 @@ set -e
 SUBCOMMAND="${1:-}"
 
 create_branch_a() {
-	git checkout -b overstory/worker-a/task-a
+	git checkout -b haru/worker-a/task-a
 
 	# Remove email from User interface
 	sed -i '/email: string;/d' src/types.ts
@@ -30,7 +30,7 @@ EOF
 create_branch_b() {
 	git checkout main
 
-	git checkout -b overstory/worker-b/task-b
+	git checkout -b haru/worker-b/task-b
 
 	# Add second migration to store.ts MIGRATIONS
 	sed -i 's/];$/	{\n\t\tversion: 2,\n\t\tup: "ALTER TABLE users ADD COLUMN notified INTEGER NOT NULL DEFAULT 0",\n\t},\n];/' src/store.ts

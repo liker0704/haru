@@ -1,5 +1,5 @@
 /**
- * CLI command: overstory nudge <agent-name> [message]
+ * CLI command: haru nudge <agent-name> [message]
  *
  * Sends a text nudge to an agent's interactive Claude Code session via
  * tmux send-keys. Used to notify agents of new mail or relay urgent
@@ -27,7 +27,7 @@ const DEBOUNCE_MS = 500;
 /**
  * Load the orchestrator's registered tmux session name.
  *
- * Written by `overstory prime` at SessionStart when the orchestrator
+ * Written by `haru prime` at SessionStart when the orchestrator
  * is running inside tmux. Enables agents to nudge the orchestrator
  * even though it's not tracked in the SessionStore.
  */
@@ -51,7 +51,7 @@ async function loadOrchestratorTmuxSession(projectRoot: string): Promise<string 
  *
  * For regular agents, looks up the SessionStore.
  * For "orchestrator", falls back to the orchestrator-tmux.json registration
- * file written by `overstory prime`.
+ * file written by `haru prime`.
  */
 async function resolveTargetSession(
 	projectRoot: string,
@@ -129,7 +129,7 @@ async function sendNudgeWithRetry(tmuxSession: string, message: string): Promise
 			await sendKeys(tmuxSession, message);
 			// Follow-up Enter after a short delay to ensure submission.
 			// Claude Code's TUI may consume the first Enter during re-render/focus
-			// events, leaving text visible but unsubmitted (overstory-t62v).
+			// events, leaving text visible but unsubmitted (haru-t62v).
 			// Same workaround as sling.ts and coordinator.ts.
 			await Bun.sleep(500);
 			await sendKeys(tmuxSession, "");
@@ -280,12 +280,12 @@ export async function nudgeAgent(
 }
 
 /**
- * Entry point for `overstory nudge <agent-name> [message]`.
+ * Entry point for `haru nudge <agent-name> [message]`.
  */
 export async function nudgeCommand(args: string[]): Promise<void> {
 	const program = new Command();
 	program
-		.name("ov nudge")
+		.name("ha nudge")
 		.description("Send a text nudge to an agent")
 		.argument("<agent-name>", "Name of the agent to nudge")
 		.argument("[message...]", "Text to send (default: check mail prompt)")
@@ -320,5 +320,5 @@ export async function nudgeCommand(args: string[]): Promise<void> {
 			},
 		);
 
-	await program.parseAsync(["node", "overstory-nudge", ...args]);
+	await program.parseAsync(["node", "haru-nudge", ...args]);
 }

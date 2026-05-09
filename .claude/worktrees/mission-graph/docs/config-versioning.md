@@ -207,13 +207,13 @@ are validated by `validateConfig()`.
 
 ## 8. Doctor Integration
 
-The `ov doctor` command's config category checks:
+The `ha doctor` command's config category checks:
 
 - Whether `version` is present and equals `CURRENT_CONFIG_VERSION`.
 - Whether any deprecated keys remain (watchdog tier names, beads/seeds).
 - Whether unknown fields would fail validation.
 
-Running `ov doctor --fix` can auto-set `version: 2` in configs that lack it.
+Running `ha doctor --fix` can auto-set `version: 2` in configs that lack it.
 
 ---
 

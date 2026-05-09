@@ -1,5 +1,5 @@
 /**
- * Tests for `overstory errors` command.
+ * Tests for `haru errors` command.
  *
  * Uses real bun:sqlite (temp files) to test the errors command end-to-end.
  * Captures process.stdout.write to verify output formatting.

@@ -245,7 +245,7 @@ describe("createSpawnService", () => {
 
 	describe("session-before-beacon ordering", () => {
 		test("store.upsert is called before tmux.sendKeys", async () => {
-			// This test verifies the overstory-036f ordering guarantee:
+			// This test verifies the haru-036f ordering guarantee:
 			// session record MUST be persisted before the beacon is sent.
 			// We can't fully test this without mocking createWorktree,
 			// but we verify the call order through the tracker.
@@ -317,8 +317,8 @@ describe("createSpawnService", () => {
 			});
 
 			// Clear env to ensure no profile is set
-			const originalProfile = process.env.OVERSTORY_PROFILE;
-			delete process.env.OVERSTORY_PROFILE;
+			const originalProfile = process.env.HARU_PROFILE;
+			delete process.env.HARU_PROFILE;
 
 			const deps: SpawnDeps = {
 				sessionStore: makeMockSessionStore(),
@@ -351,7 +351,7 @@ describe("createSpawnService", () => {
 
 			// Restore env
 			if (originalProfile !== undefined) {
-				process.env.OVERSTORY_PROFILE = originalProfile;
+				process.env.HARU_PROFILE = originalProfile;
 			}
 		});
 
@@ -402,13 +402,13 @@ describe("createSpawnService", () => {
 				agentName: "builder-test-123",
 				capability: "builder",
 				taskId: "test-123",
-				branchName: "overstory/builder-test-123/test-123",
+				branchName: "haru/builder-test-123/test-123",
 				worktreePath: "/tmp/wt",
-				tmuxSession: "overstory-test-builder-test-123",
+				tmuxSession: "haru-test-builder-test-123",
 				pid: 12345,
 			};
 			expect(result.agentName).toBe("builder-test-123");
-			expect(result.tmuxSession).toContain("overstory-");
+			expect(result.tmuxSession).toContain("haru-");
 			expect(result.pid).toBeGreaterThan(0);
 		});
 	});

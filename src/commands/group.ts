@@ -1,5 +1,5 @@
 /**
- * CLI command: ov group create|status|add|remove|list
+ * CLI command: ha group create|status|add|remove|list
  *
  * Manages TaskGroups for batch work coordination. Groups track collections
  * of issues and auto-close when all member issues are closed.
@@ -301,7 +301,7 @@ function printGroupProgress(progress: TaskGroupProgress): void {
 }
 
 /**
- * Create the Commander command for `ov group`.
+ * Create the Commander command for `ha group`.
  */
 export function createGroupCommand(): Command {
 	const cmd = new Command("group").description("Manage task groups for batch coordination");
@@ -482,7 +482,7 @@ export function createGroupCommand(): Command {
 }
 
 /**
- * Entry point for `ov group <subcommand>`.
+ * Entry point for `ha group <subcommand>`.
  */
 export async function groupCommand(args: string[]): Promise<void> {
 	const cmd = createGroupCommand();

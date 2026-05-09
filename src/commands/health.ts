@@ -1,5 +1,5 @@
 /**
- * CLI command: ov health [--json] [--run <id>] [--compare <path>]
+ * CLI command: ha health [--json] [--run <id>] [--compare <path>]
  *
  * Shows the swarm's operational health score and factor breakdown.
  * Collects signals from SessionStore, MetricsStore, and DoctorChecks,
@@ -218,12 +218,12 @@ export async function executeHealth(opts: HealthOptions): Promise<void> {
 	}
 	if (policyStatusInfo !== null) {
 		process.stdout.write("\n");
-		process.stdout.write(renderPolicyStatus(policyStatusInfo) + "\n");
+		process.stdout.write(`${renderPolicyStatus(policyStatusInfo)}\n`);
 	}
 }
 
 /**
- * Create the `ov health` command.
+ * Create the `ha health` command.
  */
 export function createHealthCommand(): Command {
 	return new Command("health")

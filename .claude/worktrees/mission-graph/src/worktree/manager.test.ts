@@ -68,7 +68,7 @@ describe("createWorktree", () => {
 		});
 
 		expect(result.path).toBe(join(worktreesDir, "auth-login"));
-		expect(result.branch).toBe("overstory/auth-login/bead-abc123");
+		expect(result.branch).toBe("haru/auth-login/bead-abc123");
 	});
 
 	test("creates worktree directory on disk", async () => {
@@ -95,7 +95,7 @@ describe("createWorktree", () => {
 		});
 
 		const branchList = await git(repoDir, ["branch", "--list"]);
-		expect(branchList).toContain("overstory/auth-login/bead-abc123");
+		expect(branchList).toContain("haru/auth-login/bead-abc123");
 	});
 
 	test("throws WorktreeError when creating same worktree twice", async () => {
@@ -142,7 +142,7 @@ describe("createWorktree", () => {
 			expect(err).toBeInstanceOf(WorktreeError);
 			const wtErr = err as WorktreeError;
 			expect(wtErr.worktreePath).toBe(join(worktreesDir, "auth-login"));
-			expect(wtErr.branchName).toBe("overstory/auth-login/bead-abc123");
+			expect(wtErr.branchName).toBe("haru/auth-login/bead-abc123");
 		}
 	});
 });
@@ -202,8 +202,8 @@ describe("listWorktrees", () => {
 		expect(paths).toContain(join(worktreesDir, "data-sync"));
 
 		const branches = entries.map((e) => e.branch);
-		expect(branches).toContain("overstory/auth-login/bead-abc");
-		expect(branches).toContain("overstory/data-sync/bead-xyz");
+		expect(branches).toContain("haru/auth-login/bead-abc");
+		expect(branches).toContain("haru/data-sync/bead-xyz");
 	});
 
 	test("strips refs/heads/ prefix from branch names", async () => {
@@ -218,7 +218,7 @@ describe("listWorktrees", () => {
 		const entries = await listWorktrees(repoDir);
 		const worktreeEntry = entries.find((e) => e.path === join(worktreesDir, "feature-worker"));
 
-		expect(worktreeEntry?.branch).toBe("overstory/feature-worker/bead-123");
+		expect(worktreeEntry?.branch).toBe("haru/feature-worker/bead-123");
 		// Ensure no refs/heads/ prefix leaked through
 		expect(worktreeEntry?.branch).not.toContain("refs/heads/");
 	});
@@ -241,7 +241,7 @@ describe("listWorktrees", () => {
 
 	test("throws WorktreeError for non-git directory", async () => {
 		// Use a separate temp dir outside the git repo so git won't find a parent .git
-		const tmpDir = realpathSync(await mkdtemp(join(tmpdir(), "overstory-notgit-")));
+		const tmpDir = realpathSync(await mkdtemp(join(tmpdir(), "haru-notgit-")));
 		try {
 			await expect(listWorktrees(tmpDir)).rejects.toThrow(WorktreeError);
 		} finally {
@@ -362,7 +362,7 @@ describe("removeWorktree", () => {
 		await removeWorktree(repoDir, wtPath);
 
 		const branchList = await git(repoDir, ["branch", "--list"]);
-		expect(branchList).not.toContain("overstory/auth-login/bead-abc");
+		expect(branchList).not.toContain("haru/auth-login/bead-abc");
 	});
 
 	test("worktree no longer appears in listWorktrees after removal", async () => {
@@ -416,7 +416,7 @@ describe("removeWorktree", () => {
 		await removeWorktree(repoDir, wtPath, { force: true, forceBranch: true });
 
 		const branchList = await git(repoDir, ["branch", "--list"]);
-		expect(branchList).not.toContain("overstory/auth-login/bead-abc");
+		expect(branchList).not.toContain("haru/auth-login/bead-abc");
 	});
 
 	test("without forceBranch, unmerged branch deletion is silently ignored", async () => {
@@ -440,7 +440,7 @@ describe("removeWorktree", () => {
 
 		// But branch still exists because -d failed silently
 		const branchList = await git(repoDir, ["branch", "--list"]);
-		expect(branchList).toContain("overstory/auth-login/bead-abc");
+		expect(branchList).toContain("haru/auth-login/bead-abc");
 	});
 });
 
@@ -475,7 +475,7 @@ describe("rollbackWorktree", () => {
 
 		expect(existsSync(wtPath)).toBe(false);
 		const branchList = await git(repoDir, ["branch", "--list"]);
-		expect(branchList).not.toContain("overstory/auth-login/bead-abc");
+		expect(branchList).not.toContain("haru/auth-login/bead-abc");
 	});
 
 	test("does not throw for a non-existent worktree path", async () => {
@@ -498,6 +498,6 @@ describe("rollbackWorktree", () => {
 		expect(existsSync(wtPath)).toBe(false);
 		// Branch still exists (we didn't delete it)
 		const branchList = await git(repoDir, ["branch", "--list"]);
-		expect(branchList).toContain("overstory/auth-login/bead-abc");
+		expect(branchList).toContain("haru/auth-login/bead-abc");
 	});
 });

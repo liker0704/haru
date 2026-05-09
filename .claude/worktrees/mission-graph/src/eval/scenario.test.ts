@@ -14,7 +14,7 @@ describe("loadScenario", () => {
 	let tempDir: string;
 
 	beforeEach(async () => {
-		tempDir = await mkdtemp(join(tmpdir(), "overstory-eval-test-"));
+		tempDir = await mkdtemp(join(tmpdir(), "haru-eval-test-"));
 	});
 
 	afterEach(async () => {

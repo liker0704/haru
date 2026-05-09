@@ -40,7 +40,7 @@ describe("createManifestLoader", () => {
 	let agentBaseDir: string;
 
 	beforeEach(async () => {
-		tempDir = await mkdtemp(join(tmpdir(), "overstory-manifest-test-"));
+		tempDir = await mkdtemp(join(tmpdir(), "haru-manifest-test-"));
 		manifestPath = join(tempDir, "agent-manifest.json");
 		agentBaseDir = join(tempDir, "agents");
 		await mkdir(agentBaseDir, { recursive: true });
@@ -992,7 +992,7 @@ describe("manifest validation accepts arbitrary model strings", () => {
 	let agentBaseDir: string;
 
 	beforeEach(async () => {
-		tempDir = await mkdtemp(join(tmpdir(), "overstory-model-test-"));
+		tempDir = await mkdtemp(join(tmpdir(), "haru-model-test-"));
 		manifestPath = join(tempDir, "agent-manifest.json");
 		agentBaseDir = join(tempDir, "agents");
 		await mkdir(agentBaseDir, { recursive: true });

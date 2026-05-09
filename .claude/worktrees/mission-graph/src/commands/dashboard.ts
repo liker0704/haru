@@ -1,5 +1,5 @@
 /**
- * CLI command: ov dashboard [--interval <ms>] [--all]
+ * CLI command: ha dashboard [--interval <ms>] [--all]
  *
  * Rich terminal dashboard using raw ANSI escape codes (zero runtime deps).
  * Polls existing data sources and renders multi-panel layout with agent status,
@@ -591,7 +591,7 @@ async function loadDashboardData(
  * Render the header bar (line 1).
  */
 function renderHeader(width: number, interval: number, currentRunId?: string | null): string {
-	const left = brand.bold(`ov dashboard v${PKG_VERSION}`);
+	const left = brand.bold(`ha dashboard v${PKG_VERSION}`);
 	const now = new Date().toLocaleTimeString();
 	const scope = currentRunId ? ` [run: ${accent(currentRunId.slice(0, 8))}]` : " [all runs]";
 	const right = `${now}${scope} | refresh: ${interval}ms`;

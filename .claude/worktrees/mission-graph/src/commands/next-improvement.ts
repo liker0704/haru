@@ -1,5 +1,5 @@
 /**
- * CLI command: ov next-improvement [--json] [--run <id>] [--all]
+ * CLI command: ha next-improvement [--json] [--run <id>] [--all]
  *
  * Synthesizes the single highest-value improvement recommendation from
  * existing Overstory signals. Drives a status → next → resolve → verify loop.
@@ -107,7 +107,7 @@ export async function executeNextImprovement(opts: NextImprovementOptions): Prom
 }
 
 /**
- * Create the `ov next-improvement` command.
+ * Create the `ha next-improvement` command.
  */
 export function createNextImprovementCommand(): Command {
 	return new Command("next-improvement")

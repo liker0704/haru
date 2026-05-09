@@ -84,7 +84,7 @@ describe("createSeedsTracker — ready()", () => {
 
 		const callArgs = spawnSpy.mock.calls[0] as unknown[];
 		const cmd = callArgs[0] as string[];
-		expect(cmd).toEqual(["sd", "ready", "--json"]);
+		expect(cmd).toEqual(["su", "ready", "--json"]);
 	});
 
 	test("throws AgentError on non-zero exit code", async () => {
@@ -162,7 +162,7 @@ describe("createSeedsTracker — show()", () => {
 
 		const callArgs = spawnSpy.mock.calls[0] as unknown[];
 		const cmd = callArgs[0] as string[];
-		expect(cmd).toEqual(["sd", "show", "sd-1", "--json"]);
+		expect(cmd).toEqual(["su", "show", "sd-1", "--json"]);
 	});
 
 	test("throws AgentError on non-zero exit code", async () => {
@@ -278,7 +278,7 @@ describe("createSeedsTracker — claim()", () => {
 
 		const callArgs = spawnSpy.mock.calls[0] as unknown[];
 		const cmd = callArgs[0] as string[];
-		expect(cmd).toEqual(["sd", "update", "sd-5", "--status", "in_progress"]);
+		expect(cmd).toEqual(["su", "update", "sd-5", "--status", "in_progress"]);
 	});
 
 	test("throws AgentError on failure", async () => {
@@ -308,7 +308,7 @@ describe("createSeedsTracker — close()", () => {
 
 		const callArgs = spawnSpy.mock.calls[0] as unknown[];
 		const cmd = callArgs[0] as string[];
-		expect(cmd).toEqual(["sd", "close", "sd-10"]);
+		expect(cmd).toEqual(["su", "close", "sd-10"]);
 	});
 
 	test("calls [sd, close, <id>, --reason, ...] with reason", async () => {
@@ -319,7 +319,7 @@ describe("createSeedsTracker — close()", () => {
 
 		const callArgs = spawnSpy.mock.calls[0] as unknown[];
 		const cmd = callArgs[0] as string[];
-		expect(cmd).toEqual(["sd", "close", "sd-10", "--reason", "Done implementing"]);
+		expect(cmd).toEqual(["su", "close", "sd-10", "--reason", "Done implementing"]);
 	});
 });
 
@@ -363,7 +363,7 @@ describe("createSeedsTracker — list()", () => {
 
 		const callArgs = spawnSpy.mock.calls[0] as unknown[];
 		const cmd = callArgs[0] as string[];
-		expect(cmd[0]).toBe("sd");
+		expect(cmd[0]).toBe("su");
 		expect(cmd[1]).toBe("list");
 		expect(cmd).toContain("--json");
 	});
@@ -403,7 +403,7 @@ describe("createSeedsTracker — sync()", () => {
 
 		const callArgs = spawnSpy.mock.calls[0] as unknown[];
 		const cmd = callArgs[0] as string[];
-		expect(cmd).toEqual(["sd", "sync"]);
+		expect(cmd).toEqual(["su", "sync"]);
 	});
 
 	test("throws AgentError on failure", async () => {

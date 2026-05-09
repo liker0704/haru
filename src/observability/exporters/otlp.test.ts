@@ -191,9 +191,9 @@ describe("buildResourceAttributes", () => {
 		const keys = attrs.map((a) => a.key);
 		expect(keys).toContain("service.name");
 		expect(keys).toContain("service.instance.id");
-		expect(keys).toContain("overstory.session.id");
-		expect(keys).toContain("overstory.task.id");
-		expect(keys).toContain("overstory.mission.id");
+		expect(keys).toContain("haru.session.id");
+		expect(keys).toContain("haru.task.id");
+		expect(keys).toContain("haru.mission.id");
 	});
 
 	test("omits null values", () => {
@@ -208,9 +208,9 @@ describe("buildResourceAttributes", () => {
 
 		expect(keys).toContain("service.name");
 		expect(keys).not.toContain("service.instance.id");
-		expect(keys).not.toContain("overstory.session.id");
-		expect(keys).not.toContain("overstory.task.id");
-		expect(keys).not.toContain("overstory.mission.id");
+		expect(keys).not.toContain("haru.session.id");
+		expect(keys).not.toContain("haru.task.id");
+		expect(keys).not.toContain("haru.mission.id");
 	});
 
 	test("service.name uses agentName", () => {
@@ -255,7 +255,7 @@ describe("buildPayload", () => {
 	test("each ResourceSpans has correct scope", () => {
 		const payload = buildPayload([makeTestSpan()]);
 		const scopeSpans = payload.resourceSpans[0]?.scopeSpans[0];
-		expect(scopeSpans?.scope.name).toBe("overstory");
+		expect(scopeSpans?.scope.name).toBe("haru");
 		expect(scopeSpans?.scope.version).toBe("0.9.1");
 	});
 

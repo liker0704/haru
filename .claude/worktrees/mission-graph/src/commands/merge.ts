@@ -1,14 +1,14 @@
 /**
- * CLI command: ov merge
+ * CLI command: ha merge
  *
  * Merges agent branches back to the canonical branch using
  * the merge queue and tiered conflict resolver.
  *
  * Usage:
- *   ov merge --branch <name>   Merge a specific branch
- *   ov merge --all             Merge all pending branches
- *   ov merge --dry-run         Check for conflicts without merging
- *   ov merge --json            Output results as JSON
+ *   ha merge --branch <name>   Merge a specific branch
+ *   ha merge --all             Merge all pending branches
+ *   ha merge --dry-run         Check for conflicts without merging
+ *   ha merge --json            Output results as JSON
  */
 
 import { join } from "node:path";
@@ -30,26 +30,26 @@ export interface MergeOptions {
 }
 
 /**
- * Extract agent name from a branch following the overstory naming convention.
- * Pattern: overstory/{agentName}/{taskId}
+ * Extract agent name from a branch following the haru naming convention.
+ * Pattern: haru/{agentName}/{taskId}
  * Falls back to "unknown" if the pattern does not match.
  */
 function parseAgentName(branchName: string): string {
 	const parts = branchName.split("/");
-	if (parts[0] === "overstory" && parts[1] !== undefined) {
+	if (parts[0] === "haru" && parts[1] !== undefined) {
 		return parts[1];
 	}
 	return "unknown";
 }
 
 /**
- * Extract task ID from a branch following the overstory naming convention.
- * Pattern: overstory/{agentName}/{taskId}
+ * Extract task ID from a branch following the haru naming convention.
+ * Pattern: haru/{agentName}/{taskId}
  * Falls back to "unknown" if the pattern does not match.
  */
 function parseTaskId(branchName: string): string {
 	const parts = branchName.split("/");
-	if (parts[0] === "overstory" && parts[2] !== undefined) {
+	if (parts[0] === "haru" && parts[2] !== undefined) {
 		return parts[2];
 	}
 	return "unknown";
@@ -126,7 +126,7 @@ function formatDryRun(entry: MergeEntry): string {
 }
 
 /**
- * Entry point for `ov merge [flags]`.
+ * Entry point for `ha merge [flags]`.
  *
  * @param opts - Command options
  */
@@ -138,7 +138,7 @@ export async function mergeCommand(opts: MergeOptions): Promise<void> {
 	const json = opts.json ?? false;
 
 	if (!branchName && !all) {
-		throw new ValidationError("Either --branch <name> or --all is required for ov merge", {
+		throw new ValidationError("Either --branch <name> or --all is required for ha merge", {
 			field: "branch|all",
 		});
 	}

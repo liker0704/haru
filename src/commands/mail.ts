@@ -1,5 +1,5 @@
 /**
- * CLI command: overstory mail send/check/list/read/reply
+ * CLI command: haru mail send/check/list/read/reply
  *
  * Parses CLI args via Commander.js and delegates to the mail client.
  * Supports --inject for hook context injection, --json for machine output,
@@ -222,7 +222,7 @@ interface PurgeOpts {
 	json?: boolean;
 }
 
-/** overstory mail send */
+/** haru mail send */
 async function handleSend(opts: SendOpts, cwd: string): Promise<void> {
 	const { to, subject, body } = opts;
 	const from = canonicalizeMailAgentName(opts.agent ?? opts.from ?? "orchestrator");
@@ -486,7 +486,7 @@ async function handleSend(opts: SendOpts, cwd: string): Promise<void> {
 
 		// Auto-nudge: write a pending nudge marker instead of sending tmux keys.
 		// Direct tmux sendKeys during tool execution corrupts the agent's I/O,
-		// causing SIGKILL (exit 137) and "request interrupted" errors (overstory-ii1o).
+		// causing SIGKILL (exit 137) and "request interrupted" errors (haru-ii1o).
 		// The message is already in the DB — the UserPromptSubmit hook's
 		// `mail check --inject` will surface it on the next prompt cycle.
 		// The pending nudge marker ensures the message gets a priority banner.
@@ -515,13 +515,13 @@ async function handleSend(opts: SendOpts, cwd: string): Promise<void> {
 		// For dispatch messages, also send an immediate tmux nudge.
 		// Dispatch targets newly spawned agents that may be idle at the welcome
 		// screen where file-based nudges can't reach (no hook fires on idle agents).
-		// The I/O corruption concern (overstory-ii1o) only applies during active
+		// The I/O corruption concern (haru-ii1o) only applies during active
 		// tool execution — newly spawned agents are idle, so sendKeys is safe.
 		if (type === "dispatch") {
 			try {
 				const { nudgeAgent } = await import("./nudge.ts");
 				const preview = body.length > 200 ? `${body.slice(0, 200)}...` : body;
-				const nudgeMessage = `[DISPATCH] New mail: "${subject}" (preview: ${preview}). Run ov mail check --agent ${canonicalTo} for the full message.`;
+				const nudgeMessage = `[DISPATCH] New mail: "${subject}" (preview: ${preview}). Run ha mail check --agent ${canonicalTo} for the full message.`;
 				// Small delay to let the agent's TUI stabilize after sling
 				await Bun.sleep(3_000);
 				await nudgeAgent(cwd, canonicalTo, nudgeMessage, true); // force=true to skip debounce
@@ -566,7 +566,7 @@ async function handleSend(opts: SendOpts, cwd: string): Promise<void> {
 	}
 }
 
-/** overstory mail check */
+/** haru mail check */
 async function handleCheck(opts: CheckOpts, cwd: string): Promise<void> {
 	const agent = canonicalizeMailAgentName(opts.agent ?? "orchestrator");
 	const inject = opts.inject ?? false;
@@ -640,7 +640,7 @@ async function handleCheck(opts: CheckOpts, cwd: string): Promise<void> {
 	}
 }
 
-/** overstory mail list */
+/** haru mail list */
 function handleList(opts: ListOpts, cwd: string): void {
 	const from = opts.from;
 	// --to takes precedence over --agent (agent is an alias for recipient filtering)
@@ -680,7 +680,7 @@ function handleList(opts: ListOpts, cwd: string): void {
 	}
 }
 
-/** overstory mail read */
+/** haru mail read */
 function handleRead(id: string, cwd: string): void {
 	const client = openClient(cwd);
 	try {
@@ -695,7 +695,7 @@ function handleRead(id: string, cwd: string): void {
 	}
 }
 
-/** overstory mail reply */
+/** haru mail reply */
 async function handleReply(id: string, opts: ReplyOpts, cwd: string): Promise<void> {
 	const body = opts.body;
 	const from = canonicalizeMailAgentName(opts.agent ?? opts.from ?? "orchestrator");
@@ -739,7 +739,7 @@ async function handleReply(id: string, opts: ReplyOpts, cwd: string): Promise<vo
 		try {
 			const { nudgeAgent } = await import("./nudge.ts");
 			const replyPreview = body.length > 200 ? `${body.slice(0, 200)}...` : body;
-			const nudgeMessage = `[DISPATCH] New mail: "${reply.subject}" (preview: ${replyPreview}). Run ov mail check --agent ${reply.to} for the full message.`;
+			const nudgeMessage = `[DISPATCH] New mail: "${reply.subject}" (preview: ${replyPreview}). Run ha mail check --agent ${reply.to} for the full message.`;
 			await Bun.sleep(3_000);
 			await nudgeAgent(cwd, reply.to, nudgeMessage, true);
 		} catch {
@@ -748,7 +748,7 @@ async function handleReply(id: string, opts: ReplyOpts, cwd: string): Promise<vo
 	}
 }
 
-/** overstory mail purge */
+/** haru mail purge */
 function handlePurge(opts: PurgeOpts, cwd: string): void {
 	const all = opts.all ?? false;
 	const daysStr = opts.days;
@@ -794,7 +794,7 @@ interface DlqOpts {
 	json?: boolean;
 }
 
-/** overstory mail dlq */
+/** haru mail dlq */
 function handleDlq(opts: DlqOpts, cwd: string): void {
 	const MAX_DLQ_LIMIT = 1000;
 	const limit = opts.limit !== undefined ? Number.parseInt(opts.limit, 10) : 100;
@@ -839,7 +839,7 @@ interface RetryOpts {
 	json?: boolean;
 }
 
-/** overstory mail retry */
+/** haru mail retry */
 function handleRetry(id: string | undefined, opts: RetryOpts, cwd: string): void {
 	if (!id && !opts.all) {
 		throw new ValidationError("Specify a message ID or --all", {
@@ -880,7 +880,7 @@ function handleRetry(id: string | undefined, opts: RetryOpts, cwd: string): void
 }
 
 /**
- * Entry point for `overstory mail <subcommand> [args...]`.
+ * Entry point for `haru mail <subcommand> [args...]`.
  *
  * Subcommands: send, check, list, read, reply, purge, dlq, retry.
  * Uses Commander.js for subcommand routing and option parsing.
@@ -892,7 +892,7 @@ export async function mailCommand(args: string[]): Promise<void> {
 	const root = await resolveProjectRoot(process.cwd());
 
 	const program = new Command();
-	program.name("ov mail").description("Agent messaging system").exitOverride();
+	program.name("ha mail").description("Agent messaging system").exitOverride();
 
 	program
 		.command("send")
@@ -994,5 +994,5 @@ export async function mailCommand(args: string[]): Promise<void> {
 			handleRetry(id, opts, root);
 		});
 
-	await program.parseAsync(["node", "overstory-mail", ...args]);
+	await program.parseAsync(["node", "haru-mail", ...args]);
 }

@@ -297,7 +297,7 @@ describe("mission command e2e", () => {
 		};
 		expect(handoffPayload.handoffs?.[0]?.workstreamId).toBe("ws-auth");
 		expect(handoffPayload.dispatchCommands?.[0]?.workstreamId).toBe("ws-auth");
-		expect(handoffPayload.dispatchCommands?.[0]?.command).toContain("ov sling task-auth");
+		expect(handoffPayload.dispatchCommands?.[0]?.command).toContain("ha sling task-auth");
 		expect(handoffPayload.dispatchCommands?.[0]?.command).toContain("--capability lead");
 		expect(handoffPayload.dispatchCommands?.[0]?.command).toContain(briefPath);
 
@@ -320,7 +320,7 @@ describe("mission command e2e", () => {
 			.getAll({ to: "execution-director" })
 			.find((message) => message.subject.includes("regenerate stale specs"));
 		expect(refreshControl?.body).toContain("Action required: coordinate the owning leads");
-		expect(refreshControl?.body).toContain("ov spec write task-auth");
+		expect(refreshControl?.body).toContain("ha spec write task-auth");
 
 		await specWriteCommand("task-auth", {
 			body: "# Auth spec v2",
@@ -673,9 +673,9 @@ describe("mission command e2e", () => {
 				capability: "lead",
 				runtime: "claude",
 				worktreePath: join(tempDir, ".overstory", "worktrees", "docs-smoke-lead"),
-				branchName: "overstory/docs-smoke-lead/task-1",
+				branchName: "haru/docs-smoke-lead/task-1",
 				taskId: "task-1",
-				tmuxSession: "overstory-overstory-docs-smoke-lead",
+				tmuxSession: "haru-haru-docs-smoke-lead",
 				state: "working",
 				pid: 4242,
 				parentAgent: "execution-director",
@@ -804,7 +804,7 @@ describe("mission command e2e", () => {
 		const mailStore = createMailStore(join(overstoryDir, "mail.db"));
 		const dispatchMail = mailStore.getAll({ to: "coordinator" }).find((m) => m.type === "dispatch");
 		expect(dispatchMail?.body).toContain("No objective was provided at start");
-		expect(dispatchMail?.body).toContain("ov mission update");
+		expect(dispatchMail?.body).toContain("ha mission update");
 
 		// Update slug and objective
 		await missionUpdate(overstoryDir, {

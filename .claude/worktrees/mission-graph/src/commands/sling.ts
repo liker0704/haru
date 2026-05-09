@@ -1,5 +1,5 @@
 /**
- * CLI command: ov sling <task-id>
+ * CLI command: ha sling <task-id>
  *
  * CRITICAL PATH. Orchestrates a full agent spawn:
  * 1. Load config + manifest
@@ -222,7 +222,7 @@ export interface BeaconOptions {
  *   Startup protocol:
  *   1. Read your assignment in .claude/CLAUDE.md
  *   2. Load expertise: mulch prime
- *   3. Check mail: ov mail check --agent <name>
+ *   3. Check mail: ha mail check --agent <name>
  *   4. Begin working on task <task-id>
  */
 export function buildBeacon(opts: BeaconOptions): string {
@@ -231,7 +231,7 @@ export function buildBeacon(opts: BeaconOptions): string {
 	const parts = [
 		`[OVERSTORY] ${opts.agentName} (${opts.capability}) ${timestamp} task:${opts.taskId}`,
 		`Depth: ${opts.depth} | Parent: ${parent}`,
-		`Startup: read ${opts.instructionPath}, run mulch prime, check mail (ov mail check --agent ${opts.agentName}), then begin task ${opts.taskId}`,
+		`Startup: read ${opts.instructionPath}, run mulch prime, check mail (ha mail check --agent ${opts.agentName}), then begin task ${opts.taskId}`,
 	];
 	return parts.join(" — ");
 }
@@ -257,7 +257,7 @@ export function parentHasScouts(
  *  - noScoutCheck is false (caller has not suppressed the warning)
  *  - skipScout is false (the lead is not intentionally running without scouts)
  *
- * Extracted from slingCommand for testability (overstory-6eyw).
+ * Extracted from slingCommand for testability (haru-6eyw).
  *
  * @param capability - The requested agent capability
  * @param parentAgent - The --parent flag value (null = coordinator/human)
@@ -321,7 +321,7 @@ export function checkTaskLock(
  *
  * This prevents the duplicate-lead anti-pattern where two leads run
  * simultaneously on the same bead, causing duplicate work streams and
- * wasted tokens (overstory-gktc postmortem).
+ * wasted tokens (haru-gktc postmortem).
  *
  * Only checks sessions with capability "lead". Builder/scout children
  * working the same bead (via parent delegation) do not trigger this check.
@@ -508,14 +508,14 @@ export async function getCurrentBranch(repoRoot: string): Promise<string | null>
 }
 
 /**
- * Entry point for `ov sling <task-id> [flags]`.
+ * Entry point for `ha sling <task-id> [flags]`.
  *
  * @param taskId - The task ID to assign to the agent
  * @param opts - Command options
  */
 export async function slingCommand(taskId: string, opts: SlingOptions): Promise<void> {
 	if (!taskId) {
-		throw new ValidationError("Task ID is required: ov sling <task-id>", {
+		throw new ValidationError("Task ID is required: ha sling <task-id>", {
 			field: "taskId",
 		});
 	}
@@ -542,7 +542,7 @@ export async function slingCommand(taskId: string, opts: SlingOptions): Promise<
 
 	if (isRunningAsRoot()) {
 		throw new AgentError(
-			"Cannot spawn agents as root (UID 0). The claude CLI rejects --permission-mode bypassPermissions when run as root, causing the tmux session to die immediately. Run overstory as a non-root user.",
+			"Cannot spawn agents as root (UID 0). The claude CLI rejects --permission-mode bypassPermissions when run as root, causing the tmux session to die immediately. Run haru as a non-root user.",
 			{ agentName: name },
 		);
 	}
@@ -968,9 +968,9 @@ export async function slingCommand(taskId: string, opts: SlingOptions): Promise<
 			if (runtime.headless === true && runtime.buildDirectSpawn) {
 				const directEnv = {
 					...runtime.buildEnv(resolvedModel),
-					OVERSTORY_AGENT_NAME: name,
-					OVERSTORY_WORKTREE_PATH: worktreePath,
-					OVERSTORY_TASK_ID: taskId,
+					HARU_AGENT_NAME: name,
+					HARU_WORKTREE_PATH: worktreePath,
+					HARU_TASK_ID: taskId,
 				};
 				const argv = runtime.buildDirectSpawn({
 					cwd: worktreePath,
@@ -981,12 +981,12 @@ export async function slingCommand(taskId: string, opts: SlingOptions): Promise<
 
 				// Create a timestamped log dir for this headless agent session.
 				// Always redirect stdout to a file. This prevents SIGPIPE death:
-				// ov sling exits after spawning, closing the pipe's read end.
+				// ha sling exits after spawning, closing the pipe's read end.
 				// If stdout is a pipe, the agent dies on the next write (SIGPIPE).
 				// File writes have no such limit, and the agent survives the CLI exit.
 				//
 				// Note: RPC connection wiring is intentionally omitted here. The RPC pipe
-				// is only useful when the spawner stays alive to consume it. ov sling is
+				// is only useful when the spawner stays alive to consume it. ha sling is
 				// a short-lived CLI — any connection created here dies with the process.
 				const logTimestamp = new Date().toISOString().replace(/[:.]/g, "-");
 				const agentLogDir = join(overstoryDir, "logs", name, logTimestamp);
@@ -1056,7 +1056,7 @@ export async function slingCommand(taskId: string, opts: SlingOptions): Promise<
 				await ensureTmuxAvailable();
 
 				// 12. Create tmux session running claude in interactive mode
-				const tmuxSessionName = `overstory-${config.project.name}-${name}`;
+				const tmuxSessionName = `haru-${config.project.name}-${name}`;
 				const sessionId = crypto.randomUUID();
 				const spawnTimestamp = Date.now();
 				const spawnCmd = runtime.buildSpawnCommand({
@@ -1067,22 +1067,22 @@ export async function slingCommand(taskId: string, opts: SlingOptions): Promise<
 					sharedWritableDirs: getSharedWritableDirs(config.project.root, capability),
 					env: {
 						...runtime.buildEnv(resolvedModel),
-						OVERSTORY_AGENT_NAME: name,
-						OVERSTORY_WORKTREE_PATH: worktreePath,
-						OVERSTORY_TASK_ID: taskId,
+						HARU_AGENT_NAME: name,
+						HARU_WORKTREE_PATH: worktreePath,
+						HARU_TASK_ID: taskId,
 					},
 				});
 				const pid = await createSession(tmuxSessionName, worktreePath, spawnCmd, {
 					...runtime.buildEnv(resolvedModel),
-					OVERSTORY_AGENT_NAME: name,
-					OVERSTORY_WORKTREE_PATH: worktreePath,
-					OVERSTORY_TASK_ID: taskId,
+					HARU_AGENT_NAME: name,
+					HARU_WORKTREE_PATH: worktreePath,
+					HARU_TASK_ID: taskId,
 				});
 
 				// 13. Record session BEFORE sending the beacon so that hook-triggered
 				// updateLastActivity() can find the entry and transition booting->working.
 				// Without this, a race exists: hooks fire before the session is persisted,
-				// leaving the agent stuck in "booting" (overstory-036f).
+				// leaving the agent stuck in "booting" (haru-036f).
 				const session: AgentSession = {
 					id: sessionId,
 					agentName: name,
@@ -1167,7 +1167,7 @@ export async function slingCommand(taskId: string, opts: SlingOptions): Promise<
 
 				// 13c. Follow-up Enters with increasing delays to ensure submission.
 				// Claude Code's TUI may consume early Enters during late initialization
-				// (overstory-yhv6). An Enter on an empty input line is harmless.
+				// (haru-yhv6). An Enter on an empty input line is harmless.
 				for (const delay of [1_000, 2_000, 3_000, 5_000]) {
 					await Bun.sleep(delay);
 					await sendKeys(tmuxSessionName, "");
@@ -1176,7 +1176,7 @@ export async function slingCommand(taskId: string, opts: SlingOptions): Promise<
 				// 13d. Verify beacon was received — if pane still shows the welcome
 				// screen (detectReady returns "ready"), resend the beacon. Claude Code's TUI
 				// sometimes consumes the Enter keystroke during late initialization, swallowing
-				// the beacon text entirely (overstory-3271).
+				// the beacon text entirely (haru-3271).
 				//
 				// Skipped for runtimes that return false from requiresBeaconVerification().
 				// Pi's TUI idle and processing states are indistinguishable via detectReady

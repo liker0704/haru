@@ -324,7 +324,7 @@ describe("evaluateAssertions", () => {
 		});
 
 		test("executes real hook file", async () => {
-			const tempDir = await mkdtemp(join(tmpdir(), "overstory-hook-test-"));
+			const tempDir = await mkdtemp(join(tmpdir(), "haru-hook-test-"));
 			try {
 				const hookPath = join(tempDir, "hook.ts");
 				await writeFile(

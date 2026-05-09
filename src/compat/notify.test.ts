@@ -9,7 +9,7 @@ import type { CompatGateDecision } from "./types.ts";
 
 function makeEntry(): MergeEntry {
 	return {
-		branchName: "overstory/test-builder/task-42",
+		branchName: "haru/test-builder/task-42",
 		taskId: "task-42",
 		agentName: "test-builder",
 		filesModified: ["src/foo.ts"],
@@ -26,7 +26,7 @@ function makeDecision(action: CompatGateDecision["action"] = "reject"): CompatGa
 		result: {
 			compatible: false,
 			branchA: "main",
-			branchB: "overstory/test-builder/task-42",
+			branchB: "haru/test-builder/task-42",
 			summary: "Breaking changes detected",
 			staticOnly: true,
 			analyzedAt: "2026-01-01T00:00:00.000Z",
@@ -90,7 +90,7 @@ function makeMockSessionStore(parentAgent?: string | null) {
 				capability: "builder",
 				runtime: "claude",
 				worktreePath: "/tmp/test",
-				branchName: "overstory/test-builder/task-42",
+				branchName: "haru/test-builder/task-42",
 				taskId: "task-42",
 				tmuxSession: "test-session",
 				state: "working",
@@ -125,7 +125,7 @@ describe("notifyCompatFailure", () => {
 		expect(sent[0]?.to).toBe("test-builder");
 		expect(sent[0]?.type).toBe("merge_failed");
 		expect(sent[0]?.priority).toBe("high");
-		expect(sent[0]?.subject).toContain("overstory/test-builder/task-42");
+		expect(sent[0]?.subject).toContain("haru/test-builder/task-42");
 	});
 
 	it("includes breaking changes in mail body", () => {

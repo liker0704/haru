@@ -23,7 +23,11 @@ function openMailClient(overstoryDir: string) {
 	return createMailClient(createMailStore(join(overstoryDir, "mail.db")));
 }
 
-export function drainAgentInbox(overstoryDir: string, agentName: string, missionId?: string): number {
+export function drainAgentInbox(
+	overstoryDir: string,
+	agentName: string,
+	missionId?: string,
+): number {
 	const client = openMailClient(overstoryDir);
 	try {
 		return client.check(agentName, missionId).length;

@@ -15,7 +15,7 @@ export async function handleHomePage(
 
 	let content: Raw;
 	if (projects.length === 0) {
-		content = emptyState("No projects registered. Run ov webserver discover to find projects.");
+		content = emptyState("No projects registered. Run ha webserver discover to find projects.");
 	} else {
 		const cards = new Raw(
 			projects

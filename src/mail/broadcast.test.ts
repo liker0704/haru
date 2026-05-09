@@ -32,7 +32,7 @@ describe("resolveGroupAddress", () => {
 			worktreePath: `/worktrees/${agentName}`,
 			branchName: `branch-${agentName}`,
 			taskId: "bead-001",
-			tmuxSession: `overstory-test-${agentName}`,
+			tmuxSession: `haru-test-${agentName}`,
 			state: "working",
 			pid: 12345,
 			parentAgent: null,

@@ -68,7 +68,7 @@ async function resolveOverstoryBin(): Promise<string> {
 			}
 		}
 	} catch {
-		// which not available or ov not on PATH
+		// which not available or ha not on PATH
 	}
 
 	const scriptPath = process.argv[1];
@@ -76,7 +76,7 @@ async function resolveOverstoryBin(): Promise<string> {
 		return scriptPath;
 	}
 
-	throw new OverstoryError("Cannot resolve overstory binary path", "WEBSERVER_ERROR");
+	throw new OverstoryError("Cannot resolve haru binary path", "WEBSERVER_ERROR");
 }
 
 export async function loadWebConfig(): Promise<WebConfig> {

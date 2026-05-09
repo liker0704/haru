@@ -63,7 +63,7 @@ export function createCanopyClient(cwd: string, instrumentCtx?: InstrumentContex
 		args: string[],
 		context: string,
 	): Promise<{ stdout: string; stderr: string }> {
-		const { stdout, stderr, exitCode } = await runCommand(["cn", ...args], cwd);
+		const { stdout, stderr, exitCode } = await runCommand(["ta", ...args], cwd);
 		if (exitCode !== 0) {
 			throw new AgentError(`canopy ${context} failed (exit ${exitCode}): ${stderr.trim()}`);
 		}
@@ -106,7 +106,7 @@ export function createCanopyClient(cwd: string, instrumentCtx?: InstrumentContex
 					args.push(name);
 				}
 				// cn validate does not support --json; parse exit code and stdout/stderr
-				const { stdout, stderr, exitCode } = await runCommand(["cn", ...args], cwd);
+				const { stdout, stderr, exitCode } = await runCommand(["ta", ...args], cwd);
 				const output = (stdout + stderr).trim();
 				const errors: string[] = [];
 				if (exitCode !== 0) {

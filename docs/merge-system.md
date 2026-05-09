@@ -7,17 +7,17 @@ resolver with new resolution strategies.
 
 ---
 
-## 1. What `ov merge` Does
+## 1. What `ha merge` Does
 
 When agent workers complete tasks on separate branches, those branches need to be
-integrated back into the canonical branch (typically `main`). `ov merge` handles
+integrated back into the canonical branch (typically `main`). `ha merge` handles
 this integration through a **tiered conflict resolution pipeline** that escalates
 from simple to complex approaches, stopping at the first tier that succeeds.
 
 The merge pipeline:
 
 1. Reads pending entries from the merge queue (`merge-queue.db`)
-2. Checks compatibility between the incoming branch and canonical surfaces (`ov compat check`)
+2. Checks compatibility between the incoming branch and canonical surfaces (`ha compat check`)
 3. Attempts resolution through up to 4 tiers in order
 4. Records conflict patterns to mulch for future learning
 5. Updates queue entry status and notifies the caller
@@ -31,7 +31,7 @@ The merge pipeline:
 | `src/merge/types.ts` | Domain types: `MergeEntry`, `MergeResult`, `ConflictHistory`, `ResolutionTier` |
 | `src/merge/queue.ts` | SQLite-backed FIFO queue: `createMergeQueue()` |
 | `src/merge/resolver.ts` | 4-tier conflict resolution: `createMergeResolver()` |
-| `src/commands/merge.ts` | CLI wiring for `ov merge` |
+| `src/commands/merge.ts` | CLI wiring for `ha merge` |
 | `agents/merger.md` | Agent definition for merger workers |
 
 ---
@@ -253,7 +253,7 @@ After each non-clean merge, the resolver records a pattern to mulch via
 `parseConflictPatterns()` can regex-extract it on future merges:
 
 ```
-Merge conflict resolved at tier auto-resolve. Branch: overstory/agent/task-id.
+Merge conflict resolved at tier auto-resolve. Branch: haru/agent/task-id.
 Agent: my-builder. Conflicting files: src/foo.ts, src/bar.ts.
 ```
 
@@ -274,7 +274,7 @@ This makes the resolver progressively smarter without any manual configuration.
 
 **Source:** `src/commands/merge.ts:175` (`compatConfig`)
 
-Before calling the resolver, `ov merge` runs a compatibility gate via
+Before calling the resolver, `ha merge` runs a compatibility gate via
 `runCompatGate()` from `src/compat/gate.ts`. The gate compares the incoming
 branch's surface hashes against canonical, scoring conflicts by semantic
 similarity.
@@ -299,26 +299,26 @@ Config keys that control compat behavior (`src/commands/merge.ts:176`):
 
 ```bash
 # Merge a specific branch
-ov merge --branch overstory/my-agent/task-123
+ha merge --branch haru/my-agent/task-123
 
 # Merge all pending branches from the queue
-ov merge --all
+ha merge --all
 
 # Merge into a specific target branch (default: canonical from config)
-ov merge --branch overstory/my-agent/task-123 --into main
+ha merge --branch haru/my-agent/task-123 --into main
 
 # Preview what would be merged without making changes
-ov merge --all --dry-run
+ha merge --all --dry-run
 
 # JSON output for scripting
-ov merge --all --json
+ha merge --all --json
 ```
 
-`ov compat check <branch>` can be run independently to inspect compatibility
+`ha compat check <branch>` can be run independently to inspect compatibility
 before merging:
 
 ```bash
-ov compat check overstory/my-agent/task-123
+ha compat check haru/my-agent/task-123
 ```
 
 ---

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # ─── Overstory Setup ─────────────────────────────────────────────────────────
-# Устанавливает os-eco ecosystem: overstory, mulch, canopy, seeds
+# Устанавливает os-eco ecosystem: haru, mulch, canopy, seeds
 # Использование:
 #   ./setup.sh                           базовая установка
 #   ./setup.sh --docker                  + Docker сборка
@@ -143,7 +143,7 @@ clone_if_missing() {
   ok "$name клонирован"
 }
 
-clone_if_missing overstory "$GITHUB_USER/overstory"
+clone_if_missing haru "$GITHUB_USER/haru"
 clone_if_missing mulch     "$GITHUB_USER/mulch"
 clone_if_missing canopy    "$GITHUB_USER/canopy"
 echo ""
@@ -152,7 +152,7 @@ echo ""
 if [ "$SKIP_INSTALL" = false ]; then
   info "Установка npm зависимостей..."
 
-  for repo in overstory mulch canopy; do
+  for repo in haru mulch canopy; do
     local_path="$PROJECTS_DIR/$repo"
     if [ -d "$local_path" ] && [ -f "$local_path/package.json" ]; then
       info "bun install в $repo..."
@@ -179,7 +179,7 @@ link_cli() {
   (cd "$dir" && bun link 2>/dev/null) && ok "$name: CLI залинкован" || warn "$name: bun link не удался (может не иметь bin)"
 }
 
-link_cli overstory
+link_cli haru
 link_cli mulch
 link_cli canopy
 
@@ -200,25 +200,25 @@ if [ "$DOCKER_MODE" = true ]; then
     fail "Docker не найден. Установи: https://docs.docker.com/engine/install/"
   fi
 
-  OVERSTORY_DIR="$PROJECTS_DIR/overstory"
+  HARU_DIR="$PROJECTS_DIR/haru"
 
   # Создаём .env из шаблона если нет
-  if [ ! -f "$OVERSTORY_DIR/.env" ]; then
+  if [ ! -f "$HARU_DIR/.env" ]; then
     info "Создаю .env из .env.example..."
-    cp "$OVERSTORY_DIR/.env.example" "$OVERSTORY_DIR/.env"
-    warn "Отредактируй $OVERSTORY_DIR/.env — впиши API ключи и PROJECT_PATH"
+    cp "$HARU_DIR/.env.example" "$HARU_DIR/.env"
+    warn "Отредактируй $HARU_DIR/.env — впиши API ключи и PROJECT_PATH"
   else
     ok ".env уже существует"
   fi
 
   # Сборка образа
   info "docker compose build..."
-  (cd "$OVERSTORY_DIR" && docker compose build)
+  (cd "$HARU_DIR" && docker compose build)
   ok "Docker образ собран"
   echo ""
 
-  info "Запуск: cd $OVERSTORY_DIR && docker compose up -d"
-  info "Вход:   docker exec -it overstory bash"
+  info "Запуск: cd $HARU_DIR && docker compose up -d"
+  info "Вход:   docker exec -it haru bash"
   echo ""
 fi
 
@@ -263,7 +263,7 @@ if [ "$PASS" -ge 6 ]; then
   echo ""
   info "Быстрый старт:"
   echo "  cd /path/to/your/project"
-  echo "  ov init                  # Инициализация overstory"
+  echo "  ov init                  # Инициализация haru"
   echo "  ov coordinator start     # Запуск координатора"
   echo "  ov status                # Статус агентов"
 else

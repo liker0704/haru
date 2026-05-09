@@ -23,7 +23,7 @@ The command surface is wide, but the workflows collapse into a few families:
 
 The detailed workflows below cover the lifecycle-critical paths that the rest of the commands orbit around.
 
-## 2. `ov init` Bootstrap Flow
+## 2. `ha init` Bootstrap Flow
 
 Purpose:
 
@@ -36,12 +36,12 @@ Purpose:
 ```mermaid
 sequenceDiagram
     participant User
-    participant Init as ov init
+    participant Init as ha init
     participant FS as Filesystem
     participant Git as git
     participant Tools as mulch/seeds/canopy
 
-    User->>Init: ov init
+    User->>Init: ha init
     Init->>Git: detect project name and canonical branch
     Init->>FS: create .overstory/ directories
     Init->>FS: write config.yaml
@@ -54,10 +54,10 @@ sequenceDiagram
 
 Architectural note:
 
-- `ov init` is the boundary between a generic repo and an overstory-managed repo.
+- `ha init` is the boundary between a generic repo and an haru-managed repo.
 - After this step, the rest of the architecture assumes `.overstory/` exists.
 
-## 3. `ov sling` Worker Spawn Flow
+## 3. `ha sling` Worker Spawn Flow
 
 This is the core execution path for non-persistent worker agents.
 
@@ -76,7 +76,7 @@ This is the core execution path for non-persistent worker agents.
 ```mermaid
 sequenceDiagram
     participant User
-    participant Sling as ov sling
+    participant Sling as ha sling
     participant Config as config + manifest
     participant Tracker as tracker adapter
     participant WT as worktree manager
@@ -85,7 +85,7 @@ sequenceDiagram
     participant Exec as tmux or headless process
     participant Stores as sessions/mail/runs
 
-    User->>Sling: ov sling TASK-123 --capability builder
+    User->>Sling: ha sling TASK-123 --capability builder
     Sling->>Config: load config + manifest + model/runtime
     Sling->>Stores: read sessions, runs, identities
     Sling->>Tracker: validate or resolve task
@@ -159,7 +159,7 @@ They convert runtime activity into:
 sequenceDiagram
     participant Agent as runtime session
     participant Hooks as deployed guards/hooks
-    participant LogCmd as ov log
+    participant LogCmd as ha log
     participant EventStore as events.db
     participant SessionStore as sessions.db
     participant Metrics as metrics.db
@@ -167,7 +167,7 @@ sequenceDiagram
     participant Mulch as mulch
 
     Agent->>Hooks: tool start / tool end / stop hook
-    Hooks->>LogCmd: ov log <event> --stdin
+    Hooks->>LogCmd: ha log <event> --stdin
     LogCmd->>Logs: append NDJSON + session logs
     LogCmd->>SessionStore: update last activity / completion state
     LogCmd->>EventStore: store normalized event
@@ -183,7 +183,7 @@ Headless runtime variant:
 
 ## 6. Watchdog And Recovery Flow
 
-`ov watch` runs the tier-0 mechanical daemon.
+`ha watch` runs the tier-0 mechanical daemon.
 
 ### What it evaluates
 
@@ -196,7 +196,7 @@ Headless runtime variant:
 
 ```mermaid
 sequenceDiagram
-    participant Watch as ov watch
+    participant Watch as ha watch
     participant Daemon as watchdog/daemon.ts
     participant Sessions as sessions.db
     participant Tmux as tmux/process probes
@@ -283,7 +283,7 @@ The engine operates in two modes:
 
 ## 7. Merge Flow
 
-`ov merge` turns worker branches back into canonical history.
+`ha merge` turns worker branches back into canonical history.
 
 ### Resolution tiers
 
@@ -295,13 +295,13 @@ The engine operates in two modes:
 ```mermaid
 sequenceDiagram
     participant User
-    participant MergeCmd as ov merge
+    participant MergeCmd as ha merge
     participant Queue as merge-queue.db
     participant Resolver as merge/resolver.ts
     participant Git as git
     participant AI as runtime print command
 
-    User->>MergeCmd: ov merge --branch ... or --all
+    User->>MergeCmd: ha merge --branch ... or --all
     MergeCmd->>Queue: load or enqueue merge entry
     MergeCmd->>Resolver: resolve(entry)
     Resolver->>Git: try clean merge
@@ -333,11 +333,11 @@ Mission mode adds a higher-level orchestration model on top of normal worker exe
 - mission runtime pointers
 - artifact root with `mission.md`, decisions, open questions, `plan/workstreams.json`, results
 - mission root roles: coordinator, mission-analyst, execution-director
-- workstreams that bridge into tracker tasks and then into normal `ov sling` lead dispatch
+- workstreams that bridge into tracker tasks and then into normal `ha sling` lead dispatch
 
 ### Mission Tiers
 
-Missions run in one of three tiers, selected at `ov mission start --tier`. The tier controls which phases are active, which roles are spawned, and which execute-phase cell handles workstream dispatch.
+Missions run in one of three tiers, selected at `ha mission start --tier`. The tier controls which phases are active, which roles are spawned, and which execute-phase cell handles workstream dispatch.
 
 | Tier | Active phases | Roles | Execute cell |
 | --- | --- | --- | --- |
@@ -362,7 +362,7 @@ complete (terminal)
 
 ```mermaid
 flowchart TD
-    Start["ov mission start --tier &lt;tier&gt;"] --> Store["create mission record"]
+    Start["ha mission start --tier &lt;tier&gt;"] --> Store["create mission record"]
     Store --> Artifacts["materialize mission artifacts"]
     Artifacts --> TierBranch{tier?}
 
@@ -374,15 +374,15 @@ flowchart TD
     PlannedRoles --> Plan["understand → plan phases\nbuild briefs and workstreams.json"]
     FullRoles --> FullPlan["all 6 phases\nwith arch review gate"]
 
-    Plan --> Handoff["ov mission handoff"]
+    Plan --> Handoff["ha mission handoff"]
     FullPlan --> Handoff
     Handoff --> Bridge["canonicalize or create tracker tasks"]
-    Bridge --> Dispatch["execution-director dispatches leads via ov sling"]
-    Dispatch --> Work["workers execute in normal overstory flow"]
+    Bridge --> Dispatch["execution-director dispatches leads via ha sling"]
+    Dispatch --> Work["workers execute in normal haru flow"]
 
     DirectExec --> Work
     Work --> PauseResume["mission pause/resume if needed"]
-    PauseResume --> Complete["ov mission complete"]
+    PauseResume --> Complete["ha mission complete"]
 ```
 
 Relationship to the rest of the system:
@@ -396,16 +396,16 @@ This is the shortest way to explain how the architecture behaves in practice:
 
 ```mermaid
 flowchart LR
-    A["ov init"] --> B["ov hooks install"]
-    B --> C["ov coordinator start or ov discover"]
-    C --> D["ov sling ..."]
+    A["ha init"] --> B["ha hooks install"]
+    B --> C["ha coordinator start or ha discover"]
+    C --> D["ha sling ..."]
     D --> E["runtime + worktree execution"]
-    E --> F["hooks -> ov log -> sessions/events/metrics/logs"]
-    F --> G["ov status/dashboard/inspect/feed"]
-    G --> H["ov watch nudges or reconciles if needed"]
-    H --> I["ov merge"]
-    I --> J["ov review / ov health / ov next-improvement"]
-    J --> K["ov snapshot / ov recover if required"]
+    E --> F["hooks -> ha log -> sessions/events/metrics/logs"]
+    F --> G["ha status/dashboard/inspect/feed"]
+    G --> H["ha watch nudges or reconciles if needed"]
+    H --> I["ha merge"]
+    I --> J["ha review / ha health / ha next-improvement"]
+    J --> K["ha snapshot / ha recover if required"]
 ```
 
 ## 10. Why The Workflows Matter More Than The File Tree

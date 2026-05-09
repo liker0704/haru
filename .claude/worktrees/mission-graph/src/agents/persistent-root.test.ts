@@ -32,7 +32,7 @@ let overstoryDir: string;
 let dbPath: string;
 
 beforeEach(async () => {
-	tempDir = await mkdtemp(join(tmpdir(), "overstory-pr-test-"));
+	tempDir = await mkdtemp(join(tmpdir(), "haru-pr-test-"));
 	overstoryDir = join(tempDir, ".overstory");
 	await mkdir(overstoryDir, { recursive: true });
 	dbPath = join(overstoryDir, "sessions.db");

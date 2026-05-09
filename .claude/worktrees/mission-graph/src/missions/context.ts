@@ -34,12 +34,12 @@ function buildMissionPlanningContract(): string {
 		"## Workstream Handoff Contract",
 		"",
 		"Treat `plan/workstreams.json` as a runtime-consumed contract, not a loose planning note.",
-		"Before declaring the mission ready for `ov mission handoff`, ensure every dispatchable workstream satisfies all of these rules:",
+		"Before declaring the mission ready for `ha mission handoff`, ensure every dispatchable workstream satisfies all of these rules:",
 		"",
 		"- The file stays valid JSON with top-level shape `{ \"version\": 1, \"workstreams\": [...] }`.",
 		"- Each workstream object uses only the runtime fields below:",
 		"  - `id`: stable kebab-case workstream identifier",
-		"  - `taskId`: non-empty task identifier; if the final canonical tracker ID is not known yet, choose a stable provisional ID and let `ov mission handoff` canonicalize it before dispatch",
+		"  - `taskId`: non-empty task identifier; if the final canonical tracker ID is not known yet, choose a stable provisional ID and let `ha mission handoff` canonicalize it before dispatch",
 		"  - `objective`: concise execution objective",
 		"  - `fileScope`: array of repo-relative files or globs owned by that workstream",
 		"  - `dependsOn`: array of workstream `id` strings",
@@ -198,7 +198,7 @@ export async function materializeMissionRolePrompt(opts: {
 		"",
 		"- You are mission-scoped.",
 		"- Update mission artifacts directly under the paths above.",
-		"- Use ov mail for coordination and operator questions.",
+		"- Use ha mail for coordination and operator questions.",
 		"",
 		buildMissionPlanningContract(),
 		"",
@@ -221,7 +221,7 @@ export function buildMissionRoleBeacon(opts: {
 }): string {
 	return [
 		`Read your mission context at ${opts.contextPath}.`,
-		`Check mail with: ov mail check --agent ${opts.agentName}.`,
+		`Check mail with: ha mail check --agent ${opts.agentName}.`,
 		`Begin mission ${opts.missionId} immediately.`,
 	].join(" ");
 }

@@ -1,5 +1,5 @@
 /**
- * Tests for ov discover command.
+ * Tests for ha discover command.
  *
  * Tests cover the pure functions and command structure.
  * The coordinator session startup is not tested here (requires tmux and

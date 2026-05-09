@@ -1,10 +1,10 @@
 /**
- * CLI command: ov compat
+ * CLI command: ha compat
  *
  * Compatibility analysis tools for agent branches.
  *
  * Usage:
- *   ov compat check <branch>   Check branch compatibility against canonical
+ *   ha compat check <branch>   Check branch compatibility against canonical
  */
 
 import { Command } from "commander";
@@ -24,11 +24,9 @@ export function createCompatCommand(): Command {
 		.description("Check branch compatibility against canonical")
 		.option("--against <branch>", "Branch to compare against", "main")
 		.option("--json", "JSON output")
-		.action(
-			async (branch: string, opts: { against?: string; json?: boolean }) => {
-				await compatCheckCommand(branch, opts);
-			},
-		);
+		.action(async (branch: string, opts: { against?: string; json?: boolean }) => {
+			await compatCheckCommand(branch, opts);
+		});
 
 	return cmd;
 }
@@ -58,11 +56,7 @@ async function compatCheckCommand(
 		extractTypeSurface(repoRoot, branch, filePatterns),
 	]);
 
-	const result = await analyzeCompatibility(
-		canonicalSurface,
-		branchSurface,
-		compatConfig,
-	);
+	const result = await analyzeCompatibility(canonicalSurface, branchSurface, compatConfig);
 
 	if (json) {
 		jsonOutput("compat", { result });

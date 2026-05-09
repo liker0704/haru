@@ -1,5 +1,5 @@
 /**
- * Tests for `overstory costs` command.
+ * Tests for `haru costs` command.
  *
  * Uses real bun:sqlite (temp files) to test the costs command end-to-end.
  * Captures process.stdout.write to verify output formatting.

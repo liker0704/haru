@@ -1,5 +1,5 @@
 /**
- * Tests for overstory coordinator command.
+ * Tests for haru coordinator command.
  *
  * Uses real temp directories and real git repos for file I/O and config loading.
  * Tmux is injected via the CoordinatorDeps DI interface instead of
@@ -309,7 +309,7 @@ function makeCoordinatorSession(overrides: Partial<AgentSession> = {}): AgentSes
 		worktreePath: tempDir,
 		branchName: "main",
 		taskId: "",
-		tmuxSession: "overstory-test-project-coordinator",
+		tmuxSession: "haru-test-project-coordinator",
 		state: "working",
 		pid: 99999,
 		parentAgent: null,
@@ -345,8 +345,8 @@ async function captureStdout(fn: () => Promise<void>): Promise<string> {
 }
 
 /** Build default CoordinatorDeps with fake tmux, watchdog, and monitor.
- * Always injects fakes for all three to prevent real Bun.spawn(["overstory", ...])
- * calls in tests (overstory CLI is not available in CI). */
+ * Always injects fakes for all three to prevent real Bun.spawn(["haru", ...])
+ * calls in tests (haru CLI is not available in CI). */
 function makeDeps(
 	sessionAliveMap: Record<string, boolean> = {},
 	watchdogConfig?: { running?: boolean; startSuccess?: boolean; stopSuccess?: boolean },
@@ -463,7 +463,7 @@ describe("startCoordinator", () => {
 		expect(session).toBeDefined();
 		expect(session?.agentName).toBe("coordinator");
 		expect(session?.capability).toBe("coordinator");
-		expect(session?.tmuxSession).toBe("overstory-test-project-coordinator");
+		expect(session?.tmuxSession).toBe("haru-test-project-coordinator");
 		expect(session?.state).toBe("booting");
 		expect(session?.pid).toBe(99999);
 		expect(session?.parentAgent).toBeNull();
@@ -479,7 +479,7 @@ describe("startCoordinator", () => {
 
 		// Verify tmux createSession was called
 		expect(calls.createSession).toHaveLength(1);
-		expect(calls.createSession[0]?.name).toBe("overstory-test-project-coordinator");
+		expect(calls.createSession[0]?.name).toBe("haru-test-project-coordinator");
 		expect(calls.createSession[0]?.cwd).toBe(tempDir);
 
 		// Verify sendKeys was called (beacon + follow-up Enter)
@@ -610,7 +610,7 @@ describe("startCoordinator", () => {
 		const content = await Bun.file(settingsPath).text();
 
 		// PreToolUse guards should include the ENV_GUARD prefix
-		expect(content).toContain("OVERSTORY_AGENT_NAME");
+		expect(content).toContain("HARU_AGENT_NAME");
 	});
 
 	test("injects agent definition via --append-system-prompt when agent-defs/coordinator.md exists", async () => {
@@ -635,7 +635,7 @@ describe("startCoordinator", () => {
 		expect(calls.createSession).toHaveLength(1);
 		const cmd = calls.createSession[0]?.command ?? "";
 		expect(cmd).toContain("--append-system-prompt");
-		// File path is passed via $(cat ...) instead of inlining content (overstory#45)
+		// File path is passed via $(cat ...) instead of inlining content (haru#45)
 		expect(cmd).toContain("$(cat '");
 		expect(cmd).toContain("agent-defs/coordinator.md");
 	});
@@ -694,7 +694,7 @@ describe("startCoordinator", () => {
 		expect(parsed.command).toBe("coordinator start");
 		expect(parsed.agentName).toBe("coordinator");
 		expect(parsed.capability).toBe("coordinator");
-		expect(parsed.tmuxSession).toBe("overstory-test-project-coordinator");
+		expect(parsed.tmuxSession).toBe("haru-test-project-coordinator");
 		expect(parsed.pid).toBe(99999);
 		expect(parsed.projectRoot).toBe(tempDir);
 	});
@@ -705,7 +705,7 @@ describe("startCoordinator", () => {
 		saveSessionsToDb([existing]);
 
 		// Mock tmux as alive for the existing session
-		const { deps } = makeDeps({ "overstory-test-project-coordinator": true });
+		const { deps } = makeDeps({ "haru-test-project-coordinator": true });
 
 		await expect(coordinatorCommand(["start"], deps)).rejects.toThrow(AgentError);
 
@@ -725,10 +725,10 @@ describe("startCoordinator", () => {
 		saveSessionsToDb([existing]);
 
 		const { deps } = makeDeps(
-			{ "overstory-test-project-coordinator": true },
+			{ "haru-test-project-coordinator": true },
 			undefined,
 			undefined,
-			{ checkSessionStateMap: { "overstory-test-project-coordinator": "alive" } },
+			{ checkSessionStateMap: { "haru-test-project-coordinator": "alive" } },
 		);
 
 		try {
@@ -750,7 +750,7 @@ describe("startCoordinator", () => {
 		saveSessionsToDb([deadSession]);
 
 		// Mock tmux as NOT alive for the existing session
-		const { deps } = makeDeps({ "overstory-test-project-coordinator": false });
+		const { deps } = makeDeps({ "haru-test-project-coordinator": false });
 
 		const originalSleep = Bun.sleep;
 		Bun.sleep = (() => Promise.resolve()) as typeof Bun.sleep;
@@ -785,10 +785,10 @@ describe("startCoordinator", () => {
 
 		// Tmux session is alive (pane exists) but PID 999999 is not running
 		const { deps } = makeDeps(
-			{ "overstory-test-project-coordinator": true },
+			{ "haru-test-project-coordinator": true },
 			undefined,
 			undefined,
-			{ checkSessionStateMap: { "overstory-test-project-coordinator": "alive" } },
+			{ checkSessionStateMap: { "haru-test-project-coordinator": "alive" } },
 		);
 
 		const originalSleep = Bun.sleep;
@@ -818,10 +818,10 @@ describe("startCoordinator", () => {
 
 		// checkSessionState returns no_server
 		const { deps } = makeDeps(
-			{ "overstory-test-project-coordinator": false },
+			{ "haru-test-project-coordinator": false },
 			undefined,
 			undefined,
-			{ checkSessionStateMap: { "overstory-test-project-coordinator": "no_server" } },
+			{ checkSessionStateMap: { "haru-test-project-coordinator": "no_server" } },
 		);
 
 		const originalSleep = Bun.sleep;
@@ -869,7 +869,7 @@ describe("startCoordinator", () => {
 	test("throws AgentError when tmux is not available", async () => {
 		const { deps } = makeDeps({}, undefined, undefined, {
 			ensureTmuxAvailableError: new AgentError(
-				"tmux is not installed or not on PATH. Install tmux to use overstory agent orchestration.",
+				"tmux is not installed or not on PATH. Install tmux to use haru agent orchestration.",
 			),
 		});
 
@@ -879,7 +879,7 @@ describe("startCoordinator", () => {
 	test("AgentError message mentions tmux not installed when tmux unavailable", async () => {
 		const { deps } = makeDeps({}, undefined, undefined, {
 			ensureTmuxAvailableError: new AgentError(
-				"tmux is not installed or not on PATH. Install tmux to use overstory agent orchestration.",
+				"tmux is not installed or not on PATH. Install tmux to use haru agent orchestration.",
 			),
 		});
 
@@ -896,7 +896,7 @@ describe("startCoordinator", () => {
 	test("throws AgentError when session dies during startup", async () => {
 		// waitForTuiReady returns false AND isSessionAlive returns false — session died
 		const { deps } = makeDeps(
-			{ "overstory-test-project-coordinator": false },
+			{ "haru-test-project-coordinator": false },
 			undefined,
 			undefined,
 			{ waitForTuiReadyResult: false },
@@ -907,7 +907,7 @@ describe("startCoordinator", () => {
 
 	test("AgentError message mentions session dying when session dies during startup", async () => {
 		const { deps } = makeDeps(
-			{ "overstory-test-project-coordinator": false },
+			{ "haru-test-project-coordinator": false },
 			undefined,
 			undefined,
 			{ waitForTuiReadyResult: false },
@@ -927,7 +927,7 @@ describe("startCoordinator", () => {
 		// waitForTuiReady returns false (timeout) and the session is still alive,
 		// so startup should fail explicitly instead of sending the beacon blindly.
 		const { deps, calls } = makeDeps(
-			{ "overstory-test-project-coordinator": true },
+			{ "haru-test-project-coordinator": true },
 			undefined,
 			undefined,
 			{ waitForTuiReadyResult: false },
@@ -949,7 +949,7 @@ describe("startCoordinator", () => {
 		const agentErr = thrownError as AgentError;
 		expect(agentErr.message).toContain("did not become ready during startup");
 		expect(calls.killSession).toHaveLength(1);
-		expect(calls.killSession[0]?.name).toBe("overstory-test-project-coordinator");
+		expect(calls.killSession[0]?.name).toBe("haru-test-project-coordinator");
 	});
 });
 
@@ -959,7 +959,7 @@ describe("stopCoordinator", () => {
 		saveSessionsToDb([session]);
 
 		// Tmux is alive so killSession will be called
-		const { deps, calls } = makeDeps({ "overstory-test-project-coordinator": true });
+		const { deps, calls } = makeDeps({ "haru-test-project-coordinator": true });
 
 		await captureStdout(() => coordinatorCommand(["stop"], deps));
 
@@ -970,13 +970,13 @@ describe("stopCoordinator", () => {
 
 		// Verify killSession was called
 		expect(calls.killSession).toHaveLength(1);
-		expect(calls.killSession[0]?.name).toBe("overstory-test-project-coordinator");
+		expect(calls.killSession[0]?.name).toBe("haru-test-project-coordinator");
 	});
 
 	test("--json outputs JSON with stopped flag", async () => {
 		const session = makeCoordinatorSession({ state: "working" });
 		saveSessionsToDb([session]);
-		const { deps } = makeDeps({ "overstory-test-project-coordinator": true });
+		const { deps } = makeDeps({ "haru-test-project-coordinator": true });
 
 		const output = await captureStdout(() => coordinatorCommand(["stop", "--json"], deps));
 		const parsed = JSON.parse(output) as Record<string, unknown>;
@@ -991,7 +991,7 @@ describe("stopCoordinator", () => {
 		saveSessionsToDb([session]);
 
 		// Tmux is NOT alive — should skip killSession
-		const { deps, calls } = makeDeps({ "overstory-test-project-coordinator": false });
+		const { deps, calls } = makeDeps({ "haru-test-project-coordinator": false });
 
 		await captureStdout(() => coordinatorCommand(["stop"], deps));
 
@@ -1048,7 +1048,7 @@ describe("stopCoordinator run completion", () => {
 		await Bun.write(join(overstoryDir, "current-run.txt"), "run-test-123");
 
 		// Stop coordinator
-		const { deps } = makeDeps({ "overstory-test-project-coordinator": true });
+		const { deps } = makeDeps({ "haru-test-project-coordinator": true });
 		await captureStdout(() => coordinatorCommand(["stop"], deps));
 
 		// Verify run status is "stopped"
@@ -1070,7 +1070,7 @@ describe("stopCoordinator run completion", () => {
 		// No current-run.txt
 
 		// Stop coordinator (should succeed without errors)
-		const { deps } = makeDeps({ "overstory-test-project-coordinator": true });
+		const { deps } = makeDeps({ "haru-test-project-coordinator": true });
 		await expect(captureStdout(() => coordinatorCommand(["stop"], deps))).resolves.toBeDefined();
 
 		// Verify session is completed
@@ -1087,7 +1087,7 @@ describe("stopCoordinator run completion", () => {
 		await Bun.write(join(overstoryDir, "current-run.txt"), "");
 
 		// Stop coordinator (should succeed without errors)
-		const { deps } = makeDeps({ "overstory-test-project-coordinator": true });
+		const { deps } = makeDeps({ "haru-test-project-coordinator": true });
 		await expect(captureStdout(() => coordinatorCommand(["stop"], deps))).resolves.toBeDefined();
 
 		// Verify session is completed
@@ -1115,7 +1115,7 @@ describe("stopCoordinator run completion", () => {
 		await Bun.write(join(overstoryDir, "current-run.txt"), "run-test-456");
 
 		// Stop coordinator with --json
-		const { deps } = makeDeps({ "overstory-test-project-coordinator": true });
+		const { deps } = makeDeps({ "haru-test-project-coordinator": true });
 		const output = await captureStdout(() => coordinatorCommand(["stop", "--json"], deps));
 
 		// Verify output includes runCompleted: true
@@ -1131,7 +1131,7 @@ describe("stopCoordinator run completion", () => {
 		// No current-run.txt
 
 		// Stop coordinator with --json
-		const { deps } = makeDeps({ "overstory-test-project-coordinator": true });
+		const { deps } = makeDeps({ "haru-test-project-coordinator": true });
 		const output = await captureStdout(() => coordinatorCommand(["stop", "--json"], deps));
 
 		// Verify output includes runCompleted: false
@@ -1159,18 +1159,18 @@ describe("statusCoordinator", () => {
 	test("shows running state when coordinator is alive", async () => {
 		const session = makeCoordinatorSession({ state: "working" });
 		saveSessionsToDb([session]);
-		const { deps } = makeDeps({ "overstory-test-project-coordinator": true });
+		const { deps } = makeDeps({ "haru-test-project-coordinator": true });
 
 		const output = await captureStdout(() => coordinatorCommand(["status"], deps));
 		expect(output).toContain("running");
 		expect(output).toContain(session.id);
-		expect(output).toContain("overstory-test-project-coordinator");
+		expect(output).toContain("haru-test-project-coordinator");
 	});
 
 	test("--json shows correct fields when running", async () => {
 		const session = makeCoordinatorSession({ state: "working", pid: 99999 });
 		saveSessionsToDb([session]);
-		const { deps } = makeDeps({ "overstory-test-project-coordinator": true });
+		const { deps } = makeDeps({ "haru-test-project-coordinator": true });
 
 		const output = await captureStdout(() => coordinatorCommand(["status", "--json"], deps));
 		const parsed = JSON.parse(output) as Record<string, unknown>;
@@ -1179,7 +1179,7 @@ describe("statusCoordinator", () => {
 		expect(parsed.running).toBe(true);
 		expect(parsed.sessionId).toBe(session.id);
 		expect(parsed.state).toBe("working");
-		expect(parsed.tmuxSession).toBe("overstory-test-project-coordinator");
+		expect(parsed.tmuxSession).toBe("haru-test-project-coordinator");
 		expect(parsed.pid).toBe(99999);
 	});
 
@@ -1188,7 +1188,7 @@ describe("statusCoordinator", () => {
 		saveSessionsToDb([session]);
 
 		// Tmux is NOT alive — triggers zombie reconciliation
-		const { deps } = makeDeps({ "overstory-test-project-coordinator": false });
+		const { deps } = makeDeps({ "haru-test-project-coordinator": false });
 
 		const output = await captureStdout(() => coordinatorCommand(["status", "--json"], deps));
 		const parsed = JSON.parse(output) as Record<string, unknown>;
@@ -1203,7 +1203,7 @@ describe("statusCoordinator", () => {
 	test("reconciles zombie for booting state too", async () => {
 		const session = makeCoordinatorSession({ state: "booting" });
 		saveSessionsToDb([session]);
-		const { deps } = makeDeps({ "overstory-test-project-coordinator": false });
+		const { deps } = makeDeps({ "haru-test-project-coordinator": false });
 
 		const output = await captureStdout(() => coordinatorCommand(["status", "--json"], deps));
 		const parsed = JSON.parse(output) as Record<string, unknown>;
@@ -1250,9 +1250,9 @@ describe("buildCoordinatorBeacon", () => {
 	test("includes startup instructions", () => {
 		const beacon = buildCoordinatorBeacon();
 		expect(beacon).toContain("mulch prime");
-		expect(beacon).toContain("ov mail check --agent coordinator");
+		expect(beacon).toContain("ha mail check --agent coordinator");
 		expect(beacon).toContain("bd ready");
-		expect(beacon).toContain("ov group status");
+		expect(beacon).toContain("ha group status");
 	});
 
 	test("defaults to bd ready when no cliName provided", () => {
@@ -1441,7 +1441,7 @@ describe("watchdog integration", () => {
 			const session = makeCoordinatorSession({ state: "working" });
 			saveSessionsToDb([session]);
 			const { deps, watchdogCalls } = makeDeps(
-				{ "overstory-test-project-coordinator": true },
+				{ "haru-test-project-coordinator": true },
 				{ stopSuccess: true },
 			);
 
@@ -1454,7 +1454,7 @@ describe("watchdog integration", () => {
 			const session = makeCoordinatorSession({ state: "working" });
 			saveSessionsToDb([session]);
 			const { deps } = makeDeps(
-				{ "overstory-test-project-coordinator": true },
+				{ "haru-test-project-coordinator": true },
 				{ stopSuccess: true },
 			);
 
@@ -1467,7 +1467,7 @@ describe("watchdog integration", () => {
 			const session = makeCoordinatorSession({ state: "working" });
 			saveSessionsToDb([session]);
 			const { deps } = makeDeps(
-				{ "overstory-test-project-coordinator": true },
+				{ "haru-test-project-coordinator": true },
 				{ stopSuccess: false },
 			);
 
@@ -1480,7 +1480,7 @@ describe("watchdog integration", () => {
 			const session = makeCoordinatorSession({ state: "working" });
 			saveSessionsToDb([session]);
 			const { deps } = makeDeps(
-				{ "overstory-test-project-coordinator": true },
+				{ "haru-test-project-coordinator": true },
 				{ stopSuccess: true },
 			);
 
@@ -1492,7 +1492,7 @@ describe("watchdog integration", () => {
 			const session = makeCoordinatorSession({ state: "working" });
 			saveSessionsToDb([session]);
 			const { deps } = makeDeps(
-				{ "overstory-test-project-coordinator": true },
+				{ "haru-test-project-coordinator": true },
 				{ stopSuccess: false },
 			);
 
@@ -1505,7 +1505,7 @@ describe("watchdog integration", () => {
 		test("includes watchdogRunning in JSON output when coordinator is running", async () => {
 			const session = makeCoordinatorSession({ state: "working" });
 			saveSessionsToDb([session]);
-			const { deps } = makeDeps({ "overstory-test-project-coordinator": true }, { running: true });
+			const { deps } = makeDeps({ "haru-test-project-coordinator": true }, { running: true });
 
 			const output = await captureStdout(() => coordinatorCommand(["status", "--json"], deps));
 			const parsed = JSON.parse(output) as Record<string, unknown>;
@@ -1515,7 +1515,7 @@ describe("watchdog integration", () => {
 		test("includes watchdogRunning:false in JSON output when watchdog is not running", async () => {
 			const session = makeCoordinatorSession({ state: "working" });
 			saveSessionsToDb([session]);
-			const { deps } = makeDeps({ "overstory-test-project-coordinator": true }, { running: false });
+			const { deps } = makeDeps({ "haru-test-project-coordinator": true }, { running: false });
 
 			const output = await captureStdout(() => coordinatorCommand(["status", "--json"], deps));
 			const parsed = JSON.parse(output) as Record<string, unknown>;
@@ -1525,7 +1525,7 @@ describe("watchdog integration", () => {
 		test("text output shows watchdog status when coordinator is running", async () => {
 			const session = makeCoordinatorSession({ state: "working" });
 			saveSessionsToDb([session]);
-			const { deps } = makeDeps({ "overstory-test-project-coordinator": true }, { running: true });
+			const { deps } = makeDeps({ "haru-test-project-coordinator": true }, { running: true });
 
 			const output = await captureStdout(() => coordinatorCommand(["status"], deps));
 			expect(output).toContain("Watchdog:  running");
@@ -1534,7 +1534,7 @@ describe("watchdog integration", () => {
 		test("text output shows 'not running' when watchdog is not running", async () => {
 			const session = makeCoordinatorSession({ state: "working" });
 			saveSessionsToDb([session]);
-			const { deps } = makeDeps({ "overstory-test-project-coordinator": true }, { running: false });
+			const { deps } = makeDeps({ "haru-test-project-coordinator": true }, { running: false });
 
 			const output = await captureStdout(() => coordinatorCommand(["status"], deps));
 			expect(output).toContain("Watchdog:  not running");
@@ -1725,7 +1725,7 @@ describe("monitor integration", () => {
 			const session = makeCoordinatorSession({ state: "working" });
 			saveSessionsToDb([session]);
 			const { deps, monitorCalls } = makeDeps(
-				{ "overstory-test-project-coordinator": true },
+				{ "haru-test-project-coordinator": true },
 				undefined,
 				{ stopSuccess: true },
 			);
@@ -1738,7 +1738,7 @@ describe("monitor integration", () => {
 		test("--json output includes monitorStopped:true when monitor was running", async () => {
 			const session = makeCoordinatorSession({ state: "working" });
 			saveSessionsToDb([session]);
-			const { deps } = makeDeps({ "overstory-test-project-coordinator": true }, undefined, {
+			const { deps } = makeDeps({ "haru-test-project-coordinator": true }, undefined, {
 				stopSuccess: true,
 			});
 
@@ -1750,7 +1750,7 @@ describe("monitor integration", () => {
 		test("--json output includes monitorStopped:false when no monitor was running", async () => {
 			const session = makeCoordinatorSession({ state: "working" });
 			saveSessionsToDb([session]);
-			const { deps } = makeDeps({ "overstory-test-project-coordinator": true }, undefined, {
+			const { deps } = makeDeps({ "haru-test-project-coordinator": true }, undefined, {
 				stopSuccess: false,
 			});
 
@@ -1762,7 +1762,7 @@ describe("monitor integration", () => {
 		test("text output shows 'Monitor stopped' when monitor was running", async () => {
 			const session = makeCoordinatorSession({ state: "working" });
 			saveSessionsToDb([session]);
-			const { deps } = makeDeps({ "overstory-test-project-coordinator": true }, undefined, {
+			const { deps } = makeDeps({ "haru-test-project-coordinator": true }, undefined, {
 				stopSuccess: true,
 			});
 
@@ -1773,7 +1773,7 @@ describe("monitor integration", () => {
 		test("text output shows 'No monitor running' when no monitor was running", async () => {
 			const session = makeCoordinatorSession({ state: "working" });
 			saveSessionsToDb([session]);
-			const { deps } = makeDeps({ "overstory-test-project-coordinator": true }, undefined, {
+			const { deps } = makeDeps({ "haru-test-project-coordinator": true }, undefined, {
 				stopSuccess: false,
 			});
 
@@ -1786,7 +1786,7 @@ describe("monitor integration", () => {
 		test("includes monitorRunning in JSON output when coordinator is running", async () => {
 			const session = makeCoordinatorSession({ state: "working" });
 			saveSessionsToDb([session]);
-			const { deps } = makeDeps({ "overstory-test-project-coordinator": true }, undefined, {
+			const { deps } = makeDeps({ "haru-test-project-coordinator": true }, undefined, {
 				running: true,
 			});
 
@@ -1798,7 +1798,7 @@ describe("monitor integration", () => {
 		test("includes monitorRunning:false in JSON output when monitor is not running", async () => {
 			const session = makeCoordinatorSession({ state: "working" });
 			saveSessionsToDb([session]);
-			const { deps } = makeDeps({ "overstory-test-project-coordinator": true }, undefined, {
+			const { deps } = makeDeps({ "haru-test-project-coordinator": true }, undefined, {
 				running: false,
 			});
 
@@ -1810,7 +1810,7 @@ describe("monitor integration", () => {
 		test("text output shows monitor status when coordinator is running", async () => {
 			const session = makeCoordinatorSession({ state: "working" });
 			saveSessionsToDb([session]);
-			const { deps } = makeDeps({ "overstory-test-project-coordinator": true }, undefined, {
+			const { deps } = makeDeps({ "haru-test-project-coordinator": true }, undefined, {
 				running: true,
 			});
 
@@ -1821,7 +1821,7 @@ describe("monitor integration", () => {
 		test("text output shows 'not running' when monitor is not running", async () => {
 			const session = makeCoordinatorSession({ state: "working" });
 			saveSessionsToDb([session]);
-			const { deps } = makeDeps({ "overstory-test-project-coordinator": true }, undefined, {
+			const { deps } = makeDeps({ "haru-test-project-coordinator": true }, undefined, {
 				running: false,
 			});
 
@@ -1897,7 +1897,7 @@ describe("sendCoordinator", () => {
 		saveSessionsToDb([session]);
 
 		let nudgeCalled = false;
-		const { deps } = makeDeps({ "overstory-test-project-coordinator": true });
+		const { deps } = makeDeps({ "haru-test-project-coordinator": true });
 		deps._nudge = async () => {
 			nudgeCalled = true;
 			return { delivered: true };
@@ -1924,7 +1924,7 @@ describe("sendCoordinator", () => {
 		const session = makeCoordinatorSession({ state: "working" });
 		saveSessionsToDb([session]);
 
-		const { deps } = makeDeps({ "overstory-test-project-coordinator": false });
+		const { deps } = makeDeps({ "haru-test-project-coordinator": false });
 
 		await expect(coordinatorCommand(["send", "--body", "hello"], deps)).rejects.toThrow(AgentError);
 
@@ -1936,7 +1936,7 @@ describe("sendCoordinator", () => {
 		const session = makeCoordinatorSession({ state: "working" });
 		saveSessionsToDb([session]);
 
-		const { deps } = makeDeps({ "overstory-test-project-coordinator": true });
+		const { deps } = makeDeps({ "haru-test-project-coordinator": true });
 		deps._nudge = async () => ({ delivered: true });
 
 		const output = await captureStdout(() =>
@@ -1951,7 +1951,7 @@ describe("sendCoordinator", () => {
 		const session = makeCoordinatorSession({ state: "working" });
 		saveSessionsToDb([session]);
 
-		const { deps } = makeDeps({ "overstory-test-project-coordinator": true });
+		const { deps } = makeDeps({ "haru-test-project-coordinator": true });
 		deps._nudge = async () => ({ delivered: false });
 
 		await captureStdout(() =>
@@ -1971,7 +1971,7 @@ describe("outputCoordinator", () => {
 		const session = makeCoordinatorSession({ state: "working" });
 		saveSessionsToDb([session]);
 
-		const { deps } = makeDeps({ "overstory-test-project-coordinator": true });
+		const { deps } = makeDeps({ "haru-test-project-coordinator": true });
 		deps._capturePaneContent = async () => "Hello from coordinator pane\n";
 
 		const output = await captureStdout(() => coordinatorCommand(["output"], deps));
@@ -1988,7 +1988,7 @@ describe("outputCoordinator", () => {
 		const session = makeCoordinatorSession({ state: "working" });
 		saveSessionsToDb([session]);
 
-		const { deps } = makeDeps({ "overstory-test-project-coordinator": false });
+		const { deps } = makeDeps({ "haru-test-project-coordinator": false });
 
 		await expect(coordinatorCommand(["output"], deps)).rejects.toThrow(AgentError);
 
@@ -2000,7 +2000,7 @@ describe("outputCoordinator", () => {
 		const session = makeCoordinatorSession({ state: "working" });
 		saveSessionsToDb([session]);
 
-		const { deps } = makeDeps({ "overstory-test-project-coordinator": true });
+		const { deps } = makeDeps({ "haru-test-project-coordinator": true });
 		deps._capturePaneContent = async () => "some output";
 
 		const output = await captureStdout(() => coordinatorCommand(["output", "--json"], deps));
@@ -2014,7 +2014,7 @@ describe("outputCoordinator", () => {
 		saveSessionsToDb([session]);
 
 		let capturedLines: number | undefined;
-		const { deps } = makeDeps({ "overstory-test-project-coordinator": true });
+		const { deps } = makeDeps({ "haru-test-project-coordinator": true });
 		deps._capturePaneContent = async (_name: string, lines?: number) => {
 			capturedLines = lines;
 			return "output";
@@ -2030,7 +2030,7 @@ describe("askCoordinator", () => {
 		const session = makeCoordinatorSession({ state: "working" });
 		saveSessionsToDb([session]);
 
-		const { deps } = makeDeps({ "overstory-test-project-coordinator": true });
+		const { deps } = makeDeps({ "haru-test-project-coordinator": true });
 		deps._nudge = async () => ({ delivered: true });
 		deps._pollIntervalMs = 50; // Fast polling for test
 
@@ -2087,7 +2087,7 @@ describe("askCoordinator", () => {
 		const session = makeCoordinatorSession({ state: "working" });
 		saveSessionsToDb([session]);
 
-		const { deps } = makeDeps({ "overstory-test-project-coordinator": true });
+		const { deps } = makeDeps({ "haru-test-project-coordinator": true });
 		deps._nudge = async () => ({ delivered: false });
 		deps._pollIntervalMs = 50; // Fast polling so the 1s timeout exhausts quickly
 
@@ -2128,7 +2128,7 @@ describe("askCoordinator", () => {
 		saveSessionsToDb([session]);
 
 		// Tmux reports session as dead
-		const { deps } = makeDeps({ "overstory-test-project-coordinator": false });
+		const { deps } = makeDeps({ "haru-test-project-coordinator": false });
 
 		let caughtError: unknown;
 		try {
@@ -2150,7 +2150,7 @@ describe("askCoordinator", () => {
 		const session = makeCoordinatorSession({ state: "working" });
 		saveSessionsToDb([session]);
 
-		const { deps } = makeDeps({ "overstory-test-project-coordinator": true });
+		const { deps } = makeDeps({ "haru-test-project-coordinator": true });
 		deps._nudge = async () => ({ delivered: true });
 		deps._pollIntervalMs = 50;
 
@@ -2537,7 +2537,7 @@ describe("checkComplete", () => {
 				capability: "lead",
 				runtime: "claude",
 				worktreePath: tempDir,
-				branchName: "overstory/lead-1/task-1",
+				branchName: "haru/lead-1/task-1",
 				taskId: "task-1",
 				tmuxSession: "tmux-1",
 				state: "completed",
@@ -2564,7 +2564,7 @@ describe("checkComplete", () => {
 		const queue = createMergeQueue(join(overstoryDir, "merge-queue.db"));
 		try {
 			queue.enqueue({
-				branchName: "overstory/lead-1/task-1",
+				branchName: "haru/lead-1/task-1",
 				taskId: "task-1",
 				agentName: "lead-1",
 				filesModified: ["src/foo.ts"],
@@ -2577,7 +2577,7 @@ describe("checkComplete", () => {
 		expect(result.triggers.allAgentsDone.enabled).toBe(true);
 		expect(result.triggers.allAgentsDone.met).toBe(false);
 		expect(result.triggers.allAgentsDone.detail).toInclude("pending merge");
-		expect(result.triggers.allAgentsDone.detail).toInclude("overstory/lead-1/task-1");
+		expect(result.triggers.allAgentsDone.detail).toInclude("haru/lead-1/task-1");
 		expect(result.complete).toBe(false);
 	});
 
@@ -2608,7 +2608,7 @@ describe("checkComplete", () => {
 				capability: "lead",
 				runtime: "claude",
 				worktreePath: tempDir,
-				branchName: "overstory/lead-1/task-1",
+				branchName: "haru/lead-1/task-1",
 				taskId: "task-1",
 				tmuxSession: "tmux-1",
 				state: "completed",
@@ -2635,7 +2635,7 @@ describe("checkComplete", () => {
 		const queue = createMergeQueue(join(overstoryDir, "merge-queue.db"));
 		try {
 			const entry = queue.enqueue({
-				branchName: "overstory/lead-1/task-1",
+				branchName: "haru/lead-1/task-1",
 				taskId: "task-1",
 				agentName: "lead-1",
 				filesModified: ["src/foo.ts"],
@@ -2701,7 +2701,7 @@ function makePersistentTmux(
 
 describe("persistent-root: startPersistentAgent", () => {
 	test("records session and creates run", async () => {
-		const { tmux } = makePersistentTmux({ "overstory-test-project-analyst": true });
+		const { tmux } = makePersistentTmux({ "haru-test-project-analyst": true });
 		const originalSleep = Bun.sleep;
 		Bun.sleep = (() => Promise.resolve()) as typeof Bun.sleep;
 		try {
@@ -2711,7 +2711,7 @@ describe("persistent-root: startPersistentAgent", () => {
 					capability: "coordinator", // uses 'coordinator' capability for manifest resolution
 					projectRoot: tempDir,
 					overstoryDir,
-					tmuxSession: "overstory-test-project-analyst",
+					tmuxSession: "haru-test-project-analyst",
 					createRun: true,
 					coordinatorName: "mission-analyst",
 					beacon: "Hello analyst",
@@ -2729,7 +2729,7 @@ describe("persistent-root: startPersistentAgent", () => {
 	});
 
 	test("creates run record with coordinatorName set", async () => {
-		const { tmux } = makePersistentTmux({ "overstory-test-project-analyst": true });
+		const { tmux } = makePersistentTmux({ "haru-test-project-analyst": true });
 		const originalSleep = Bun.sleep;
 		Bun.sleep = (() => Promise.resolve()) as typeof Bun.sleep;
 		try {
@@ -2739,7 +2739,7 @@ describe("persistent-root: startPersistentAgent", () => {
 					capability: "coordinator",
 					projectRoot: tempDir,
 					overstoryDir,
-					tmuxSession: "overstory-test-project-analyst",
+					tmuxSession: "haru-test-project-analyst",
 					createRun: true,
 					coordinatorName: "mission-analyst",
 				},
@@ -2760,7 +2760,7 @@ describe("persistent-root: startPersistentAgent", () => {
 	});
 
 	test("writes current-run.txt when createRun=true", async () => {
-		const { tmux } = makePersistentTmux({ "overstory-test-project-analyst": true });
+		const { tmux } = makePersistentTmux({ "haru-test-project-analyst": true });
 		const originalSleep = Bun.sleep;
 		Bun.sleep = (() => Promise.resolve()) as typeof Bun.sleep;
 		try {
@@ -2770,7 +2770,7 @@ describe("persistent-root: startPersistentAgent", () => {
 					capability: "coordinator",
 					projectRoot: tempDir,
 					overstoryDir,
-					tmuxSession: "overstory-test-project-analyst",
+					tmuxSession: "haru-test-project-analyst",
 					createRun: true,
 				},
 				tmux,
@@ -2783,7 +2783,7 @@ describe("persistent-root: startPersistentAgent", () => {
 	});
 
 	test("does NOT write current-run.txt when createRun=false", async () => {
-		const { tmux } = makePersistentTmux({ "overstory-test-project-analyst": true });
+		const { tmux } = makePersistentTmux({ "haru-test-project-analyst": true });
 		const originalSleep = Bun.sleep;
 		Bun.sleep = (() => Promise.resolve()) as typeof Bun.sleep;
 		try {
@@ -2793,7 +2793,7 @@ describe("persistent-root: startPersistentAgent", () => {
 					capability: "coordinator",
 					projectRoot: tempDir,
 					overstoryDir,
-					tmuxSession: "overstory-test-project-analyst",
+					tmuxSession: "haru-test-project-analyst",
 					createRun: false,
 				},
 				tmux,
@@ -2806,7 +2806,7 @@ describe("persistent-root: startPersistentAgent", () => {
 	});
 
 	test("links to existingRunId when provided", async () => {
-		const { tmux } = makePersistentTmux({ "overstory-test-project-analyst": true });
+		const { tmux } = makePersistentTmux({ "haru-test-project-analyst": true });
 		const originalSleep = Bun.sleep;
 		Bun.sleep = (() => Promise.resolve()) as typeof Bun.sleep;
 		try {
@@ -2816,7 +2816,7 @@ describe("persistent-root: startPersistentAgent", () => {
 					capability: "coordinator",
 					projectRoot: tempDir,
 					overstoryDir,
-					tmuxSession: "overstory-test-project-analyst",
+					tmuxSession: "haru-test-project-analyst",
 					createRun: false,
 					existingRunId: "run-existing-123",
 				},
@@ -2834,14 +2834,14 @@ describe("persistent-root: startPersistentAgent", () => {
 		Bun.sleep = (() => Promise.resolve()) as typeof Bun.sleep;
 		try {
 			// Start once
-			const { tmux } = makePersistentTmux({ "overstory-test-project-analyst": true });
+			const { tmux } = makePersistentTmux({ "haru-test-project-analyst": true });
 			await startPersistentAgent(
 				{
 					agentName: "mission-analyst",
 					capability: "coordinator",
 					projectRoot: tempDir,
 					overstoryDir,
-					tmuxSession: "overstory-test-project-analyst",
+					tmuxSession: "haru-test-project-analyst",
 					createRun: false,
 				},
 				tmux,
@@ -2851,8 +2851,8 @@ describe("persistent-root: startPersistentAgent", () => {
 			// (fake tmux always returns pid=12345 which won't be running in test)
 			// The existing session has state "booting" — should throw
 			const { tmux: tmux2 } = makePersistentTmux(
-				{ "overstory-test-project-analyst": true },
-				{ checkSessionStateMap: { "overstory-test-project-analyst": "alive" } },
+				{ "haru-test-project-analyst": true },
+				{ checkSessionStateMap: { "haru-test-project-analyst": "alive" } },
 			);
 			// Override isSessionAlive for the second check to return true
 			// and simulate a running PID by patching isProcessRunning logic:
@@ -2866,7 +2866,7 @@ describe("persistent-root: startPersistentAgent", () => {
 						capability: "coordinator",
 						projectRoot: tempDir,
 						overstoryDir,
-						tmuxSession: "overstory-test-project-analyst",
+						tmuxSession: "haru-test-project-analyst",
 						createRun: false,
 					},
 					tmux2,
@@ -2879,7 +2879,7 @@ describe("persistent-root: startPersistentAgent", () => {
 
 	test("throws AgentError when TUI does not become ready", async () => {
 		const { tmux } = makePersistentTmux(
-			{ "overstory-test-project-analyst": false },
+			{ "haru-test-project-analyst": false },
 			{ waitForTuiReadyResult: false },
 		);
 		const originalSleep = Bun.sleep;
@@ -2892,7 +2892,7 @@ describe("persistent-root: startPersistentAgent", () => {
 						capability: "coordinator",
 						projectRoot: tempDir,
 						overstoryDir,
-						tmuxSession: "overstory-test-project-analyst",
+						tmuxSession: "haru-test-project-analyst",
 						createRun: false,
 					},
 					tmux,
@@ -2914,7 +2914,7 @@ describe("persistent-root: startPersistentAgent", () => {
 				worktreePath: tempDir,
 				branchName: "main",
 				taskId: "",
-				tmuxSession: "overstory-test-project-analyst",
+				tmuxSession: "haru-test-project-analyst",
 				state: "completed",
 				pid: 12345,
 				parentAgent: null,
@@ -2935,8 +2935,8 @@ describe("persistent-root: startPersistentAgent", () => {
 		}
 
 		const { tmux, killSessionCalls } = makePersistentTmux(
-			{ "overstory-test-project-analyst": true },
-			{ checkSessionStateMap: { "overstory-test-project-analyst": "alive" } },
+			{ "haru-test-project-analyst": true },
+			{ checkSessionStateMap: { "haru-test-project-analyst": "alive" } },
 		);
 		const originalSleep = Bun.sleep;
 		Bun.sleep = (() => Promise.resolve()) as typeof Bun.sleep;
@@ -2947,7 +2947,7 @@ describe("persistent-root: startPersistentAgent", () => {
 					capability: "coordinator",
 					projectRoot: tempDir,
 					overstoryDir,
-					tmuxSession: "overstory-test-project-analyst",
+					tmuxSession: "haru-test-project-analyst",
 					createRun: false,
 				},
 				tmux,
@@ -2956,7 +2956,7 @@ describe("persistent-root: startPersistentAgent", () => {
 			Bun.sleep = originalSleep;
 		}
 
-		expect(killSessionCalls).toContain("overstory-test-project-analyst");
+		expect(killSessionCalls).toContain("haru-test-project-analyst");
 	});
 });
 
@@ -2973,7 +2973,7 @@ describe("persistent-root: stopPersistentAgent", () => {
 				worktreePath: tempDir,
 				branchName: "main",
 				taskId: "",
-				tmuxSession: "overstory-test-project-analyst",
+				tmuxSession: "haru-test-project-analyst",
 				state: "working",
 				pid: 11111,
 				parentAgent: null,
@@ -2995,7 +2995,7 @@ describe("persistent-root: stopPersistentAgent", () => {
 
 		const killCalls: string[] = [];
 		const tmux: PersistentAgentTmuxDeps = {
-			...makePersistentTmux({ "overstory-test-project-analyst": true }).tmux,
+			...makePersistentTmux({ "haru-test-project-analyst": true }).tmux,
 			isSessionAlive: async () => true,
 			killSession: async (name) => {
 				killCalls.push(name);
@@ -3009,7 +3009,7 @@ describe("persistent-root: stopPersistentAgent", () => {
 		);
 
 		expect(result.sessionKilled).toBe(true);
-		expect(killCalls).toContain("overstory-test-project-analyst");
+		expect(killCalls).toContain("haru-test-project-analyst");
 		expect(result.sessionId).toBe("session-111-mission-analyst");
 	});
 
@@ -3042,7 +3042,7 @@ describe("persistent-root: stopPersistentAgent", () => {
 				worktreePath: tempDir,
 				branchName: "main",
 				taskId: "",
-				tmuxSession: "overstory-test-project-analyst",
+				tmuxSession: "haru-test-project-analyst",
 				state: "working",
 				pid: 22222,
 				parentAgent: null,
@@ -3062,7 +3062,7 @@ describe("persistent-root: stopPersistentAgent", () => {
 			store.close();
 		}
 
-		const { tmux } = makePersistentTmux({ "overstory-test-project-analyst": true });
+		const { tmux } = makePersistentTmux({ "haru-test-project-analyst": true });
 		const result = await stopPersistentAgent(
 			"mission-analyst",
 			{ projectRoot: tempDir, overstoryDir },
@@ -3114,7 +3114,7 @@ describe("persistent-root: getPersistentAgentStatus", () => {
 				worktreePath: tempDir,
 				branchName: "main",
 				taskId: "",
-				tmuxSession: "overstory-test-project-analyst",
+				tmuxSession: "haru-test-project-analyst",
 				state: "completed",
 				pid: null,
 				parentAgent: null,
@@ -3154,7 +3154,7 @@ describe("persistent-root: getPersistentAgentStatus", () => {
 				worktreePath: tempDir,
 				branchName: "main",
 				taskId: "",
-				tmuxSession: "overstory-test-project-analyst",
+				tmuxSession: "haru-test-project-analyst",
 				state: "working",
 				pid: 44444,
 				parentAgent: null,
@@ -3174,7 +3174,7 @@ describe("persistent-root: getPersistentAgentStatus", () => {
 			store.close();
 		}
 
-		const { tmux } = makePersistentTmux({ "overstory-test-project-analyst": true });
+		const { tmux } = makePersistentTmux({ "haru-test-project-analyst": true });
 		const status = await getPersistentAgentStatus(
 			"mission-analyst",
 			{ projectRoot: tempDir, overstoryDir },
@@ -3184,7 +3184,7 @@ describe("persistent-root: getPersistentAgentStatus", () => {
 		expect(status?.running).toBe(true);
 		expect(status?.sessionId).toBe("session-444-analyst");
 		expect(status?.state).toBe("working");
-		expect(status?.tmuxSession).toBe("overstory-test-project-analyst");
+		expect(status?.tmuxSession).toBe("haru-test-project-analyst");
 	});
 
 	test("returns running=false and reconciles zombie state when tmux session is dead", async () => {
@@ -3198,7 +3198,7 @@ describe("persistent-root: getPersistentAgentStatus", () => {
 				worktreePath: tempDir,
 				branchName: "main",
 				taskId: "",
-				tmuxSession: "overstory-test-project-analyst",
+				tmuxSession: "haru-test-project-analyst",
 				state: "working",
 				pid: 55555,
 				parentAgent: null,
@@ -3219,7 +3219,7 @@ describe("persistent-root: getPersistentAgentStatus", () => {
 		}
 
 		// Session alive=false → zombie reconciliation
-		const { tmux } = makePersistentTmux({ "overstory-test-project-analyst": false });
+		const { tmux } = makePersistentTmux({ "haru-test-project-analyst": false });
 		const status = await getPersistentAgentStatus(
 			"mission-analyst",
 			{ projectRoot: tempDir, overstoryDir },
@@ -3259,7 +3259,7 @@ describe("persistent-root: readPersistentAgentOutput", () => {
 				worktreePath: tempDir,
 				branchName: "main",
 				taskId: "",
-				tmuxSession: "overstory-test-project-analyst",
+				tmuxSession: "haru-test-project-analyst",
 				state: "working",
 				pid: 66666,
 				parentAgent: null,
@@ -3295,7 +3295,7 @@ describe("persistent-root: readPersistentAgentOutput", () => {
 
 		expect(content).toBe("pane content here");
 		expect(captureCalls).toHaveLength(1);
-		expect(captureCalls[0]?.name).toBe("overstory-test-project-analyst");
+		expect(captureCalls[0]?.name).toBe("haru-test-project-analyst");
 		expect(captureCalls[0]?.lines).toBe(42);
 	});
 });

@@ -6,11 +6,11 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "if [ -z \"$OVERSTORY_AGENT_NAME\" ]; then [ -z \"$OVERSTORY_RUNTIME_SESSION_ID\" ] && exit 0; [ -f \".claude/.agent-env.$OVERSTORY_RUNTIME_SESSION_ID\" ] && . \".claude/.agent-env.$OVERSTORY_RUNTIME_SESSION_ID\"; [ -z \"$OVERSTORY_AGENT_NAME\" ] && exit 0; fi; ov prime --agent \"$OVERSTORY_AGENT_NAME\""
+						"command": "if [ -z \"$HARU_AGENT_NAME\" ]; then [ -z \"$HARU_RUNTIME_SESSION_ID\" ] && exit 0; [ -f \".claude/.agent-env.$HARU_RUNTIME_SESSION_ID\" ] && . \".claude/.agent-env.$HARU_RUNTIME_SESSION_ID\"; [ -z \"$HARU_AGENT_NAME\" ] && exit 0; fi; ha prime --agent \"$HARU_AGENT_NAME\""
 					},
 					{
 						"type": "command",
-						"command": "if [ -z \"$OVERSTORY_AGENT_NAME\" ]; then [ -z \"$OVERSTORY_RUNTIME_SESSION_ID\" ] && exit 0; [ -f \".claude/.agent-env.$OVERSTORY_RUNTIME_SESSION_ID\" ] && . \".claude/.agent-env.$OVERSTORY_RUNTIME_SESSION_ID\"; [ -z \"$OVERSTORY_AGENT_NAME\" ] && exit 0; fi; if ! ov mail check --inject --agent \"$OVERSTORY_AGENT_NAME\"; then printf '%s [%s] mail check failed (SessionStart)\\n' \"$(date -Iseconds)\" \"$OVERSTORY_AGENT_NAME\" >> \".overstory/logs/hook-errors.log\" 2>/dev/null; fi; exit 0"
+						"command": "if [ -z \"$HARU_AGENT_NAME\" ]; then [ -z \"$HARU_RUNTIME_SESSION_ID\" ] && exit 0; [ -f \".claude/.agent-env.$HARU_RUNTIME_SESSION_ID\" ] && . \".claude/.agent-env.$HARU_RUNTIME_SESSION_ID\"; [ -z \"$HARU_AGENT_NAME\" ] && exit 0; fi; if ! ha mail check --inject --agent \"$HARU_AGENT_NAME\"; then printf '%s [%s] mail check failed (SessionStart)\\n' \"$(date -Iseconds)\" \"$HARU_AGENT_NAME\" >> \".overstory/logs/hook-errors.log\" 2>/dev/null; fi; exit 0"
 					}
 				]
 			}
@@ -21,7 +21,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "if [ -z \"$OVERSTORY_AGENT_NAME\" ]; then [ -z \"$OVERSTORY_RUNTIME_SESSION_ID\" ] && exit 0; [ -f \".claude/.agent-env.$OVERSTORY_RUNTIME_SESSION_ID\" ] && . \".claude/.agent-env.$OVERSTORY_RUNTIME_SESSION_ID\"; [ -z \"$OVERSTORY_AGENT_NAME\" ] && exit 0; fi; if ! ov mail check --inject --agent \"$OVERSTORY_AGENT_NAME\"; then printf '%s [%s] mail check failed (UserPromptSubmit)\\n' \"$(date -Iseconds)\" \"$OVERSTORY_AGENT_NAME\" >> \".overstory/logs/hook-errors.log\" 2>/dev/null; fi; exit 0"
+						"command": "if [ -z \"$HARU_AGENT_NAME\" ]; then [ -z \"$HARU_RUNTIME_SESSION_ID\" ] && exit 0; [ -f \".claude/.agent-env.$HARU_RUNTIME_SESSION_ID\" ] && . \".claude/.agent-env.$HARU_RUNTIME_SESSION_ID\"; [ -z \"$HARU_AGENT_NAME\" ] && exit 0; fi; if ! ha mail check --inject --agent \"$HARU_AGENT_NAME\"; then printf '%s [%s] mail check failed (UserPromptSubmit)\\n' \"$(date -Iseconds)\" \"$HARU_AGENT_NAME\" >> \".overstory/logs/hook-errors.log\" 2>/dev/null; fi; exit 0"
 					}
 				]
 			}
@@ -32,7 +32,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "if [ -z \"$OVERSTORY_AGENT_NAME\" ]; then [ -z \"$OVERSTORY_RUNTIME_SESSION_ID\" ] && exit 0; [ -f \".claude/.agent-env.$OVERSTORY_RUNTIME_SESSION_ID\" ] && . \".claude/.agent-env.$OVERSTORY_RUNTIME_SESSION_ID\"; [ -z \"$OVERSTORY_AGENT_NAME\" ] && exit 0; fi; ov log tool-start --agent \"$OVERSTORY_AGENT_NAME\" --stdin"
+						"command": "if [ -z \"$HARU_AGENT_NAME\" ]; then [ -z \"$HARU_RUNTIME_SESSION_ID\" ] && exit 0; [ -f \".claude/.agent-env.$HARU_RUNTIME_SESSION_ID\" ] && . \".claude/.agent-env.$HARU_RUNTIME_SESSION_ID\"; [ -z \"$HARU_AGENT_NAME\" ] && exit 0; fi; ha log tool-start --agent \"$HARU_AGENT_NAME\" --stdin"
 					}
 				]
 			},
@@ -41,7 +41,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "if [ -z \"$OVERSTORY_AGENT_NAME\" ]; then [ -z \"$OVERSTORY_RUNTIME_SESSION_ID\" ] && exit 0; [ -f \".claude/.agent-env.$OVERSTORY_RUNTIME_SESSION_ID\" ] && . \".claude/.agent-env.$OVERSTORY_RUNTIME_SESSION_ID\"; [ -z \"$OVERSTORY_AGENT_NAME\" ] && exit 0; fi; read -r INPUT; CMD=$(echo \"$INPUT\" | sed 's/.*\"command\": *\"\\([^\"]*\\)\".*/\\1/'); if echo \"$CMD\" | grep -qE '\\bgit\\s+push\\b'; then echo '{\"decision\":\"block\",\"reason\":\"git push is blocked — use ov merge to integrate changes, push manually when ready\"}'; exit 0; fi;"
+						"command": "if [ -z \"$HARU_AGENT_NAME\" ]; then [ -z \"$HARU_RUNTIME_SESSION_ID\" ] && exit 0; [ -f \".claude/.agent-env.$HARU_RUNTIME_SESSION_ID\" ] && . \".claude/.agent-env.$HARU_RUNTIME_SESSION_ID\"; [ -z \"$HARU_AGENT_NAME\" ] && exit 0; fi; read -r INPUT; CMD=$(echo \"$INPUT\" | sed 's/.*\"command\": *\"\\([^\"]*\\)\".*/\\1/'); if echo \"$CMD\" | grep -qE '\\bgit\\s+push\\b'; then echo '{\"decision\":\"block\",\"reason\":\"git push is blocked — use ha merge to integrate changes, push manually when ready\"}'; exit 0; fi;"
 					}
 				]
 			}
@@ -52,11 +52,11 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "if [ -z \"$OVERSTORY_AGENT_NAME\" ]; then [ -z \"$OVERSTORY_RUNTIME_SESSION_ID\" ] && exit 0; [ -f \".claude/.agent-env.$OVERSTORY_RUNTIME_SESSION_ID\" ] && . \".claude/.agent-env.$OVERSTORY_RUNTIME_SESSION_ID\"; [ -z \"$OVERSTORY_AGENT_NAME\" ] && exit 0; fi; ov log tool-end --agent \"$OVERSTORY_AGENT_NAME\" --stdin"
+						"command": "if [ -z \"$HARU_AGENT_NAME\" ]; then [ -z \"$HARU_RUNTIME_SESSION_ID\" ] && exit 0; [ -f \".claude/.agent-env.$HARU_RUNTIME_SESSION_ID\" ] && . \".claude/.agent-env.$HARU_RUNTIME_SESSION_ID\"; [ -z \"$HARU_AGENT_NAME\" ] && exit 0; fi; ha log tool-end --agent \"$HARU_AGENT_NAME\" --stdin"
 					},
 					{
 						"type": "command",
-						"command": "if [ -z \"$OVERSTORY_AGENT_NAME\" ]; then [ -z \"$OVERSTORY_RUNTIME_SESSION_ID\" ] && exit 0; [ -f \".claude/.agent-env.$OVERSTORY_RUNTIME_SESSION_ID\" ] && . \".claude/.agent-env.$OVERSTORY_RUNTIME_SESSION_ID\"; [ -z \"$OVERSTORY_AGENT_NAME\" ] && exit 0; fi; if ! ov mail check --inject --agent \"$OVERSTORY_AGENT_NAME\" --debounce 5000; then printf '%s [%s] mail check failed (PostToolUse)\\n' \"$(date -Iseconds)\" \"$OVERSTORY_AGENT_NAME\" >> \".overstory/logs/hook-errors.log\" 2>/dev/null; fi; exit 0"
+						"command": "if [ -z \"$HARU_AGENT_NAME\" ]; then [ -z \"$HARU_RUNTIME_SESSION_ID\" ] && exit 0; [ -f \".claude/.agent-env.$HARU_RUNTIME_SESSION_ID\" ] && . \".claude/.agent-env.$HARU_RUNTIME_SESSION_ID\"; [ -z \"$HARU_AGENT_NAME\" ] && exit 0; fi; if ! ha mail check --inject --agent \"$HARU_AGENT_NAME\" --debounce 5000; then printf '%s [%s] mail check failed (PostToolUse)\\n' \"$(date -Iseconds)\" \"$HARU_AGENT_NAME\" >> \".overstory/logs/hook-errors.log\" 2>/dev/null; fi; exit 0"
 					}
 				]
 			},
@@ -65,7 +65,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "if [ -z \"$OVERSTORY_AGENT_NAME\" ]; then [ -z \"$OVERSTORY_RUNTIME_SESSION_ID\" ] && exit 0; [ -f \".claude/.agent-env.$OVERSTORY_RUNTIME_SESSION_ID\" ] && . \".claude/.agent-env.$OVERSTORY_RUNTIME_SESSION_ID\"; [ -z \"$OVERSTORY_AGENT_NAME\" ] && exit 0; fi; read -r INPUT; if echo \"$INPUT\" | grep -qE '\\bgit\\s+commit\\b'; then ml diff HEAD~1 >/dev/null 2>&1 || true; fi; exit 0;"
+						"command": "if [ -z \"$HARU_AGENT_NAME\" ]; then [ -z \"$HARU_RUNTIME_SESSION_ID\" ] && exit 0; [ -f \".claude/.agent-env.$HARU_RUNTIME_SESSION_ID\" ] && . \".claude/.agent-env.$HARU_RUNTIME_SESSION_ID\"; [ -z \"$HARU_AGENT_NAME\" ] && exit 0; fi; read -r INPUT; if echo \"$INPUT\" | grep -qE '\\bgit\\s+commit\\b'; then ml diff HEAD~1 >/dev/null 2>&1 || true; fi; exit 0;"
 					}
 				]
 			}
@@ -76,11 +76,11 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "if [ -z \"$OVERSTORY_AGENT_NAME\" ]; then [ -z \"$OVERSTORY_RUNTIME_SESSION_ID\" ] && exit 0; [ -f \".claude/.agent-env.$OVERSTORY_RUNTIME_SESSION_ID\" ] && . \".claude/.agent-env.$OVERSTORY_RUNTIME_SESSION_ID\"; [ -z \"$OVERSTORY_AGENT_NAME\" ] && exit 0; fi; ov log session-end --agent \"$OVERSTORY_AGENT_NAME\" --stdin"
+						"command": "if [ -z \"$HARU_AGENT_NAME\" ]; then [ -z \"$HARU_RUNTIME_SESSION_ID\" ] && exit 0; [ -f \".claude/.agent-env.$HARU_RUNTIME_SESSION_ID\" ] && . \".claude/.agent-env.$HARU_RUNTIME_SESSION_ID\"; [ -z \"$HARU_AGENT_NAME\" ] && exit 0; fi; ha log session-end --agent \"$HARU_AGENT_NAME\" --stdin"
 					},
 					{
 						"type": "command",
-						"command": "if [ -z \"$OVERSTORY_AGENT_NAME\" ]; then [ -z \"$OVERSTORY_RUNTIME_SESSION_ID\" ] && exit 0; [ -f \".claude/.agent-env.$OVERSTORY_RUNTIME_SESSION_ID\" ] && . \".claude/.agent-env.$OVERSTORY_RUNTIME_SESSION_ID\"; [ -z \"$OVERSTORY_AGENT_NAME\" ] && exit 0; fi; ml learn"
+						"command": "if [ -z \"$HARU_AGENT_NAME\" ]; then [ -z \"$HARU_RUNTIME_SESSION_ID\" ] && exit 0; [ -f \".claude/.agent-env.$HARU_RUNTIME_SESSION_ID\" ] && . \".claude/.agent-env.$HARU_RUNTIME_SESSION_ID\"; [ -z \"$HARU_AGENT_NAME\" ] && exit 0; fi; ml learn"
 					}
 				]
 			}
@@ -91,7 +91,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "if [ -z \"$OVERSTORY_AGENT_NAME\" ]; then [ -z \"$OVERSTORY_RUNTIME_SESSION_ID\" ] && exit 0; [ -f \".claude/.agent-env.$OVERSTORY_RUNTIME_SESSION_ID\" ] && . \".claude/.agent-env.$OVERSTORY_RUNTIME_SESSION_ID\"; [ -z \"$OVERSTORY_AGENT_NAME\" ] && exit 0; fi; ov prime --agent \"$OVERSTORY_AGENT_NAME\" --compact"
+						"command": "if [ -z \"$HARU_AGENT_NAME\" ]; then [ -z \"$HARU_RUNTIME_SESSION_ID\" ] && exit 0; [ -f \".claude/.agent-env.$HARU_RUNTIME_SESSION_ID\" ] && . \".claude/.agent-env.$HARU_RUNTIME_SESSION_ID\"; [ -z \"$HARU_AGENT_NAME\" ] && exit 0; fi; ha prime --agent \"$HARU_AGENT_NAME\" --compact"
 					}
 				]
 			}

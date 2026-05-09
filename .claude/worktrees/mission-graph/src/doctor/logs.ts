@@ -177,7 +177,7 @@ export const checkLogs: DoctorCheckFn = async (_config, overstoryDir): Promise<D
 			totalBytes > DISK_USAGE_WARN_THRESHOLD
 				? [
 						`Exceeds ${formatBytes(DISK_USAGE_WARN_THRESHOLD)} threshold`,
-						"Consider running 'ov worktree clean --completed' to remove old logs",
+						"Consider running 'ha worktree clean --completed' to remove old logs",
 					]
 				: undefined,
 		fixable: totalBytes > DISK_USAGE_WARN_THRESHOLD,

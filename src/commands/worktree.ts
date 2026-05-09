@@ -1,5 +1,5 @@
 /**
- * CLI command: ov worktree list | clean [--completed] [--all]
+ * CLI command: ha worktree list | clean [--completed] [--all]
  *
  * List shows worktrees with agent status.
  * Clean removes worktree dirs, branch refs (if merged), and tmux sessions.
@@ -24,7 +24,7 @@ import {
 import { isSessionAlive, killSession } from "../worktree/tmux.ts";
 
 /**
- * Handle `ov worktree list`.
+ * Handle `ha worktree list`.
  */
 async function handleList(root: string, json: boolean): Promise<void> {
 	const worktrees = await listWorktrees(root);
@@ -37,7 +37,7 @@ async function handleList(root: string, json: boolean): Promise<void> {
 		store.close();
 	}
 
-	const overstoryWts = worktrees.filter((wt) => wt.branch.startsWith("overstory/"));
+	const overstoryWts = worktrees.filter((wt) => wt.branch.startsWith("haru/"));
 
 	if (json) {
 		const entries = overstoryWts.map((wt) => {
@@ -73,7 +73,7 @@ async function handleList(root: string, json: boolean): Promise<void> {
 }
 
 /**
- * Handle `ov worktree clean [--completed] [--all] [--force]`.
+ * Handle `ha worktree clean [--completed] [--all] [--force]`.
  */
 async function handleClean(
 	opts: { all: boolean; force: boolean; completedOnly: boolean },
@@ -95,7 +95,7 @@ async function handleClean(
 		return;
 	}
 
-	const overstoryWts = worktrees.filter((wt) => wt.branch.startsWith("overstory/"));
+	const overstoryWts = worktrees.filter((wt) => wt.branch.startsWith("haru/"));
 	const cleaned: string[] = [];
 	const failed: string[] = [];
 	const skipped: string[] = [];
@@ -347,7 +347,7 @@ export function createWorktreeCommand(): Command {
 }
 
 /**
- * Entry point for `ov worktree <subcommand> [flags]`.
+ * Entry point for `ha worktree <subcommand> [flags]`.
  *
  * Subcommands: list, clean.
  */

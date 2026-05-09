@@ -1,5 +1,5 @@
 /**
- * CLI command: ov config
+ * CLI command: ha config
  *
  * Interactive config editor for .overstory/config.yaml.
  * Subcommands: list, get, set, reset.
@@ -7,7 +7,7 @@
 
 import { join } from "node:path";
 import { Command } from "commander";
-import { loadConfig, DEFAULT_CONFIG } from "../config.ts";
+import { DEFAULT_CONFIG, loadConfig } from "../config.ts";
 import { parseYaml, serializeConfigToYaml } from "../config-yaml.ts";
 import { jsonOutput } from "../json.ts";
 
@@ -43,11 +43,7 @@ function getNestedValue(obj: Record<string, unknown>, keyPath: string): unknown 
  * Set a nested value in an object by dot-separated key path.
  * Creates intermediate objects if they don't exist.
  */
-function setNestedValue(
-	obj: Record<string, unknown>,
-	keyPath: string,
-	value: unknown,
-): void {
+function setNestedValue(obj: Record<string, unknown>, keyPath: string, value: unknown): void {
 	const keys = keyPath.split(".");
 	let current: Record<string, unknown> = obj;
 	for (let i = 0; i < keys.length - 1; i++) {
@@ -64,9 +60,9 @@ function setNestedValue(
 }
 
 export function createConfigCommand(): Command {
-	const cmd = new Command("config").description("View and modify overstory configuration");
+	const cmd = new Command("config").description("View and modify haru configuration");
 
-	// ov config list
+	// ha config list
 	cmd
 		.command("list")
 		.description("Show all current settings (merged config)")
@@ -83,7 +79,7 @@ export function createConfigCommand(): Command {
 			}
 		});
 
-	// ov config get <key>
+	// ha config get <key>
 	cmd
 		.command("get <key>")
 		.description("Get a specific config value (e.g., taskTracker.backend)")
@@ -112,7 +108,7 @@ export function createConfigCommand(): Command {
 			}
 		});
 
-	// ov config set <key> <value>
+	// ha config set <key> <value>
 	cmd
 		.command("set <key> <value>")
 		.description("Set a config value (e.g., taskTracker.backend github)")
@@ -148,7 +144,7 @@ export function createConfigCommand(): Command {
 			}
 		});
 
-	// ov config reset
+	// ha config reset
 	cmd
 		.command("reset")
 		.description("Reset config.yaml to defaults")

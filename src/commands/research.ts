@@ -1,5 +1,5 @@
 /**
- * CLI command: ov research
+ * CLI command: ha research
  *
  * Runs deep research on a topic via a coordinator-driven researcher swarm.
  * Provides 5 subcommands: start, stop, status, list, output.
@@ -76,7 +76,7 @@ function formatSessionRow(session: ResearchSession): string {
 // --- Command factory ---
 
 /**
- * Build Commander command for ov research.
+ * Build Commander command for ha research.
  * Accepts optional deps for testing (real runner is loaded lazily when omitted).
  */
 export function createResearchCommand(deps?: ResearchDeps): Command {

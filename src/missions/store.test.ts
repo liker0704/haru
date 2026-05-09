@@ -10,7 +10,7 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { cleanupTempDir } from "../test-helpers.ts";
-import type { InsertMission, MissionStore, MissionTier } from "../types.ts";
+import type { InsertMission, MissionStore } from "../types.ts";
 import { createMissionStore } from "./store.ts";
 
 let tempDir: string;
@@ -18,7 +18,7 @@ let dbPath: string;
 let store: MissionStore;
 
 beforeEach(async () => {
-	tempDir = await mkdtemp(join(tmpdir(), "overstory-missions-test-"));
+	tempDir = await mkdtemp(join(tmpdir(), "haru-missions-test-"));
 	dbPath = join(tempDir, "sessions.db");
 	store = createMissionStore(dbPath);
 });
@@ -855,12 +855,12 @@ describe("tier operations", () => {
 		db.close();
 
 		expect(rows).toHaveLength(3);
-		expect(rows[0]!.from_tier).toBeNull();
-		expect(rows[0]!.to_tier).toBe("direct");
-		expect(rows[1]!.from_tier).toBe("direct");
-		expect(rows[1]!.to_tier).toBe("planned");
-		expect(rows[2]!.from_tier).toBe("planned");
-		expect(rows[2]!.to_tier).toBe("full");
+		expect(rows[0]?.from_tier).toBeNull();
+		expect(rows[0]?.to_tier).toBe("direct");
+		expect(rows[1]?.from_tier).toBe("direct");
+		expect(rows[1]?.to_tier).toBe("planned");
+		expect(rows[2]?.from_tier).toBe("planned");
+		expect(rows[2]?.to_tier).toBe("full");
 	});
 
 	test("clearGateStates clears gate state rows", () => {

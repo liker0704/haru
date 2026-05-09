@@ -290,7 +290,7 @@ describe("parentHasScouts", () => {
 });
 
 /**
- * Tests for shouldShowScoutWarning (overstory-6eyw).
+ * Tests for shouldShowScoutWarning (haru-6eyw).
  *
  * shouldShowScoutWarning determines whether the "spawning builder without scouts"
  * warning should be emitted. It is a pure function extracted from slingCommand
@@ -372,7 +372,7 @@ describe("getSharedWritableDirs", () => {
 
 describe("generateAgentName", () => {
 	test("returns capability-taskId when no collision", () => {
-		expect(generateAgentName("builder", "overstory-2f10", [])).toBe("builder-overstory-2f10");
+		expect(generateAgentName("builder", "haru-2f10", [])).toBe("builder-haru-2f10");
 	});
 
 	test("returns capability-taskId when takenNames is empty", () => {
@@ -380,18 +380,18 @@ describe("generateAgentName", () => {
 	});
 
 	test("appends -2 when base name is taken", () => {
-		expect(generateAgentName("builder", "overstory-2f10", ["builder-overstory-2f10"])).toBe(
-			"builder-overstory-2f10-2",
+		expect(generateAgentName("builder", "haru-2f10", ["builder-haru-2f10"])).toBe(
+			"builder-haru-2f10-2",
 		);
 	});
 
 	test("skips taken suffixes and returns -3 when -2 is also taken", () => {
 		expect(
-			generateAgentName("builder", "overstory-2f10", [
-				"builder-overstory-2f10",
-				"builder-overstory-2f10-2",
+			generateAgentName("builder", "haru-2f10", [
+				"builder-haru-2f10",
+				"builder-haru-2f10-2",
 			]),
-		).toBe("builder-overstory-2f10-3");
+		).toBe("builder-haru-2f10-3");
 	});
 });
 
@@ -672,14 +672,14 @@ describe("slingCommand mission spec enforcement", () => {
  * hierarchy info (depth, parent), and startup instructions.
  *
  * The beacon is a single-line string (parts joined by " — ") to prevent
- * multiline tmux send-keys issues (overstory-y2ob, overstory-cczf).
+ * multiline tmux send-keys issues (haru-y2ob, haru-cczf).
  */
 
 function makeBeaconOpts(overrides?: Partial<BeaconOptions>): BeaconOptions {
 	return {
 		agentName: "test-builder",
 		capability: "builder",
-		taskId: "overstory-abc",
+		taskId: "haru-abc",
 		parentAgent: null,
 		depth: 0,
 		instructionPath: ".claude/CLAUDE.md",
@@ -698,7 +698,7 @@ describe("buildBeacon", () => {
 		const beacon = buildBeacon(makeBeaconOpts());
 
 		expect(beacon).toContain("[OVERSTORY] test-builder (builder) ");
-		expect(beacon).toContain("task:overstory-abc");
+		expect(beacon).toContain("task:haru-abc");
 	});
 
 	test("includes ISO timestamp", () => {
@@ -720,13 +720,13 @@ describe("buildBeacon", () => {
 	});
 
 	test("includes startup instructions with agent name and task ID", () => {
-		const opts = makeBeaconOpts({ agentName: "scout-1", taskId: "overstory-xyz" });
+		const opts = makeBeaconOpts({ agentName: "scout-1", taskId: "haru-xyz" });
 		const beacon = buildBeacon(opts);
 
 		expect(beacon).toContain(`read ${opts.instructionPath}`);
 		expect(beacon).toContain("mulch prime");
-		expect(beacon).toContain("ov mail check --agent scout-1");
-		expect(beacon).toContain("begin task overstory-xyz");
+		expect(beacon).toContain("ha mail check --agent scout-1");
+		expect(beacon).toContain("begin task haru-xyz");
 	});
 
 	test("uses custom instructionPath in startup instructions", () => {
@@ -740,7 +740,7 @@ describe("buildBeacon", () => {
 	test("uses agent name in mail check command", () => {
 		const beacon = buildBeacon(makeBeaconOpts({ agentName: "reviewer-beta" }));
 
-		expect(beacon).toContain("ov mail check --agent reviewer-beta");
+		expect(beacon).toContain("ha mail check --agent reviewer-beta");
 	});
 
 	test("reflects capability in header", () => {
@@ -754,14 +754,14 @@ describe("buildBeacon", () => {
 			makeBeaconOpts({
 				agentName: "worker-3",
 				capability: "builder",
-				taskId: "overstory-deep",
+				taskId: "haru-deep",
 				parentAgent: "lead-main",
 				depth: 2,
 			}),
 		);
 
 		expect(beacon).toContain("[OVERSTORY] worker-3 (builder)");
-		expect(beacon).toContain("task:overstory-deep");
+		expect(beacon).toContain("task:haru-deep");
 		expect(beacon).toContain("Depth: 2 | Parent: lead-main");
 	});
 });
@@ -893,36 +893,36 @@ function makeTaskSession(agentName: string, taskId: string): { agentName: string
 
 describe("checkTaskLock", () => {
 	test("returns null when no sessions exist", () => {
-		expect(checkTaskLock([], "overstory-abc")).toBeNull();
+		expect(checkTaskLock([], "haru-abc")).toBeNull();
 	});
 
 	test("returns null when no session matches the task ID", () => {
 		const sessions = [
-			makeTaskSession("builder-1", "overstory-xyz"),
-			makeTaskSession("builder-2", "overstory-def"),
+			makeTaskSession("builder-1", "haru-xyz"),
+			makeTaskSession("builder-2", "haru-def"),
 		];
 
-		expect(checkTaskLock(sessions, "overstory-abc")).toBeNull();
+		expect(checkTaskLock(sessions, "haru-abc")).toBeNull();
 	});
 
 	test("returns the agent name when a session matches", () => {
 		const sessions = [
-			makeTaskSession("builder-1", "overstory-abc"),
-			makeTaskSession("builder-2", "overstory-xyz"),
+			makeTaskSession("builder-1", "haru-abc"),
+			makeTaskSession("builder-2", "haru-xyz"),
 		];
 
-		expect(checkTaskLock(sessions, "overstory-abc")).toBe("builder-1");
+		expect(checkTaskLock(sessions, "haru-abc")).toBe("builder-1");
 	});
 
 	test("returns the first matching agent when multiple sessions match", () => {
 		// Multiple sessions can have the same taskId (e.g., retried agent)
 		// checkTaskLock returns the first match
 		const sessions = [
-			makeTaskSession("builder-1", "overstory-abc"),
-			makeTaskSession("builder-2", "overstory-abc"),
+			makeTaskSession("builder-1", "haru-abc"),
+			makeTaskSession("builder-2", "haru-abc"),
 		];
 
-		expect(checkTaskLock(sessions, "overstory-abc")).toBe("builder-1");
+		expect(checkTaskLock(sessions, "haru-abc")).toBe("builder-1");
 	});
 });
 
@@ -931,15 +931,15 @@ describe("checkTaskLock parent bypass", () => {
 		// checkTaskLock is a pure function — it returns the lock holder name or null.
 		// The parent bypass logic is in slingCommand, not checkTaskLock.
 		// These tests verify the building blocks work correctly.
-		const sessions = [makeTaskSession("lead-alpha", "overstory-abc")];
+		const sessions = [makeTaskSession("lead-alpha", "haru-abc")];
 		// checkTaskLock still returns the holder — the caller (slingCommand) decides
 		// whether to allow based on parentAgent match.
-		expect(checkTaskLock(sessions, "overstory-abc")).toBe("lead-alpha");
+		expect(checkTaskLock(sessions, "haru-abc")).toBe("lead-alpha");
 	});
 
 	test("non-parent lock holder blocks spawn", () => {
-		const sessions = [makeTaskSession("other-agent", "overstory-abc")];
-		const lockHolder = checkTaskLock(sessions, "overstory-abc");
+		const sessions = [makeTaskSession("other-agent", "haru-abc")];
+		const lockHolder = checkTaskLock(sessions, "haru-abc");
 		const parentAgent = "lead-alpha";
 		// lockHolder is 'other-agent', parentAgent is 'lead-alpha' — not equal, should block
 		expect(lockHolder).not.toBeNull();
@@ -947,8 +947,8 @@ describe("checkTaskLock parent bypass", () => {
 	});
 
 	test("null parent with lock holder blocks spawn", () => {
-		const sessions = [makeTaskSession("lead-alpha", "overstory-abc")];
-		const lockHolder = checkTaskLock(sessions, "overstory-abc");
+		const sessions = [makeTaskSession("lead-alpha", "haru-abc")];
+		const lockHolder = checkTaskLock(sessions, "haru-abc");
 		const parentAgent = null;
 		// lockHolder is non-null and parentAgent is null — should block
 		expect(lockHolder).not.toBeNull();
@@ -979,45 +979,45 @@ function makeLeadSession(
 describe("checkDuplicateLead", () => {
 	test("returns lead agent name when an active lead exists for the task", () => {
 		const sessions = [
-			makeLeadSession("lead-alpha", "overstory-abc", "lead"),
-			makeLeadSession("builder-1", "overstory-xyz", "builder"),
+			makeLeadSession("lead-alpha", "haru-abc", "lead"),
+			makeLeadSession("builder-1", "haru-xyz", "builder"),
 		];
-		expect(checkDuplicateLead(sessions, "overstory-abc")).toBe("lead-alpha");
+		expect(checkDuplicateLead(sessions, "haru-abc")).toBe("lead-alpha");
 	});
 
 	test("returns null when no lead exists for the task", () => {
 		const sessions = [
-			makeLeadSession("lead-alpha", "overstory-xyz", "lead"),
-			makeLeadSession("builder-1", "overstory-abc", "builder"),
+			makeLeadSession("lead-alpha", "haru-xyz", "lead"),
+			makeLeadSession("builder-1", "haru-abc", "builder"),
 		];
-		expect(checkDuplicateLead(sessions, "overstory-abc")).toBeNull();
+		expect(checkDuplicateLead(sessions, "haru-abc")).toBeNull();
 	});
 
 	test("returns null when no sessions exist (completed/zombie filtered out)", () => {
 		// activeSessions from store.getActive() already excludes completed/zombie
-		expect(checkDuplicateLead([], "overstory-abc")).toBeNull();
+		expect(checkDuplicateLead([], "haru-abc")).toBeNull();
 	});
 
 	test("ignores non-lead agents working the same bead", () => {
 		const sessions = [
-			makeLeadSession("builder-1", "overstory-abc", "builder"),
-			makeLeadSession("scout-1", "overstory-abc", "scout"),
-			makeLeadSession("reviewer-1", "overstory-abc", "reviewer"),
+			makeLeadSession("builder-1", "haru-abc", "builder"),
+			makeLeadSession("scout-1", "haru-abc", "scout"),
+			makeLeadSession("reviewer-1", "haru-abc", "reviewer"),
 		];
-		expect(checkDuplicateLead(sessions, "overstory-abc")).toBeNull();
+		expect(checkDuplicateLead(sessions, "haru-abc")).toBeNull();
 	});
 
 	test("returns first matching lead when multiple leads exist for the same bead", () => {
 		const sessions = [
-			makeLeadSession("lead-alpha", "overstory-abc", "lead"),
-			makeLeadSession("lead-beta", "overstory-abc", "lead"),
+			makeLeadSession("lead-alpha", "haru-abc", "lead"),
+			makeLeadSession("lead-beta", "haru-abc", "lead"),
 		];
-		expect(checkDuplicateLead(sessions, "overstory-abc")).toBe("lead-alpha");
+		expect(checkDuplicateLead(sessions, "haru-abc")).toBe("lead-alpha");
 	});
 
 	test("differentiates between task IDs", () => {
-		const sessions = [makeLeadSession("lead-alpha", "overstory-abc", "lead")];
-		expect(checkDuplicateLead(sessions, "overstory-xyz")).toBeNull();
+		const sessions = [makeLeadSession("lead-alpha", "haru-abc", "lead")];
+		expect(checkDuplicateLead(sessions, "haru-xyz")).toBeNull();
 	});
 });
 
@@ -1117,13 +1117,13 @@ describe("checkParentAgentLimit", () => {
  *
  * In slingCommand, resolveModel() is called to get the { model, env } for the
  * spawned agent. The env dict is then spread into createSession's env parameter
- * alongside OVERSTORY_AGENT_NAME and OVERSTORY_WORKTREE_PATH:
+ * alongside HARU_AGENT_NAME and HARU_WORKTREE_PATH:
  *
  *   const { model, env } = resolveModel(config, manifest, capability, agentDef.model);
  *   const pid = await createSession(tmuxSessionName, worktreePath, claudeCmd, {
  *       ...env,
- *       OVERSTORY_AGENT_NAME: name,
- *       OVERSTORY_WORKTREE_PATH: worktreePath,
+ *       HARU_AGENT_NAME: name,
+ *       HARU_WORKTREE_PATH: worktreePath,
  *   });
  *
  * These tests verify the building blocks: that resolveModel and resolveProviderEnv
@@ -1206,7 +1206,7 @@ describe("sling provider env injection building blocks", () => {
 		expect(result.env?.ANTHROPIC_DEFAULT_SONNET_MODEL).toBe("anthropic/claude-3-5-sonnet");
 	});
 
-	test("env dict from resolveModel can be spread with OVERSTORY_AGENT_NAME and OVERSTORY_WORKTREE_PATH", () => {
+	test("env dict from resolveModel can be spread with HARU_AGENT_NAME and HARU_WORKTREE_PATH", () => {
 		const config = makeConfig(
 			{ builder: "openrouter/anthropic/claude-3-5-sonnet" },
 			{ openrouter: { type: "gateway", baseUrl: "https://openrouter.ai/api/v1" } },
@@ -1214,20 +1214,20 @@ describe("sling provider env injection building blocks", () => {
 		const manifest = makeManifest();
 
 		const { env } = resolveModel(config, manifest, "builder", "sonnet");
-		// Simulates the spread in slingCommand: { ...env, OVERSTORY_AGENT_NAME: name, OVERSTORY_WORKTREE_PATH: wt }
+		// Simulates the spread in slingCommand: { ...env, HARU_AGENT_NAME: name, HARU_WORKTREE_PATH: wt }
 		const combined: Record<string, string> = {
 			...(env ?? {}),
-			OVERSTORY_AGENT_NAME: "test-builder",
-			OVERSTORY_WORKTREE_PATH: "/tmp/wt",
+			HARU_AGENT_NAME: "test-builder",
+			HARU_WORKTREE_PATH: "/tmp/wt",
 		};
 
 		expect(combined.ANTHROPIC_BASE_URL).toBe("https://openrouter.ai/api/v1");
 		expect(combined.ANTHROPIC_API_KEY).toBe("");
-		expect(combined.OVERSTORY_AGENT_NAME).toBe("test-builder");
-		expect(combined.OVERSTORY_WORKTREE_PATH).toBe("/tmp/wt");
+		expect(combined.HARU_AGENT_NAME).toBe("test-builder");
+		expect(combined.HARU_WORKTREE_PATH).toBe("/tmp/wt");
 	});
 
-	test("env dict from resolveModel can be spread with OVERSTORY_TASK_ID", () => {
+	test("env dict from resolveModel can be spread with HARU_TASK_ID", () => {
 		const config = makeConfig(
 			{ builder: "openrouter/anthropic/claude-3-5-sonnet" },
 			{ openrouter: { type: "gateway", baseUrl: "https://openrouter.ai/api/v1" } },
@@ -1235,17 +1235,17 @@ describe("sling provider env injection building blocks", () => {
 		const manifest = makeManifest();
 
 		const { env } = resolveModel(config, manifest, "builder", "sonnet");
-		// Simulates the spread in slingCommand: { ...env, OVERSTORY_AGENT_NAME: name, OVERSTORY_WORKTREE_PATH: wt, OVERSTORY_TASK_ID: taskId }
+		// Simulates the spread in slingCommand: { ...env, HARU_AGENT_NAME: name, HARU_WORKTREE_PATH: wt, HARU_TASK_ID: taskId }
 		const combined: Record<string, string> = {
 			...(env ?? {}),
-			OVERSTORY_AGENT_NAME: "test-builder",
-			OVERSTORY_WORKTREE_PATH: "/tmp/wt",
-			OVERSTORY_TASK_ID: "overstory-1234",
+			HARU_AGENT_NAME: "test-builder",
+			HARU_WORKTREE_PATH: "/tmp/wt",
+			HARU_TASK_ID: "haru-1234",
 		};
 
-		expect(combined.OVERSTORY_AGENT_NAME).toBe("test-builder");
-		expect(combined.OVERSTORY_WORKTREE_PATH).toBe("/tmp/wt");
-		expect(combined.OVERSTORY_TASK_ID).toBe("overstory-1234");
+		expect(combined.HARU_AGENT_NAME).toBe("test-builder");
+		expect(combined.HARU_WORKTREE_PATH).toBe("/tmp/wt");
+		expect(combined.HARU_TASK_ID).toBe("haru-1234");
 	});
 
 	test("resolveModel returns no env for native anthropic provider", () => {
@@ -1340,7 +1340,7 @@ describe("sling provider env injection building blocks", () => {
 function makeAutoDispatchOpts(overrides?: Partial<AutoDispatchOptions>): AutoDispatchOptions {
 	return {
 		agentName: "builder-1",
-		taskId: "overstory-abc",
+		taskId: "haru-abc",
 		capability: "builder",
 		specPath: "/path/to/spec.md",
 		parentAgent: "lead-alpha",
@@ -1353,7 +1353,7 @@ describe("buildAutoDispatch", () => {
 	test("uses parent agent as sender when provided", () => {
 		const dispatch = buildAutoDispatch({
 			agentName: "builder-1",
-			taskId: "overstory-abc",
+			taskId: "haru-abc",
 			capability: "builder",
 			specPath: "/path/to/spec.md",
 			parentAgent: "lead-alpha",
@@ -1361,14 +1361,14 @@ describe("buildAutoDispatch", () => {
 		});
 		expect(dispatch.from).toBe("lead-alpha");
 		expect(dispatch.to).toBe("builder-1");
-		expect(dispatch.subject).toContain("overstory-abc");
+		expect(dispatch.subject).toContain("haru-abc");
 		expect(dispatch.body).toContain("spec.md");
 	});
 
 	test("uses orchestrator as sender when no parent", () => {
 		const dispatch = buildAutoDispatch({
 			agentName: "lead-1",
-			taskId: "overstory-xyz",
+			taskId: "haru-xyz",
 			capability: "lead",
 			specPath: null,
 			parentAgent: null,
@@ -1381,7 +1381,7 @@ describe("buildAutoDispatch", () => {
 	test("includes capability in body", () => {
 		const dispatch = buildAutoDispatch({
 			agentName: "scout-1",
-			taskId: "overstory-abc",
+			taskId: "haru-abc",
 			capability: "scout",
 			specPath: null,
 			parentAgent: "lead-alpha",
@@ -1393,7 +1393,7 @@ describe("buildAutoDispatch", () => {
 	test("includes spec path when provided", () => {
 		const dispatch = buildAutoDispatch({
 			agentName: "builder-1",
-			taskId: "overstory-abc",
+			taskId: "haru-abc",
 			capability: "builder",
 			specPath: "/abs/path/to/spec.md",
 			parentAgent: "lead-alpha",
@@ -1403,8 +1403,8 @@ describe("buildAutoDispatch", () => {
 	});
 
 	test("subject contains task ID", () => {
-		const dispatch = buildAutoDispatch(makeAutoDispatchOpts({ taskId: "overstory-zz99" }));
-		expect(dispatch.subject).toContain("overstory-zz99");
+		const dispatch = buildAutoDispatch(makeAutoDispatchOpts({ taskId: "haru-zz99" }));
+		expect(dispatch.subject).toContain("haru-zz99");
 	});
 
 	test("to is the agent name", () => {
@@ -1423,12 +1423,12 @@ describe("buildAutoDispatch", () => {
  * test files — see mx-56558b).
  *
  * Manual verification:
- * 1. `ov sling <task-id> --name test --capability builder`
- * 2. Watch tmux pane: `tmux capture-pane -t overstory-<project>-test -p`
+ * 1. `ha sling <task-id> --name test --capability builder`
+ * 2. Watch tmux pane: `tmux capture-pane -t haru-<project>-test -p`
  * 3. Verify the beacon text appears and the agent starts processing
  *
  * Integration coverage: The beacon loop has been validated through production
- * agent spawns. Failure mode is agents stuck at welcome screen (overstory-3271).
+ * agent spawns. Failure mode is agents stuck at welcome screen (haru-3271).
  */
 
 describe("sling runtime integration", () => {
@@ -1594,7 +1594,7 @@ describe("getCurrentBranch", () => {
 	});
 
 	test("returns null for non-git directory", async () => {
-		const tmpDir = realpathSync(await mkdtemp(join(tmpdir(), "overstory-notgit-")));
+		const tmpDir = realpathSync(await mkdtemp(join(tmpdir(), "haru-notgit-")));
 		try {
 			const branch = await getCurrentBranch(tmpDir);
 			expect(branch).toBeNull();

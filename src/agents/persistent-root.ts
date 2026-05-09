@@ -246,7 +246,7 @@ export async function startPersistentAgent(
 
 		// Deploy hooks config to the project root for this agent.
 		// The ENV_GUARD prefix ensures hooks only activate inside this agent's
-		// tmux session (when OVERSTORY_AGENT_NAME is set), not the user's session.
+		// tmux session (when HARU_AGENT_NAME is set), not the user's session.
 		await runtime.deployConfig(projectRoot, undefined, {
 			agentName,
 			capability,
@@ -283,9 +283,9 @@ export async function startPersistentAgent(
 		const runtimeSessionId = crypto.randomUUID();
 		const agentEnv = {
 			...runtime.buildEnv(resolvedModel),
-			OVERSTORY_AGENT_NAME: agentName,
-			OVERSTORY_CAPABILITY: capability,
-			OVERSTORY_RUNTIME_SESSION_ID: runtimeSessionId,
+			HARU_AGENT_NAME: agentName,
+			HARU_CAPABILITY: capability,
+			HARU_RUNTIME_SESSION_ID: runtimeSessionId,
 		};
 		const spawnCmd = runtime.buildSpawnCommand({
 			model: resolvedModel.model,
@@ -317,12 +317,12 @@ export async function startPersistentAgent(
 			} finally {
 				runStore.close();
 			}
-			// Write current-run.txt for ov sling and other consumers
+			// Write current-run.txt for ha sling and other consumers
 			await Bun.write(join(overstoryDir, "current-run.txt"), runId);
 		}
 
 		// Record session BEFORE sending beacon so hook-triggered updateLastActivity()
-		// can find the entry and transition booting->working (overstory-036f).
+		// can find the entry and transition booting->working (haru-036f).
 		const session: AgentSession = {
 			id: sessionId,
 			agentName,

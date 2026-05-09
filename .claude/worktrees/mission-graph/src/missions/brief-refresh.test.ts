@@ -16,7 +16,7 @@ let tempDir: string;
 let briefPath: string;
 
 beforeEach(async () => {
-	tempDir = await mkdtemp(join(tmpdir(), "overstory-brief-refresh-test-"));
+	tempDir = await mkdtemp(join(tmpdir(), "haru-brief-refresh-test-"));
 	briefPath = join(tempDir, "brief.md");
 	await writeFile(briefPath, "# Initial brief content\n");
 });

@@ -68,7 +68,7 @@ describe("NotificationDetector", () => {
 			id: "msg-wd-001",
 			from: "builder-agent",
 			to: "lead",
-			subject: "Task overstory-xyz done",
+			subject: "Task haru-xyz done",
 			body: "All tests pass",
 			type: "worker_done",
 			priority: "normal",
@@ -85,7 +85,7 @@ describe("NotificationDetector", () => {
 		expect(notif.kind).toBe("completion");
 		expect(notif.severity).toBe("medium");
 		expect(notif.title).toBe("Worker completed: builder-agent");
-		expect(notif.body).toBe("Task overstory-xyz done");
+		expect(notif.body).toBe("Task haru-xyz done");
 	});
 
 	test("mail result messages generate completion notifications with low severity", () => {

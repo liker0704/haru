@@ -1,5 +1,5 @@
 /**
- * CLI command: ov feed [--follow] [--agent <name>...] [--run <id>]
+ * CLI command: ha feed [--follow] [--agent <name>...] [--run <id>]
  *              [--since <ts>] [--limit <n>] [--interval <ms>] [--json]
  *
  * Unified real-time event stream across all agents — like `tail -f` for the fleet.

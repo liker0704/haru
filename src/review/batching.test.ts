@@ -320,7 +320,7 @@ describe("batchForReview", () => {
 		const { store } = makeReviewRecord(tempDir);
 		const record = store.insert({
 			subjectType: "spec",
-			subjectId: "overstory-d869",
+			subjectId: "haru-d869",
 			dimensions: [{ dimension: "clarity", score: 40, details: "vague" }],
 			overallScore: 40,
 			notes: [],
@@ -371,7 +371,7 @@ describe("batchForReview", () => {
 		}
 	});
 
-	test("does not crash when overstory dir does not exist", () => {
+	test("does not crash when haru dir does not exist", () => {
 		const missingDir = join(tempDir, "nonexistent");
 		expect(() => batchForReview(missingDir, "mission-x")).not.toThrow();
 		const batches = batchForReview(missingDir, "mission-x");

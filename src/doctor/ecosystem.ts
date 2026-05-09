@@ -23,9 +23,9 @@ interface EcosystemTool {
 }
 
 const ECOSYSTEM_TOOLS: EcosystemTool[] = [
-	{ name: "mulch", bin: "ml", pkg: "@os-eco/mulch-cli" },
-	{ name: "seeds", bin: "sd", pkg: "@os-eco/seeds-cli" },
-	{ name: "canopy", bin: "cn", pkg: "@os-eco/canopy-cli" },
+	{ name: "mulch", bin: "ku", pkg: "@os-eco/mulch-cli" },
+	{ name: "seeds", bin: "su", pkg: "@os-eco/seeds-cli" },
+	{ name: "canopy", bin: "ta", pkg: "@os-eco/canopy-cli" },
 ];
 
 /** Spawner abstraction — injected in tests, uses Bun.spawn in production. */

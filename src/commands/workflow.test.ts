@@ -1,5 +1,5 @@
 /**
- * Tests for `ov workflow import` and `ov workflow sync`.
+ * Tests for `ha workflow import` and `ha workflow sync`.
  *
  * Tests executeWorkflowImport() and executeWorkflowSync() directly.
  * Uses a temp directory with a minimal .overstory/ structure.

@@ -89,8 +89,8 @@ describe("checkVersion", () => {
 		expect(versionCheck).toBeDefined();
 
 		if (versionCheck?.status === "pass") {
-			// Message should contain version in format "ov vX.Y.Z"
-			expect(versionCheck.message).toMatch(/ov v\d+\.\d+\.\d+/);
+			// Message should contain version in format "ha vX.Y.Z"
+			expect(versionCheck.message).toMatch(/ha v\d+\.\d+\.\d+/);
 		}
 	});
 

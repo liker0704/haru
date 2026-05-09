@@ -18,7 +18,7 @@ describe("loadConfig", () => {
 	let tempDir: string;
 
 	beforeEach(async () => {
-		tempDir = await mkdtemp(join(tmpdir(), "overstory-test-"));
+		tempDir = await mkdtemp(join(tmpdir(), "haru-test-"));
 	});
 
 	afterEach(async () => {
@@ -438,7 +438,7 @@ describe("validateConfig", () => {
 	let tempDir: string;
 
 	beforeEach(async () => {
-		tempDir = await mkdtemp(join(tmpdir(), "overstory-test-"));
+		tempDir = await mkdtemp(join(tmpdir(), "haru-test-"));
 		const { mkdir } = await import("node:fs/promises");
 		await mkdir(join(tempDir, ".overstory"), { recursive: true });
 		clearWarningsSeen();
@@ -971,14 +971,14 @@ describe("resolveProjectRoot", () => {
 			"project:\n  canonicalBranch: main\n",
 		);
 
-		// Create a worktree like overstory sling does
+		// Create a worktree like haru sling does
 		const worktreeDir = join(repoDir, ".overstory", "worktrees", "test-agent");
 		await mkdir(join(repoDir, ".overstory", "worktrees"), { recursive: true });
 		await runGitInDir(repoDir, [
 			"worktree",
 			"add",
 			"-b",
-			"overstory/test-agent/task-1",
+			"haru/test-agent/task-1",
 			worktreeDir,
 		]);
 
@@ -992,14 +992,14 @@ describe("resolveProjectRoot", () => {
 		repoDir = await realpath(repoDir);
 
 		// Commit .overstory/config.yaml so the worktree gets a copy via git
-		// (this is what overstory init does — the file is tracked)
+		// (this is what haru init does — the file is tracked)
 		await mkdir(join(repoDir, ".overstory"), { recursive: true });
 		await Bun.write(
 			join(repoDir, ".overstory", "config.yaml"),
 			"project:\n  canonicalBranch: main\n",
 		);
 		await runGitInDir(repoDir, ["add", ".overstory/config.yaml"]);
-		await runGitInDir(repoDir, ["commit", "-m", "add overstory config"]);
+		await runGitInDir(repoDir, ["commit", "-m", "add haru config"]);
 
 		// Create a worktree — it will now have .overstory/config.yaml from git
 		const worktreeDir = join(repoDir, ".overstory", "worktrees", "mail-scout");
@@ -1008,7 +1008,7 @@ describe("resolveProjectRoot", () => {
 			"worktree",
 			"add",
 			"-b",
-			"overstory/mail-scout/task-1",
+			"haru/mail-scout/task-1",
 			worktreeDir,
 		]);
 
@@ -1030,7 +1030,7 @@ describe("resolveProjectRoot", () => {
 
 		const worktreeDir = join(repoDir, ".overstory", "worktrees", "agent-2");
 		await mkdir(join(repoDir, ".overstory", "worktrees"), { recursive: true });
-		await runGitInDir(repoDir, ["worktree", "add", "-b", "overstory/agent-2/task-2", worktreeDir]);
+		await runGitInDir(repoDir, ["worktree", "add", "-b", "haru/agent-2/task-2", worktreeDir]);
 
 		// loadConfig from the worktree should resolve to the main project root
 		const config = await loadConfig(worktreeDir);
@@ -1043,7 +1043,7 @@ describe("projectRootOverride", () => {
 	let tempDir: string;
 
 	beforeEach(async () => {
-		tempDir = await mkdtemp(join(tmpdir(), "overstory-test-"));
+		tempDir = await mkdtemp(join(tmpdir(), "haru-test-"));
 		clearProjectRootOverride();
 	});
 
@@ -1080,7 +1080,7 @@ describe("projectRootOverride", () => {
 
 	test("override takes precedence over worktree resolution", async () => {
 		// Even if we're in a worktree, the override wins
-		const otherDir = await mkdtemp(join(tmpdir(), "overstory-other-"));
+		const otherDir = await mkdtemp(join(tmpdir(), "haru-other-"));
 		try {
 			await mkdir(join(otherDir, ".overstory"), { recursive: true });
 			await Bun.write(
@@ -1100,7 +1100,7 @@ describe("coordinator.exitTriggers", () => {
 	let tempDir: string;
 
 	beforeEach(async () => {
-		tempDir = await mkdtemp(join(tmpdir(), "overstory-test-"));
+		tempDir = await mkdtemp(join(tmpdir(), "haru-test-"));
 		const { mkdir } = await import("node:fs/promises");
 		await mkdir(join(tempDir, ".overstory"), { recursive: true });
 	});
@@ -1165,7 +1165,7 @@ describe("config versioning", () => {
 	let tempDir: string;
 
 	beforeEach(async () => {
-		tempDir = await mkdtemp(join(tmpdir(), "overstory-test-"));
+		tempDir = await mkdtemp(join(tmpdir(), "haru-test-"));
 		const { mkdir } = await import("node:fs/promises");
 		await mkdir(join(tempDir, ".overstory"), { recursive: true });
 		clearWarningsSeen();

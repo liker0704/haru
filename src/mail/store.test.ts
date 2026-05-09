@@ -13,7 +13,7 @@ describe("createMailStore", () => {
 	let store: MailStore;
 
 	beforeEach(async () => {
-		tempDir = await mkdtemp(join(tmpdir(), "overstory-mail-test-"));
+		tempDir = await mkdtemp(join(tmpdir(), "haru-mail-test-"));
 		store = createMailStore(join(tempDir, "mail.db"));
 	});
 

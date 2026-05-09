@@ -4,8 +4,8 @@ Date: 2026-03-13
 
 Scope:
 
-- Repo: `liker0704/overstory`
-- Issue: `#13` `Epic: implement ov mission end-to-end`
+- Repo: `liker0704/haru`
+- Issue: `#13` `Epic: implement ha mission end-to-end`
 - HEAD reviewed: `57a8eb2` `Add mission e2e proof and code-generated lead dispatch`
 - Additional reviewed commits:
   - `7b668d7` `Close mission spec refresh and pause control gaps`
@@ -50,7 +50,7 @@ Excluded from review target as unrelated local changes:
 
    Impact:
 
-   - `ov sling` checks mission spec freshness only when both:
+   - `ha sling` checks mission spec freshness only when both:
      - `.overstory/current-mission.txt` exists, and
      - `--spec` is provided.
    - If mission pointer is lost, or a builder/reviewer is spawned without `--spec`, the stale-spec guard is skipped.
@@ -136,7 +136,7 @@ Excluded from review target as unrelated local changes:
 
    - They show mission lifecycle, pending input, and paused count.
    - They do not show inline runtime presence of `coordinator / analyst / execution director`.
-   - `ov mission status` does show those roles, but Phase 10 requires that visibility on the shared operator surfaces.
+   - `ha mission status` does show those roles, but Phase 10 requires that visibility on the shared operator surfaces.
 
    Evidence:
 
@@ -145,7 +145,7 @@ Excluded from review target as unrelated local changes:
    - `src/commands/mission.ts:616`
    - `docs/ov-mission-implementation.md:673`
 
-6. `ov review missions` and `ov review mission <id>` have weaker proof than the rest of the mission flow.
+6. `ha review missions` and `ha review mission <id>` have weaker proof than the rest of the mission flow.
    **Status: IMPROVED** — functional tests added (review.test.ts:177-222), but CLI proof still lighter than rest of flow
 
    Impact:
@@ -165,7 +165,7 @@ Excluded from review target as unrelated local changes:
 
 | DoD item | Verdict | Notes |
 | --- | --- | --- |
-| mission can be started, inspected, answered, and stopped through `ov mission` | yes | Implemented and covered by command/e2e tests. `mission answer` replies in-thread and unfreezes mission. Evidence: `src/commands/mission.ts:390`, `src/commands/mission.ts:564`, `src/commands/mission.ts:709`, `src/commands/mission.ts:1548`, `src/commands/mission.e2e.test.ts:213` |
+| mission can be started, inspected, answered, and stopped through `ha mission` | yes | Implemented and covered by command/e2e tests. `mission answer` replies in-thread and unfreezes mission. Evidence: `src/commands/mission.ts:390`, `src/commands/mission.ts:564`, `src/commands/mission.ts:709`, `src/commands/mission.ts:1548`, `src/commands/mission.e2e.test.ts:213` |
 | mission-owned run is created immediately and terminalized correctly | yes | Run is created during `mission start`; terminal path completes/stops run and clears mission/run pointers. Evidence: `src/commands/mission.ts:430`, `src/commands/mission.ts:467`, `src/commands/mission.ts:319`, `src/commands/mission.e2e.test.ts:168`, `src/commands/mission.e2e.test.ts:270` |
 | mission analyst lifecycle is deterministic and mission-scoped | yes | Analyst starts on mission start, binds to mission/run, and stops on terminalize. Evidence: `src/commands/mission.ts:469`, `src/commands/mission.ts:482`, `src/commands/mission.ts:276`, `src/commands/coordinator.test.ts:2771` |
 | execution director can dispatch leads through the real runtime | yes | Runtime enforcement added in sling.ts:423-425. Evidence: `src/commands/mission.ts:929`, `src/types.ts:439`, `src/commands/mission.e2e.test.ts:227`, `src/commands/sling.ts:398` |
@@ -175,14 +175,14 @@ Excluded from review target as unrelated local changes:
 | mission status and dashboard surfaces show mission lifecycle correctly | yes | Role presence now shown inline. Evidence: `src/commands/status.ts:301`, `src/commands/dashboard.ts:1018`, `src/commands/status.test.ts:237`, `src/commands/dashboard.test.ts:246` |
 | mission result bundle is exported on terminal states | yes | Terminalizer exports bundle; complete path proves it end-to-end. Evidence: `src/commands/mission.ts:333`, `src/commands/mission.ts:359`, `src/missions/bundle.ts:58`, `src/commands/mission.e2e.test.ts:264` |
 | mission review contour can score completed/stopped missions | improved | Functional tests added. Evidence: `src/commands/mission.ts:347`, `src/commands/review.ts:425`, `src/commands/review.ts:495`, `src/missions/review.test.ts:142` |
-| current fast-path `ov coordinator` behavior still works | yes | Mandatory coordinator regression suite passed, including run/pointer semantics and persistent-root behavior. Evidence: `src/commands/coordinator.test.ts:488`, `src/commands/coordinator.test.ts:1030`, `src/commands/coordinator.test.ts:2748` |
+| current fast-path `ha coordinator` behavior still works | yes | Mandatory coordinator regression suite passed, including run/pointer semantics and persistent-root behavior. Evidence: `src/commands/coordinator.test.ts:488`, `src/commands/coordinator.test.ts:1030`, `src/commands/coordinator.test.ts:2748` |
 
 ## Evidence
 
 Commands executed:
 
-1. `gh issue view 13 --repo liker0704/overstory`
-2. `gh issue view 13 --repo liker0704/overstory --json number,title,state,labels,url,body`
+1. `gh issue view 13 --repo liker0704/haru`
+2. `gh issue view 13 --repo liker0704/haru --json number,title,state,labels,url,body`
 3. `git show --stat 87e1efc`
 4. `git show --stat 7b668d7`
 5. `git show --stat 57a8eb2`
@@ -202,7 +202,7 @@ Results:
 
 ## Final Verdict
 
-`ov mission v1` should not yet be considered "real" under `docs/ov-mission-implementation.md`.
+`ha mission v1` should not yet be considered "real" under `docs/ov-mission-implementation.md`.
 
 Why not:
 
@@ -216,7 +216,7 @@ What is already solid:
 - The primary happy-path mission flow is implemented and covered.
 - `mission answer` unfreezes correctly.
 - Terminal mission path exports bundle and generates mission review.
-- Fast-path `ov coordinator` behavior still passes regression coverage.
+- Fast-path `ha coordinator` behavior still passes regression coverage.
 
 Residual risks and testing gaps:
 
@@ -227,5 +227,5 @@ Residual risks and testing gaps:
 - No negative test proving ED cannot spawn non-leads
 - No resume test for missing spec metadata
 - No stale-spec guard test when mission pointer is absent
-- No functional CLI proof for `ov review missions` and `ov review mission <id>`
+- No functional CLI proof for `ha review missions` and `ha review mission <id>`
 

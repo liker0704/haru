@@ -69,7 +69,7 @@ describe("buildSupervisorBeacon", () => {
 		expect(beacon).toContain("mulch prime");
 
 		// Should include mail check with agent name
-		expect(beacon).toContain("ov mail check --agent supervisor-1");
+		expect(beacon).toContain("ha mail check --agent supervisor-1");
 
 		// Should include bd show with taskId
 		expect(beacon).toContain("bd show task-1");

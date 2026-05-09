@@ -1,5 +1,5 @@
 /**
- * Tests for `overstory replay` command.
+ * Tests for `haru replay` command.
  *
  * Uses real bun:sqlite (temp files) to test the replay command end-to-end.
  * Captures process.stdout.write to verify output formatting.

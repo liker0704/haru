@@ -137,7 +137,7 @@ export async function startResearch(
 		capability: "research-lead",
 		projectRoot,
 		overstoryDir,
-		tmuxSession: `overstory-research-${slug}`,
+		tmuxSession: `haru-research-${slug}`,
 		createRun: true,
 		beacon,
 	});

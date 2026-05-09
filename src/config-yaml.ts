@@ -252,7 +252,7 @@ function findLastKey(obj: Record<string, unknown>): string | null {
 export function serializeConfigToYaml(config: Record<string, unknown>): string {
 	const lines: string[] = [];
 	lines.push("# Overstory configuration");
-	lines.push("# See: https://github.com/overstory/overstory");
+	lines.push("# See: https://github.com/haru/haru");
 	lines.push("");
 
 	serializeObject(config, lines, 0);

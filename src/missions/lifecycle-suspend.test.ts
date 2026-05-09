@@ -22,7 +22,7 @@ beforeEach(async () => {
 	tempDir = await mkdtemp(join(tmpdir(), "ov-lifecycle-suspend-test-"));
 	overstoryDir = join(tempDir, ".overstory");
 	projectRoot = tempDir;
-	// Create the overstory dir (needed for event store and session store)
+	// Create the haru dir (needed for event store and session store)
 	await Bun.write(join(overstoryDir, ".keep"), "");
 });
 
@@ -77,9 +77,9 @@ describe("suspendMission", () => {
 
 		const dbPath = join(overstoryDir, "sessions.db");
 		const store = createMissionStore(dbPath);
-		let mission;
+		let _mission;
 		try {
-			mission = store.getById("m-sus-002");
+			_mission = store.getById("m-sus-002");
 		} finally {
 			store.close();
 		}

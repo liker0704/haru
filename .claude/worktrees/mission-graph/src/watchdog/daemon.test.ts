@@ -36,7 +36,7 @@ const THRESHOLDS = {
 
 /** Create a temp directory with .overstory/ subdirectory, ready for sessions.db. */
 async function createTempRoot(): Promise<string> {
-	const dir = await mkdtemp(join(tmpdir(), "overstory-daemon-test-"));
+	const dir = await mkdtemp(join(tmpdir(), "haru-daemon-test-"));
 	await mkdir(join(dir, ".overstory"), { recursive: true });
 	return dir;
 }
@@ -68,9 +68,9 @@ function makeSession(overrides: Partial<AgentSession> = {}): AgentSession {
 		capability: "builder",
 		runtime: "claude",
 		worktreePath: "/tmp/test",
-		branchName: "overstory/test-agent/test-task",
+		branchName: "haru/test-agent/test-task",
 		taskId: "test-task",
-		tmuxSession: "overstory-test-agent",
+		tmuxSession: "haru-test-agent",
 		state: "working",
 		pid: process.pid, // Use our own PID so isProcessRunning returns true
 		parentAgent: null,
@@ -247,14 +247,14 @@ describe("daemon tick", () => {
 	test("tick with dead tmux transitions session to zombie and fires terminate", async () => {
 		const session = makeSession({
 			agentName: "dead-agent",
-			tmuxSession: "overstory-dead-agent",
+			tmuxSession: "haru-dead-agent",
 			state: "working",
 			lastActivity: new Date().toISOString(),
 		});
 
 		writeSessionsToStore(tempRoot, [session]);
 
-		const tmuxMock = tmuxWithLiveness({ "overstory-dead-agent": false });
+		const tmuxMock = tmuxWithLiveness({ "haru-dead-agent": false });
 		const checks: HealthCheck[] = [];
 
 		await runDaemonTick({
@@ -285,14 +285,14 @@ describe("daemon tick", () => {
 		const oldActivity = new Date(Date.now() - 200_000).toISOString();
 		const session = makeSession({
 			agentName: "zombie-agent",
-			tmuxSession: "overstory-zombie-agent",
+			tmuxSession: "haru-zombie-agent",
 			state: "working",
 			lastActivity: oldActivity,
 		});
 
 		writeSessionsToStore(tempRoot, [session]);
 
-		const tmuxMock = tmuxWithLiveness({ "overstory-zombie-agent": true });
+		const tmuxMock = tmuxWithLiveness({ "haru-zombie-agent": true });
 		const checks: HealthCheck[] = [];
 
 		await runDaemonTick({
@@ -307,7 +307,7 @@ describe("daemon tick", () => {
 		expect(checks[0]?.action).toBe("terminate");
 
 		// tmux was alive, so killSession SHOULD have been called
-		expect(tmuxMock.killed).toContain("overstory-zombie-agent");
+		expect(tmuxMock.killed).toContain("haru-zombie-agent");
 
 		// Session persisted as zombie
 		const reloaded = readSessionsFromStore(tempRoot);
@@ -320,14 +320,14 @@ describe("daemon tick", () => {
 		const staleActivity = new Date(Date.now() - 60_000).toISOString();
 		const session = makeSession({
 			agentName: "stalled-agent",
-			tmuxSession: "overstory-stalled-agent",
+			tmuxSession: "haru-stalled-agent",
 			state: "working",
 			lastActivity: staleActivity,
 		});
 
 		writeSessionsToStore(tempRoot, [session]);
 
-		const tmuxMock = tmuxWithLiveness({ "overstory-stalled-agent": true });
+		const tmuxMock = tmuxWithLiveness({ "haru-stalled-agent": true });
 		const checks: HealthCheck[] = [];
 		const nudgeMock = nudgeTracker();
 
@@ -363,7 +363,7 @@ describe("daemon tick", () => {
 		const stalledSince = new Date(Date.now() - 70_000).toISOString();
 		const session = makeSession({
 			agentName: "stalled-agent",
-			tmuxSession: "overstory-stalled-agent",
+			tmuxSession: "haru-stalled-agent",
 			state: "stalled",
 			lastActivity: staleActivity,
 			escalationLevel: 0,
@@ -372,7 +372,7 @@ describe("daemon tick", () => {
 
 		writeSessionsToStore(tempRoot, [session]);
 
-		const tmuxMock = tmuxWithLiveness({ "overstory-stalled-agent": true });
+		const tmuxMock = tmuxWithLiveness({ "haru-stalled-agent": true });
 		const nudgeMock = nudgeTracker();
 
 		await runDaemonTick({
@@ -401,7 +401,7 @@ describe("daemon tick", () => {
 		const stalledSince = new Date(Date.now() - 130_000).toISOString();
 		const session = makeSession({
 			agentName: "stalled-agent",
-			tmuxSession: "overstory-stalled-agent",
+			tmuxSession: "haru-stalled-agent",
 			state: "stalled",
 			lastActivity: staleActivity,
 			escalationLevel: 1,
@@ -410,7 +410,7 @@ describe("daemon tick", () => {
 
 		writeSessionsToStore(tempRoot, [session]);
 
-		const tmuxMock = tmuxWithLiveness({ "overstory-stalled-agent": true });
+		const tmuxMock = tmuxWithLiveness({ "haru-stalled-agent": true });
 		let triageCalled = false;
 
 		const triageMock = async (opts: {
@@ -436,7 +436,7 @@ describe("daemon tick", () => {
 		expect(triageCalled).toBe(true);
 
 		// Triage returned terminate — session should be zombie
-		expect(tmuxMock.killed).toContain("overstory-stalled-agent");
+		expect(tmuxMock.killed).toContain("haru-stalled-agent");
 		const reloaded = readSessionsFromStore(tempRoot);
 		expect(reloaded[0]?.state).toBe("zombie");
 	});
@@ -446,7 +446,7 @@ describe("daemon tick", () => {
 		const stalledSince = new Date(Date.now() - 130_000).toISOString();
 		const session = makeSession({
 			agentName: "stalled-agent",
-			tmuxSession: "overstory-stalled-agent",
+			tmuxSession: "haru-stalled-agent",
 			state: "stalled",
 			lastActivity: staleActivity,
 			escalationLevel: 1,
@@ -455,7 +455,7 @@ describe("daemon tick", () => {
 
 		writeSessionsToStore(tempRoot, [session]);
 
-		const tmuxMock = tmuxWithLiveness({ "overstory-stalled-agent": true });
+		const tmuxMock = tmuxWithLiveness({ "haru-stalled-agent": true });
 		let triageCalled = false;
 
 		const triageMock = async (): Promise<"retry" | "terminate" | "extend"> => {
@@ -491,7 +491,7 @@ describe("daemon tick", () => {
 		const stalledSince = new Date(Date.now() - 200_000).toISOString();
 		const session = makeSession({
 			agentName: "doomed-agent",
-			tmuxSession: "overstory-doomed-agent",
+			tmuxSession: "haru-doomed-agent",
 			state: "stalled",
 			lastActivity: staleActivity,
 			escalationLevel: 2,
@@ -500,7 +500,7 @@ describe("daemon tick", () => {
 
 		writeSessionsToStore(tempRoot, [session]);
 
-		const tmuxMock = tmuxWithLiveness({ "overstory-doomed-agent": true });
+		const tmuxMock = tmuxWithLiveness({ "haru-doomed-agent": true });
 
 		await runDaemonTick({
 			root: tempRoot,
@@ -512,7 +512,7 @@ describe("daemon tick", () => {
 		});
 
 		// Level 3 = terminate
-		expect(tmuxMock.killed).toContain("overstory-doomed-agent");
+		expect(tmuxMock.killed).toContain("haru-doomed-agent");
 
 		const reloaded = readSessionsFromStore(tempRoot);
 		expect(reloaded[0]?.state).toBe("zombie");
@@ -526,7 +526,7 @@ describe("daemon tick", () => {
 		const stalledSince = new Date(Date.now() - 130_000).toISOString();
 		const session = makeSession({
 			agentName: "retry-agent",
-			tmuxSession: "overstory-retry-agent",
+			tmuxSession: "haru-retry-agent",
 			state: "stalled",
 			lastActivity: staleActivity,
 			escalationLevel: 1,
@@ -535,7 +535,7 @@ describe("daemon tick", () => {
 
 		writeSessionsToStore(tempRoot, [session]);
 
-		const tmuxMock = tmuxWithLiveness({ "overstory-retry-agent": true });
+		const tmuxMock = tmuxWithLiveness({ "haru-retry-agent": true });
 		const nudgeMock = nudgeTracker();
 
 		await runDaemonTick({
@@ -564,7 +564,7 @@ describe("daemon tick", () => {
 		// Agent was stalled but now has recent activity
 		const session = makeSession({
 			agentName: "recovered-agent",
-			tmuxSession: "overstory-recovered-agent",
+			tmuxSession: "haru-recovered-agent",
 			state: "working",
 			lastActivity: new Date().toISOString(), // Recent activity
 			escalationLevel: 2,
@@ -596,14 +596,14 @@ describe("daemon tick", () => {
 			makeSession({
 				id: "session-1",
 				agentName: "agent-alpha",
-				tmuxSession: "overstory-agent-alpha",
+				tmuxSession: "haru-agent-alpha",
 				state: "working",
 				lastActivity: new Date().toISOString(),
 			}),
 			makeSession({
 				id: "session-2",
 				agentName: "agent-beta",
-				tmuxSession: "overstory-agent-beta",
+				tmuxSession: "haru-agent-beta",
 				state: "working",
 				// Make beta's tmux dead so it transitions to zombie
 				lastActivity: new Date().toISOString(),
@@ -611,7 +611,7 @@ describe("daemon tick", () => {
 			makeSession({
 				id: "session-3",
 				agentName: "agent-gamma",
-				tmuxSession: "overstory-agent-gamma",
+				tmuxSession: "haru-agent-gamma",
 				state: "completed",
 				lastActivity: new Date().toISOString(),
 			}),
@@ -620,9 +620,9 @@ describe("daemon tick", () => {
 		writeSessionsToStore(tempRoot, sessions);
 
 		const tmuxMock = tmuxWithLiveness({
-			"overstory-agent-alpha": true,
-			"overstory-agent-beta": false, // Dead — should become zombie
-			"overstory-agent-gamma": true, // Alive — will be killed as completed cleanup
+			"haru-agent-alpha": true,
+			"haru-agent-beta": false, // Dead — should become zombie
+			"haru-agent-gamma": true, // Alive — will be killed as completed cleanup
 		});
 
 		const checks: HealthCheck[] = [];
@@ -709,13 +709,13 @@ describe("daemon tick", () => {
 	test("completed sessions with live tmux are killed on next tick", async () => {
 		const session = makeSession({
 			state: "completed",
-			tmuxSession: "overstory-lead-done",
+			tmuxSession: "haru-lead-done",
 		});
 
 		writeSessionsToStore(tempRoot, [session]);
 
 		const tmuxMock = tmuxWithLiveness({
-			"overstory-lead-done": true,
+			"haru-lead-done": true,
 		});
 		const checks: HealthCheck[] = [];
 
@@ -731,7 +731,7 @@ describe("daemon tick", () => {
 		expect(checks).toHaveLength(0);
 
 		// But the lingering tmux session was killed
-		expect(tmuxMock.killed).toEqual(["overstory-lead-done"]);
+		expect(tmuxMock.killed).toEqual(["haru-lead-done"]);
 
 		// State unchanged (still completed)
 		const reloaded = readSessionsFromStore(tempRoot);
@@ -744,28 +744,28 @@ describe("daemon tick", () => {
 			makeSession({
 				id: "s1",
 				agentName: "healthy",
-				tmuxSession: "overstory-healthy",
+				tmuxSession: "haru-healthy",
 				state: "working",
 				lastActivity: new Date(now).toISOString(),
 			}),
 			makeSession({
 				id: "s2",
 				agentName: "dying",
-				tmuxSession: "overstory-dying",
+				tmuxSession: "haru-dying",
 				state: "working",
 				lastActivity: new Date(now).toISOString(),
 			}),
 			makeSession({
 				id: "s3",
 				agentName: "stale",
-				tmuxSession: "overstory-stale",
+				tmuxSession: "haru-stale",
 				state: "working",
 				lastActivity: new Date(now - 60_000).toISOString(),
 			}),
 			makeSession({
 				id: "s4",
 				agentName: "done",
-				tmuxSession: "overstory-done",
+				tmuxSession: "haru-done",
 				state: "completed",
 			}),
 		];
@@ -773,10 +773,10 @@ describe("daemon tick", () => {
 		writeSessionsToStore(tempRoot, sessions);
 
 		const tmuxMock = tmuxWithLiveness({
-			"overstory-healthy": true,
-			"overstory-dying": false,
-			"overstory-stale": true,
-			"overstory-done": false,
+			"haru-healthy": true,
+			"haru-dying": false,
+			"haru-stale": true,
+			"haru-done": false,
 		});
 
 		const checks: HealthCheck[] = [];
@@ -855,9 +855,9 @@ describe("daemon tick", () => {
 			id: "session-old",
 			agentName: "old-agent",
 			worktreePath: "/tmp/test",
-			branchName: "overstory/old-agent/task",
+			branchName: "haru/old-agent/task",
 			taskId: "task",
-			tmuxSession: "overstory-old-agent",
+			tmuxSession: "haru-old-agent",
 			state: "working",
 			pid: process.pid,
 			escalationLevel: 0,
@@ -903,7 +903,7 @@ describe("daemon event recording", () => {
 		const staleActivity = new Date(Date.now() - 60_000).toISOString();
 		const session = makeSession({
 			agentName: "stalled-agent",
-			tmuxSession: "overstory-stalled-agent",
+			tmuxSession: "haru-stalled-agent",
 			state: "working",
 			lastActivity: staleActivity,
 		});
@@ -919,7 +919,7 @@ describe("daemon event recording", () => {
 				root: tempRoot,
 				...THRESHOLDS,
 				nudgeIntervalMs: 60_000,
-				_tmux: tmuxWithLiveness({ "overstory-stalled-agent": true }),
+				_tmux: tmuxWithLiveness({ "haru-stalled-agent": true }),
 				_triage: triageAlways("extend"),
 				_nudge: nudgeTracker().nudge,
 				_eventStore: eventStore,
@@ -947,7 +947,7 @@ describe("daemon event recording", () => {
 		const stalledSince = new Date(Date.now() - 70_000).toISOString();
 		const session = makeSession({
 			agentName: "stalled-agent",
-			tmuxSession: "overstory-stalled-agent",
+			tmuxSession: "haru-stalled-agent",
 			state: "stalled",
 			lastActivity: staleActivity,
 			escalationLevel: 0,
@@ -965,7 +965,7 @@ describe("daemon event recording", () => {
 				root: tempRoot,
 				...THRESHOLDS,
 				nudgeIntervalMs: 60_000,
-				_tmux: tmuxWithLiveness({ "overstory-stalled-agent": true }),
+				_tmux: tmuxWithLiveness({ "haru-stalled-agent": true }),
 				_triage: triageAlways("extend"),
 				_nudge: nudgeMock.nudge,
 				_eventStore: eventStore,
@@ -993,7 +993,7 @@ describe("daemon event recording", () => {
 		const stalledSince = new Date(Date.now() - 130_000).toISOString();
 		const session = makeSession({
 			agentName: "stalled-agent",
-			tmuxSession: "overstory-stalled-agent",
+			tmuxSession: "haru-stalled-agent",
 			state: "stalled",
 			lastActivity: staleActivity,
 			escalationLevel: 1,
@@ -1011,7 +1011,7 @@ describe("daemon event recording", () => {
 				...THRESHOLDS,
 				nudgeIntervalMs: 60_000,
 				tier1Enabled: true,
-				_tmux: tmuxWithLiveness({ "overstory-stalled-agent": true }),
+				_tmux: tmuxWithLiveness({ "haru-stalled-agent": true }),
 				_triage: triageAlways("extend"),
 				_nudge: nudgeTracker().nudge,
 				_eventStore: eventStore,
@@ -1039,7 +1039,7 @@ describe("daemon event recording", () => {
 		const stalledSince = new Date(Date.now() - 200_000).toISOString();
 		const session = makeSession({
 			agentName: "doomed-agent",
-			tmuxSession: "overstory-doomed-agent",
+			tmuxSession: "haru-doomed-agent",
 			state: "stalled",
 			lastActivity: staleActivity,
 			escalationLevel: 2,
@@ -1056,7 +1056,7 @@ describe("daemon event recording", () => {
 				root: tempRoot,
 				...THRESHOLDS,
 				nudgeIntervalMs: 60_000,
-				_tmux: tmuxWithLiveness({ "overstory-doomed-agent": true }),
+				_tmux: tmuxWithLiveness({ "haru-doomed-agent": true }),
 				_triage: triageAlways("extend"),
 				_nudge: nudgeTracker().nudge,
 				_eventStore: eventStore,
@@ -1083,7 +1083,7 @@ describe("daemon event recording", () => {
 		const staleActivity = new Date(Date.now() - 60_000).toISOString();
 		const session = makeSession({
 			agentName: "stalled-agent",
-			tmuxSession: "overstory-stalled-agent",
+			tmuxSession: "haru-stalled-agent",
 			state: "working",
 			lastActivity: staleActivity,
 		});
@@ -1102,7 +1102,7 @@ describe("daemon event recording", () => {
 				root: tempRoot,
 				...THRESHOLDS,
 				nudgeIntervalMs: 60_000,
-				_tmux: tmuxWithLiveness({ "overstory-stalled-agent": true }),
+				_tmux: tmuxWithLiveness({ "haru-stalled-agent": true }),
 				_triage: triageAlways("extend"),
 				_nudge: nudgeTracker().nudge,
 				_eventStore: eventStore,
@@ -1121,7 +1121,7 @@ describe("daemon event recording", () => {
 		const staleActivity = new Date(Date.now() - 60_000).toISOString();
 		const session = makeSession({
 			agentName: "stalled-agent",
-			tmuxSession: "overstory-stalled-agent",
+			tmuxSession: "haru-stalled-agent",
 			state: "working",
 			lastActivity: staleActivity,
 		});
@@ -1136,7 +1136,7 @@ describe("daemon event recording", () => {
 			...THRESHOLDS,
 			nudgeIntervalMs: 60_000,
 			onHealthCheck: (c) => checks.push(c),
-			_tmux: tmuxWithLiveness({ "overstory-stalled-agent": true }),
+			_tmux: tmuxWithLiveness({ "haru-stalled-agent": true }),
 			_triage: triageAlways("extend"),
 			_nudge: nudgeTracker().nudge,
 			_eventStore: null,
@@ -1194,14 +1194,14 @@ describe("daemon mulch failure recording", () => {
 			agentName: "dying-agent",
 			capability: "builder",
 			taskId: "task-123",
-			tmuxSession: "overstory-dying-agent",
+			tmuxSession: "haru-dying-agent",
 			state: "working",
 			lastActivity: new Date().toISOString(),
 		});
 
 		writeSessionsToStore(tempRoot, [session]);
 
-		const tmuxMock = tmuxWithLiveness({ "overstory-dying-agent": false });
+		const tmuxMock = tmuxWithLiveness({ "haru-dying-agent": false });
 		const failureMock = failureTracker();
 
 		await runDaemonTick({
@@ -1230,7 +1230,7 @@ describe("daemon mulch failure recording", () => {
 			agentName: "triaged-agent",
 			capability: "scout",
 			taskId: "task-456",
-			tmuxSession: "overstory-triaged-agent",
+			tmuxSession: "haru-triaged-agent",
 			state: "stalled",
 			lastActivity: staleActivity,
 			escalationLevel: 1,
@@ -1239,7 +1239,7 @@ describe("daemon mulch failure recording", () => {
 
 		writeSessionsToStore(tempRoot, [session]);
 
-		const tmuxMock = tmuxWithLiveness({ "overstory-triaged-agent": true });
+		const tmuxMock = tmuxWithLiveness({ "haru-triaged-agent": true });
 		const failureMock = failureTracker();
 
 		await runDaemonTick({
@@ -1268,7 +1268,7 @@ describe("daemon mulch failure recording", () => {
 		const stalledSince = new Date(Date.now() - 130_000).toISOString();
 		const session = makeSession({
 			agentName: "retry-agent",
-			tmuxSession: "overstory-retry-agent",
+			tmuxSession: "haru-retry-agent",
 			state: "stalled",
 			lastActivity: staleActivity,
 			escalationLevel: 1,
@@ -1277,7 +1277,7 @@ describe("daemon mulch failure recording", () => {
 
 		writeSessionsToStore(tempRoot, [session]);
 
-		const tmuxMock = tmuxWithLiveness({ "overstory-retry-agent": true });
+		const tmuxMock = tmuxWithLiveness({ "haru-retry-agent": true });
 		const failureMock = failureTracker();
 
 		await runDaemonTick({
@@ -1300,7 +1300,7 @@ describe("daemon mulch failure recording", () => {
 		const stalledSince = new Date(Date.now() - 130_000).toISOString();
 		const session = makeSession({
 			agentName: "extend-agent",
-			tmuxSession: "overstory-extend-agent",
+			tmuxSession: "haru-extend-agent",
 			state: "stalled",
 			lastActivity: staleActivity,
 			escalationLevel: 1,
@@ -1309,7 +1309,7 @@ describe("daemon mulch failure recording", () => {
 
 		writeSessionsToStore(tempRoot, [session]);
 
-		const tmuxMock = tmuxWithLiveness({ "overstory-extend-agent": true });
+		const tmuxMock = tmuxWithLiveness({ "haru-extend-agent": true });
 		const failureMock = failureTracker();
 
 		await runDaemonTick({
@@ -1332,14 +1332,14 @@ describe("daemon mulch failure recording", () => {
 			agentName: "beaded-agent",
 			capability: "builder",
 			taskId: "task-789",
-			tmuxSession: "overstory-beaded-agent",
+			tmuxSession: "haru-beaded-agent",
 			state: "working",
 			lastActivity: new Date().toISOString(),
 		});
 
 		writeSessionsToStore(tempRoot, [session]);
 
-		const tmuxMock = tmuxWithLiveness({ "overstory-beaded-agent": false });
+		const tmuxMock = tmuxWithLiveness({ "haru-beaded-agent": false });
 		const failureMock = failureTracker();
 
 		await runDaemonTick({
@@ -1358,13 +1358,13 @@ describe("daemon mulch failure recording", () => {
 	test("wait behavior auto-confirms Claude rate limit dialog", async () => {
 		const session = makeSession({
 			agentName: "rate-limited-agent",
-			tmuxSession: "overstory-rate-limited-agent",
+			tmuxSession: "haru-rate-limited-agent",
 			lastActivity: new Date(Date.now() - 60_000).toISOString(),
 		});
 		writeSessionsToStore(tempRoot, [session]);
 
 		const tmuxMock = tmuxWithLivenessAndInput({
-			"overstory-rate-limited-agent": true,
+			"haru-rate-limited-agent": true,
 		});
 		const config = {
 			rateLimit: {
@@ -1394,7 +1394,7 @@ describe("daemon mulch failure recording", () => {
 		});
 
 		expect(tmuxMock.sentKeys).toEqual([
-			{ name: "overstory-rate-limited-agent", keys: "" },
+			{ name: "haru-rate-limited-agent", keys: "" },
 		]);
 
 		const reloaded = readSessionsFromStore(tempRoot);
@@ -1405,7 +1405,7 @@ describe("daemon mulch failure recording", () => {
 		const oldActivity = new Date(Date.now() - 60_000).toISOString();
 		const session = makeSession({
 			agentName: "rate-limit-resume-agent",
-			tmuxSession: "overstory-rate-limit-resume-agent",
+			tmuxSession: "haru-rate-limit-resume-agent",
 			state: "working",
 			lastActivity: oldActivity,
 			rateLimitedSince: new Date(Date.now() - 30_000).toISOString(),
@@ -1413,7 +1413,7 @@ describe("daemon mulch failure recording", () => {
 		writeSessionsToStore(tempRoot, [session]);
 
 		const tmuxMock = tmuxWithLivenessAndInput({
-			"overstory-rate-limit-resume-agent": true,
+			"haru-rate-limit-resume-agent": true,
 		});
 		const config = {
 			rateLimit: {
@@ -1437,10 +1437,10 @@ describe("daemon mulch failure recording", () => {
 
 		expect(tmuxMock.sentKeys).toEqual([
 			{
-				name: "overstory-rate-limit-resume-agent",
-				keys: "Rate limit has reset. Run ov mail check --agent rate-limit-resume-agent if needed, then continue task test-task from where you left off.",
+				name: "haru-rate-limit-resume-agent",
+				keys: "Rate limit has reset. Run ha mail check --agent rate-limit-resume-agent if needed, then continue task test-task from where you left off.",
 			},
-			{ name: "overstory-rate-limit-resume-agent", keys: "" },
+			{ name: "haru-rate-limit-resume-agent", keys: "" },
 		]);
 
 		const reloaded = readSessionsFromStore(tempRoot);
@@ -1453,7 +1453,7 @@ describe("daemon mulch failure recording", () => {
 		const oldActivity = new Date(Date.now() - 600_000).toISOString();
 		const session = makeSession({
 			agentName: "mail-blocked-agent",
-			tmuxSession: "overstory-mail-blocked-agent",
+			tmuxSession: "haru-mail-blocked-agent",
 			state: "zombie",
 			lastActivity: oldActivity,
 		});
@@ -1477,7 +1477,7 @@ describe("daemon mulch failure recording", () => {
 		}
 
 		const tmuxMock = tmuxWithLivenessAndInput({
-			"overstory-mail-blocked-agent": true,
+			"haru-mail-blocked-agent": true,
 		});
 
 		await runDaemonTick({
@@ -1490,10 +1490,10 @@ describe("daemon mulch failure recording", () => {
 
 		expect(tmuxMock.sentKeys).toEqual([
 			{
-				name: "overstory-mail-blocked-agent",
-				keys: "You have 1 unread message(s): Need synthesis — check mail: ov mail check --agent mail-blocked-agent",
+				name: "haru-mail-blocked-agent",
+				keys: "You have 1 unread message(s): Need synthesis — check mail: ha mail check --agent mail-blocked-agent",
 			},
-			{ name: "overstory-mail-blocked-agent", keys: "" },
+			{ name: "haru-mail-blocked-agent", keys: "" },
 		]);
 
 		const reloaded = readSessionsFromStore(tempRoot);
@@ -1505,7 +1505,7 @@ describe("daemon mulch failure recording", () => {
 		const oldActivity = new Date(Date.now() - 600_000).toISOString();
 		const session = makeSession({
 			agentName: "ended-zombie-agent",
-			tmuxSession: "overstory-ended-zombie-agent",
+			tmuxSession: "haru-ended-zombie-agent",
 			state: "zombie",
 			lastActivity: oldActivity,
 		});
@@ -1540,7 +1540,7 @@ describe("daemon mulch failure recording", () => {
 		}
 
 		const tmuxWithInput = tmuxWithLivenessAndInput({
-			"overstory-ended-zombie-agent": true,
+			"haru-ended-zombie-agent": true,
 		});
 
 		await runDaemonTick({
@@ -1553,10 +1553,10 @@ describe("daemon mulch failure recording", () => {
 
 		expect(tmuxWithInput.sentKeys).toEqual([
 			{
-				name: "overstory-ended-zombie-agent",
-				keys: "Rate limit has reset. Run ov mail check --agent ended-zombie-agent if needed, then continue task test-task from where you left off.",
+				name: "haru-ended-zombie-agent",
+				keys: "Rate limit has reset. Run ha mail check --agent ended-zombie-agent if needed, then continue task test-task from where you left off.",
 			},
-			{ name: "overstory-ended-zombie-agent", keys: "" },
+			{ name: "haru-ended-zombie-agent", keys: "" },
 		]);
 
 		const reloaded = readSessionsFromStore(tempRoot);
@@ -1578,7 +1578,7 @@ describe("daemon mulch failure recording", () => {
 		const oldActivity = new Date(Date.now() - 600_000).toISOString();
 		const session = makeSession({
 			agentName: "plain-ended-zombie-agent",
-			tmuxSession: "overstory-plain-ended-zombie-agent",
+			tmuxSession: "haru-plain-ended-zombie-agent",
 			state: "zombie",
 			lastActivity: oldActivity,
 		});
@@ -1605,7 +1605,7 @@ describe("daemon mulch failure recording", () => {
 			root: tempRoot,
 			...THRESHOLDS,
 			_tmux: tmuxWithLiveness({
-				"overstory-plain-ended-zombie-agent": true,
+				"haru-plain-ended-zombie-agent": true,
 			}),
 			_triage: triageAlways("extend"),
 			_capturePaneContent: async () => 'Try "help" to get started\n❯\nbypass permissions',
@@ -1620,7 +1620,7 @@ describe("daemon mulch failure recording", () => {
 		const oldActivity = new Date(Date.now() - 600_000).toISOString();
 		const session = makeSession({
 			agentName: "dead-ended-agent",
-			tmuxSession: "overstory-dead-ended-agent",
+			tmuxSession: "haru-dead-ended-agent",
 			state: "zombie",
 			lastActivity: oldActivity,
 		});
@@ -1647,7 +1647,7 @@ describe("daemon mulch failure recording", () => {
 			root: tempRoot,
 			...THRESHOLDS,
 			_tmux: tmuxWithLiveness({
-				"overstory-dead-ended-agent": false,
+				"haru-dead-ended-agent": false,
 			}),
 			_triage: triageAlways("extend"),
 		});
@@ -1671,7 +1671,7 @@ describe("daemon mulch failure recording", () => {
 		const oldActivity = new Date(Date.now() - 600_000).toISOString();
 		const session = makeSession({
 			agentName: "dead-rate-limited-agent",
-			tmuxSession: "overstory-dead-rate-limited-agent",
+			tmuxSession: "haru-dead-rate-limited-agent",
 			state: "zombie",
 			lastActivity: oldActivity,
 		});
@@ -1720,7 +1720,7 @@ describe("daemon mulch failure recording", () => {
 			root: tempRoot,
 			...THRESHOLDS,
 			_tmux: tmuxWithLiveness({
-				"overstory-dead-rate-limited-agent": false,
+				"haru-dead-rate-limited-agent": false,
 			}),
 			_triage: triageAlways("extend"),
 		});
@@ -1744,7 +1744,7 @@ describe("daemon mulch failure recording", () => {
 		const oldActivity = new Date(Date.now() - 600_000).toISOString();
 		const session = makeSession({
 			agentName: "dead-unfinished-rate-limit-agent",
-			tmuxSession: "overstory-dead-unfinished-rate-limit-agent",
+			tmuxSession: "haru-dead-unfinished-rate-limit-agent",
 			state: "zombie",
 			lastActivity: oldActivity,
 		});
@@ -1782,7 +1782,7 @@ describe("daemon mulch failure recording", () => {
 			root: tempRoot,
 			...THRESHOLDS,
 			_tmux: tmuxWithLiveness({
-				"overstory-dead-unfinished-rate-limit-agent": false,
+				"haru-dead-unfinished-rate-limit-agent": false,
 			}),
 			_triage: triageAlways("extend"),
 			_recordFailure: failureTracker().recordFailure,
@@ -1814,7 +1814,7 @@ describe("daemon mulch failure recording", () => {
 			agentName: "doomed-agent",
 			capability: "builder",
 			taskId: "task-999",
-			tmuxSession: "overstory-doomed-agent",
+			tmuxSession: "haru-doomed-agent",
 			state: "stalled",
 			lastActivity: staleActivity,
 			escalationLevel: 2,
@@ -1823,7 +1823,7 @@ describe("daemon mulch failure recording", () => {
 
 		writeSessionsToStore(tempRoot, [session]);
 
-		const tmuxMock = tmuxWithLiveness({ "overstory-doomed-agent": true });
+		const tmuxMock = tmuxWithLiveness({ "haru-doomed-agent": true });
 		const failureMock = failureTracker();
 
 		await runDaemonTick({
@@ -1855,7 +1855,7 @@ describe("run completion detection", () => {
 				id: "s1",
 				agentName: "builder-one",
 				capability: "builder",
-				tmuxSession: "overstory-agent-fake-builder-one",
+				tmuxSession: "haru-agent-fake-builder-one",
 				state: "completed",
 				runId,
 				lastActivity: new Date().toISOString(),
@@ -1864,7 +1864,7 @@ describe("run completion detection", () => {
 				id: "s2",
 				agentName: "builder-two",
 				capability: "builder",
-				tmuxSession: "overstory-agent-fake-builder-two",
+				tmuxSession: "haru-agent-fake-builder-two",
 				state: "completed",
 				runId,
 				lastActivity: new Date().toISOString(),
@@ -1873,7 +1873,7 @@ describe("run completion detection", () => {
 				id: "s3",
 				agentName: "coordinator",
 				capability: "coordinator",
-				tmuxSession: "overstory-agent-fake-coordinator",
+				tmuxSession: "haru-agent-fake-coordinator",
 				state: "working",
 				runId,
 				lastActivity: new Date().toISOString(),
@@ -1910,7 +1910,7 @@ describe("run completion detection", () => {
 				id: "s1",
 				agentName: "builder-one",
 				capability: "builder",
-				tmuxSession: "overstory-agent-fake-builder-one",
+				tmuxSession: "haru-agent-fake-builder-one",
 				state: "completed",
 				runId,
 				lastActivity: new Date().toISOString(),
@@ -1919,7 +1919,7 @@ describe("run completion detection", () => {
 				id: "s2",
 				agentName: "builder-two",
 				capability: "builder",
-				tmuxSession: "overstory-agent-fake-builder-two",
+				tmuxSession: "haru-agent-fake-builder-two",
 				state: "working",
 				runId,
 				lastActivity: new Date().toISOString(),
@@ -1952,7 +1952,7 @@ describe("run completion detection", () => {
 				id: "s1",
 				agentName: "builder-one",
 				capability: "builder",
-				tmuxSession: "overstory-agent-fake-builder-one",
+				tmuxSession: "haru-agent-fake-builder-one",
 				state: "completed",
 				runId,
 				lastActivity: new Date().toISOString(),
@@ -1961,7 +1961,7 @@ describe("run completion detection", () => {
 				id: "s2",
 				agentName: "builder-two",
 				capability: "builder",
-				tmuxSession: "overstory-agent-fake-builder-two",
+				tmuxSession: "haru-agent-fake-builder-two",
 				state: "completed",
 				runId,
 				lastActivity: new Date().toISOString(),
@@ -1996,7 +1996,7 @@ describe("run completion detection", () => {
 				id: "s1",
 				agentName: "builder-one",
 				capability: "builder",
-				tmuxSession: "overstory-agent-fake-builder-one",
+				tmuxSession: "haru-agent-fake-builder-one",
 				state: "completed",
 				runId,
 				lastActivity: new Date().toISOString(),
@@ -2005,7 +2005,7 @@ describe("run completion detection", () => {
 				id: "s2",
 				agentName: "builder-two",
 				capability: "builder",
-				tmuxSession: "overstory-agent-fake-builder-two",
+				tmuxSession: "haru-agent-fake-builder-two",
 				state: "completed",
 				runId,
 				lastActivity: new Date().toISOString(),
@@ -2038,7 +2038,7 @@ describe("run completion detection", () => {
 				id: "s1",
 				agentName: "coordinator",
 				capability: "coordinator",
-				tmuxSession: "overstory-agent-fake-coordinator",
+				tmuxSession: "haru-agent-fake-coordinator",
 				state: "working",
 				runId,
 				lastActivity: new Date().toISOString(),
@@ -2047,7 +2047,7 @@ describe("run completion detection", () => {
 				id: "s2",
 				agentName: "monitor",
 				capability: "monitor",
-				tmuxSession: "overstory-agent-fake-monitor",
+				tmuxSession: "haru-agent-fake-monitor",
 				state: "working",
 				runId,
 				lastActivity: new Date().toISOString(),
@@ -2056,7 +2056,7 @@ describe("run completion detection", () => {
 				id: "s3",
 				agentName: "builder-one",
 				capability: "builder",
-				tmuxSession: "overstory-agent-fake-builder-one",
+				tmuxSession: "haru-agent-fake-builder-one",
 				state: "completed",
 				runId,
 				lastActivity: new Date().toISOString(),
@@ -2065,7 +2065,7 @@ describe("run completion detection", () => {
 				id: "s4",
 				agentName: "builder-two",
 				capability: "builder",
-				tmuxSession: "overstory-agent-fake-builder-two",
+				tmuxSession: "haru-agent-fake-builder-two",
 				state: "completed",
 				runId,
 				lastActivity: new Date().toISOString(),
@@ -2102,7 +2102,7 @@ describe("run completion detection", () => {
 				id: "s1",
 				agentName: "coordinator",
 				capability: "coordinator",
-				tmuxSession: "overstory-agent-fake-coordinator",
+				tmuxSession: "haru-agent-fake-coordinator",
 				state: "working",
 				runId,
 				lastActivity: new Date().toISOString(),
@@ -2111,7 +2111,7 @@ describe("run completion detection", () => {
 				id: "s2",
 				agentName: "monitor",
 				capability: "monitor",
-				tmuxSession: "overstory-agent-fake-monitor",
+				tmuxSession: "haru-agent-fake-monitor",
 				state: "working",
 				runId,
 				lastActivity: new Date().toISOString(),
@@ -2144,7 +2144,7 @@ describe("run completion detection", () => {
 				id: "s1",
 				agentName: "builder-one",
 				capability: "builder",
-				tmuxSession: "overstory-agent-fake-builder-one",
+				tmuxSession: "haru-agent-fake-builder-one",
 				state: "completed",
 				runId,
 				lastActivity: new Date().toISOString(),
@@ -2153,7 +2153,7 @@ describe("run completion detection", () => {
 				id: "s2",
 				agentName: "builder-two",
 				capability: "builder",
-				tmuxSession: "overstory-agent-fake-builder-two",
+				tmuxSession: "haru-agent-fake-builder-two",
 				state: "completed",
 				runId,
 				lastActivity: new Date().toISOString(),
@@ -2202,7 +2202,7 @@ describe("run completion detection", () => {
 				id: "s1",
 				agentName: "builder-one",
 				capability: "builder",
-				tmuxSession: "overstory-agent-fake-builder-one",
+				tmuxSession: "haru-agent-fake-builder-one",
 				state: "completed",
 				runId,
 				lastActivity: new Date().toISOString(),
@@ -2211,7 +2211,7 @@ describe("run completion detection", () => {
 				id: "s2",
 				agentName: "builder-two",
 				capability: "builder",
-				tmuxSession: "overstory-agent-fake-builder-two",
+				tmuxSession: "haru-agent-fake-builder-two",
 				state: "completed",
 				runId,
 				lastActivity: new Date().toISOString(),
@@ -2243,7 +2243,7 @@ describe("run completion detection", () => {
 				id: "s1",
 				agentName: "scout-one",
 				capability: "scout",
-				tmuxSession: "overstory-agent-fake-scout-one",
+				tmuxSession: "haru-agent-fake-scout-one",
 				state: "completed",
 				runId,
 				lastActivity: new Date().toISOString(),
@@ -2252,7 +2252,7 @@ describe("run completion detection", () => {
 				id: "s2",
 				agentName: "scout-two",
 				capability: "scout",
-				tmuxSession: "overstory-agent-fake-scout-two",
+				tmuxSession: "haru-agent-fake-scout-two",
 				state: "completed",
 				runId,
 				lastActivity: new Date().toISOString(),
@@ -2289,7 +2289,7 @@ describe("run completion detection", () => {
 				id: "s1",
 				agentName: "scout-one",
 				capability: "scout",
-				tmuxSession: "overstory-agent-fake-scout-one",
+				tmuxSession: "haru-agent-fake-scout-one",
 				state: "completed",
 				runId,
 				lastActivity: new Date().toISOString(),
@@ -2298,7 +2298,7 @@ describe("run completion detection", () => {
 				id: "s2",
 				agentName: "builder-one",
 				capability: "builder",
-				tmuxSession: "overstory-agent-fake-builder-one",
+				tmuxSession: "haru-agent-fake-builder-one",
 				state: "completed",
 				runId,
 				lastActivity: new Date().toISOString(),
@@ -2333,7 +2333,7 @@ describe("run completion detection", () => {
 				id: "s1",
 				agentName: "reviewer-one",
 				capability: "reviewer",
-				tmuxSession: "overstory-agent-fake-reviewer-one",
+				tmuxSession: "haru-agent-fake-reviewer-one",
 				state: "completed",
 				runId,
 				lastActivity: new Date().toISOString(),
@@ -2368,7 +2368,7 @@ describe("run completion detection", () => {
 				id: "s1",
 				agentName: "builder-one",
 				capability: "builder",
-				tmuxSession: "overstory-agent-fake-builder-one",
+				tmuxSession: "haru-agent-fake-builder-one",
 				state: "completed",
 				runId,
 				lastActivity: new Date().toISOString(),

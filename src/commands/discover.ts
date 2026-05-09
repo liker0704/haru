@@ -1,5 +1,5 @@
 /**
- * CLI command: ov discover
+ * CLI command: ha discover
  *
  * Launches a coordinator session with the ov-discovery profile to explore a
  * brownfield codebase and produce structured mulch records. The coordinator
@@ -138,7 +138,7 @@ export function buildScoutArgs(
 	];
 }
 
-/** Main handler for ov discover. */
+/** Main handler for ha discover. */
 export async function discoverCommand(
 	opts: DiscoverOptions,
 	deps: DiscoverDeps = {},

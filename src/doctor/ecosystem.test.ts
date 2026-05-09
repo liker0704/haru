@@ -125,9 +125,9 @@ describe("parseSemver", () => {
 describe("checkEcosystem", () => {
 	test("returns exactly 3 checks (one per tool)", async () => {
 		const spawner = makeMockSpawner({
-			ml: { exitCode: 0, stdout: "1.0.0\n", stderr: "" },
-			sd: { exitCode: 0, stdout: "2.0.0\n", stderr: "" },
-			cn: { exitCode: 0, stdout: "3.0.0\n", stderr: "" },
+			ku: { exitCode: 0, stdout: "1.0.0\n", stderr: "" },
+			su: { exitCode: 0, stdout: "2.0.0\n", stderr: "" },
+			ta: { exitCode: 0, stdout: "3.0.0\n", stderr: "" },
 		});
 		const check = makeCheckEcosystem(spawner);
 		const results = await check(mockConfig, "/tmp/.overstory");
@@ -137,9 +137,9 @@ describe("checkEcosystem", () => {
 
 	test("check names match tool names", async () => {
 		const spawner = makeMockSpawner({
-			ml: { exitCode: 0, stdout: "1.0.0\n", stderr: "" },
-			sd: { exitCode: 0, stdout: "2.0.0\n", stderr: "" },
-			cn: { exitCode: 0, stdout: "3.0.0\n", stderr: "" },
+			ku: { exitCode: 0, stdout: "1.0.0\n", stderr: "" },
+			su: { exitCode: 0, stdout: "2.0.0\n", stderr: "" },
+			ta: { exitCode: 0, stdout: "3.0.0\n", stderr: "" },
 		});
 		const check = makeCheckEcosystem(spawner);
 		const results = await check(mockConfig, "/tmp/.overstory");
@@ -152,9 +152,9 @@ describe("checkEcosystem", () => {
 
 	test("all checks report category 'ecosystem'", async () => {
 		const spawner = makeMockSpawner({
-			ml: { exitCode: 0, stdout: "1.0.0\n", stderr: "" },
-			sd: { exitCode: 0, stdout: "2.0.0\n", stderr: "" },
-			cn: { exitCode: 0, stdout: "3.0.0\n", stderr: "" },
+			ku: { exitCode: 0, stdout: "1.0.0\n", stderr: "" },
+			su: { exitCode: 0, stdout: "2.0.0\n", stderr: "" },
+			ta: { exitCode: 0, stdout: "3.0.0\n", stderr: "" },
 		});
 		const check = makeCheckEcosystem(spawner);
 		const results = await check(mockConfig, "/tmp/.overstory");
@@ -166,9 +166,9 @@ describe("checkEcosystem", () => {
 
 	test("pass when all tools report valid semver", async () => {
 		const spawner = makeMockSpawner({
-			ml: { exitCode: 0, stdout: "mulch v1.2.3\n", stderr: "" },
-			sd: { exitCode: 0, stdout: "seeds 0.5.0\n", stderr: "" },
-			cn: { exitCode: 0, stdout: "0.1.0\n", stderr: "" },
+			ku: { exitCode: 0, stdout: "mulch v1.2.3\n", stderr: "" },
+			su: { exitCode: 0, stdout: "seeds 0.5.0\n", stderr: "" },
+			ta: { exitCode: 0, stdout: "0.1.0\n", stderr: "" },
 		});
 		const check = makeCheckEcosystem(spawner);
 		const results = await check(mockConfig, "/tmp/.overstory");
@@ -180,9 +180,9 @@ describe("checkEcosystem", () => {
 
 	test("warn when a tool is not available (non-zero exit code)", async () => {
 		const spawner = makeMockSpawner({
-			ml: { exitCode: 127, stdout: "", stderr: "ml: command not found" },
-			sd: { exitCode: 0, stdout: "1.0.0\n", stderr: "" },
-			cn: { exitCode: 0, stdout: "1.0.0\n", stderr: "" },
+			ku: { exitCode: 127, stdout: "", stderr: "ml: command not found" },
+			su: { exitCode: 0, stdout: "1.0.0\n", stderr: "" },
+			ta: { exitCode: 0, stdout: "1.0.0\n", stderr: "" },
 		});
 		const check = makeCheckEcosystem(spawner);
 		const results = await check(mockConfig, "/tmp/.overstory");
@@ -195,9 +195,9 @@ describe("checkEcosystem", () => {
 
 	test("warn when version output is not valid semver", async () => {
 		const spawner = makeMockSpawner({
-			ml: { exitCode: 0, stdout: "mulch dev-build\n", stderr: "" },
-			sd: { exitCode: 0, stdout: "1.0.0\n", stderr: "" },
-			cn: { exitCode: 0, stdout: "1.0.0\n", stderr: "" },
+			ku: { exitCode: 0, stdout: "mulch dev-build\n", stderr: "" },
+			su: { exitCode: 0, stdout: "1.0.0\n", stderr: "" },
+			ta: { exitCode: 0, stdout: "1.0.0\n", stderr: "" },
 		});
 		const check = makeCheckEcosystem(spawner);
 		const results = await check(mockConfig, "/tmp/.overstory");
@@ -210,9 +210,9 @@ describe("checkEcosystem", () => {
 
 	test("passing checks include version in message", async () => {
 		const spawner = makeMockSpawner({
-			ml: { exitCode: 0, stdout: "1.2.3\n", stderr: "" },
-			sd: { exitCode: 0, stdout: "1.2.3\n", stderr: "" },
-			cn: { exitCode: 0, stdout: "1.2.3\n", stderr: "" },
+			ku: { exitCode: 0, stdout: "1.2.3\n", stderr: "" },
+			su: { exitCode: 0, stdout: "1.2.3\n", stderr: "" },
+			ta: { exitCode: 0, stdout: "1.2.3\n", stderr: "" },
 		});
 		const check = makeCheckEcosystem(spawner);
 		const results = await check(mockConfig, "/tmp/.overstory");
@@ -225,9 +225,9 @@ describe("checkEcosystem", () => {
 
 	test("passing checks include raw output in details", async () => {
 		const spawner = makeMockSpawner({
-			ml: { exitCode: 0, stdout: "mulch v1.0.0\n", stderr: "" },
-			sd: { exitCode: 0, stdout: "seeds 1.0.0\n", stderr: "" },
-			cn: { exitCode: 0, stdout: "1.0.0\n", stderr: "" },
+			ku: { exitCode: 0, stdout: "mulch v1.0.0\n", stderr: "" },
+			su: { exitCode: 0, stdout: "seeds 1.0.0\n", stderr: "" },
+			ta: { exitCode: 0, stdout: "1.0.0\n", stderr: "" },
 		});
 		const check = makeCheckEcosystem(spawner);
 		const results = await check(mockConfig, "/tmp/.overstory");
@@ -238,9 +238,9 @@ describe("checkEcosystem", () => {
 
 	test("unavailable tool details include install hint", async () => {
 		const spawner = makeMockSpawner({
-			ml: { exitCode: 127, stdout: "", stderr: "not found" },
-			sd: { exitCode: 0, stdout: "1.0.0\n", stderr: "" },
-			cn: { exitCode: 0, stdout: "1.0.0\n", stderr: "" },
+			ku: { exitCode: 127, stdout: "", stderr: "not found" },
+			su: { exitCode: 0, stdout: "1.0.0\n", stderr: "" },
+			ta: { exitCode: 0, stdout: "1.0.0\n", stderr: "" },
 		});
 		const check = makeCheckEcosystem(spawner);
 		const results = await check(mockConfig, "/tmp/.overstory");
@@ -252,9 +252,9 @@ describe("checkEcosystem", () => {
 
 	test("all checks have required DoctorCheck fields", async () => {
 		const spawner = makeMockSpawner({
-			ml: { exitCode: 0, stdout: "1.0.0\n", stderr: "" },
-			sd: { exitCode: 0, stdout: "1.0.0\n", stderr: "" },
-			cn: { exitCode: 0, stdout: "1.0.0\n", stderr: "" },
+			ku: { exitCode: 0, stdout: "1.0.0\n", stderr: "" },
+			su: { exitCode: 0, stdout: "1.0.0\n", stderr: "" },
+			ta: { exitCode: 0, stdout: "1.0.0\n", stderr: "" },
 		});
 		const check = makeCheckEcosystem(spawner);
 		const results = await check(mockConfig, "/tmp/.overstory");
@@ -282,9 +282,9 @@ describe("checkEcosystem", () => {
 
 	test("handles version in stderr when stdout is empty", async () => {
 		const spawner = makeMockSpawner({
-			ml: { exitCode: 0, stdout: "", stderr: "1.0.0" },
-			sd: { exitCode: 0, stdout: "1.0.0\n", stderr: "" },
-			cn: { exitCode: 0, stdout: "1.0.0\n", stderr: "" },
+			ku: { exitCode: 0, stdout: "", stderr: "1.0.0" },
+			su: { exitCode: 0, stdout: "1.0.0\n", stderr: "" },
+			ta: { exitCode: 0, stdout: "1.0.0\n", stderr: "" },
 		});
 		const check = makeCheckEcosystem(spawner);
 		const results = await check(mockConfig, "/tmp/.overstory");

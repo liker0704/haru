@@ -85,42 +85,42 @@ function getTemplatePath(): string {
  *
  * When hooks are deployed to the project root (e.g. for the coordinator),
  * they affect ALL Claude Code sessions in that directory. This prefix
- * ensures hooks only activate for overstory-managed agent sessions
- * (which have OVERSTORY_AGENT_NAME set in their environment) and are
+ * ensures hooks only activate for haru-managed agent sessions
+ * (which have HARU_AGENT_NAME set in their environment) and are
  * no-ops for the user's own Claude Code session.
  *
- * Uses OVERSTORY_RUNTIME_SESSION_ID as a session discriminator to distinguish
+ * Uses HARU_RUNTIME_SESSION_ID as a session discriminator to distinguish
  * agent compaction recovery from human sessions. Human sessions have neither
- * OVERSTORY_AGENT_NAME nor OVERSTORY_RUNTIME_SESSION_ID — they exit at step 2.
+ * HARU_AGENT_NAME nor HARU_RUNTIME_SESSION_ID — they exit at step 2.
  *
- * Recovery path (compaction): if OVERSTORY_AGENT_NAME is lost but
- * OVERSTORY_RUNTIME_SESSION_ID survives (set in tmux env at spawn), sources
+ * Recovery path (compaction): if HARU_AGENT_NAME is lost but
+ * HARU_RUNTIME_SESSION_ID survives (set in tmux env at spawn), sources
  * a session-scoped `.agent-env.{sessionId}` file to recover identity.
  *
  * Steps:
- *  1. OVERSTORY_AGENT_NAME set → proceed (happy path, ~0ms)
- *  2. OVERSTORY_RUNTIME_SESSION_ID unset → human session → exit 0
+ *  1. HARU_AGENT_NAME set → proceed (happy path, ~0ms)
+ *  2. HARU_RUNTIME_SESSION_ID unset → human session → exit 0
  *  3. Source session-scoped .agent-env.{sessionId} file (~0.03ms)
- *  4. OVERSTORY_AGENT_NAME still unset → exit 0
+ *  4. HARU_AGENT_NAME still unset → exit 0
  */
 const ENV_GUARD =
-	'if [ -z "$OVERSTORY_AGENT_NAME" ]; then ' +
-	'[ -z "$OVERSTORY_RUNTIME_SESSION_ID" ] && exit 0; ' +
-	'[ -f ".claude/.agent-env.$OVERSTORY_RUNTIME_SESSION_ID" ] && . ".claude/.agent-env.$OVERSTORY_RUNTIME_SESSION_ID"; ' +
-	'[ -z "$OVERSTORY_AGENT_NAME" ] && exit 0; ' +
+	'if [ -z "$HARU_AGENT_NAME" ]; then ' +
+	'[ -z "$HARU_RUNTIME_SESSION_ID" ] && exit 0; ' +
+	'[ -f ".claude/.agent-env.$HARU_RUNTIME_SESSION_ID" ] && . ".claude/.agent-env.$HARU_RUNTIME_SESSION_ID"; ' +
+	'[ -z "$HARU_AGENT_NAME" ] && exit 0; ' +
 	"fi;";
 
 /**
  * Agent-specific guard prefix for capability-scoped hooks.
  *
- * Unlike ENV_GUARD (which activates for ANY overstory agent), this guard
- * only activates when $OVERSTORY_AGENT_NAME matches the intended agent.
+ * Unlike ENV_GUARD (which activates for ANY haru agent), this guard
+ * only activates when $HARU_AGENT_NAME matches the intended agent.
  * Used for capability-specific blocks (e.g. Write/Edit blocks for mission-analyst)
  * so they don't accidentally restrict other agents sharing the same
  * settings.local.json (e.g. coordinator at the project root).
  */
 function agentGuard(agentName: string): string {
-	return `${ENV_GUARD} [ "$OVERSTORY_AGENT_NAME" != "${agentName}" ] && exit 0;`;
+	return `${ENV_GUARD} [ "$HARU_AGENT_NAME" != "${agentName}" ] && exit 0;`;
 }
 
 /**
@@ -129,7 +129,7 @@ function agentGuard(agentName: string): string {
  * Claude Code executes hook commands via /bin/sh with a minimal PATH
  * (/usr/bin:/bin:/usr/sbin:/sbin). os-eco CLIs may be available either via
  * project-local node_modules/.bin or via Bun global installs in ~/.bun/bin;
- * both are absent from that PATH, causing hooks like `ov prime` (SessionStart)
+ * both are absent from that PATH, causing hooks like `ha prime` (SessionStart)
  * and `ml learn` (Stop) to fail with "command not found".
  *
  * Prepend this to any hook command that invokes one of those CLIs so they
@@ -145,7 +145,7 @@ export const PATH_PREFIX =
  * the agent's worktree boundary.
  *
  * Applied to Write, Edit, and NotebookEdit tools. Uses the
- * OVERSTORY_WORKTREE_PATH env var set during tmux session creation
+ * HARU_WORKTREE_PATH env var set during tmux session creation
  * to determine the allowed path boundary.
  *
  * @param filePathField - The JSON field name containing the file path
@@ -153,10 +153,10 @@ export const PATH_PREFIX =
  */
 export function buildPathBoundaryGuardScript(filePathField: string): string {
 	const script = [
-		// Only enforce for overstory agent sessions
+		// Only enforce for haru agent sessions
 		ENV_GUARD,
 		// Skip if worktree path is not set (e.g., orchestrator)
-		'[ -z "$OVERSTORY_WORKTREE_PATH" ] && exit 0;',
+		'[ -z "$HARU_WORKTREE_PATH" ] && exit 0;',
 		"read -r INPUT;",
 		// Extract file path from JSON (sed -n + p = empty if no match)
 		`FILE_PATH=$(echo "$INPUT" | sed -n 's/.*"${filePathField}": *"\\([^"]*\\)".*/\\1/p');`,
@@ -165,7 +165,7 @@ export function buildPathBoundaryGuardScript(filePathField: string): string {
 		// Resolve relative paths against cwd
 		'case "$FILE_PATH" in /*) ;; *) FILE_PATH="$(pwd)/$FILE_PATH" ;; esac;',
 		// Allow if path is inside the worktree (exact match or subpath)
-		'case "$FILE_PATH" in "$OVERSTORY_WORKTREE_PATH"/*) exit 0 ;; "$OVERSTORY_WORKTREE_PATH") exit 0 ;; esac;',
+		'case "$FILE_PATH" in "$HARU_WORKTREE_PATH"/*) exit 0 ;; "$HARU_WORKTREE_PATH") exit 0 ;; esac;',
 		// Block: path is outside the worktree boundary
 		'echo \'{"decision":"block","reason":"Path boundary violation: file is outside your assigned worktree. All writes must target files within your worktree."}\';',
 	].join(" ");
@@ -233,8 +233,8 @@ function blockGuard(toolName: string, reason: string): HookEntry {
 /**
  * Build a PreToolUse guard that blocks a specific tool for a SPECIFIC agent only.
  *
- * Unlike blockGuard() which fires for all overstory agents, this variant
- * uses agentGuard() so it only blocks when $OVERSTORY_AGENT_NAME matches.
+ * Unlike blockGuard() which fires for all haru agents, this variant
+ * uses agentGuard() so it only blocks when $HARU_AGENT_NAME matches.
  * Used for capability-specific restrictions that shouldn't leak to other
  * agents sharing the same settings.local.json.
  */
@@ -285,14 +285,14 @@ function buildBashGuardScript(agentName: string): string {
 	// The script reads JSON from stdin, extracts the command field, then checks patterns.
 	// Uses parameter expansion to avoid requiring jq (zero runtime deps).
 	const script = [
-		// Only enforce for overstory agent sessions (skip for user's own Claude Code)
+		// Only enforce for haru agent sessions (skip for user's own Claude Code)
 		ENV_GUARD,
 		"read -r INPUT;",
 		// Extract command value from JSON — grab everything after "command": (with optional space)
 		'CMD=$(echo "$INPUT" | sed \'s/.*"command": *"\\([^"]*\\)".*/\\1/\');',
 		// Check 1: Block all git push — agents must never push to remote
 		"if echo \"$CMD\" | grep -qE '\\bgit\\s+push\\b'; then",
-		'  echo \'{"decision":"block","reason":"git push is blocked — use ov merge to integrate changes, push manually when ready"}\';',
+		'  echo \'{"decision":"block","reason":"git push is blocked — use ha merge to integrate changes, push manually when ready"}\';',
 		"  exit 0;",
 		"fi;",
 		// Check 2: Block git reset --hard
@@ -303,8 +303,8 @@ function buildBashGuardScript(agentName: string): string {
 		// Check 3: Warn on git checkout -b with wrong naming convention
 		"if echo \"$CMD\" | grep -qE 'git\\s+checkout\\s+-b\\s'; then",
 		`  BRANCH=$(echo "$CMD" | sed 's/.*git\\s*checkout\\s*-b\\s*\\([^ ]*\\).*/\\1/');`,
-		`  if ! echo "$BRANCH" | grep -qE '^overstory/${agentName}/'; then`,
-		`    echo '{"decision":"block","reason":"Branch must follow overstory/${agentName}/{task-id} convention"}';`,
+		`  if ! echo "$BRANCH" | grep -qE '^haru/${agentName}/'; then`,
+		`    echo '{"decision":"block","reason":"Branch must follow haru/${agentName}/{task-id} convention"}';`,
 		"    exit 0;",
 		"  fi;",
 		"fi;",
@@ -381,33 +381,33 @@ export function buildBashFileGuardScript(
  * issues they don't own.
  *
  * Guards against two patterns:
- * - `sd/bd close <id>` — blocks if <id> != $OVERSTORY_TASK_ID
- * - `sd/bd update <id> --status` — blocks if <id> != $OVERSTORY_TASK_ID
+ * - `sd/bd close <id>` — blocks if <id> != $HARU_TASK_ID
+ * - `sd/bd update <id> --status` — blocks if <id> != $HARU_TASK_ID
  *
- * Agents without OVERSTORY_TASK_ID (coordinator, monitor) exit early and are unaffected.
+ * Agents without HARU_TASK_ID (coordinator, monitor) exit early and are unaffected.
  */
 export function buildTrackerCloseGuardScript(): string {
 	const script = [
-		// Only enforce for overstory agent sessions
+		// Only enforce for haru agent sessions
 		ENV_GUARD,
 		// Skip if task ID is not set (coordinator/monitor have no task)
-		'[ -z "$OVERSTORY_TASK_ID" ] && exit 0;',
+		'[ -z "$HARU_TASK_ID" ] && exit 0;',
 		"read -r INPUT;",
 		// Extract command value from JSON
 		'CMD=$(echo "$INPUT" | sed \'s/.*"command": *"\\([^"]*\\)".*/\\1/\');',
 		// Check for sd/bd close <id>
 		"if echo \"$CMD\" | grep -qE '^\\s*(sd|bd)\\s+close\\s'; then",
 		"  ISSUE_ID=$(echo \"$CMD\" | sed -E 's/^[[:space:]]*(sd|bd)[[:space:]]+close[[:space:]]+([^ ]+).*/\\2/');",
-		'  if [ "$ISSUE_ID" != "$OVERSTORY_TASK_ID" ]; then',
-		'    echo "{\\"decision\\":\\"block\\",\\"reason\\":\\"Cannot close issue $ISSUE_ID — agents may only close their own task ($OVERSTORY_TASK_ID). Report completion via worker_done mail to your parent instead.\\"}";',
+		'  if [ "$ISSUE_ID" != "$HARU_TASK_ID" ]; then',
+		'    echo "{\\"decision\\":\\"block\\",\\"reason\\":\\"Cannot close issue $ISSUE_ID — agents may only close their own task ($HARU_TASK_ID). Report completion via worker_done mail to your parent instead.\\"}";',
 		"    exit 0;",
 		"  fi;",
 		"fi;",
 		// Check for sd/bd update <id> --status
 		"if echo \"$CMD\" | grep -qE '^\\s*(sd|bd)\\s+update\\s.*--status'; then",
 		"  ISSUE_ID=$(echo \"$CMD\" | sed -E 's/^[[:space:]]*(sd|bd)[[:space:]]+update[[:space:]]+([^ ]+).*/\\2/');",
-		'  if [ "$ISSUE_ID" != "$OVERSTORY_TASK_ID" ]; then',
-		'    echo "{\\"decision\\":\\"block\\",\\"reason\\":\\"Cannot update issue $ISSUE_ID — agents may only update their own task ($OVERSTORY_TASK_ID).\\"}";',
+		'  if [ "$ISSUE_ID" != "$HARU_TASK_ID" ]; then',
+		'    echo "{\\"decision\\":\\"block\\",\\"reason\\":\\"Cannot update issue $ISSUE_ID — agents may only update their own task ($HARU_TASK_ID).\\"}";',
 		"    exit 0;",
 		"  fi;",
 		"fi;",
@@ -420,7 +420,7 @@ export function buildTrackerCloseGuardScript(): string {
  *
  * Returns a single Bash matcher entry. Applied to ALL agent capabilities
  * so that no agent can accidentally close the coordinator's dispatch issue.
- * Agents without OVERSTORY_TASK_ID (coordinator, monitor) are unaffected.
+ * Agents without HARU_TASK_ID (coordinator, monitor) are unaffected.
  */
 export function getTrackerCloseGuards(): HookEntry[] {
 	return [
@@ -475,16 +475,16 @@ const FILE_MODIFYING_BASH_PATTERNS = [
  * - Cannot detect paths inside subshells or backtick evaluation
  * - Relative paths are assumed safe (tmux cwd IS the worktree)
  *
- * Uses OVERSTORY_WORKTREE_PATH env var set during tmux session creation.
+ * Uses HARU_WORKTREE_PATH env var set during tmux session creation.
  */
 export function buildBashPathBoundaryScript(): string {
 	const fileModifyPattern = FILE_MODIFYING_BASH_PATTERNS.join("|");
 
 	const script = [
-		// Only enforce for overstory agent sessions
+		// Only enforce for haru agent sessions
 		ENV_GUARD,
 		// Skip if worktree path is not set (e.g., orchestrator)
-		'[ -z "$OVERSTORY_WORKTREE_PATH" ] && exit 0;',
+		'[ -z "$HARU_WORKTREE_PATH" ] && exit 0;',
 		"read -r INPUT;",
 		// Extract command value from JSON (with optional space after colon)
 		'CMD=$(echo "$INPUT" | sed \'s/.*"command": *"\\([^"]*\\)".*/\\1/\');',
@@ -498,8 +498,8 @@ export function buildBashPathBoundaryScript(): string {
 		// Check each absolute path against the worktree boundary
 		'echo "$PATHS" | while IFS= read -r P; do',
 		'  case "$P" in',
-		'    "$OVERSTORY_WORKTREE_PATH"/*) ;;',
-		'    "$OVERSTORY_WORKTREE_PATH") ;;',
+		'    "$HARU_WORKTREE_PATH"/*) ;;',
+		'    "$HARU_WORKTREE_PATH") ;;',
 		"    /dev/*) ;;",
 		"    /tmp/*) ;;",
 		'    *) echo \'{"decision":"block","reason":"Bash path boundary violation: command targets a path outside your worktree. All file modifications must stay within your assigned worktree."}\'; exit 0; ;;',
@@ -539,9 +539,9 @@ export function getBashPathBoundaryGuards(): HookEntry[] {
  * Implementation capabilities (builder, merger) get:
  * - Bash path boundary guards (validates absolute paths stay in worktree)
  *
- * All overstory-managed agents get:
+ * All haru-managed agents get:
  * - Claude Code native team/task tool blocks (Task, TeamCreate, SendMessage, etc.)
- *   to ensure delegation goes through overstory sling
+ *   to ensure delegation goes through haru sling
  *
  * Note: All capabilities also receive Bash danger guards via getDangerGuards().
  */
@@ -554,23 +554,23 @@ export function getCapabilityGuards(
 	const gates = qualityGates ?? DEFAULT_QUALITY_GATES;
 	const gatePrefixes = extractQualityGatePrefixes(gates);
 
-	// Block Claude Code native team/task tools for ALL overstory agents.
-	// Agents must use `overstory sling` for delegation, not native Task/Team tools.
+	// Block Claude Code native team/task tools for ALL haru agents.
+	// Agents must use `haru sling` for delegation, not native Task/Team tools.
 	const teamToolGuards = NATIVE_TEAM_TOOLS.map((tool) =>
 		blockGuard(
 			tool,
-			`Overstory agents must use 'ov sling' for delegation — ${tool} is not allowed`,
+			`Overstory agents must use 'ha sling' for delegation — ${tool} is not allowed`,
 		),
 	);
 	guards.push(...teamToolGuards);
 
-	// Block interactive tools for ALL overstory agents.
+	// Block interactive tools for ALL haru agents.
 	// These tools require a human to respond and block indefinitely in tmux sessions.
-	// Agents must use overstory mail (--type question) to escalate instead.
+	// Agents must use haru mail (--type question) to escalate instead.
 	const interactiveGuards = INTERACTIVE_TOOLS.map((tool) =>
 		blockGuard(
 			tool,
-			`${tool} requires human interaction -- agents run non-interactively. Use ov mail (--type question) to escalate`,
+			`${tool} requires human interaction -- agents run non-interactively. Use ha mail (--type question) to escalate`,
 		),
 	);
 	guards.push(...interactiveGuards);
@@ -640,18 +640,15 @@ export function getCapabilityGuards(
 }
 
 /**
- * Check whether a hook entry is overstory-managed.
+ * Check whether a hook entry is haru-managed.
  *
- * Overstory hook commands always reference either `ov ` / `overstory` (CLI commands)
- * or `OVERSTORY_` (env var guards like OVERSTORY_AGENT_NAME, OVERSTORY_WORKTREE_PATH).
+ * Haru hook commands always reference either `ha ` / `haru` (CLI commands)
+ * or `HARU_` (env var guards like HARU_AGENT_NAME, HARU_WORKTREE_PATH).
  * User hooks will not contain these patterns.
  */
 export function isOverstoryHookEntry(entry: HookEntry): boolean {
 	return entry.hooks.some(
-		(h) =>
-			h.command.includes("ov ") ||
-			h.command.includes("overstory") ||
-			h.command.includes("OVERSTORY_"),
+		(h) => h.command.includes("ha ") || h.command.includes("haru") || h.command.includes("HARU_"),
 	);
 }
 
@@ -663,7 +660,7 @@ export function isOverstoryHookEntry(entry: HookEntry): boolean {
  *
  * When the target file already exists (e.g. at the project root for coordinator/
  * supervisor/monitor), preserves non-hooks keys and user-defined hook entries.
- * Stale overstory hook entries are stripped and replaced with the new set.
+ * Stale haru hook entries are stripped and replaced with the new set.
  * Overstory hooks are placed before user hooks per event type so security
  * guards run first.
  *
@@ -699,7 +696,7 @@ export async function deployHooks(
 	}
 
 	// Template no longer uses {{AGENT_NAME}} — hooks resolve identity dynamically
-	// via $OVERSTORY_AGENT_NAME env var at runtime (ENV_GUARD v2).
+	// via $HARU_AGENT_NAME env var at runtime (ENV_GUARD v2).
 	const content = template;
 
 	// Parse the base config from the template
@@ -757,7 +754,7 @@ export async function deployHooks(
 	// Separate non-hooks keys (permissions, env, $schema, etc.) from hooks
 	const { hooks: existingHooksRaw, ...nonHooksKeys } = existingConfig;
 
-	// Partition existing hooks: keep user entries, discard stale overstory entries
+	// Partition existing hooks: keep user entries, discard stale haru entries
 	const existingHooks = (existingHooksRaw ?? {}) as Record<string, HookEntry[]>;
 	const userHooks: Record<string, HookEntry[]> = {};
 	for (const [eventType, entries] of Object.entries(existingHooks)) {
@@ -767,7 +764,7 @@ export async function deployHooks(
 		}
 	}
 
-	// Merge: overstory hooks first (security guards must run first), then user hooks
+	// Merge: haru hooks first (security guards must run first), then user hooks
 	const mergedHooks: Record<string, HookEntry[]> = {};
 	const allEventTypes = new Set([...Object.keys(config.hooks), ...Object.keys(userHooks)]);
 	for (const eventType of allEventTypes) {

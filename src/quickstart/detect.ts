@@ -5,16 +5,16 @@
  * a prerequisite or setup step has already been completed.
  */
 
-/** Check whether overstory has been initialized in the given project root. */
+/** Check whether haru has been initialized in the given project root. */
 export async function isInitialized(projectRoot: string): Promise<boolean> {
 	return Bun.file(`${projectRoot}/.overstory/config.yaml`).exists();
 }
 
 /**
- * Check whether overstory hooks are installed.
+ * Check whether haru hooks are installed.
  *
  * Requires both `.overstory/hooks.json` and `.claude/settings.local.json`
- * containing an overstory reference.
+ * containing an haru reference.
  */
 export async function areHooksInstalled(projectRoot: string): Promise<boolean> {
 	const hooksExists = await Bun.file(`${projectRoot}/.overstory/hooks.json`).exists();
@@ -25,7 +25,7 @@ export async function areHooksInstalled(projectRoot: string): Promise<boolean> {
 	if (!settingsExists) return false;
 
 	const content = await Bun.file(settingsPath).text();
-	return content.includes("overstory");
+	return content.includes("haru");
 }
 
 interface DoctorJsonOutput {
@@ -38,7 +38,7 @@ interface DoctorJsonOutput {
 /**
  * Check whether required CLI dependencies are available.
  *
- * Runs `ov doctor --category dependencies --json` and parses the result.
+ * Runs `ha doctor --category dependencies --json` and parses the result.
  * Returns `{ ok: true, missing: [] }` on any parse or execution failure
  * to avoid blocking the wizard on transient errors.
  */
@@ -83,7 +83,7 @@ interface StatusJsonOutput {
 /**
  * Check whether any agents are currently active.
  *
- * Runs `ov status --json` and looks for non-zombie, non-completed agents.
+ * Runs `ha status --json` and looks for non-zombie, non-completed agents.
  * Returns false on any error or if the command is unavailable.
  */
 export async function hasActiveAgents(): Promise<boolean> {

@@ -19,7 +19,6 @@ import type { Mission } from "../types.ts";
 import {
 	getCurrentSessionName,
 	isSessionAlive,
-	killProcessTree,
 	killSession,
 	removeAgentEnvFile,
 } from "../worktree/tmux.ts";
@@ -91,7 +90,7 @@ async function terminalizeMission(opts: {
 	const stopRole = deps?.stopMissionRole ?? stopMissionRole;
 	const stopAgent = deps?.stopAgentCommand ?? stopCommand;
 
-	// Detect if we're running inside a mission tmux session (coordinator calling ov mission complete).
+	// Detect if we're running inside a mission tmux session (coordinator calling ha mission complete).
 	// If so, skip killing our own session until all cleanup is done.
 	const selfTmuxSession = await getCurrentSessionName();
 
@@ -480,7 +479,7 @@ async function terminalizeMission(opts: {
 	}
 }
 
-// === ov mission stop / complete ===
+// === ha mission stop / complete ===
 
 export async function missionStop(
 	overstoryDir: string,
@@ -518,8 +517,8 @@ export async function missionStop(
 						jsonError("mission stop", "Mission is already suspended");
 					} else {
 						printError("Mission is already suspended", suspended[0].slug);
-						printHint("Kill it with: ov mission stop --kill");
-						printHint("Or resume it with: ov mission resume");
+						printHint("Kill it with: ha mission stop --kill");
+						printHint("Or resume it with: ha mission resume");
 					}
 					process.exitCode = 1;
 					return;

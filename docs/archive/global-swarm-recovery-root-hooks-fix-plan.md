@@ -46,9 +46,9 @@ Because the deployed hook commands are baked with a specific agent name, the las
 The hook surface is also asymmetric:
 
 - `PreToolUse`, `PostToolUse`, and `Stop` can receive hook payloads over stdin
-- `SessionStart`, `UserPromptSubmit`, and `PreCompact` do not provide stdin payloads, yet still invoke `ov prime` and `ov mail check --inject`
+- `SessionStart`, `UserPromptSubmit`, and `PreCompact` do not provide stdin payloads, yet still invoke `ha prime` and `ha mail check --inject`
 
-That means a fix based only on stdin `session_id` handling in `ov log` is incomplete. Shared-root identity resolution must also work for non-stdin hooks.
+That means a fix based only on stdin `session_id` handling in `ha log` is incomplete. Shared-root identity resolution must also work for non-stdin hooks.
 
 This is not a one-off data issue. It is a structural flaw in how shared-root persistent agents deploy hooks and recover hook identity.
 
@@ -62,14 +62,14 @@ Another project-root persistent role also exists on the same lifecycle path:
 
 There is an important asymmetry in the current codebase that any fix must account for:
 
-- **Template hooks** (`hooks.json.tmpl`) use a simple guard: `[ -z "$OVERSTORY_AGENT_NAME" ] && exit 0` — **no `.agent-env` fallback**. They pass a baked `{{AGENT_NAME}}` to `--agent`.
+- **Template hooks** (`hooks.json.tmpl`) use a simple guard: `[ -z "$HARU_AGENT_NAME" ] && exit 0` — **no `.agent-env` fallback**. They pass a baked `{{AGENT_NAME}}` to `--agent`.
 - **Generated capability guards** (`hooks-deployer.ts`) use `ENV_GUARD` which **includes** the `.agent-env` fallback: `[ -f .claude/.agent-env ] && . .claude/.agent-env`.
 
 This means after compaction/restart:
-- Template hooks: `$OVERSTORY_AGENT_NAME` is still in tmux env (survives compaction), so the guard passes, but the baked `--agent <last-deployed-role>` is wrong — this is the primary attribution drift vector.
+- Template hooks: `$HARU_AGENT_NAME` is still in tmux env (survives compaction), so the guard passes, but the baked `--agent <last-deployed-role>` is wrong — this is the primary attribution drift vector.
 - Capability guards: `ENV_GUARD` sources `.agent-env`, which may contain the wrong agent's name if another role started later.
 
-**IMPORTANT:** Whether `$OVERSTORY_AGENT_NAME` truly survives all compaction/restart paths is an unverified assumption. The `.agent-env` fallback exists precisely because someone already discovered env survival is not guaranteed. See Phase 4 risks.
+**IMPORTANT:** Whether `$HARU_AGENT_NAME` truly survives all compaction/restart paths is an unverified assumption. The `.agent-env` fallback exists precisely because someone already discovered env survival is not guaranteed. See Phase 4 risks.
 
 ### ENV_GUARD vs. Human Sessions (C6 Conflict)
 
@@ -77,51 +77,51 @@ The current `ENV_GUARD` has a fundamental design conflict with constraint C6 (hu
 
 ```sh
 # Current ENV_GUARD — BROKEN for C6
-if [ -z "$OVERSTORY_AGENT_NAME" ]; then
+if [ -z "$HARU_AGENT_NAME" ]; then
   [ -f .claude/.agent-env ] && . .claude/.agent-env;
-  [ -z "$OVERSTORY_AGENT_NAME" ] && exit 0;
+  [ -z "$HARU_AGENT_NAME" ] && exit 0;
 fi;
 ```
 
 When a human opens Claude Code at the project root:
-1. `$OVERSTORY_AGENT_NAME` is unset (human session has no overstory env)
+1. `$HARU_AGENT_NAME` is unset (human session has no haru env)
 2. `.agent-env` exists (written by the last-started root role)
-3. Guard sources `.agent-env`, setting `OVERSTORY_AGENT_NAME` to the last-started agent's name
+3. Guard sources `.agent-env`, setting `HARU_AGENT_NAME` to the last-started agent's name
 4. Guard does NOT exit — the hook activates for the human session as if it were an agent
 
-This violates C6. The fix requires a **session discriminator** — a way to distinguish "agent whose env was lost after compaction" from "human who opened Claude Code." The discriminator is `$OVERSTORY_RUNTIME_SESSION_ID`, which is set in the tmux session env by Phase 1 and is NOT present in human sessions:
+This violates C6. The fix requires a **session discriminator** — a way to distinguish "agent whose env was lost after compaction" from "human who opened Claude Code." The discriminator is `$HARU_RUNTIME_SESSION_ID`, which is set in the tmux session env by Phase 1 and is NOT present in human sessions:
 
 ```sh
 # ENV_GUARD v2 — safe for human sessions
-if [ -z "$OVERSTORY_AGENT_NAME" ]; then
-  [ -z "$OVERSTORY_RUNTIME_SESSION_ID" ] && exit 0;
-  [ -f .claude/.agent-env.$OVERSTORY_AGENT_NAME ] && . .claude/.agent-env.$OVERSTORY_AGENT_NAME;
-  [ -z "$OVERSTORY_AGENT_NAME" ] && exit 0;
+if [ -z "$HARU_AGENT_NAME" ]; then
+  [ -z "$HARU_RUNTIME_SESSION_ID" ] && exit 0;
+  [ -f .claude/.agent-env.$HARU_AGENT_NAME ] && . .claude/.agent-env.$HARU_AGENT_NAME;
+  [ -z "$HARU_AGENT_NAME" ] && exit 0;
 fi;
 ```
 
-Wait — if `OVERSTORY_AGENT_NAME` is unset, we can't source `.agent-env.$OVERSTORY_AGENT_NAME`. The correct pattern uses `OVERSTORY_RUNTIME_SESSION_ID` as both the discriminator AND the lookup key:
+Wait — if `HARU_AGENT_NAME` is unset, we can't source `.agent-env.$HARU_AGENT_NAME`. The correct pattern uses `HARU_RUNTIME_SESSION_ID` as both the discriminator AND the lookup key:
 
 ```sh
 # ENV_GUARD v2 — correct
-if [ -z "$OVERSTORY_AGENT_NAME" ]; then
-  [ -z "$OVERSTORY_RUNTIME_SESSION_ID" ] && exit 0;
-  OVERSTORY_AGENT_NAME=$(ov identity-resolve "$OVERSTORY_RUNTIME_SESSION_ID" 2>/dev/null);
-  [ -z "$OVERSTORY_AGENT_NAME" ] && exit 0;
-  export OVERSTORY_AGENT_NAME;
+if [ -z "$HARU_AGENT_NAME" ]; then
+  [ -z "$HARU_RUNTIME_SESSION_ID" ] && exit 0;
+  HARU_AGENT_NAME=$(ha identity-resolve "$HARU_RUNTIME_SESSION_ID" 2>/dev/null);
+  [ -z "$HARU_AGENT_NAME" ] && exit 0;
+  export HARU_AGENT_NAME;
 fi;
 ```
 
-This requires a lightweight `ov identity-resolve` CLI command that does a sessions.db lookup by `runtimeSessionId` and outputs the agent name. Cost: ~5ms (bun startup + sqlite query). This runs only on the compaction-recovery fallback path, not the happy path.
+This requires a lightweight `ha identity-resolve` CLI command that does a sessions.db lookup by `runtimeSessionId` and outputs the agent name. Cost: ~5ms (bun startup + sqlite query). This runs only on the compaction-recovery fallback path, not the happy path.
 
-If the CLI call is too expensive for hooks, the alternative is agent-scoped env files keyed by `OVERSTORY_RUNTIME_SESSION_ID`:
+If the CLI call is too expensive for hooks, the alternative is agent-scoped env files keyed by `HARU_RUNTIME_SESSION_ID`:
 
 ```sh
 # ENV_GUARD v2 — file-based alternative
-if [ -z "$OVERSTORY_AGENT_NAME" ]; then
-  [ -z "$OVERSTORY_RUNTIME_SESSION_ID" ] && exit 0;
-  [ -f ".claude/.agent-env.$OVERSTORY_RUNTIME_SESSION_ID" ] && . ".claude/.agent-env.$OVERSTORY_RUNTIME_SESSION_ID";
-  [ -z "$OVERSTORY_AGENT_NAME" ] && exit 0;
+if [ -z "$HARU_AGENT_NAME" ]; then
+  [ -z "$HARU_RUNTIME_SESSION_ID" ] && exit 0;
+  [ -f ".claude/.agent-env.$HARU_RUNTIME_SESSION_ID" ] && . ".claude/.agent-env.$HARU_RUNTIME_SESSION_ID";
+  [ -z "$HARU_AGENT_NAME" ] && exit 0;
 fi;
 ```
 
@@ -129,7 +129,7 @@ This requires writing `.agent-env.{runtimeSessionId}` files at startup (one per 
 
 ### Pre-existing Template Bug: Unguarded git push Block
 
-The `hooks.json.tmpl` `PreToolUse` Bash guard for `git push` blocking (line 40-48) uses `read -r INPUT` directly without any `ENV_GUARD` or agent guard. This means it blocks `git push` for ALL Claude Code sessions in the project root, including non-overstory human sessions. This must be corrected as part of Phase 2 template cleanup.
+The `hooks.json.tmpl` `PreToolUse` Bash guard for `git push` blocking (line 40-48) uses `read -r INPUT` directly without any `ENV_GUARD` or agent guard. This means it blocks `git push` for ALL Claude Code sessions in the project root, including non-haru human sessions. This must be corrected as part of Phase 2 template cleanup.
 
 ### Stdin Model
 
@@ -140,14 +140,14 @@ Claude Code provides independent stdin per hook entry and runs hooks within a ma
 The observed live attribution drift is caused by all of the following:
 
 1. Persistent mission roles deploy hooks into one shared project root.
-2. Hook commands are generated with a baked `{{AGENT_NAME}}` — the template uses deploy-time substitution instead of runtime `$OVERSTORY_AGENT_NAME`.
-3. Existing overstory hooks are replaced wholesale on each deployment.
+2. Hook commands are generated with a baked `{{AGENT_NAME}}` — the template uses deploy-time substitution instead of runtime `$HARU_AGENT_NAME`.
+3. Existing haru hooks are replaced wholesale on each deployment.
 
 An additional coupled hazard makes recovery and guard behavior less reliable:
 
 4. Hook fallback identity for shared-root recovery currently depends on one shared `.claude/.agent-env` file (singleton content problem).
 5. Shared-root lifecycle cleanup paths can overwrite or delete that singleton file when one root role starts, stops, or is reaped.
-6. The current `ENV_GUARD` `.agent-env` fallback activates overstory hooks for human sessions at the project root (C6 violation).
+6. The current `ENV_GUARD` `.agent-env` fallback activates haru hooks for human sessions at the project root (C6 violation).
 
 A third class of bug exists in capability guard classification:
 
@@ -164,20 +164,20 @@ Result:
 - shared-root recovery paths remain brittle because `.agent-env` is singleton state rather than per-role state
 - one root role's stop/watchdog cleanup can invalidate fallback state for other still-live root roles
 - `stopPersistentAgent()` calls `removeAgentEnvFile(projectRoot)` unconditionally — stopping ANY root role deletes the fallback file for ALL other root roles
-- human Claude Code sessions at the project root have overstory hooks activated via `.agent-env` sourcing (C6 violation)
+- human Claude Code sessions at the project root have haru hooks activated via `.agent-env` sourcing (C6 violation)
 - unclassified capabilities fall through `getCapabilityGuards()` with zero guards
 - `plan-review-lead` gets incorrectly transitioned to `completed` on every Stop hook
 
 ## Constraints
 
 - C1: Do not break worker/worktree agents; they already have per-worktree isolation.
-- C2: Do not regress the existing `ov coordinator` fast path.
+- C2: Do not regress the existing `ha coordinator` fast path.
 - C3: Do not rely on prompt-only discipline; fix must be enforced in runtime behavior.
 - C4: Do not patch only the hook template while leaving capability guards baked per role.
 - C5: Fix must work for restart/compaction flows, not only clean startups.
-- C6: Human Claude sessions at the repo root must remain inert; overstory hooks must not activate for non-overstory sessions. The `ENV_GUARD` must use `$OVERSTORY_RUNTIME_SESSION_ID` as a session discriminator — see "ENV_GUARD vs. Human Sessions" above.
+- C6: Human Claude sessions at the repo root must remain inert; haru hooks must not activate for non-haru sessions. The `ENV_GUARD` must use `$HARU_RUNTIME_SESSION_ID` as a session discriminator — see "ENV_GUARD vs. Human Sessions" above.
 - C7: Preserve existing user hooks and non-hook keys in `.claude/settings.local.json` during shared-root deployment changes.
-- C8: Preserve explicit manual CLI behavior for `ov prime --agent ...`, `ov mail check --agent ...`, and similar commands outside hook-driven shared-root execution.
+- C8: Preserve explicit manual CLI behavior for `ha prime --agent ...`, `ha mail check --agent ...`, and similar commands outside hook-driven shared-root execution.
 - C9: Headless runtimes (Sapling, Codex, OpenCode, Pi) must NOT be used as persistent root agents. Add a guard in `startPersistentAgent()`.
 - C10: Phases 1-3 MUST ship as a single atomic deployment (one branch, one merge). Phase 4 ships with them if env-survival is proven, otherwise deferred — Phases 1-3 are independently correct and must not be blocked by Phase 4's prerequisite.
 
@@ -192,11 +192,11 @@ This plan is complete only when all of the following are true:
 - Capability guards remain correct for each live root role.
 - `mission-analyst` and `execution-director` no longer drift to `zombie` because of hook identity corruption.
 - Existing worktree agent behavior remains unchanged.
-- Human Claude sessions at repo root do not trigger overstory hooks (C6 — verified by ENV_GUARD v2 discriminator).
+- Human Claude sessions at repo root do not trigger haru hooks (C6 — verified by ENV_GUARD v2 discriminator).
 - All root role capabilities have explicit guard classifications across all runtime guard generators.
 - Stopping one root role does not break the identity or guard state of other live root roles.
-- `$OVERSTORY_CAPABILITY` is validated against sessions.db — env alone is not the sole authority.
-- Unset `$OVERSTORY_CAPABILITY` triggers maximum-restrictiveness failsafe for agent sessions (but NOT for human sessions — C6).
+- `$HARU_CAPABILITY` is validated against sessions.db — env alone is not the sole authority.
+- Unset `$HARU_CAPABILITY` triggers maximum-restrictiveness failsafe for agent sessions (but NOT for human sessions — C6).
 
 ## Recommended Execution Order
 
@@ -212,7 +212,7 @@ Phases 1-3 ship atomically (constraint C10). Phase 4 ships with them if prerequi
 Rationale:
 
 - Phase 1 establishes identity model, fixes live safety bugs, provides session-scoped `.agent-env` files that solve both the singleton content problem AND the C6 violation.
-- Phase 2 is the core attribution fix — template hooks use `$OVERSTORY_AGENT_NAME` with ENV_GUARD v2.
+- Phase 2 is the core attribution fix — template hooks use `$HARU_AGENT_NAME` with ENV_GUARD v2.
 - Phase 3 makes guards stable and capability-aware via Option B (no concurrent write problem).
 - Phase 4 removes `.agent-env` dependency entirely once env-survival is proven. If env-survival test fails, `.agent-env` remains but is now session-scoped (safe).
 - Phase 5 tests are written alongside Phases 1-3, not as a trailing phase.
@@ -224,7 +224,7 @@ Rationale:
 
 ## Phase 1: Shared-Root Identity Model + Session-Scoped Env Files + Safety Patches + Capability Classification
 
-Status: FIXED — Shipped atomically with Phases 2-3 per C10. Commit: 6359e58d 'fix(hooks): shared-root identity isolation for concurrent persistent agents'. Implements ENV_GUARD v2 with OVERSTORY_RUNTIME_SESSION_ID discriminator, session-scoped .agent-env.{sessionId} files, capability classification for coordinator-mission/execution-director/plan-review-lead, plan-review-lead added to PERSISTENT_CAPABILITIES, OVERSTORY_CAPABILITY + OVERSTORY_RUNTIME_SESSION_ID propagation, and scoped stopPersistentAgent file removal. Follow-up: 0bb85bcc (test fix), cb450ad5 (gitignore fix).
+Status: FIXED — Shipped atomically with Phases 2-3 per C10. Commit: 6359e58d 'fix(hooks): shared-root identity isolation for concurrent persistent agents'. Implements ENV_GUARD v2 with HARU_RUNTIME_SESSION_ID discriminator, session-scoped .agent-env.{sessionId} files, capability classification for coordinator-mission/execution-director/plan-review-lead, plan-review-lead added to PERSISTENT_CAPABILITIES, HARU_CAPABILITY + HARU_RUNTIME_SESSION_ID propagation, and scoped stopPersistentAgent file removal. Follow-up: 0bb85bcc (test fix), cb450ad5 (gitignore fix).
 
 Goal:
 
@@ -253,24 +253,24 @@ Primary files:
 
 ### Env Propagation
 
-- Add `OVERSTORY_CAPABILITY` to spawned agent env in BOTH paths:
+- Add `HARU_CAPABILITY` to spawned agent env in BOTH paths:
   - `tmux.createSession()` env argument (`persistent-root.ts:280-283`)
   - `runtime.buildSpawnCommand()` env block (`persistent-root.ts:275-278`)
   - Both must carry the same value.
-- Expose `runtimeSessionId` (already generated at `persistent-root.ts:267`) as `OVERSTORY_RUNTIME_SESSION_ID` in BOTH env paths. This is the same UUID passed to `buildSpawnCommand({ sessionId })`.
-- Add `OVERSTORY_TASK_ID` where task-scoped guard behavior depends on it.
+- Expose `runtimeSessionId` (already generated at `persistent-root.ts:267`) as `HARU_RUNTIME_SESSION_ID` in BOTH env paths. This is the same UUID passed to `buildSpawnCommand({ sessionId })`.
+- Add `HARU_TASK_ID` where task-scoped guard behavior depends on it.
 - Propagate to ALL root-style spawn paths: persistent root roles, worktree agents (sling.ts), monitor, supervisor.
 - Update `resume.ts` and `watchdog/swap.ts` to propagate the same env contract.
-- The Phase 4 env-survival test must verify ALL three vars (`OVERSTORY_AGENT_NAME`, `OVERSTORY_RUNTIME_SESSION_ID`, `OVERSTORY_CAPABILITY`) survive compaction.
+- The Phase 4 env-survival test must verify ALL three vars (`HARU_AGENT_NAME`, `HARU_RUNTIME_SESSION_ID`, `HARU_CAPABILITY`) survive compaction.
 
 ### Session-Scoped `.agent-env` Files
 
-Replace the singleton `.claude/.agent-env` with session-scoped files keyed by `OVERSTORY_RUNTIME_SESSION_ID`:
+Replace the singleton `.claude/.agent-env` with session-scoped files keyed by `HARU_RUNTIME_SESSION_ID`:
 
-- Write `.claude/.agent-env.{runtimeSessionId}` at startup (one per root role). Contains `export OVERSTORY_AGENT_NAME="..." OVERSTORY_CAPABILITY="..."`.
+- Write `.claude/.agent-env.{runtimeSessionId}` at startup (one per root role). Contains `export HARU_AGENT_NAME="..." HARU_CAPABILITY="..."`.
 - This solves THREE problems simultaneously:
   1. **Singleton content problem:** Each root role has its own file. Stopping one doesn't affect others.
-  2. **C6 violation:** Human sessions don't have `OVERSTORY_RUNTIME_SESSION_ID`, so no file matches, so nothing is sourced.
+  2. **C6 violation:** Human sessions don't have `HARU_RUNTIME_SESSION_ID`, so no file matches, so nothing is sourced.
   3. **Concurrent startup:** Each role writes its own file. No race on a shared file.
 - Write with mode `0600` (owner-only) and atomic write via temp-file + rename.
 - Cleanup: when a root role is stopped, remove only its own `.agent-env.{sessionId}` file.
@@ -281,12 +281,12 @@ Replace the singleton `.claude/.agent-env` with session-scoped files keyed by `O
 - Add `SessionStore` lookup by `runtime_session_id` (primary correlation for hook identity).
 - Add `SessionStore` lookup by `tmux_session` only as a secondary fallback.
 - Add a shared identity resolution helper that prefers:
-  1. live process env (`$OVERSTORY_AGENT_NAME`)
+  1. live process env (`$HARU_AGENT_NAME`)
   2. runtime `session_id` from hook payload mapped to durable `runtimeSessionId`
-  3. explicit env-provided `OVERSTORY_RUNTIME_SESSION_ID` for non-stdin hook paths
+  3. explicit env-provided `HARU_RUNTIME_SESSION_ID` for non-stdin hook paths
   4. durable session lookup fallback
   5. session-scoped `.agent-env.{sessionId}` file as last resort
-- The resolution helper must validate `$OVERSTORY_CAPABILITY` against sessions.db when performing capability-based decisions.
+- The resolution helper must validate `$HARU_CAPABILITY` against sessions.db when performing capability-based decisions.
 
 ### Immediate Safety Patches
 
@@ -314,7 +314,7 @@ Acceptance criteria:
 - Root and worktree agents expose capability via env in both tmux and spawn-command paths.
 - Session-scoped `.agent-env.{sessionId}` files exist for each root role.
 - Stopping one root role removes only its own session-scoped file.
-- Human sessions at root cannot source any session-scoped file (no `OVERSTORY_RUNTIME_SESSION_ID`).
+- Human sessions at root cannot source any session-scoped file (no `HARU_RUNTIME_SESSION_ID`).
 - All root role capabilities have conservative guard classifications.
 - `plan-review-lead` is in `PERSISTENT_CAPABILITIES`.
 
@@ -342,28 +342,28 @@ Primary files:
 
 ### Core Template Fix
 
-Replace every occurrence of baked `{{AGENT_NAME}}` in `hooks.json.tmpl` with `$OVERSTORY_AGENT_NAME`, and upgrade ALL template guards to ENV_GUARD v2:
+Replace every occurrence of baked `{{AGENT_NAME}}` in `hooks.json.tmpl` with `$HARU_AGENT_NAME`, and upgrade ALL template guards to ENV_GUARD v2:
 
 ```diff
--"command": "[ -z \"$OVERSTORY_AGENT_NAME\" ] && exit 0; ov prime --agent {{AGENT_NAME}}"
-+"command": "if [ -z \"$OVERSTORY_AGENT_NAME\" ]; then [ -z \"$OVERSTORY_RUNTIME_SESSION_ID\" ] && exit 0; [ -f \".claude/.agent-env.$OVERSTORY_RUNTIME_SESSION_ID\" ] && . \".claude/.agent-env.$OVERSTORY_RUNTIME_SESSION_ID\"; [ -z \"$OVERSTORY_AGENT_NAME\" ] && exit 0; fi; ov prime --agent \"$OVERSTORY_AGENT_NAME\""
+-"command": "[ -z \"$HARU_AGENT_NAME\" ] && exit 0; ha prime --agent {{AGENT_NAME}}"
++"command": "if [ -z \"$HARU_AGENT_NAME\" ]; then [ -z \"$HARU_RUNTIME_SESSION_ID\" ] && exit 0; [ -f \".claude/.agent-env.$HARU_RUNTIME_SESSION_ID\" ] && . \".claude/.agent-env.$HARU_RUNTIME_SESSION_ID\"; [ -z \"$HARU_AGENT_NAME\" ] && exit 0; fi; ha prime --agent \"$HARU_AGENT_NAME\""
 ```
 
 **ENV_GUARD v2** design:
-1. Check `$OVERSTORY_AGENT_NAME` — if set (happy path), proceed. (~0ms)
-2. Check `$OVERSTORY_RUNTIME_SESSION_ID` — if unset, this is a human session → exit 0. (~0ms)
+1. Check `$HARU_AGENT_NAME` — if set (happy path), proceed. (~0ms)
+2. Check `$HARU_RUNTIME_SESSION_ID` — if unset, this is a human session → exit 0. (~0ms)
 3. Source session-scoped `.agent-env.{sessionId}` file (Phase 1 creates these). (~0.03ms)
-4. If `OVERSTORY_AGENT_NAME` still unset after sourcing → exit 0. (~0ms)
+4. If `HARU_AGENT_NAME` still unset after sourcing → exit 0. (~0ms)
 
 This satisfies C6 (human sessions exit at step 2) and C5 (compaction recovery sources the correct session-scoped file at step 3).
 
 Apply to ALL hook commands in the template:
-- `SessionStart`: `ov prime --agent ...` and `ov mail check --inject --agent ...`
-- `UserPromptSubmit`: `ov mail check --inject --agent ...`
-- `PreToolUse`: `ov log tool-start --agent ...`
-- `PostToolUse`: `ov log tool-end --agent ...` and `ov mail check --inject --agent ...`
-- `Stop`: `ov log session-end --agent ...`
-- `PreCompact`: `ov prime --agent ... --compact`
+- `SessionStart`: `ha prime --agent ...` and `ha mail check --inject --agent ...`
+- `UserPromptSubmit`: `ha mail check --inject --agent ...`
+- `PreToolUse`: `ha log tool-start --agent ...`
+- `PostToolUse`: `ha log tool-end --agent ...` and `ha mail check --inject --agent ...`
+- `Stop`: `ha log session-end --agent ...`
+- `PreCompact`: `ha prime --agent ... --compact`
 
 ### Template Guard Unification
 
@@ -371,21 +371,21 @@ ALL hooks (template-generated and capability-guard-generated) must use ENV_GUARD
 
 ### Additional Template Cleanup
 
-- Fix the unguarded `git push` block (template line 40-48): add ENV_GUARD v2 so it only fires for overstory sessions.
+- Fix the unguarded `git push` block (template line 40-48): add ENV_GUARD v2 so it only fires for haru sessions.
 - Remove the `{{AGENT_NAME}}` substitution loop in `deployHooks()` (`hooks-deployer.ts:630`).
 
 ### Supporting Command Changes (Defense-in-Depth)
 
-After the template fix, `--agent` will correctly resolve via `$OVERSTORY_AGENT_NAME`. The following are belt-and-suspenders:
+After the template fix, `--agent` will correctly resolve via `$HARU_AGENT_NAME`. The following are belt-and-suspenders:
 
-- Update `ov log` internals so identity resolution can override stale CLI `--agent` values.
+- Update `ha log` internals so identity resolution can override stale CLI `--agent` values.
 - Add observable audit logging: when hook identity resolution falls back to session-scoped `.agent-env` file (rather than live env), log a warning so attribution drift is detectable before it causes zombies.
 - Keep explicit user-invoked CLI `--agent` behavior stable outside hook context.
 
 Acceptance criteria:
 
 - No `{{AGENT_NAME}}` residue in any deployed hook command.
-- ALL template hooks use ENV_GUARD v2 with `$OVERSTORY_RUNTIME_SESSION_ID` discriminator.
+- ALL template hooks use ENV_GUARD v2 with `$HARU_RUNTIME_SESSION_ID` discriminator.
 - Human Claude sessions at root: hooks exit at ENV_GUARD v2 step 2 (verified by test).
 - Agent compaction recovery: hooks resolve correct agent name via session-scoped file (verified by test).
 - Template `git push` guard is properly gated.
@@ -394,7 +394,7 @@ Acceptance criteria:
 Risks:
 
 - Template migration can break existing tests that assume agent name substitution.
-- Worker/worktree agents also use the same template — verify `$OVERSTORY_AGENT_NAME` and `$OVERSTORY_RUNTIME_SESSION_ID` are set for them too.
+- Worker/worktree agents also use the same template — verify `$HARU_AGENT_NAME` and `$HARU_RUNTIME_SESSION_ID` are set for them too.
 
 ## Phase 3: Dynamic Capability Guards (Option B)
 
@@ -425,29 +425,29 @@ Primary files:
 
 ### Capability-Based Dynamic Guards
 
-Replace `agentGuard(agentName)` checks with capability-based checks that read `$OVERSTORY_CAPABILITY` at execution time:
+Replace `agentGuard(agentName)` checks with capability-based checks that read `$HARU_CAPABILITY` at execution time:
 
 ```sh
 # Old: agent-scoped guard
-[ "$OVERSTORY_AGENT_NAME" != "mission-analyst" ] && exit 0;
+[ "$HARU_AGENT_NAME" != "mission-analyst" ] && exit 0;
 
 # New: capability-scoped guard
-case "$OVERSTORY_CAPABILITY" in scout|reviewer|lead|supervisor|monitor|mission-analyst|plan-review-lead) ;; *) exit 0 ;; esac;
+case "$HARU_CAPABILITY" in scout|reviewer|lead|supervisor|monitor|mission-analyst|plan-review-lead) ;; *) exit 0 ;; esac;
 ```
 
 Generate one static set of shell scripts that branch on capability. The hook file never needs rewriting for new root roles.
 
 ### Mandatory Failsafe
 
-When `$OVERSTORY_CAPABILITY` is unset or empty AND the session IS an overstory session (has `$OVERSTORY_RUNTIME_SESSION_ID`), apply the most restrictive guard set (`NON_IMPLEMENTATION_CAPABILITIES` rules — block all writes, block all file-modifying Bash). An unset capability must NEVER result in zero guards for an agent session.
+When `$HARU_CAPABILITY` is unset or empty AND the session IS an haru session (has `$HARU_RUNTIME_SESSION_ID`), apply the most restrictive guard set (`NON_IMPLEMENTATION_CAPABILITIES` rules — block all writes, block all file-modifying Bash). An unset capability must NEVER result in zero guards for an agent session.
 
-When `$OVERSTORY_CAPABILITY` is unset AND `$OVERSTORY_RUNTIME_SESSION_ID` is also unset — this is a human session. Exit 0 (no guards). This satisfies C6.
+When `$HARU_CAPABILITY` is unset AND `$HARU_RUNTIME_SESSION_ID` is also unset — this is a human session. Exit 0 (no guards). This satisfies C6.
 
 ### Capability Validation
 
-`$OVERSTORY_CAPABILITY` must be cross-validated against sessions.db by the identity resolution helper (Phase 1). If the live env value doesn't match the stored value, apply the more restrictive class.
+`$HARU_CAPABILITY` must be cross-validated against sessions.db by the identity resolution helper (Phase 1). If the live env value doesn't match the stored value, apply the more restrictive class.
 
-**Limitation:** Multiple agents of the same capability at the project root (e.g., two supervisors) cannot be distinguished by capability-based guards. Agent-scoped branch naming guards (which check `$OVERSTORY_AGENT_NAME`, not capability) are an exception and remain agent-scoped.
+**Limitation:** Multiple agents of the same capability at the project root (e.g., two supervisors) cannot be distinguished by capability-based guards. Agent-scoped branch naming guards (which check `$HARU_AGENT_NAME`, not capability) are an exception and remain agent-scoped.
 
 ### Implementation tasks:
 
@@ -480,7 +480,7 @@ Goal:
 
 - Remove the `.agent-env` fallback entirely, relying purely on tmux env vars.
 
-**PREREQUISITE:** An automated test must prove that ALL THREE env vars (`OVERSTORY_AGENT_NAME`, `OVERSTORY_RUNTIME_SESSION_ID`, `OVERSTORY_CAPABILITY`) survive Claude Code context compaction within a tmux session. The test must: (1) create a tmux session with exported env vars, (2) simulate the inner process being killed and restarted (as compaction does), (3) verify all three env vars are still available in the new process. Do NOT remove `.agent-env` until this test passes on Linux and macOS.
+**PREREQUISITE:** An automated test must prove that ALL THREE env vars (`HARU_AGENT_NAME`, `HARU_RUNTIME_SESSION_ID`, `HARU_CAPABILITY`) survive Claude Code context compaction within a tmux session. The test must: (1) create a tmux session with exported env vars, (2) simulate the inner process being killed and restarted (as compaction does), (3) verify all three env vars are still available in the new process. Do NOT remove `.agent-env` until this test passes on Linux and macOS.
 
 **If the test fails:** Phase 4 is deferred. Phases 1-3 are still correct — session-scoped `.agent-env.{sessionId}` files provide safe fallback indefinitely.
 
@@ -503,7 +503,7 @@ Implementation tasks:
 - Stop writing the backward-compat singleton `.agent-env`.
 - Simplify ENV_GUARD v2 to remove the file-sourcing fallback (only env vars remain).
 - Update all lifecycle cleanup paths.
-- Keep the guard's `[ -z "$OVERSTORY_RUNTIME_SESSION_ID" ] && exit 0` check for C6 compliance.
+- Keep the guard's `[ -z "$HARU_RUNTIME_SESSION_ID" ] && exit 0` check for C6 compliance.
 
 Acceptance criteria:
 
@@ -524,13 +524,13 @@ Status: COMPLETE (Priority 1) — Tests shipped alongside the Phase 1-3 commit. 
 
 **Must be written alongside implementation, not after.**
 
-1. **End-to-end attribution drift** (the actual failure chain): (a) deploy hooks for coordinator, (b) deploy hooks for mission-analyst (overwriting), (c) read deployed `settings.local.json` and extract the `--agent` value from a hook command, (d) invoke `ov log tool-start` with that extracted value while env says `$OVERSTORY_AGENT_NAME=coordinator`, (e) verify the coordinator's session record is updated (not analyst's). Must FAIL before the fix and PASS after.
-2. **Template uses `$OVERSTORY_AGENT_NAME`**: Deploy hooks, verify no `{{AGENT_NAME}}` residue and all `--agent` flags reference `$OVERSTORY_AGENT_NAME`.
+1. **End-to-end attribution drift** (the actual failure chain): (a) deploy hooks for coordinator, (b) deploy hooks for mission-analyst (overwriting), (c) read deployed `settings.local.json` and extract the `--agent` value from a hook command, (d) invoke `ha log tool-start` with that extracted value while env says `$HARU_AGENT_NAME=coordinator`, (e) verify the coordinator's session record is updated (not analyst's). Must FAIL before the fix and PASS after.
+2. **Template uses `$HARU_AGENT_NAME`**: Deploy hooks, verify no `{{AGENT_NAME}}` residue and all `--agent` flags reference `$HARU_AGENT_NAME`.
 3. **Sequential start produces stable hooks**: Start coordinator, then analyst, verify `settings.local.json` base hooks are identical after each.
-4. **Stop safety with content verification**: Start coordinator and analyst. Stop analyst. Simulate compaction for coordinator (unset `OVERSTORY_AGENT_NAME`, source the remaining `.agent-env` files). Verify the resolved `OVERSTORY_AGENT_NAME` is `coordinator` (not `mission-analyst`). This verifies both existence AND correctness.
+4. **Stop safety with content verification**: Start coordinator and analyst. Stop analyst. Simulate compaction for coordinator (unset `HARU_AGENT_NAME`, source the remaining `.agent-env` files). Verify the resolved `HARU_AGENT_NAME` is `coordinator` (not `mission-analyst`). This verifies both existence AND correctness.
 5. **Capability classification completeness**: Verify `getCapabilityGuards()` returns non-empty guards for `coordinator-mission`, `execution-director`, `plan-review-lead`.
 6. **Failsafe for unset capability**: Call capability guard logic with empty capability + agent session context → maximum-restrictiveness. Call with empty capability + no session context → no guards (C6).
-7. **Human session at root (C6)**: Deploy hooks. Run ENV_GUARD v2 with no `OVERSTORY_*` vars set but `.agent-env` files present. Verify hook exits at step 2 (OVERSTORY_RUNTIME_SESSION_ID check). Verify NO overstory hook commands execute.
+7. **Human session at root (C6)**: Deploy hooks. Run ENV_GUARD v2 with no `OVERSTORY_*` vars set but `.agent-env` files present. Verify hook exits at step 2 (HARU_RUNTIME_SESSION_ID check). Verify NO haru hook commands execute.
 
 ### Priority 2: Comprehensive Coverage
 
@@ -556,7 +556,7 @@ Acceptance criteria:
 
 ## Phase 6: Live Mission Recovery Path
 
-Status: NOT IMPLEMENTED — No 'ov mission repair' command found in src/commands/. No grep hits for 'mission repair'.
+Status: NOT IMPLEMENTED — No 'ha mission repair' command found in src/commands/. No grep hits for 'mission repair'.
 
 Goal:
 
@@ -571,10 +571,10 @@ Primary files:
 
 ### Decisions (resolved)
 
-1. **Repair command or manual procedure?** → Dedicated `ov mission repair` command. Manual procedures are error-prone for a multi-role restart sequence.
-2. **Must the coordinator be restarted?** → Yes. The coordinator's tmux session was started with the old overstory binary. Its `settings.local.json` has baked hooks. Since Claude Code does not hot-reload hooks, the coordinator must be restarted. The repair command should handle this with: save coordinator state → stop coordinator → redeploy hooks → restart coordinator with saved state context.
+1. **Repair command or manual procedure?** → Dedicated `ha mission repair` command. Manual procedures are error-prone for a multi-role restart sequence.
+2. **Must the coordinator be restarted?** → Yes. The coordinator's tmux session was started with the old haru binary. Its `settings.local.json` has baked hooks. Since Claude Code does not hot-reload hooks, the coordinator must be restarted. The repair command should handle this with: save coordinator state → stop coordinator → redeploy hooks → restart coordinator with saved state context.
 3. **Recovery sequence:**
-   1. `ov mission repair` verifies the current mission/run is active.
+   1. `ha mission repair` verifies the current mission/run is active.
    2. Stops `execution-director` (if running).
    3. Stops `mission-analyst` (if running).
    4. Stops `coordinator`.
@@ -599,17 +599,17 @@ If the fix causes unexpected issues after deployment:
 2. **Capability relaxation:** If conservative classifications are too restrictive for `execution-director`, widen its classification in a follow-up without reverting the rest.
 3. **Phase 4 revert:** If Phase 4 shipped and env-survival fails on some platforms, restore session-scoped `.agent-env` writes. Phases 1-3 remain intact.
 
-**Mid-flight mission rollback:** If a mission is active when rollback is needed: (1) stop all root roles (`ov mission stop`), (2) revert the branch, (3) restart the mission. The old baked hooks will be redeployed. This restores the original attribution drift bug but is operationally safe.
+**Mid-flight mission rollback:** If a mission is active when rollback is needed: (1) stop all root roles (`ha mission stop`), (2) revert the branch, (3) restart the mission. The old baked hooks will be redeployed. This restores the original attribution drift bug but is operationally safe.
 
 ## Deliverables
 
 - Session-scoped `.agent-env.{sessionId}` files replacing singleton `.agent-env`
-- ENV_GUARD v2 with `$OVERSTORY_RUNTIME_SESSION_ID` discriminator (C6-safe)
-- Dynamic root identity via `$OVERSTORY_AGENT_NAME` in template hooks
+- ENV_GUARD v2 with `$HARU_RUNTIME_SESSION_ID` discriminator (C6-safe)
+- Dynamic root identity via `$HARU_AGENT_NAME` in template hooks
 - Capability-based dynamic guards (Option B) with failsafe
 - Complete capability classification for all root role capabilities across all runtimes
-- `ov identity-resolve` CLI command (or file-based alternative) for compaction recovery
-- `ov mission repair` command for live recovery
+- `ha identity-resolve` CLI command (or file-based alternative) for compaction recovery
+- `ha mission repair` command for live recovery
 - Regression tests (Priority 1 written alongside implementation)
 
 ## Explicit Non-Goals
@@ -631,15 +631,15 @@ Before implementation is considered ready, verify:
 - [ ] Recovery path for `global-swarm-recovery` after rollout is tested
 - [ ] `coordinator-mission`, `execution-director`, `plan-review-lead` classified in all four guard generators
 - [ ] Stopping one root role leaves other root roles' identity and guards intact
-- [ ] Template `git push` block is properly gated to overstory sessions
+- [ ] Template `git push` block is properly gated to haru sessions
 - [ ] No concurrent write race on `settings.local.json` (Option B: static file)
 - [ ] Failsafe applies maximum-restrictiveness for agent sessions with unset capability
 - [ ] Human sessions at root are fully inert (C6 — ENV_GUARD v2 discriminator)
-- [ ] `$OVERSTORY_CAPABILITY` is cross-validated against sessions.db
+- [ ] `$HARU_CAPABILITY` is cross-validated against sessions.db
 - [ ] `plan-review-lead` is in `PERSISTENT_CAPABILITIES` in `log.ts`
 - [ ] ALL template hooks use ENV_GUARD v2 (not the old simple guard)
 - [ ] Rollback path is documented and covers mid-flight missions
 - [ ] Phase 4 env-survival test covers all three env vars
 - [ ] Headless runtimes are rejected for persistent root roles
 - [ ] Session-scoped `.agent-env` files are written with mode 0600 + atomic rename
-- [ ] `ov mission repair` handles full stop-redeploy-restart sequence
+- [ ] `ha mission repair` handles full stop-redeploy-restart sequence

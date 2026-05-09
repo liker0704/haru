@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { validateGraph } from "../graph.ts";
 import { createMockCheckpointStore, createMockMissionStore } from "../test-mocks.ts";
-import { understandPhaseCell } from "./understand-phase.ts";
 import type { PhaseCellConfig, PhaseCellDeps } from "./types.ts";
+import { understandPhaseCell } from "./understand-phase.ts";
 
 const config: PhaseCellConfig = {
 	missionId: "m1",
@@ -35,19 +35,19 @@ describe("understandPhaseCell.buildSubgraph", () => {
 	test("await-research has gate: async", () => {
 		const node = graph.nodes.find((n) => n.id === "understand-phase:await-research");
 		expect(node).toBeDefined();
-		expect(node!.gate).toBe("async");
+		expect(node?.gate).toBe("async");
 	});
 
 	test("evaluate has gate: async", () => {
 		const node = graph.nodes.find((n) => n.id === "understand-phase:evaluate");
 		expect(node).toBeDefined();
-		expect(node!.gate).toBe("async");
+		expect(node?.gate).toBe("async");
 	});
 
 	test("frozen has gate: human", () => {
 		const node = graph.nodes.find((n) => n.id === "understand-phase:frozen");
 		expect(node).toBeDefined();
-		expect(node!.gate).toBe("human");
+		expect(node?.gate).toBe("human");
 	});
 });
 
@@ -56,7 +56,7 @@ describe("understandPhaseCell.buildHandlers", () => {
 		const handlers = understandPhaseCell.buildHandlers(makeDeps());
 		const handler = handlers["ensure-coordinator"];
 		expect(handler).toBeDefined();
-		const result = await handler!({ getMission: () => null, checkpoint: null } as never);
+		const result = await handler?.({ getMission: () => null, checkpoint: null } as never);
 		expect(result.trigger).toBe("coordinator_ready");
 	});
 });

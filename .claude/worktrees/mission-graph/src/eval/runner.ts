@@ -1,7 +1,7 @@
 /**
  * Eval runner: orchestrates an eval run end-to-end against a fixture repo.
  *
- * Steps: setup fixture → ov init → apply config overrides → startup actions →
+ * Steps: setup fixture → ha init → apply config overrides → startup actions →
  * start coordinator → poll for completion → collect metrics → evaluate assertions.
  */
 
@@ -15,7 +15,7 @@ import { createSessionStore } from "../sessions/store.ts";
 import { evaluateAssertions } from "./assertions.ts";
 import type { EvalMetrics, EvalResult, EvalRunConfig } from "./types.ts";
 
-/** Run the ov CLI with the given args, returning stdout text and exit code. */
+/** Run the ha CLI with the given args, returning stdout text and exit code. */
 async function runOv(
 	args: string[],
 	cwd: string,
@@ -42,7 +42,7 @@ async function initGitRepo(repoPath: string): Promise<void> {
 		}
 	};
 	await spawnGit(["init"]);
-	await spawnGit(["config", "user.email", "eval@overstory.local"]);
+	await spawnGit(["config", "user.email", "eval@haru.local"]);
 	await spawnGit(["config", "user.name", "Overstory Eval"]);
 	// Create an initial commit so the repo has a HEAD
 	const readmeFile = join(repoPath, "README.md");
@@ -97,7 +97,7 @@ async function runStartupAction(command: string, cwd: string): Promise<void> {
 	}
 }
 
-/** Poll ov coordinator check-complete until done or timeout. */
+/** Poll ha coordinator check-complete until done or timeout. */
 async function waitForCompletion(
 	fixtureRoot: string,
 	timeoutMs: number,
@@ -281,13 +281,13 @@ export async function runEval(config: EvalRunConfig): Promise<EvalResult> {
 			await initGitRepo(fixtureRoot);
 		}
 
-		// Step 2: Init overstory in the fixture
+		// Step 2: Init haru in the fixture
 		const initResult = await runOv(
 			["init", "--yes", "--skip-mulch", "--skip-seeds", "--skip-canopy", "--project", fixtureRoot],
 			fixtureRoot,
 		);
 		if (initResult.exitCode !== 0) {
-			throw new EvalScenarioError(`ov init failed in fixture: ${initResult.stderr}`);
+			throw new EvalScenarioError(`ha init failed in fixture: ${initResult.stderr}`);
 		}
 
 		// Step 3: Apply config overrides
@@ -309,7 +309,7 @@ export async function runEval(config: EvalRunConfig): Promise<EvalResult> {
 			fixtureRoot,
 		);
 		if (coordResult.exitCode !== 0) {
-			throw new EvalScenarioError(`ov coordinator start failed: ${coordResult.stderr}`);
+			throw new EvalScenarioError(`ha coordinator start failed: ${coordResult.stderr}`);
 		}
 
 		// Step 6: Wait for completion

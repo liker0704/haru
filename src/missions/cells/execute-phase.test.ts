@@ -26,7 +26,7 @@ describe("executePhaseCell.buildSubgraph", () => {
 	test("await-ws-completion has gate: async", () => {
 		const node = graph.nodes.find((n) => n.id === "execute-phase:await-ws-completion");
 		expect(node).toBeDefined();
-		expect(node!.gate).toBe("async");
+		expect(node?.gate).toBe("async");
 	});
 
 	test("dispatch-ready node exists", () => {

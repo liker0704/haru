@@ -1,6 +1,6 @@
 ## intro
 
-Guided workflow profile setup for overstory. Walks through four questions to build a custom canopy profile and seed mulch domain structure, then optionally runs a discovery swarm.
+Guided workflow profile setup for haru. Walks through four questions to build a custom canopy profile and seed mulch domain structure, then optionally runs a discovery swarm.
 
 **Argument:** `$ARGUMENTS` — optional profile name to use (e.g., `my-project`). If empty, the name is derived during setup.
 
@@ -63,7 +63,7 @@ Run this for each domain the user named. Inform the user that these are empty st
 
 Ask the user: *"Do you want to run a discovery swarm now? Scouts will explore your codebase and populate the mulch domains you just created with real conventions, patterns, and architecture notes."*
 
-- If **yes**: run `ov discover` and tell the user to monitor progress with `ov status`. The mulch records from step 3 will be enriched automatically.
+- If **yes**: run `ha discover` and tell the user to monitor progress with `ha status`. The mulch records from step 3 will be enriched automatically.
 - If **no**: skip. The user can run `/discover` later at any time.
 
 ---
@@ -120,8 +120,8 @@ Print a summary of what was configured:
 
 Next steps:
   - Run /discover to populate mulch domains with real codebase knowledge
-  - Run ov coordinator start to begin an agent session
-  - Use --profile <profile-name> on any ov sling call to apply your profile
+  - Run ha coordinator start to begin an agent session
+  - Use --profile <profile-name> on any ha sling call to apply your profile
   - Run cn render <profile-name> to inspect your profile
 ```
 

@@ -1,14 +1,14 @@
 /**
- * CLI command: ov merge
+ * CLI command: ha merge
  *
  * Merges agent branches back to the canonical branch using
  * the merge queue and tiered conflict resolver.
  *
  * Usage:
- *   ov merge --branch <name>   Merge a specific branch
- *   ov merge --all             Merge all pending branches
- *   ov merge --dry-run         Check for conflicts without merging
- *   ov merge --json            Output results as JSON
+ *   ha merge --branch <name>   Merge a specific branch
+ *   ha merge --all             Merge all pending branches
+ *   ha merge --dry-run         Check for conflicts without merging
+ *   ha merge --json            Output results as JSON
  */
 
 import { mkdir } from "node:fs/promises";
@@ -34,26 +34,26 @@ export interface MergeOptions {
 }
 
 /**
- * Extract agent name from a branch following the overstory naming convention.
- * Pattern: overstory/{agentName}/{taskId}
+ * Extract agent name from a branch following the haru naming convention.
+ * Pattern: haru/{agentName}/{taskId}
  * Falls back to "unknown" if the pattern does not match.
  */
 function parseAgentName(branchName: string): string {
 	const parts = branchName.split("/");
-	if (parts[0] === "overstory" && parts[1] !== undefined) {
+	if (parts[0] === "haru" && parts[1] !== undefined) {
 		return parts[1];
 	}
 	return "unknown";
 }
 
 /**
- * Extract task ID from a branch following the overstory naming convention.
- * Pattern: overstory/{agentName}/{taskId}
+ * Extract task ID from a branch following the haru naming convention.
+ * Pattern: haru/{agentName}/{taskId}
  * Falls back to "unknown" if the pattern does not match.
  */
 function parseTaskId(branchName: string): string {
 	const parts = branchName.split("/");
-	if (parts[0] === "overstory" && parts[2] !== undefined) {
+	if (parts[0] === "haru" && parts[2] !== undefined) {
 		return parts[2];
 	}
 	return "unknown";
@@ -130,7 +130,7 @@ function formatDryRun(entry: MergeEntry): string {
 }
 
 /**
- * Entry point for `ov merge [flags]`.
+ * Entry point for `ha merge [flags]`.
  *
  * @param opts - Command options
  */
@@ -142,7 +142,7 @@ export async function mergeCommand(opts: MergeOptions): Promise<void> {
 	const json = opts.json ?? false;
 
 	if (!branchName && !all) {
-		throw new ValidationError("Either --branch <name> or --all is required for ov merge", {
+		throw new ValidationError("Either --branch <name> or --all is required for ha merge", {
 			field: "branch|all",
 		});
 	}
@@ -335,7 +335,7 @@ async function handleBranch(
 
 	// SSOT: record workstream completion so gate evaluators advance only when
 	// all planned workstreams have merged. Workstream id must be known at
-	// dispatch time (ov sling) and threaded through MergeEntry.
+	// dispatch time (ha sling) and threaded through MergeEntry.
 	if (result.success) {
 		await recordWorkstreamMerge(entry, join(config.project.root, ".overstory"));
 	}
@@ -357,7 +357,7 @@ async function handleBranch(
 /**
  * Open a sessions.db handle configured for concurrent writes. Caller owns
  * close(). Used by the ov-merge producer path — shared by recordWorkstreamMerge
- * so `ov merge --all` does not open/close a fresh handle per entry.
+ * so `ha merge --all` does not open/close a fresh handle per entry.
  */
 function openSessionsDbForWrite(overstoryDir: string): import("bun:sqlite").Database {
 	// biome-ignore lint/style/useNodejsImportProtocol: bun:sqlite is Bun-specific
@@ -374,7 +374,7 @@ function openSessionsDbForWrite(overstoryDir: string): import("bun:sqlite").Data
  * plan §BUG-A) — missed producer wiring surfaces in stderr rather than
  * silently skipping the SSOT update.
  *
- * Callers running in a loop (e.g. `ov merge --all`) SHOULD pass a pre-opened
+ * Callers running in a loop (e.g. `ha merge --all`) SHOULD pass a pre-opened
  * `db` handle to avoid repeated open/close cycles.
  */
 async function recordWorkstreamMerge(
@@ -386,7 +386,7 @@ async function recordWorkstreamMerge(
 	if (!entry.workstreamId) {
 		process.stderr.write(
 			`[merge] warning: workstreamId absent for branch ${entry.branchName} — ` +
-				`workstream_status NOT updated. Fix: ov sling must record workstreamId at dispatch.\n`,
+				`workstream_status NOT updated. Fix: ha sling must record workstreamId at dispatch.\n`,
 		);
 		return;
 	}
@@ -463,7 +463,7 @@ async function handleAll(
 	let failCount = 0;
 
 	// Shared sessions.db handle for recordWorkstreamMerge across the loop.
-	// Avoids N open/close cycles per `ov merge --all` invocation.
+	// Avoids N open/close cycles per `ha merge --all` invocation.
 	const overstoryDir = join(config.project.root, ".overstory");
 	const sharedDb = openSessionsDbForWrite(overstoryDir);
 

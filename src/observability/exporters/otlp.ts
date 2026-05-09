@@ -158,13 +158,13 @@ export function buildResourceAttributes(resource: SpanResource): OtlpAttribute[]
 		attrs.push({ key: "service.instance.id", value: { stringValue: resource.runId } });
 	}
 	if (resource.sessionId !== null) {
-		attrs.push({ key: "overstory.session.id", value: { stringValue: resource.sessionId } });
+		attrs.push({ key: "haru.session.id", value: { stringValue: resource.sessionId } });
 	}
 	if (resource.taskId !== null) {
-		attrs.push({ key: "overstory.task.id", value: { stringValue: resource.taskId } });
+		attrs.push({ key: "haru.task.id", value: { stringValue: resource.taskId } });
 	}
 	if (resource.missionId !== null) {
-		attrs.push({ key: "overstory.mission.id", value: { stringValue: resource.missionId } });
+		attrs.push({ key: "haru.mission.id", value: { stringValue: resource.missionId } });
 	}
 	return attrs;
 }
@@ -198,7 +198,7 @@ export function buildPayload(spans: ExportSpan[]): OtlpPayload {
 			},
 			scopeSpans: [
 				{
-					scope: { name: "overstory", version: PACKAGE_VERSION },
+					scope: { name: "haru", version: PACKAGE_VERSION },
 					spans: groupSpans.map(mapSpan),
 				},
 			],
