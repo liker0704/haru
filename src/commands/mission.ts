@@ -94,6 +94,10 @@ export function createMissionCommand(): Command {
 			"supervised",
 		)
 		.option("--spec <file>", "Use a pre-written product-spec.md (skips clarifier)")
+		.option(
+			"--tier <tier>",
+			"Pre-set mission tier (direct | planned | full). Requires --spec; skips intake-phase entirely.",
+		)
 		.option("--attach", "Attach to coordinator tmux session after start")
 		.option("--no-attach", "Do not attach to coordinator tmux session")
 		.option("--json", "Output as JSON")
@@ -105,6 +109,7 @@ export function createMissionCommand(): Command {
 					objective?: string;
 					autonomy?: string;
 					spec?: string;
+					tier?: string;
 					attach?: boolean;
 					json?: boolean;
 				},
@@ -122,6 +127,21 @@ export function createMissionCommand(): Command {
 						`Invalid --autonomy value '${autonomy}'. ` +
 							`Must be one of: ${validAutonomies.join(", ")}`,
 					);
+					process.exitCode = 1;
+					return;
+				}
+
+				// Validate --tier (only meaningful with --spec)
+				const validTiers = ["direct", "planned", "full"] as const;
+				if (opts.tier && !validTiers.includes(opts.tier as (typeof validTiers)[number])) {
+					console.error(
+						`Invalid --tier value '${opts.tier}'. ` + `Must be one of: ${validTiers.join(", ")}`,
+					);
+					process.exitCode = 1;
+					return;
+				}
+				if (opts.tier && !opts.spec) {
+					console.error("--tier requires --spec; tier-classifier sets tier when no spec is given.");
 					process.exitCode = 1;
 					return;
 				}
@@ -148,6 +168,7 @@ export function createMissionCommand(): Command {
 					objective,
 					autonomy: autonomy as import("../types.ts").MissionAutonomy,
 					specFile: opts.spec,
+					tier: opts.tier as import("../types.ts").MissionTier | undefined,
 					attach,
 					json: opts.json,
 					requireIntent,

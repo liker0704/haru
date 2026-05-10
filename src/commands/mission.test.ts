@@ -107,6 +107,13 @@ describe("createMissionCommand", () => {
 		expect(autonomyOpt?.defaultValue).toBe("supervised");
 	});
 
+	test("start subcommand has --tier flag", () => {
+		const cmd = createMissionCommand();
+		const start = cmd.commands.find((command) => command.name() === "start");
+		const tierOpt = start?.options.find((option) => option.long === "--tier");
+		expect(tierOpt).toBeDefined();
+	});
+
 	test("resolveCurrentMissionId recovers from MissionStore when current-mission.txt is missing", async () => {
 		const missionStore = createMissionStore(join(overstoryDir, "sessions.db"));
 		try {

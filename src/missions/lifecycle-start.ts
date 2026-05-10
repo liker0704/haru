@@ -44,6 +44,8 @@ interface StartOpts {
 	autonomy?: import("../types.ts").MissionAutonomy;
 	/** Stage A: pre-written spec path. When set, intake-phase is skipped. */
 	specFile?: string;
+	/** Stage A: pre-set tier for `--spec` power-user path. Skips intake-phase entirely. */
+	tier?: import("../types.ts").MissionTier;
 	/** When true, missing intent in non-TTY context is an error rather than placeholder. */
 	requireIntent?: boolean;
 }
@@ -141,19 +143,40 @@ export async function missionStart(
 			runId,
 			artifactRoot,
 			startedAt: new Date().toISOString(),
-			tier: null,
+			tier: opts.specFile && opts.tier ? opts.tier : null,
 			autonomy: opts.autonomy ?? "supervised",
 		};
 		const createdMission = missionStore.create(insertMission);
 		missionCreated = true;
 		missionStore.start(missionId);
-		// Stage A: missions begin in `intake` phase. The engine seeds
-		// currentNode from `${phase}:active` automatically when null.
-		// The intake-phase subgraph drives clarifier + tier-classifier; once
-		// `ha mission tier set` fires, the operational coordinator is spawned
-		// by `tierSetCommand`.
-		missionStore.updatePhase(missionId, "intake");
-		missionStore.updateCurrentNode(missionId, "intake:active");
+
+		// Stage A `--spec` power-user paths short-circuit intake-phase:
+		//   --spec <file>           → copy spec; skip clarifier+analyst-intake;
+		//                              tier-classifier still runs (jump straight
+		//                              to `intake-phase:dispatch-tier-classifier`).
+		//   --spec <file> --tier X  → copy spec; tier preset; skip ALL intake-phase;
+		//                              jump to first phase of tier X.
+		// Default (no --spec):       → start at `intake:active`, full subgraph runs.
+		let initialPhase: import("../types.ts").MissionPhase;
+		let initialNode: string;
+		if (opts.specFile && opts.tier) {
+			// Skip intake entirely. tierSetCommand normally handles transition,
+			// but with --tier on `start` we set it directly here so the engine
+			// seeds the right subgraph on first tick.
+			initialPhase = opts.tier === "direct" ? "execute" : "understand";
+			initialNode = `${initialPhase}:active`;
+		} else if (opts.specFile) {
+			// Imported spec but no tier — let classifier do its job, but skip
+			// the upstream clarifier/analyst nodes.
+			initialPhase = "intake";
+			initialNode = "intake-phase:dispatch-tier-classifier";
+		} else {
+			// Standard intake flow.
+			initialPhase = "intake";
+			initialNode = "intake:active";
+		}
+		missionStore.updatePhase(missionId, initialPhase);
+		missionStore.updateCurrentNode(missionId, initialNode);
 		const mission = missionStore.getById(missionId) ?? createdMission;
 
 		await mkdir(artifactRoot, { recursive: true });
@@ -161,15 +184,7 @@ export async function missionStart(
 		await ensureMissionArtifacts(mission);
 		await writeMissionRuntimePointers(overstoryDir, mission.id, runId);
 
-		// --spec power-user path: copy pre-written spec to the mission's
-		// product-spec.md and short-circuit intake-phase. The mission still
-		// starts in `intake` so the engine can run the tier-classifier; the
-		// clarifier/analyst-intake spawn is skipped because spec_ready mail
-		// will already be present (no — the gate evaluator looks at mail, so
-		// we emit a synthetic spec_ready event instead). For simplicity now
-		// we only copy the file and rely on the caller to also pass --tier
-		// so understand/execute spawns directly. If --tier is absent the
-		// classifier still runs.
+		// Copy pre-written spec into the mission artifact root when --spec is set.
 		if (opts.specFile) {
 			const { copyFile } = await import("node:fs/promises");
 			const { getMissionArtifactPaths } = await import("./context.ts");
@@ -181,7 +196,9 @@ export async function missionStart(
 				agentName: "operator",
 				data: {
 					kind: "spec_imported",
-					detail: `Pre-written spec copied from ${opts.specFile}`,
+					detail: opts.tier
+						? `Pre-written spec copied from ${opts.specFile}; tier=${opts.tier}; skipping intake-phase`
+						: `Pre-written spec copied from ${opts.specFile}; skipping clarifier+analyst (tier-classifier still runs)`,
 				},
 			});
 		}
