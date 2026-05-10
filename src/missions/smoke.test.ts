@@ -41,7 +41,7 @@ describe("mission smoke tests", () => {
 			expect(mission.slug).toBe("smoke-mission");
 			expect(mission.objective).toBe("Smoke test the mission lifecycle");
 			expect(mission.state).toBe("active");
-			expect(mission.phase).toBe("understand");
+			expect(mission.phase).toBe("intake");
 			expect(mission.pendingUserInput).toBe(false);
 			expect(mission.reopenCount).toBe(0);
 			expect(mission.runId).toBeNull();
@@ -54,7 +54,7 @@ describe("mission smoke tests", () => {
 			const fetched = store.getById("mission-smoke-002");
 			expect(fetched).not.toBeNull();
 			expect(fetched?.state).toBe("active");
-			expect(fetched?.phase).toBe("understand");
+			expect(fetched?.phase).toBe("intake");
 		});
 
 		test("mission stop sets terminal state", () => {

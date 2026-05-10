@@ -12,7 +12,7 @@ import { openSessionStore } from "../sessions/compat.ts";
 import { createRunStore } from "../sessions/store.ts";
 import type { InsertMission } from "../types.ts";
 import { createWatchdogControl } from "../watchdog/control.ts";
-import { attachOrSwitch, listSessions } from "../worktree/tmux.ts";
+import { listSessions } from "../worktree/tmux.ts";
 import {
 	buildMissionRoleBeacon,
 	ensureMissionArtifacts,
@@ -30,6 +30,7 @@ import {
 } from "./messaging.ts";
 import { startMissionAnalyst, startMissionCoordinator, stopMissionRole } from "./roles.ts";
 import { removeActiveMission, writeMissionRuntimePointers } from "./runtime-context.ts";
+import { generateSlugFromIntent } from "./slug.ts";
 import { createMissionStore } from "./store.ts";
 
 // === ha mission start ===
@@ -39,6 +40,14 @@ interface StartOpts {
 	objective?: string;
 	json?: boolean;
 	attach?: boolean;
+	/** Stage A: mission autonomy level — controls intake gates. Default `supervised`. */
+	autonomy?: import("../types.ts").MissionAutonomy;
+	/** Stage A: pre-written spec path. When set, intake-phase is skipped. */
+	specFile?: string;
+	/** Stage A: pre-set tier for `--spec` power-user path. Skips intake-phase entirely. */
+	tier?: import("../types.ts").MissionTier;
+	/** When true, missing intent in non-TTY context is an error rather than placeholder. */
+	requireIntent?: boolean;
 }
 
 export async function missionStart(
@@ -47,21 +56,49 @@ export async function missionStart(
 	opts: StartOpts,
 	deps: MissionCommandDeps = {},
 ): Promise<void> {
-	const slug = opts.slug ?? `mission-${Date.now()}`;
-	const objective = opts.objective ?? "Pending — coordinator will clarify with operator";
-	const pendingObjective = !opts.objective;
-	const shouldAttach = opts.attach ?? false;
-
 	const dbPath = join(overstoryDir, "sessions.db");
 	const missionStore = createMissionStore(dbPath);
+
+	// Strict-intent guard: when caller asserts intent is required (non-TTY +
+	// no positional arg) and nothing was provided, fail fast.
+	if (
+		opts.requireIntent &&
+		(!opts.objective || opts.objective.trim().length === 0) &&
+		!opts.specFile
+	) {
+		const message = "Intent required: pass it as positional arg, --objective, or --spec <file>";
+		if (opts.json) {
+			jsonError("mission start", message);
+		} else {
+			printError("Mission start failed", message);
+		}
+		missionStore.close();
+		process.exitCode = 1;
+		return;
+	}
+
+	const objective = opts.objective ?? "Pending — clarifier will resolve from intent";
+
+	// Auto-generate slug from intent (objective) when --slug omitted.
+	let slug: string;
+	if (opts.slug) {
+		slug = opts.slug;
+	} else if (opts.objective && opts.objective.trim().length > 0) {
+		const existingSlugs = new Set(missionStore.list({ limit: 200 }).map((m) => m.slug));
+		slug = generateSlugFromIntent(opts.objective, existingSlugs);
+	} else {
+		slug = `mission-${Date.now()}`;
+	}
 	const runId = `run-${new Date().toISOString().replace(/[:.]/g, "-")}-mission`;
 	const missionId = `mission-${Date.now()}-${slug}`;
 	const artifactRoot = join(overstoryDir, "missions", missionId);
 	let missionCreated = false;
-	let coordinatorStarted = false;
+	// Stage A: no coordinator spawned at start; intake-phase drives.
+	// `coordinatorStarted` and `analystStarted` retained as `false` so the
+	// catch-block cleanup loop is a no-op for these roles (intake-phase
+	// agents are leaf-spawn via `ha sling` and clean themselves up).
+	const coordinatorStarted = false;
 	const analystStarted = false;
-	const startCoord = deps.startMissionCoordinator ?? startMissionCoordinator;
-	const _startAnalyst = deps.startMissionAnalyst ?? startMissionAnalyst;
 	const stopRole = deps.stopMissionRole ?? stopMissionRole;
 
 	try {
@@ -106,13 +143,40 @@ export async function missionStart(
 			runId,
 			artifactRoot,
 			startedAt: new Date().toISOString(),
-			tier: null,
+			tier: opts.specFile && opts.tier ? opts.tier : null,
+			autonomy: opts.autonomy ?? "supervised",
 		};
 		const createdMission = missionStore.create(insertMission);
 		missionCreated = true;
 		missionStore.start(missionId);
-		// currentNode stays NULL — assess mode. The backward-compat guard in
-		// processMission() checks tier===null && currentNode===null to skip engine.
+
+		// Stage A `--spec` power-user paths short-circuit intake-phase:
+		//   --spec <file>           → copy spec; skip clarifier+analyst-intake;
+		//                              tier-classifier still runs (jump straight
+		//                              to `intake-phase:dispatch-tier-classifier`).
+		//   --spec <file> --tier X  → copy spec; tier preset; skip ALL intake-phase;
+		//                              jump to first phase of tier X.
+		// Default (no --spec):       → start at `intake:active`, full subgraph runs.
+		let initialPhase: import("../types.ts").MissionPhase;
+		let initialNode: string;
+		if (opts.specFile && opts.tier) {
+			// Skip intake entirely. tierSetCommand normally handles transition,
+			// but with --tier on `start` we set it directly here so the engine
+			// seeds the right subgraph on first tick.
+			initialPhase = opts.tier === "direct" ? "execute" : "understand";
+			initialNode = `${initialPhase}:active`;
+		} else if (opts.specFile) {
+			// Imported spec but no tier — let classifier do its job, but skip
+			// the upstream clarifier/analyst nodes.
+			initialPhase = "intake";
+			initialNode = "intake-phase:dispatch-tier-classifier";
+		} else {
+			// Standard intake flow.
+			initialPhase = "intake";
+			initialNode = "intake:active";
+		}
+		missionStore.updatePhase(missionId, initialPhase);
+		missionStore.updateCurrentNode(missionId, initialNode);
 		const mission = missionStore.getById(missionId) ?? createdMission;
 
 		await mkdir(artifactRoot, { recursive: true });
@@ -120,93 +184,45 @@ export async function missionStart(
 		await ensureMissionArtifacts(mission);
 		await writeMissionRuntimePointers(overstoryDir, mission.id, runId);
 
-		// --- Start mission coordinator (user-facing role) ---
-		// Scope agent names by slug for parallel mission support
-		const coordAgentName = slug ? `coordinator-${slug}` : "coordinator";
-		const _analystAgentName = slug ? `mission-analyst-${slug}` : "mission-analyst";
-		const _edAgentName = slug ? `execution-director-${slug}` : "execution-director";
-		const coordPrompt = await materializeMissionRolePrompt({
-			overstoryDir,
-			agentName: coordAgentName,
-			capability: "coordinator-mission-assess",
-			roleLabel: "Mission Coordinator (Assess)",
-			mission,
-			siblingNames: {},
-		});
-		drainAgentInbox(overstoryDir, coordAgentName);
+		// Copy pre-written spec into the mission artifact root when --spec is set.
+		if (opts.specFile) {
+			const { copyFile } = await import("node:fs/promises");
+			const { getMissionArtifactPaths } = await import("./context.ts");
+			const paths = getMissionArtifactPaths(mission);
+			await copyFile(opts.specFile, paths.productSpecMd);
+			recordMissionEvent({
+				overstoryDir,
+				mission,
+				agentName: "operator",
+				data: {
+					kind: "spec_imported",
+					detail: opts.tier
+						? `Pre-written spec copied from ${opts.specFile}; tier=${opts.tier}; skipping intake-phase`
+						: `Pre-written spec copied from ${opts.specFile}; skipping clarifier+analyst (tier-classifier still runs)`,
+				},
+			});
+		}
 
-		const coordResult = await startCoord({
-			missionId: mission.id,
-			missionSlug: mission.slug,
-			agentName: coordAgentName,
-			projectRoot,
-			overstoryDir,
-			existingRunId: runId,
-			appendSystemPromptFile: coordPrompt.promptPath,
-			beacon: buildMissionRoleBeacon({
-				agentName: coordAgentName,
-				missionId: mission.id,
-				contextPath: coordPrompt.contextPath,
-			}),
-		});
-		coordinatorStarted = true;
-
-		// Bind coordinator session to the mission record
-		missionStore.bindCoordinatorSession(mission.id, coordResult.session.id);
-
-		// Analyst spawn is deferred — lazy start via `ha mission tier set` when
-		// tier is set to planned or full. In assess mode only the coordinator runs.
-
-		// --- Dispatch objective to coordinator (assess mode) ---
-		const dispatchBody = pendingObjective
-			? [
-					`Mission ID: ${mission.id}`,
-					`Artifact root: ${mission.artifactRoot ?? "none"}`,
-					`Context file: ${coordPrompt.contextPath}`,
-					"",
-					"No objective was provided at start. Begin by asking the operator what they want to accomplish.",
-					"Once you understand the objective, set the mission identity:",
-					`  ha mission update --slug <short-name> --objective '<real objective>'`,
-					"Then assess complexity and set mission tier: ha mission tier set <direct|planned|full>",
-				]
-			: [
-					`Mission ID: ${mission.id}`,
-					`Objective: ${mission.objective}`,
-					`Artifact root: ${mission.artifactRoot ?? "none"}`,
-					`Context file: ${coordPrompt.contextPath}`,
-					"",
-					"You are in assess mode. Read the objective, scan the codebase, and select a tier.",
-					"Run: ha mission tier set <direct|planned|full>",
-				];
-		const dispatchId = await sendMissionDispatchMail({
-			overstoryDir,
-			to: coordAgentName,
-			subject: `Mission started: ${mission.slug}`,
-			body: dispatchBody.join("\n"),
-		});
-
-		// Analyst notification deferred to tier set (analyst is lazy-spawned)
-
+		// Stage A: no coordinator spawned at mission-start. The intake-phase
+		// subgraph (running inside the watchdog/engine) takes over from here:
+		//   1. dispatch-analyst-intake — spawns mission-analyst-intake
+		//   2. dispatch-clarifier — spawns product-clarifier (interacts with
+		//      operator via `ha mail send --to operator --type question`)
+		//   3. dispatch-tier-classifier — calls `ha mission tier set <tier>`
+		//   4. tier-set spawns the operational coordinator (direct/planned/full)
+		//      via `tierSetCommand`.
+		//
+		// Legacy `coordinator-mission-assess.md` is no longer the entry agent.
+		// Resume of pre-Stage-A missions is still supported via
+		// `restartMissionRoles()` below (which keeps the assess-tier branch).
 		recordMissionEvent({
 			overstoryDir,
 			mission,
 			agentName: "operator",
 			data: {
 				kind: "mission_started",
-				detail: `Mission started and dispatched to coordinator (${dispatchId})`,
+				detail: "Mission started — intake-phase subgraph will drive intake",
 			},
-		});
-		recordMissionEvent({
-			overstoryDir,
-			mission,
-			agentName: "operator",
-			data: { kind: "role_started", detail: "coordinator (mission) started" },
-		});
-		recordMissionEvent({
-			overstoryDir,
-			mission,
-			agentName: "operator",
-			data: { kind: "role_started", detail: "mission-analyst started" },
 		});
 
 		// Auto-start watchdog for rate-limit detection and health monitoring
@@ -233,20 +249,15 @@ export async function missionStart(
 		}
 
 		if (opts.json) {
-			jsonOutput("mission start", { mission: toSummary(mission), runId, dispatchId });
+			jsonOutput("mission start", { mission: toSummary(mission), runId });
 		} else {
 			printSuccess("Mission started", mission.slug);
 			process.stdout.write(`  ID:          ${accent(mission.id)}\n`);
 			process.stdout.write(`  Objective:   ${mission.objective}\n`);
 			process.stdout.write(`  Run:         ${runId}\n`);
 			process.stdout.write(`  Artifacts:   ${artifactRoot}\n`);
-			process.stdout.write(`  Coordinator: ${coordResult.session.id}\n`);
-			process.stdout.write(`  Tier:        ${accent("null (assess mode)")}\n`);
-			process.stdout.write(`  Dispatch:    ${dispatchId}\n`);
-		}
-
-		if (shouldAttach && coordResult.session.tmuxSession) {
-			attachOrSwitch(coordResult.session.tmuxSession);
+			process.stdout.write(`  Phase:       ${accent("intake")}\n`);
+			process.stdout.write(`  Tier:        ${accent("null (set after classifier)")}\n`);
 		}
 	} catch (err) {
 		for (const roleName of ["coordinator", "mission-analyst"]) {
@@ -307,6 +318,14 @@ async function restartMissionRoles(
 	const runId = mission.runId;
 	const tier = mission.tier;
 
+	// Stage A: tier=null means mission is still in intake phase — there are no
+	// persistent roles to restart. The intake-phase subgraph (driven by the
+	// watchdog tick) re-spawns ephemeral clarifier/analyst-intake/tier-classifier
+	// agents on the next tick if needed.
+	if (tier === null) {
+		return;
+	}
+
 	// Slug-scoped agent names (mirrors missionStart pattern)
 	const coordAgentName = mission.slug ? `coordinator-${mission.slug}` : "coordinator";
 	const analystAgentName = mission.slug ? `mission-analyst-${mission.slug}` : "mission-analyst";
@@ -320,13 +339,11 @@ async function restartMissionRoles(
 	} else if (tier === "planned") {
 		coordCapability = "coordinator-mission-planned";
 		siblingNames["Mission Analyst agent"] = analystAgentName;
-	} else if (tier === "full") {
+	} else {
+		// tier === "full"
 		coordCapability = "coordinator-mission";
 		siblingNames["Mission Analyst agent"] = analystAgentName;
 		siblingNames["Execution Director agent"] = edAgentName;
-	} else {
-		// tier === null → assess mode
-		coordCapability = "coordinator-mission-assess";
 	}
 
 	const coordPrompt = await materializeMissionRolePrompt({

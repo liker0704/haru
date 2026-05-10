@@ -27,7 +27,6 @@ const AGENT_DEF_FILES = [
 	"architecture-review-lead.md",
 	"architecture-sync.md",
 	"builder.md",
-	"coordinator-mission-assess.md",
 	"coordinator-mission-direct.md",
 	"coordinator-mission-full.md",
 	"coordinator-mission-planned.md",
@@ -37,6 +36,7 @@ const AGENT_DEF_FILES = [
 	"lead-mission.md",
 	"lead.md",
 	"merger.md",
+	"mission-analyst-intake.md",
 	"mission-analyst-planned.md",
 	"mission-analyst.md",
 	"monitor.md",
@@ -49,12 +49,14 @@ const AGENT_DEF_FILES = [
 	"plan-second-opinion.md",
 	"plan-security-critic.md",
 	"plan-simulator.md",
+	"product-clarifier.md",
 	"research-lead.md",
 	"researcher.md",
 	"reviewer.md",
 	"scout.md",
 	"shared-mandate.md",
 	"tester.md",
+	"tier-classifier.md",
 ];
 
 /** Resolve the source agents directory (same logic as init.ts). */

@@ -515,6 +515,168 @@ export function evaluateArchReviewComplete(
 	};
 }
 
+// === Intake-phase gate evaluators (Stage A) ===
+
+/**
+ * Wait for `research_complete` mail from mission-analyst-intake.
+ *
+ * Fired by analyst once research/_summary.md materializes. Until then,
+ * nudge the analyst with the standard "still working" message.
+ *
+ * Stage A locked-in decision (#228): the effective deadline is
+ * `min(scout_count × 5min, 25min)`. The subgraph node carries the upper
+ * bound (1500s) as `gateTimeout`; this evaluator surfaces an early stuck
+ * signal when the analyst has been silent for longer than the adaptive
+ * window allows. Scout count is derived from the analyst's outbound
+ * `dispatch` mail (one per scout spawn).
+ */
+export function evaluateAwaitResearchComplete(
+	mission: Mission,
+	mailStore: MailStore | null,
+	gateEnteredAt?: string,
+): GateEvalResult {
+	if (!mailStore) return { met: false };
+
+	const analystName = `mission-analyst-${mission.slug}`;
+	// Look for research_complete signal in any inbox tied to this mission
+	// (analyst may address it to a coordinator or the mission system).
+	const fromAnalyst = mailStore.getAll({ from: analystName });
+	const ready = fromAnalyst.find(
+		(m) => m.type === "research_complete" && (!gateEnteredAt || m.createdAt >= gateEnteredAt),
+	);
+	if (ready) {
+		return { met: true, trigger: "research_ready" };
+	}
+
+	// Adaptive deadline: count scout dispatches the analyst has emitted, then
+	// compute `min(scout_count × 5min, 25min)`. If the analyst hasn't
+	// dispatched anyone yet (scout_count=0), fall back to the upper bound.
+	const adaptiveBudgetMs = computeAdaptiveResearchTimeout(fromAnalyst);
+	const stuckBeyondAdaptive =
+		gateEnteredAt &&
+		Date.now() - new Date(gateEnteredAt).getTime() > adaptiveBudgetMs &&
+		// Don't out-shout the engine timeout: engine handles the hard cap.
+		adaptiveBudgetMs < ADAPTIVE_RESEARCH_CAP_MS;
+
+	return {
+		met: false,
+		nudgeTarget: analystName,
+		nudgeMessage: stuckBeyondAdaptive
+			? `Research has exceeded the adaptive ${Math.round(adaptiveBudgetMs / 60_000)}min budget — emit \`research_complete\` now or escalate via mail.`
+			: "Research summary not yet emitted — finish synthesizing scout findings and send `research_complete` mail.",
+	};
+}
+
+const ADAPTIVE_RESEARCH_PER_SCOUT_MS = 300_000; // 5 min/scout
+const ADAPTIVE_RESEARCH_CAP_MS = 1_500_000; // 25 min hard cap
+
+/**
+ * Compute `min(scout_count × 300_000, 1_500_000)` ms based on the analyst's
+ * outbound dispatch mail. Each scout spawn emits exactly one `dispatch` mail
+ * from `mission-analyst-${slug}` to `scout-...`. Returns the cap when
+ * scout_count is 0 (analyst hasn't dispatched yet).
+ *
+ * Exported for tests.
+ */
+export function computeAdaptiveResearchTimeout(
+	analystOutbox: { type: string; to: string }[],
+): number {
+	const scoutDispatches = analystOutbox.filter(
+		(m) => m.type === "dispatch" && m.to.startsWith("scout-"),
+	).length;
+	if (scoutDispatches === 0) return ADAPTIVE_RESEARCH_CAP_MS;
+	return Math.min(scoutDispatches * ADAPTIVE_RESEARCH_PER_SCOUT_MS, ADAPTIVE_RESEARCH_CAP_MS);
+}
+
+/**
+ * Wait for `spec_ready` mail from product-clarifier.
+ *
+ * Clarifier emits this once product-spec.md is materialized at the canonical
+ * artifact path.
+ */
+export function evaluateAwaitSpecReady(
+	mission: Mission,
+	mailStore: MailStore | null,
+	gateEnteredAt?: string,
+): GateEvalResult {
+	if (!mailStore) return { met: false };
+
+	const clarifierName = `product-clarifier-${mission.slug}`;
+	const fromClarifier = mailStore.getAll({ from: clarifierName });
+	const ready = fromClarifier.find(
+		(m) => m.type === "spec_ready" && (!gateEnteredAt || m.createdAt >= gateEnteredAt),
+	);
+	if (ready) {
+		return { met: true, trigger: "spec_ready" };
+	}
+
+	return {
+		met: false,
+		nudgeTarget: clarifierName,
+		nudgeMessage:
+			"product-spec.md not yet emitted — synthesize intent + research into the spec template and send `spec_ready` mail.",
+	};
+}
+
+/**
+ * Supervised-mode human gate for product-spec review. Resolved by the operator
+ * via `ha mission spec approve|reject`, which emits a `spec_approved` or
+ * `spec_rejected` mail addressed to `operator-decision-${slug}`. Auto-skip for
+ * non-supervised autonomies happens at the handler layer (see intake-phase.ts);
+ * this evaluator only runs for supervised missions.
+ *
+ * Returns `met:true` with trigger `approved` or `rejected` once the operator
+ * verdict mail is observed; otherwise stays open (no nudge target — there is
+ * no agent to wake; the operator is the gate).
+ */
+export function evaluateHumanSpecReview(
+	mission: Mission,
+	mailStore: MailStore | null,
+	gateEnteredAt?: string,
+): GateEvalResult {
+	// Auto-skip the human gate for non-supervised autonomy modes. The engine
+	// returns gate-result BEFORE invoking node handlers for `gate: "human"`
+	// nodes, so the auto-skip MUST live here in the evaluator (the inline
+	// handler in intake-phase.ts is unreachable from the engine).
+	if (mission.autonomy === "auto-spec" || mission.autonomy === "auto-all") {
+		return { met: true, trigger: "approved" };
+	}
+
+	if (!mailStore) return { met: false };
+	const decisionRecipient = `operator-decision-${mission.slug}`;
+	const verdicts = mailStore.getAll({ to: decisionRecipient });
+	const verdict = verdicts.find(
+		(m) =>
+			(m.type === "spec_approved" || m.type === "spec_rejected") &&
+			(!gateEnteredAt || m.createdAt >= gateEnteredAt),
+	);
+	if (verdict) {
+		return {
+			met: true,
+			trigger: verdict.type === "spec_approved" ? "approved" : "rejected",
+		};
+	}
+	// No nudge target — operator is the gate. Watchdog will surface stuck state
+	// via gate-timeout escalation (default 1h on the human gate).
+	return { met: false };
+}
+
+/**
+ * Wait for tier to be set by tier-classifier (mission.tier transitions from
+ * null to direct/planned/full).
+ */
+export function evaluateAwaitTierSet(mission: Mission): GateEvalResult {
+	if (mission.tier !== null) {
+		return { met: true, trigger: "tier_set" };
+	}
+	return {
+		met: false,
+		nudgeTarget: `tier-classifier-${mission.slug}`,
+		nudgeMessage:
+			"Mission tier not set — read product-spec.md, classify, and call `ha mission tier set <tier>`.",
+	};
+}
+
 /** Dispatch gate evaluator based on the current node ID. */
 export async function evaluateGate(
 	nodeId: string,
@@ -574,6 +736,17 @@ export async function evaluateGate(
 			// Human gates are resolved by ha mission answer, not by evaluators.
 			// Return met:false without unknown flag to suppress missing-evaluator warnings.
 			return { met: false };
+		case "await-research-complete":
+			return evaluateAwaitResearchComplete(mission, stores.mailStore, gateEnteredAt);
+		case "await-spec-ready":
+			return evaluateAwaitSpecReady(mission, stores.mailStore, gateEnteredAt);
+		case "await-tier-set":
+			return evaluateAwaitTierSet(mission);
+		case "human-spec-review":
+			// Supervised mode: resolved by `ha mission spec approve|reject` which
+			// emits `spec_approved` / `spec_rejected` mail. Auto-spec/auto-all
+			// modes short-circuit via the handler before this evaluator runs.
+			return evaluateHumanSpecReview(mission, stores.mailStore, gateEnteredAt);
 		default:
 			return { met: false, unknown: true };
 	}

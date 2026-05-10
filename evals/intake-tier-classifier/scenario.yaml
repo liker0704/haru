@@ -1,0 +1,97 @@
+description: "Intake-phase tier-classifier: 10 fixtures with expected tier classification + kura persistence"
+timeout_ms: 300000
+
+# Stage A intake-phase eval. Validates tier-classifier:
+# - Reads product-spec.md + research/_summary.md
+# - Extracts structured signals
+# - Applies heuristic rules
+# - Persists every decision to kura under tier-classifier domain
+# - Calls ha mission tier set <tier>
+#
+# NOTE: requires Wave 3 intake-phase wired for full e2e. This file is a
+# behavioral contract until then.
+
+fixtures:
+  trivial_typo:
+    spec_summary: "Fix typo in README.md, single-line change"
+    research_summary: "README.md, no code paths"
+    expected_tier: direct
+    expected_signals:
+      fileCount: 1
+      hasApiChange: false
+      ambiguity: low
+
+  multi_file_refactor:
+    spec_summary: "Split src/utils.ts (800 LOC) into focused modules"
+    research_summary: "utils.ts imported by 12 files; no API change; tests colocated"
+    expected_tier: planned
+    expected_signals:
+      fileCount: 12
+      hasApiChange: false
+      crossComponentDeps: 3
+
+  api_breaking_change:
+    spec_summary: "Rename public function getUser() to getUserById() across SDK"
+    research_summary: "Public API used externally; breaking signature change"
+    expected_tier: full
+    expected_signals:
+      hasApiChange: true
+      hasBreakingChange: true
+
+  auth_change:
+    spec_summary: "Switch session-based auth to JWT in src/auth/"
+    research_summary: "src/auth/middleware.ts handles all auth; downstream of API"
+    expected_tier: full
+    expected_signals:
+      hasAuthChange: true
+
+  db_migration:
+    spec_summary: "Add 'created_by' column to missions table"
+    research_summary: "Requires migration v10; backfill needed"
+    expected_tier: full
+    expected_signals:
+      hasMigration: true
+
+  billing_change:
+    spec_summary: "Implement Stripe webhook handler for subscription events"
+    research_summary: "New code in src/billing/; touches user accounts"
+    expected_tier: full
+    expected_signals:
+      hasBilling: true
+
+  security_critical:
+    spec_summary: "Rotate JWT signing keys daily via cron"
+    research_summary: "Touches src/crypto/keys.ts; sensitive secret rotation"
+    expected_tier: full
+    expected_signals:
+      hasSecurityCritical: true
+
+  bounded_cross_component:
+    spec_summary: "Add metrics emission to merge queue and watchdog"
+    research_summary: "Touches src/merge/ and src/watchdog/; no API change; bounded scope"
+    expected_tier: planned
+    expected_signals:
+      crossComponentDeps: 2
+      hasApiChange: false
+
+  ambiguous_spec:
+    spec_summary: "Make the dashboard better"
+    research_summary: "Dashboard at src/dashboard/, multiple panels"
+    expected_tier: full
+    expected_signals:
+      ambiguity: high
+
+  simple_refactor:
+    spec_summary: "Extract magic number 60_000 into named constant in single file"
+    research_summary: "src/timeouts.ts only; no API surface; trivial change"
+    expected_tier: direct
+    expected_signals:
+      fileCount: 1
+      ambiguity: low
+
+assertions:
+  - kura_record_present_for_each_classification: true
+  - kura_record_has_signals_field: true
+  - kura_record_has_rationale_field: true
+  - ha_mission_tier_set_invoked: true
+  - all_fixture_tiers_match_expected: true

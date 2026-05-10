@@ -49,7 +49,8 @@ describe("createMissionCommand", () => {
 		expect(names).toContain("update");
 		expect(names).toContain("extract-learnings");
 		expect(names).toContain("tier");
-		expect(names).toHaveLength(20);
+		expect(names).toContain("spec");
+		expect(names).toHaveLength(21);
 	});
 
 	test("answer subcommand supports --body and --file", () => {
@@ -81,6 +82,36 @@ describe("createMissionCommand", () => {
 		expect(pause?.options.find((option) => option.long === "--json")).toBeDefined();
 		expect(refresh?.options.find((option) => option.long === "--workstream")).toBeDefined();
 		expect(refresh?.options.find((option) => option.long === "--json")).toBeDefined();
+	});
+
+	test("start subcommand accepts positional intent + Stage A flags", () => {
+		const cmd = createMissionCommand();
+		const start = cmd.commands.find((command) => command.name() === "start");
+		expect(start).toBeDefined();
+		const options = start?.options ?? [];
+
+		// Positional [intent...] is accepted (registered as a command argument)
+		expect(start?.registeredArguments?.length ?? 0).toBeGreaterThan(0);
+
+		// Stage A flags
+		expect(options.find((option) => option.long === "--slug")).toBeDefined();
+		expect(options.find((option) => option.long === "--objective")).toBeDefined();
+		expect(options.find((option) => option.long === "--autonomy")).toBeDefined();
+		expect(options.find((option) => option.long === "--spec")).toBeDefined();
+	});
+
+	test("start subcommand --autonomy default is supervised", () => {
+		const cmd = createMissionCommand();
+		const start = cmd.commands.find((command) => command.name() === "start");
+		const autonomyOpt = start?.options.find((option) => option.long === "--autonomy");
+		expect(autonomyOpt?.defaultValue).toBe("supervised");
+	});
+
+	test("start subcommand has --tier flag", () => {
+		const cmd = createMissionCommand();
+		const start = cmd.commands.find((command) => command.name() === "start");
+		const tierOpt = start?.options.find((option) => option.long === "--tier");
+		expect(tierOpt).toBeDefined();
 	});
 
 	test("resolveCurrentMissionId recovers from MissionStore when current-mission.txt is missing", async () => {

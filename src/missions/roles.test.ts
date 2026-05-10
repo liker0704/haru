@@ -419,6 +419,7 @@ function makeMission(overrides?: Partial<Mission>): Mission {
 		learningsExtracted: false,
 		hasEmittedWsProducerWrite: false,
 		tier: "full",
+		autonomy: "supervised",
 		...overrides,
 	};
 }

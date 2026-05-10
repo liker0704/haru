@@ -268,11 +268,17 @@ async function processMission(mission: Mission, opts: MissionTickOpts): Promise<
 	// === Dead agent detection for critical mission roles ===
 	await checkAndRecoverDeadAgents(mission, opts);
 
-	// Skip engine for assess mode (tier=null AND no currentNode yet).
-	// Legacy missions also have tier=null but DO have a currentNode — those keep running as full.
-	if (mission.tier === null && mission.currentNode === null) {
-		return;
-	}
+	// Stage A: legacy assess-mode skip-guard removed.
+	//
+	// Pre-Stage-A behavior: missions with tier=null AND currentNode=null skipped
+	// the engine entirely so the assess coordinator could run before the lifecycle
+	// graph kicked in. With Stage A's intake-phase as the FIRST graph node, the
+	// engine must run from mission start — `lifecycle-start.ts` seeds
+	// currentNode='intake:active' for new missions, and intake-phase calls
+	// `ha mission tier set` once the classifier finishes.
+	//
+	// Legacy missions with tier=null AND currentNode=null (rare, dev-only) will
+	// fall through and the engine will seed currentNode below from `phase:state`.
 
 	// Seed checkpoint on first engine tick for this mission (backward compat)
 	const checkpoint = missionStore.checkpoints.getLatestCheckpoint(mission.id);

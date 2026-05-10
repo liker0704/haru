@@ -12,6 +12,7 @@ import { ensureMigrations, hasColumn, type Migration, rebuildTable } from "../db
 import type {
 	InsertMission,
 	Mission,
+	MissionAutonomy,
 	MissionPhase,
 	MissionState,
 	MissionStore,
@@ -62,6 +63,7 @@ interface MissionRow {
 	learnings_extracted: number;
 	tier: string | null;
 	has_emitted_ws_producer_write: number;
+	autonomy: string;
 }
 
 const CREATE_TABLE = `
@@ -72,8 +74,8 @@ CREATE TABLE IF NOT EXISTS missions (
   run_id TEXT,
   state TEXT NOT NULL DEFAULT 'active'
     CHECK(state IN ('active','frozen','completed','failed','stopped','suspended')),
-  phase TEXT NOT NULL DEFAULT 'understand'
-    CHECK(phase IN ('understand','align','decide','plan','execute','done')),
+  phase TEXT NOT NULL DEFAULT 'intake'
+    CHECK(phase IN ('intake','understand','align','decide','plan','execute','done')),
   first_freeze_at TEXT,
   frozen_at TEXT,
   pending_user_input INTEGER NOT NULL DEFAULT 0,
@@ -93,7 +95,11 @@ CREATE TABLE IF NOT EXISTS missions (
   completed_at TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
-  learnings_extracted INTEGER NOT NULL DEFAULT 0
+  learnings_extracted INTEGER NOT NULL DEFAULT 0,
+  tier TEXT CHECK(tier IS NULL OR tier IN ('direct','planned','full')),
+  has_emitted_ws_producer_write INTEGER NOT NULL DEFAULT 0,
+  autonomy TEXT NOT NULL DEFAULT 'supervised'
+    CHECK(autonomy IN ('supervised','auto-spec','auto-all'))
 )`;
 
 const CREATE_INDEXES = `
@@ -129,6 +135,7 @@ const REQUIRED_MISSION_COLUMNS = [
 	"updated_at",
 	"learnings_extracted",
 	"has_emitted_ws_producer_write",
+	"autonomy",
 ] as const;
 
 function getMissionColumns(db: Database): Set<string> {
@@ -567,6 +574,81 @@ const MISSION_MIGRATIONS: Migration[] = [
 			return checkExtended && hasColumn(db, "missions", "has_emitted_ws_producer_write");
 		},
 	},
+	{
+		version: 9,
+		description: "Add autonomy column to missions for intake-phase gate control",
+		up: (db) => {
+			if (!hasColumn(db, "missions", "autonomy")) {
+				db.exec(
+					"ALTER TABLE missions ADD COLUMN autonomy TEXT NOT NULL DEFAULT 'supervised' " +
+						"CHECK(autonomy IN ('supervised','auto-spec','auto-all'))",
+				);
+			}
+		},
+		detect: (db) => hasColumn(db, "missions", "autonomy"),
+	},
+	{
+		version: 10,
+		description: "Extend missions.phase CHECK to allow 'intake' (Stage A first phase)",
+		up: (db) => {
+			// CHECK constraint cannot be altered in place — rebuild the table.
+			// Guard: skip if 'intake' is already in the CHECK clause.
+			const schemaRow = db
+				.prepare<{ sql: string }, []>(
+					"SELECT sql FROM sqlite_master WHERE type='table' AND name='missions'",
+				)
+				.get();
+			if (!schemaRow || schemaRow.sql.includes("'intake'")) {
+				return;
+			}
+			// Rebuild missions table with the extended CHECK clause and new
+			// 'intake' default for phase.
+			rebuildTable({
+				db,
+				table: "missions",
+				createSql: CREATE_TABLE.replace("CREATE TABLE IF NOT EXISTS", "CREATE TABLE"),
+				columns: [
+					"id",
+					"slug",
+					"objective",
+					"run_id",
+					"state",
+					"phase",
+					"first_freeze_at",
+					"frozen_at",
+					"pending_user_input",
+					"pending_input_kind",
+					"pending_input_thread_id",
+					"reopen_count",
+					"artifact_root",
+					"paused_workstream_ids",
+					"analyst_session_id",
+					"execution_director_session_id",
+					"coordinator_session_id",
+					"architect_session_id",
+					"paused_lead_names",
+					"pause_reason",
+					"current_node",
+					"started_at",
+					"completed_at",
+					"created_at",
+					"updated_at",
+					"learnings_extracted",
+					"tier",
+					"has_emitted_ws_producer_write",
+					"autonomy",
+				],
+			});
+		},
+		detect: (db) => {
+			const row = db
+				.prepare<{ sql: string }, []>(
+					"SELECT sql FROM sqlite_master WHERE type='table' AND name='missions'",
+				)
+				.get();
+			return row ? row.sql.includes("'intake'") : false;
+		},
+	},
 ];
 
 /** Convert a database row (snake_case) to a Mission object (camelCase). */
@@ -599,6 +681,7 @@ function rowToMission(row: MissionRow): Mission {
 		learningsExtracted: row.learnings_extracted === 1,
 		tier: (row.tier as MissionTier | null) ?? null,
 		hasEmittedWsProducerWrite: (row.has_emitted_ws_producer_write ?? 0) === 1,
+		autonomy: (row.autonomy as MissionAutonomy | null) ?? "supervised",
 	};
 }
 
@@ -635,12 +718,13 @@ export function createMissionStore(dbPath: string): MissionStore {
 			$created_at: string;
 			$updated_at: string;
 			$tier: string | null;
+			$autonomy: string;
 		}
 	>(`
 		INSERT INTO missions
-			(id, slug, objective, run_id, artifact_root, started_at, created_at, updated_at, tier)
+			(id, slug, objective, run_id, artifact_root, started_at, created_at, updated_at, tier, autonomy)
 		VALUES
-			($id, $slug, $objective, $run_id, $artifact_root, $started_at, $created_at, $updated_at, $tier)
+			($id, $slug, $objective, $run_id, $artifact_root, $started_at, $created_at, $updated_at, $tier, $autonomy)
 	`);
 
 	const getByIdStmt = db.prepare<MissionRow, { $id: string }>(`
@@ -840,6 +924,7 @@ export function createMissionStore(dbPath: string): MissionStore {
 				$created_at: now,
 				$updated_at: now,
 				$tier: mission.tier ?? null,
+				$autonomy: mission.autonomy ?? "supervised",
 			});
 			const row = getByIdStmt.get({ $id: mission.id });
 			if (!row) {

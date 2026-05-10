@@ -32,6 +32,7 @@ import {
 import { resolveMissionByIdOrSlug } from "../missions/runtime-context.ts";
 import { createMissionStore } from "../missions/store.ts";
 import { missionHandoff, missionResume } from "../missions/workstream-control.ts";
+import { createMissionSpecCommand } from "./mission-spec.ts";
 import { createMissionTierCommand } from "./mission-tier.ts";
 
 export { missionRefreshBriefsCommand } from "../missions/brief-refresh.ts";
@@ -80,20 +81,98 @@ export function createMissionCommand(): Command {
 	});
 
 	cmd
-		.command("start")
-		.description("Create a new mission (run + pointer files + artifact root)")
-		.option("--slug <slug>", "Short identifier for the mission (e.g. auth-rewrite)")
-		.option("--objective <objective>", "Mission objective (what to accomplish)")
+		.command("start [intent...]")
+		.description(
+			"Create a new mission. Pass <intent> as positional args; the intake-phase " +
+				"clarifier resolves slug/objective from it.",
+		)
+		.option("--slug <slug>", "Short identifier (auto-generated from intent when omitted)")
+		.option("--objective <objective>", "DEPRECATED: pass intent as positional argument instead")
+		.option(
+			"--autonomy <level>",
+			"Mission autonomy: supervised | auto-spec | auto-all",
+			"supervised",
+		)
+		.option("--spec <file>", "Use a pre-written product-spec.md (skips clarifier)")
+		.option(
+			"--tier <tier>",
+			"Pre-set mission tier (direct | planned | full). Requires --spec; skips intake-phase entirely.",
+		)
 		.option("--attach", "Attach to coordinator tmux session after start")
 		.option("--no-attach", "Do not attach to coordinator tmux session")
 		.option("--json", "Output as JSON")
 		.action(
-			async (opts: { slug?: string; objective?: string; attach?: boolean; json?: boolean }) => {
+			async (
+				intentArgs: string[],
+				opts: {
+					slug?: string;
+					objective?: string;
+					autonomy?: string;
+					spec?: string;
+					tier?: string;
+					attach?: boolean;
+					json?: boolean;
+				},
+			) => {
 				const cwd = process.cwd();
 				const config = await loadConfig(cwd);
 				const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 				const attach = opts.attach ?? (opts.json ? false : process.stdout.isTTY === true);
-				await missionStart(overstoryDir, config.project.root, { ...opts, attach });
+
+				// Validate autonomy level
+				const validAutonomies = ["supervised", "auto-spec", "auto-all"] as const;
+				const autonomy = opts.autonomy ?? "supervised";
+				if (!validAutonomies.includes(autonomy as (typeof validAutonomies)[number])) {
+					console.error(
+						`Invalid --autonomy value '${autonomy}'. ` +
+							`Must be one of: ${validAutonomies.join(", ")}`,
+					);
+					process.exitCode = 1;
+					return;
+				}
+
+				// Validate --tier (only meaningful with --spec)
+				const validTiers = ["direct", "planned", "full"] as const;
+				if (opts.tier && !validTiers.includes(opts.tier as (typeof validTiers)[number])) {
+					console.error(
+						`Invalid --tier value '${opts.tier}'. ` + `Must be one of: ${validTiers.join(", ")}`,
+					);
+					process.exitCode = 1;
+					return;
+				}
+				if (opts.tier && !opts.spec) {
+					console.error("--tier requires --spec; tier-classifier sets tier when no spec is given.");
+					process.exitCode = 1;
+					return;
+				}
+
+				// Resolve intent: positional > --objective (deprecated)
+				const intent = intentArgs.join(" ").trim();
+				let objective = opts.objective;
+				if (intent.length > 0) {
+					objective = intent;
+				} else if (opts.objective !== undefined) {
+					console.error(
+						"Warning: --objective is deprecated. Pass intent as positional argument instead.",
+					);
+				}
+
+				// In a non-TTY context (CI, scripts) with no intent and no spec,
+				// fail fast rather than silently creating an empty mission.
+				const isTTY = process.stdout.isTTY === true;
+				const hasIntent = (objective ?? "").trim().length > 0;
+				const requireIntent = !isTTY && !hasIntent && !opts.spec;
+
+				await missionStart(overstoryDir, config.project.root, {
+					slug: opts.slug,
+					objective,
+					autonomy: autonomy as import("../types.ts").MissionAutonomy,
+					specFile: opts.spec,
+					tier: opts.tier as import("../types.ts").MissionTier | undefined,
+					attach,
+					json: opts.json,
+					requireIntent,
+				});
 			},
 		);
 
@@ -420,6 +499,7 @@ export function createMissionCommand(): Command {
 		});
 
 	cmd.addCommand(createMissionTierCommand());
+	cmd.addCommand(createMissionSpecCommand());
 
 	return cmd;
 }

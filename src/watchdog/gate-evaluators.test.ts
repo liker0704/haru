@@ -7,11 +7,16 @@ import type { MailMessage } from "../mail/types.ts";
 import { makeMission } from "../missions/test-mocks.ts";
 import type { SessionStore } from "../sessions/store.ts";
 import {
+	computeAdaptiveResearchTimeout,
 	evaluateArchitectDesign,
 	evaluateAwaitPlan,
 	evaluateAwaitResearch,
+	evaluateAwaitResearchComplete,
+	evaluateAwaitSpecReady,
+	evaluateAwaitTierSet,
 	evaluateDispatchPlanning,
 	evaluateGate,
+	evaluateHumanSpecReview,
 	evaluateUnderstandReady,
 	evaluateWsCompletion,
 } from "./gate-evaluators.ts";
@@ -49,9 +54,12 @@ function toMailMessage(m: TestMessage, i: number): MailMessage {
 
 function createTestMailStore(messages: TestMessage[]): MailStore {
 	const store = {
-		getAll(filters?: { to?: string }): MailMessage[] {
+		getAll(filters?: { to?: string; from?: string }): MailMessage[] {
 			const to = filters?.to;
-			return messages.filter((m) => !to || m.to === to).map((m, i) => toMailMessage(m, i));
+			const from = filters?.from;
+			return messages
+				.filter((m) => (!to || m.to === to) && (!from || m.from === from))
+				.map((m, i) => toMailMessage(m, i));
 		},
 	};
 	return store as unknown as MailStore;
@@ -483,5 +491,201 @@ describe("evaluateGate", () => {
 		const result = await evaluateGate("nonexistent:bogus-node", mission, stores, "/tmp");
 		expect(result.met).toBe(false);
 		expect(result.unknown).toBe(true);
+	});
+});
+
+describe("evaluateAwaitResearchComplete", () => {
+	const mission = makeMission({ slug: "test", analystSessionId: "analyst-1" });
+
+	it("research_complete mail from analyst → met:true, trigger=research_ready", () => {
+		const mailStore = createTestMailStore([
+			{
+				from: "mission-analyst-test",
+				to: "coordinator-test",
+				type: "research_complete",
+				subject: "Research done",
+			},
+		]);
+		const result = evaluateAwaitResearchComplete(mission, mailStore);
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("research_ready");
+	});
+
+	it("no mail → nudges analyst", () => {
+		const mailStore = createTestMailStore([]);
+		const result = evaluateAwaitResearchComplete(mission, mailStore);
+		expect(result.met).toBe(false);
+		expect(result.nudgeTarget).toBe("mission-analyst-test");
+	});
+
+	it("filters by gateEnteredAt", () => {
+		const mailStore = createTestMailStore([
+			{
+				from: "mission-analyst-test",
+				to: "coordinator-test",
+				type: "research_complete",
+				subject: "stale",
+				createdAt: "2026-01-01T00:00:00.000Z",
+			},
+		]);
+		const result = evaluateAwaitResearchComplete(mission, mailStore, "2026-04-01T00:00:00.000Z");
+		expect(result.met).toBe(false);
+	});
+});
+
+describe("evaluateAwaitSpecReady", () => {
+	const mission = makeMission({ slug: "test" });
+
+	it("spec_ready mail from clarifier → met:true, trigger=spec_ready", () => {
+		const mailStore = createTestMailStore([
+			{
+				from: "product-clarifier-test",
+				to: "coordinator-test",
+				type: "spec_ready",
+				subject: "Spec done",
+			},
+		]);
+		const result = evaluateAwaitSpecReady(mission, mailStore);
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("spec_ready");
+	});
+
+	it("no spec_ready → nudges clarifier", () => {
+		const mailStore = createTestMailStore([]);
+		const result = evaluateAwaitSpecReady(mission, mailStore);
+		expect(result.met).toBe(false);
+		expect(result.nudgeTarget).toBe("product-clarifier-test");
+	});
+});
+
+describe("evaluateAwaitTierSet", () => {
+	it("tier=null → met:false, nudges tier-classifier", () => {
+		const mission = makeMission({ slug: "test", tier: null });
+		const result = evaluateAwaitTierSet(mission);
+		expect(result.met).toBe(false);
+		expect(result.nudgeTarget).toBe("tier-classifier-test");
+	});
+
+	it("tier=planned → met:true, trigger=tier_set", () => {
+		const mission = makeMission({ slug: "test", tier: "planned" });
+		const result = evaluateAwaitTierSet(mission);
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("tier_set");
+	});
+
+	it("tier=direct → met:true", () => {
+		const mission = makeMission({ slug: "test", tier: "direct" });
+		const result = evaluateAwaitTierSet(mission);
+		expect(result.met).toBe(true);
+	});
+});
+
+describe("computeAdaptiveResearchTimeout", () => {
+	it("returns 25min cap when no scout dispatches yet", () => {
+		expect(computeAdaptiveResearchTimeout([])).toBe(1_500_000);
+	});
+
+	it("returns scout_count × 5min for partial fleets", () => {
+		expect(
+			computeAdaptiveResearchTimeout([
+				{ type: "dispatch", to: "scout-a" },
+				{ type: "dispatch", to: "scout-b" },
+			]),
+		).toBe(600_000);
+
+		expect(
+			computeAdaptiveResearchTimeout([
+				{ type: "dispatch", to: "scout-a" },
+				{ type: "dispatch", to: "scout-b" },
+				{ type: "dispatch", to: "scout-c" },
+			]),
+		).toBe(900_000);
+	});
+
+	it("caps at 25min for 5+ scouts", () => {
+		const dispatches = Array.from({ length: 6 }, (_, i) => ({
+			type: "dispatch",
+			to: `scout-${i}`,
+		}));
+		expect(computeAdaptiveResearchTimeout(dispatches)).toBe(1_500_000);
+	});
+
+	it("ignores non-scout dispatches and non-dispatch mail", () => {
+		const mixed = [
+			{ type: "dispatch", to: "scout-a" },
+			{ type: "dispatch", to: "lead-foo" }, // not a scout
+			{ type: "status", to: "scout-b" }, // not a dispatch
+			{ type: "dispatch", to: "scout-b" },
+		];
+		expect(computeAdaptiveResearchTimeout(mixed)).toBe(600_000);
+	});
+});
+
+describe("evaluateHumanSpecReview", () => {
+	it("autonomy=auto-spec → auto-approves without consulting mail", () => {
+		const mission = makeMission({ slug: "test", autonomy: "auto-spec" });
+		const result = evaluateHumanSpecReview(mission, null);
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("approved");
+	});
+
+	it("autonomy=auto-all → auto-approves", () => {
+		const mission = makeMission({ slug: "test", autonomy: "auto-all" });
+		const result = evaluateHumanSpecReview(mission, null);
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("approved");
+	});
+
+	it("supervised + spec_approved mail → met:true, trigger=approved", () => {
+		const mission = makeMission({ slug: "test", autonomy: "supervised" });
+		const mailStore = createTestMailStore([
+			{
+				from: "operator",
+				to: "operator-decision-test",
+				type: "spec_approved",
+				subject: "Spec approved",
+			},
+		]);
+		const result = evaluateHumanSpecReview(mission, mailStore);
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("approved");
+	});
+
+	it("supervised + spec_rejected mail → met:true, trigger=rejected", () => {
+		const mission = makeMission({ slug: "test", autonomy: "supervised" });
+		const mailStore = createTestMailStore([
+			{
+				from: "operator",
+				to: "operator-decision-test",
+				type: "spec_rejected",
+				subject: "Spec rejected",
+			},
+		]);
+		const result = evaluateHumanSpecReview(mission, mailStore);
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("rejected");
+	});
+
+	it("supervised + no verdict mail → met:false, no nudge target", () => {
+		const mission = makeMission({ slug: "test", autonomy: "supervised" });
+		const mailStore = createTestMailStore([]);
+		const result = evaluateHumanSpecReview(mission, mailStore);
+		expect(result.met).toBe(false);
+		expect(result.nudgeTarget).toBeUndefined();
+	});
+
+	it("supervised + verdict before gateEnteredAt is ignored", () => {
+		const mission = makeMission({ slug: "test", autonomy: "supervised" });
+		const mailStore = createTestMailStore([
+			{
+				from: "operator",
+				to: "operator-decision-test",
+				type: "spec_approved",
+				subject: "old",
+				createdAt: "2025-01-01T00:00:00Z",
+			},
+		]);
+		const result = evaluateHumanSpecReview(mission, mailStore, "2026-01-01T00:00:00Z");
+		expect(result.met).toBe(false);
 	});
 });

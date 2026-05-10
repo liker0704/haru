@@ -303,7 +303,6 @@ const EXAMPLE_CHILD_CAPABILITY: Record<string, string> = {
 	"lead-mission": "builder",
 	coordinator: "lead",
 	"coordinator-mission": "lead",
-	"coordinator-mission-assess": "lead",
 	"coordinator-mission-direct": "lead",
 	"coordinator-mission-planned": "lead",
 	"execution-director": "lead",

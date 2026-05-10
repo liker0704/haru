@@ -402,7 +402,16 @@ export function allowedChildCapabilities(
 	tier?: import("../missions/types.ts").MissionTier | null,
 ): string[] {
 	if (parentCapability === null) {
-		return ["lead", "scout", "builder", "mission-analyst", "execution-director"];
+		return [
+			"lead",
+			"scout",
+			"builder",
+			"mission-analyst",
+			"mission-analyst-intake",
+			"execution-director",
+			"product-clarifier",
+			"tier-classifier",
+		];
 	}
 
 	// Tier-specific coordinator rules (checked before the generic coordinator case)
@@ -434,6 +443,12 @@ export function allowedChildCapabilities(
 
 	if (parentCapability === "mission-analyst") {
 		return ["scout", "plan-review-lead"];
+	}
+
+	if (parentCapability === "mission-analyst-intake") {
+		// Intake-phase analyst spawns scouts for codebase research; no plan reviews
+		// at this stage (plan review happens later in plan-phase).
+		return ["scout"];
 	}
 
 	if (parentCapability === "architect") {

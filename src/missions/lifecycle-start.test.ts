@@ -106,6 +106,96 @@ describe("missionStart", () => {
 	});
 });
 
+describe("missionStart --spec power-user paths", () => {
+	async function startWithSpec(opts: {
+		specFile: string;
+		tier?: import("../types.ts").MissionTier;
+		slug: string;
+	}) {
+		const deps = {
+			startMissionCoordinator: makeRoleStub("coord-stub"),
+			startMissionAnalyst: makeRoleStub("analyst-stub"),
+			stopMissionRole: async () => ({}) as never,
+		} as MissionCommandDeps;
+
+		await missionStart(
+			overstoryDir,
+			projectRoot,
+			{
+				slug: opts.slug,
+				objective: "imported spec test",
+				specFile: opts.specFile,
+				tier: opts.tier,
+				json: true,
+			},
+			deps,
+		);
+
+		const store = createMissionStore(join(overstoryDir, "sessions.db"));
+		try {
+			return store.list().find((m) => m.slug === opts.slug) ?? null;
+		} finally {
+			store.close();
+		}
+	}
+
+	test("--spec without --tier: jumps to dispatch-tier-classifier (skips clarifier+analyst)", async () => {
+		const specPath = join(tempDir, "pre.md");
+		await Bun.write(specPath, "# Test spec\n\nIntent: test\n");
+
+		const m = await startWithSpec({ specFile: specPath, slug: "spec-no-tier" });
+		expect(m).not.toBeNull();
+		expect(m?.phase).toBe("intake");
+		expect(m?.currentNode).toBe("intake-phase:dispatch-tier-classifier");
+		expect(m?.tier).toBeNull();
+	});
+
+	test("--spec --tier=planned: skips intake-phase entirely, jumps to understand:active", async () => {
+		const specPath = join(tempDir, "pre.md");
+		await Bun.write(specPath, "# Test spec\n");
+
+		const m = await startWithSpec({ specFile: specPath, tier: "planned", slug: "spec-planned" });
+		expect(m).not.toBeNull();
+		expect(m?.phase).toBe("understand");
+		expect(m?.currentNode).toBe("understand:active");
+		expect(m?.tier).toBe("planned");
+	});
+
+	test("--spec --tier=direct: jumps directly to execute:active", async () => {
+		const specPath = join(tempDir, "pre.md");
+		await Bun.write(specPath, "# Test spec\n");
+
+		const m = await startWithSpec({ specFile: specPath, tier: "direct", slug: "spec-direct" });
+		expect(m).not.toBeNull();
+		expect(m?.phase).toBe("execute");
+		expect(m?.currentNode).toBe("execute:active");
+		expect(m?.tier).toBe("direct");
+	});
+
+	test("default (no --spec): starts at intake:active for full subgraph traversal", async () => {
+		const deps = {
+			startMissionCoordinator: makeRoleStub("c"),
+			startMissionAnalyst: makeRoleStub("a"),
+			stopMissionRole: async () => ({}) as never,
+		} as MissionCommandDeps;
+		await missionStart(
+			overstoryDir,
+			projectRoot,
+			{ slug: "default-flow", objective: "regular flow", json: true },
+			deps,
+		);
+		const store = createMissionStore(join(overstoryDir, "sessions.db"));
+		try {
+			const m = store.list().find((mm) => mm.slug === "default-flow");
+			expect(m?.phase).toBe("intake");
+			expect(m?.currentNode).toBe("intake:active");
+			expect(m?.tier).toBeNull();
+		} finally {
+			store.close();
+		}
+	});
+});
+
 describe("missionResumeAll", () => {
 	test("sets exitCode=1 and returns when no suspended mission exists", async () => {
 		process.exitCode = 0;

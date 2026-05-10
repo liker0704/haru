@@ -41,8 +41,17 @@ function buildDefaultGraph(): MissionGraph {
 	const nodes: MissionGraphNode[] = [];
 	const edges: MissionGraphEdge[] = [];
 
-	// Build active + frozen nodes for each working phase
-	const workingPhases: MissionPhase[] = ["understand", "align", "decide", "plan", "execute"];
+	// Build active + frozen nodes for each working phase.
+	// Stage A adds `intake` as the first phase; the intake-phase subgraph
+	// drives clarifier + tier-classifier before tier-set fires.
+	const workingPhases: MissionPhase[] = [
+		"intake",
+		"understand",
+		"align",
+		"decide",
+		"plan",
+		"execute",
+	];
 	const autoAdvancePhases = new Set<MissionPhase>(["align", "decide"]);
 	for (const phase of workingPhases) {
 		nodes.push({
@@ -383,7 +392,7 @@ export function validateGraph(
 	}
 
 	// Check for unreachable nodes (BFS from startNodeId)
-	const startId = opts?.startNodeId ?? nodeId("understand", "active");
+	const startId = opts?.startNodeId ?? nodeId("intake", "active");
 	if (!nodeIds.has(startId)) {
 		errors.push(`Start node '${startId}' not found`);
 	} else {

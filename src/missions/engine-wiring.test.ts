@@ -286,40 +286,42 @@ describe("getCellEngineStatus", () => {
 // === tier-aware graph construction ===
 
 describe("tier-aware graph construction", () => {
-	test('buildLifecycleGraph with tier="direct" produces only execute+done phases', () => {
+	test('buildLifecycleGraph with tier="direct" produces intake+execute+done phases', () => {
 		const mission = makeMission({ tier: "direct" });
 		const graph = buildLifecycleGraph(mission);
 
 		const lifecycleNodes = graph.nodes.filter((n) => n.kind === "lifecycle");
 		const phases = new Set(lifecycleNodes.map((n) => n.phase));
 
-		expect(phases).toEqual(new Set(["execute", "done"]));
+		expect(phases).toEqual(new Set(["intake", "execute", "done"]));
 		expect(phases.has("understand")).toBe(false);
 		expect(phases.has("align")).toBe(false);
 		expect(phases.has("decide")).toBe(false);
 		expect(phases.has("plan")).toBe(false);
 	});
 
-	test('buildLifecycleGraph with tier="planned" includes understand, plan, execute, done (skips align/decide)', () => {
+	test('buildLifecycleGraph with tier="planned" includes intake, understand, plan, execute, done (skips align/decide)', () => {
 		const mission = makeMission({ tier: "planned" });
 		const graph = buildLifecycleGraph(mission);
 
 		const lifecycleNodes = graph.nodes.filter((n) => n.kind === "lifecycle");
 		const phases = new Set(lifecycleNodes.map((n) => n.phase));
 
-		expect(phases).toEqual(new Set(["understand", "plan", "execute", "done"]));
+		expect(phases).toEqual(new Set(["intake", "understand", "plan", "execute", "done"]));
 		expect(phases.has("align")).toBe(false);
 		expect(phases.has("decide")).toBe(false);
 	});
 
-	test('buildLifecycleGraph with tier="full" includes all 6 phases', () => {
+	test('buildLifecycleGraph with tier="full" includes all 7 phases', () => {
 		const mission = makeMission({ tier: "full" });
 		const graph = buildLifecycleGraph(mission);
 
 		const lifecycleNodes = graph.nodes.filter((n) => n.kind === "lifecycle");
 		const phases = new Set(lifecycleNodes.map((n) => n.phase));
 
-		expect(phases).toEqual(new Set(["understand", "align", "decide", "plan", "execute", "done"]));
+		expect(phases).toEqual(
+			new Set(["intake", "understand", "align", "decide", "plan", "execute", "done"]),
+		);
 	});
 
 	test("buildLifecycleGraph with tier=null defaults to full (backward compat)", () => {

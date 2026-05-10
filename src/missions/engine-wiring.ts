@@ -20,6 +20,7 @@ import { architectureReviewCell } from "./cells/architecture-review.ts";
 import { donePhaseCell } from "./cells/done-phase.ts";
 import { executeDirectPhaseCell } from "./cells/execute-direct-phase.ts";
 import { executePhaseCell } from "./cells/execute-phase.ts";
+import { intakePhaseCell } from "./cells/intake-phase.ts";
 import { planPhaseCell } from "./cells/plan-phase.ts";
 import { planReviewCell } from "./cells/plan-review.ts";
 import type {
@@ -70,8 +71,9 @@ export const CELL_REGISTRY: Record<string, ReviewCellDefinition> = {
 	"architecture-review": architectureReviewCell,
 };
 
-/** Phase cell registry (understand, plan, execute, done). Used by startLifecycleEngine(). */
+/** Phase cell registry (intake, understand, plan, execute, done). Used by startLifecycleEngine(). */
 export const PHASE_CELL_REGISTRY: Record<string, PhaseCellDefinition> = {
+	"intake-phase": intakePhaseCell,
 	"understand-phase": understandPhaseCell,
 	"plan-phase": planPhaseCell,
 	"execute-phase": executePhaseCell,
@@ -80,11 +82,17 @@ export const PHASE_CELL_REGISTRY: Record<string, PhaseCellDefinition> = {
 
 // === Tier-phase mapping ===
 
-/** Which lifecycle phases are active for each mission tier. */
+/**
+ * Which lifecycle phases are active for each mission tier.
+ *
+ * `intake` always runs first (Stage A) — it materializes `product-spec.md`
+ * and calls `ha mission tier set` which transitions the mission into the
+ * tier-specific phase chain below.
+ */
 export const TIER_PHASES: Record<MissionTier, readonly string[]> = {
-	direct: ["execute", "done"],
-	planned: ["understand", "plan", "execute", "done"],
-	full: ["understand", "align", "decide", "plan", "execute", "done"],
+	direct: ["intake", "execute", "done"],
+	planned: ["intake", "understand", "plan", "execute", "done"],
+	full: ["intake", "understand", "align", "decide", "plan", "execute", "done"],
 };
 
 // === Bridge functions ===

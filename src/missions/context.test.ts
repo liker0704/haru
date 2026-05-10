@@ -40,6 +40,7 @@ function makeMission(overrides: Partial<Mission> = {}): Mission {
 		learningsExtracted: false,
 		hasEmittedWsProducerWrite: false,
 		tier: null,
+		autonomy: "supervised",
 		...overrides,
 	};
 }
@@ -74,6 +75,11 @@ describe("mission context helpers", () => {
 		expect(await Bun.file(paths.currentStateMd).exists()).toBe(true);
 		expect(await Bun.file(paths.researchSummaryMd).exists()).toBe(true);
 		expect(await Bun.file(paths.workstreamsJson).exists()).toBe(true);
+	});
+
+	test("getMissionArtifactPaths returns productSpecMd at the artifact root", () => {
+		const paths = getMissionArtifactPaths(mission);
+		expect(paths.productSpecMd).toBe(join(paths.root, "product-spec.md"));
 	});
 
 	test("materializeMissionRolePrompt renders context and resolved prompt", async () => {

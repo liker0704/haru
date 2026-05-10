@@ -46,6 +46,7 @@ function makeMission(): Mission {
 		learningsExtracted: false,
 		hasEmittedWsProducerWrite: false,
 		tier: null,
+		autonomy: "supervised",
 	};
 }
 
