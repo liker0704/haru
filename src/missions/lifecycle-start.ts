@@ -12,7 +12,7 @@ import { openSessionStore } from "../sessions/compat.ts";
 import { createRunStore } from "../sessions/store.ts";
 import type { InsertMission } from "../types.ts";
 import { createWatchdogControl } from "../watchdog/control.ts";
-import { attachOrSwitch, listSessions } from "../worktree/tmux.ts";
+import { listSessions } from "../worktree/tmux.ts";
 import {
 	buildMissionRoleBeacon,
 	ensureMissionArtifacts,
@@ -30,6 +30,7 @@ import {
 } from "./messaging.ts";
 import { startMissionAnalyst, startMissionCoordinator, stopMissionRole } from "./roles.ts";
 import { removeActiveMission, writeMissionRuntimePointers } from "./runtime-context.ts";
+import { generateSlugFromIntent } from "./slug.ts";
 import { createMissionStore } from "./store.ts";
 
 // === ha mission start ===
@@ -49,11 +50,21 @@ export async function missionStart(
 	opts: StartOpts,
 	deps: MissionCommandDeps = {},
 ): Promise<void> {
-	const slug = opts.slug ?? `mission-${Date.now()}`;
 	const objective = opts.objective ?? "Pending — clarifier will resolve from intent";
 
 	const dbPath = join(overstoryDir, "sessions.db");
 	const missionStore = createMissionStore(dbPath);
+
+	// Auto-generate slug from intent (objective) when --slug omitted.
+	let slug: string;
+	if (opts.slug) {
+		slug = opts.slug;
+	} else if (opts.objective && opts.objective.trim().length > 0) {
+		const existingSlugs = new Set(missionStore.list({ limit: 200 }).map((m) => m.slug));
+		slug = generateSlugFromIntent(opts.objective, existingSlugs);
+	} else {
+		slug = `mission-${Date.now()}`;
+	}
 	const runId = `run-${new Date().toISOString().replace(/[:.]/g, "-")}-mission`;
 	const missionId = `mission-${Date.now()}-${slug}`;
 	const artifactRoot = join(overstoryDir, "missions", missionId);

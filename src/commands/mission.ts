@@ -80,20 +80,67 @@ export function createMissionCommand(): Command {
 	});
 
 	cmd
-		.command("start")
-		.description("Create a new mission (run + pointer files + artifact root)")
-		.option("--slug <slug>", "Short identifier for the mission (e.g. auth-rewrite)")
-		.option("--objective <objective>", "Mission objective (what to accomplish)")
+		.command("start [intent...]")
+		.description(
+			"Create a new mission. Pass <intent> as positional args; the intake-phase " +
+				"clarifier resolves slug/objective from it.",
+		)
+		.option("--slug <slug>", "Short identifier (auto-generated from intent when omitted)")
+		.option("--objective <objective>", "DEPRECATED: pass intent as positional argument instead")
+		.option(
+			"--autonomy <level>",
+			"Mission autonomy: supervised | auto-spec | auto-all",
+			"supervised",
+		)
 		.option("--attach", "Attach to coordinator tmux session after start")
 		.option("--no-attach", "Do not attach to coordinator tmux session")
 		.option("--json", "Output as JSON")
 		.action(
-			async (opts: { slug?: string; objective?: string; attach?: boolean; json?: boolean }) => {
+			async (
+				intentArgs: string[],
+				opts: {
+					slug?: string;
+					objective?: string;
+					autonomy?: string;
+					attach?: boolean;
+					json?: boolean;
+				},
+			) => {
 				const cwd = process.cwd();
 				const config = await loadConfig(cwd);
 				const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 				const attach = opts.attach ?? (opts.json ? false : process.stdout.isTTY === true);
-				await missionStart(overstoryDir, config.project.root, { ...opts, attach });
+
+				// Validate autonomy level
+				const validAutonomies = ["supervised", "auto-spec", "auto-all"] as const;
+				const autonomy = opts.autonomy ?? "supervised";
+				if (!validAutonomies.includes(autonomy as (typeof validAutonomies)[number])) {
+					console.error(
+						`Invalid --autonomy value '${autonomy}'. ` +
+							`Must be one of: ${validAutonomies.join(", ")}`,
+					);
+					process.exitCode = 1;
+					return;
+				}
+
+				// Resolve intent: positional > --objective (deprecated)
+				const intent = intentArgs.join(" ").trim();
+				let objective = opts.objective;
+				if (intent.length > 0) {
+					objective = intent;
+				} else if (opts.objective !== undefined) {
+					console.error(
+						"Warning: --objective is deprecated. Pass intent as positional argument instead.",
+					);
+				}
+
+				await missionStart(overstoryDir, config.project.root, {
+					slug: opts.slug,
+					objective,
+					autonomy: autonomy as import("../types.ts").MissionAutonomy,
+					attach,
+					json: opts.json,
+				});
 			},
 		);
 
