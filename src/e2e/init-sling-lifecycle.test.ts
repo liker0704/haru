@@ -25,25 +25,40 @@ import type { OverlayConfig } from "../types.ts";
 const noopSpawner: Spawner = async () => ({ exitCode: 1, stdout: "", stderr: "not found" });
 
 const EXPECTED_AGENT_DEFS = [
+	"architect.md",
+	"architecture-review-lead.md",
+	"architecture-sync.md",
 	"builder.md",
+	"coordinator-mission-direct.md",
+	"coordinator-mission-full.md",
+	"coordinator-mission-planned.md",
 	"coordinator-mission.md",
 	"coordinator.md",
 	"execution-director.md",
 	"lead-mission.md",
 	"lead.md",
 	"merger.md",
+	"mission-analyst-intake.md",
+	"mission-analyst-planned.md",
 	"mission-analyst.md",
 	"monitor.md",
 	"orchestrator.md",
 	"ov-co-creation.md",
+	"plan-architecture-critic.md",
 	"plan-devil-advocate.md",
 	"plan-performance-critic.md",
 	"plan-review-lead.md",
 	"plan-second-opinion.md",
 	"plan-security-critic.md",
 	"plan-simulator.md",
+	"product-clarifier.md",
+	"research-lead.md",
+	"researcher.md",
 	"reviewer.md",
 	"scout.md",
+	"shared-mandate.md",
+	"tester.md",
+	"tier-classifier.md",
 ];
 
 describe("E2E: init→sling lifecycle on external project", () => {
@@ -125,7 +140,7 @@ describe("E2E: init→sling lifecycle on external project", () => {
 		expect(config.project.name).toBeTruthy();
 	});
 
-	test("manifest loads successfully with all 8 agents (supervisor deprecated)", async () => {
+	test("manifest loads successfully with all registered agents", async () => {
 		await initCommand({ _spawner: noopSpawner });
 
 		const manifestPath = join(tempDir, ".haru", "agent-manifest.json");
@@ -134,17 +149,24 @@ describe("E2E: init→sling lifecycle on external project", () => {
 
 		const manifest = await loader.load();
 
-		// All 7 agents present (supervisor removed: deprecated, use lead instead)
 		const agentNames = Object.keys(manifest.agents).sort();
-		expect(agentNames).toEqual([
-			"builder",
-			"coordinator",
-			"lead",
-			"merger",
-			"monitor",
-			"reviewer",
-			"scout",
-		]);
+		// Core agents — sanity checks that the manifest loaded successfully and
+		// includes both base swarm primitives and Stage A intake-phase agents.
+		expect(agentNames).toContain("builder");
+		expect(agentNames).toContain("coordinator");
+		expect(agentNames).toContain("lead");
+		expect(agentNames).toContain("merger");
+		expect(agentNames).toContain("monitor");
+		expect(agentNames).toContain("reviewer");
+		expect(agentNames).toContain("scout");
+		// Stage A
+		expect(agentNames).toContain("mission-analyst-intake");
+		expect(agentNames).toContain("product-clarifier");
+		expect(agentNames).toContain("tier-classifier");
+		// Supervisor removed: deprecated, use lead instead
+		expect(agentNames).not.toContain("supervisor");
+		// coordinator-mission-assess removed in Stage A
+		expect(agentNames).not.toContain("coordinator-mission-assess");
 
 		// Each agent has a valid file reference
 		for (const [_name, def] of Object.entries(manifest.agents)) {
@@ -284,7 +306,7 @@ describe("E2E: init→sling lifecycle on external project", () => {
 		expect(overlayContent).toContain("orchestrator");
 		expect(overlayContent).toContain("`src/main.ts`");
 		expect(overlayContent).toContain("`src/utils.ts`");
-		expect(overlayContent).toContain("ml prime typescript");
+		expect(overlayContent).toContain("ku prime typescript");
 
 		// No unresolved placeholders
 		expect(overlayContent).not.toMatch(/\{\{[A-Z_]+\}\}/);

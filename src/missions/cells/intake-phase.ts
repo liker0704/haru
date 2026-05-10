@@ -214,10 +214,36 @@ async function spawnEphemeralAgent(opts: {
 
 function buildHandlers(deps: PhaseCellDeps): HandlerRegistry {
 	return {
-		"ensure-context-generate": async () => {
-			// project-context.json freshness check happens at spawn-time per agent
-			// (existing pattern in spawn.ts). For now this is a pass-through —
-			// actual auto-regen on git-HEAD-changed is a follow-up enhancement.
+		"ensure-context-generate": async (ctx) => {
+			// Plan #231 (locked-in): compare cached project-context against the
+			// current state of the repo and regenerate on mismatch. The existing
+			// context system uses a structural hash (dir layout + package.json +
+			// tsconfig.json) rather than raw `git rev-parse HEAD`, but the
+			// purpose is identical: invalidate the cache when the project shape
+			// changed so analyst-intake gets fresh signal.
+			if (!deps.projectRoot || !deps.overstoryDir) {
+				return { trigger: "context_ready" };
+			}
+			try {
+				const { join } = await import("node:path");
+				const { readCachedContext, writeCachedContext, isCacheValid, computeStructuralHash } =
+					await import("../../context/cache.ts");
+				const { analyzeProject } = await import("../../context/analyze.ts");
+				const cachePath = join(deps.overstoryDir, "project-context.json");
+				const cached = readCachedContext(cachePath);
+				const currentHash = await computeStructuralHash(deps.projectRoot);
+				if (cached && isCacheValid(cached, currentHash)) {
+					return { trigger: "context_ready" };
+				}
+				// Stale or missing — regenerate before the analyst spawns.
+				const fresh = await analyzeProject(deps.projectRoot, {});
+				await writeCachedContext(cachePath, fresh);
+			} catch (err) {
+				// Best-effort — never block the graph on context-generation failure.
+				// The analyst can still spawn and operate against whatever cached
+				// context (if any) is present.
+				process.stderr.write(`[intake-phase] ensure-context-generate failed: ${String(err)}\n`);
+			}
 			return { trigger: "context_ready" };
 		},
 

@@ -522,6 +522,13 @@ export function evaluateArchReviewComplete(
  *
  * Fired by analyst once research/_summary.md materializes. Until then,
  * nudge the analyst with the standard "still working" message.
+ *
+ * Stage A locked-in decision (#228): the effective deadline is
+ * `min(scout_count × 5min, 25min)`. The subgraph node carries the upper
+ * bound (1500s) as `gateTimeout`; this evaluator surfaces an early stuck
+ * signal when the analyst has been silent for longer than the adaptive
+ * window allows. Scout count is derived from the analyst's outbound
+ * `dispatch` mail (one per scout spawn).
  */
 export function evaluateAwaitResearchComplete(
 	mission: Mission,
@@ -541,12 +548,44 @@ export function evaluateAwaitResearchComplete(
 		return { met: true, trigger: "research_ready" };
 	}
 
+	// Adaptive deadline: count scout dispatches the analyst has emitted, then
+	// compute `min(scout_count × 5min, 25min)`. If the analyst hasn't
+	// dispatched anyone yet (scout_count=0), fall back to the upper bound.
+	const adaptiveBudgetMs = computeAdaptiveResearchTimeout(fromAnalyst);
+	const stuckBeyondAdaptive =
+		gateEnteredAt &&
+		Date.now() - new Date(gateEnteredAt).getTime() > adaptiveBudgetMs &&
+		// Don't out-shout the engine timeout: engine handles the hard cap.
+		adaptiveBudgetMs < ADAPTIVE_RESEARCH_CAP_MS;
+
 	return {
 		met: false,
 		nudgeTarget: analystName,
-		nudgeMessage:
-			"Research summary not yet emitted — finish synthesizing scout findings and send `research_complete` mail.",
+		nudgeMessage: stuckBeyondAdaptive
+			? `Research has exceeded the adaptive ${Math.round(adaptiveBudgetMs / 60_000)}min budget — emit \`research_complete\` now or escalate via mail.`
+			: "Research summary not yet emitted — finish synthesizing scout findings and send `research_complete` mail.",
 	};
+}
+
+const ADAPTIVE_RESEARCH_PER_SCOUT_MS = 300_000; // 5 min/scout
+const ADAPTIVE_RESEARCH_CAP_MS = 1_500_000; // 25 min hard cap
+
+/**
+ * Compute `min(scout_count × 300_000, 1_500_000)` ms based on the analyst's
+ * outbound dispatch mail. Each scout spawn emits exactly one `dispatch` mail
+ * from `mission-analyst-${slug}` to `scout-...`. Returns the cap when
+ * scout_count is 0 (analyst hasn't dispatched yet).
+ *
+ * Exported for tests.
+ */
+export function computeAdaptiveResearchTimeout(
+	analystOutbox: { type: string; to: string }[],
+): number {
+	const scoutDispatches = analystOutbox.filter(
+		(m) => m.type === "dispatch" && m.to.startsWith("scout-"),
+	).length;
+	if (scoutDispatches === 0) return ADAPTIVE_RESEARCH_CAP_MS;
+	return Math.min(scoutDispatches * ADAPTIVE_RESEARCH_PER_SCOUT_MS, ADAPTIVE_RESEARCH_CAP_MS);
 }
 
 /**

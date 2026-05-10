@@ -7,6 +7,7 @@ import type { MailMessage } from "../mail/types.ts";
 import { makeMission } from "../missions/test-mocks.ts";
 import type { SessionStore } from "../sessions/store.ts";
 import {
+	computeAdaptiveResearchTimeout,
 	evaluateArchitectDesign,
 	evaluateAwaitPlan,
 	evaluateAwaitResearch,
@@ -576,6 +577,47 @@ describe("evaluateAwaitTierSet", () => {
 		const mission = makeMission({ slug: "test", tier: "direct" });
 		const result = evaluateAwaitTierSet(mission);
 		expect(result.met).toBe(true);
+	});
+});
+
+describe("computeAdaptiveResearchTimeout", () => {
+	it("returns 25min cap when no scout dispatches yet", () => {
+		expect(computeAdaptiveResearchTimeout([])).toBe(1_500_000);
+	});
+
+	it("returns scout_count × 5min for partial fleets", () => {
+		expect(
+			computeAdaptiveResearchTimeout([
+				{ type: "dispatch", to: "scout-a" },
+				{ type: "dispatch", to: "scout-b" },
+			]),
+		).toBe(600_000);
+
+		expect(
+			computeAdaptiveResearchTimeout([
+				{ type: "dispatch", to: "scout-a" },
+				{ type: "dispatch", to: "scout-b" },
+				{ type: "dispatch", to: "scout-c" },
+			]),
+		).toBe(900_000);
+	});
+
+	it("caps at 25min for 5+ scouts", () => {
+		const dispatches = Array.from({ length: 6 }, (_, i) => ({
+			type: "dispatch",
+			to: `scout-${i}`,
+		}));
+		expect(computeAdaptiveResearchTimeout(dispatches)).toBe(1_500_000);
+	});
+
+	it("ignores non-scout dispatches and non-dispatch mail", () => {
+		const mixed = [
+			{ type: "dispatch", to: "scout-a" },
+			{ type: "dispatch", to: "lead-foo" }, // not a scout
+			{ type: "status", to: "scout-b" }, // not a dispatch
+			{ type: "dispatch", to: "scout-b" },
+		];
+		expect(computeAdaptiveResearchTimeout(mixed)).toBe(600_000);
 	});
 });
 
