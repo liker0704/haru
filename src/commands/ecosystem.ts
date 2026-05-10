@@ -109,7 +109,7 @@ async function fetchLatestVersion(packageName: string): Promise<string> {
 
 async function getDoctorSummary(): Promise<DoctorSummary | undefined> {
 	try {
-		const proc = Bun.spawn(["ov", "doctor", "--json"], {
+		const proc = Bun.spawn(["ha", "doctor", "--json"], {
 			stdout: "pipe",
 			stderr: "pipe",
 		});

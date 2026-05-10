@@ -27,7 +27,7 @@ function formatFileScope(fileScope: readonly string[]): string {
 }
 
 /**
- * Format mulch domains as a `ml prime` command.
+ * Format mulch domains as a `ku prime` command.
  * Returns a human-readable fallback if no domains are configured.
  */
 function formatMulchDomains(domains: readonly string[], audience?: string): string {
@@ -35,7 +35,7 @@ function formatMulchDomains(domains: readonly string[], audience?: string): stri
 		return "No specific expertise domains configured";
 	}
 	const audienceFlag = audience ? ` --audience ${audience}` : "";
-	return `\`\`\`bash\nml prime ${domains.join(" ")}${audienceFlag}\n\`\`\``;
+	return `\`\`\`bash\nku prime ${domains.join(" ")}${audienceFlag}\n\`\`\``;
 }
 
 /**
@@ -231,8 +231,8 @@ function formatQualityGates(config: OverlayConfig): string {
 			"",
 			"Before reporting completion:",
 			"",
-			`1. **Record mulch learnings:** \`ml record <domain> --type <convention|pattern|reference> --description "..."\` — capture reusable knowledge from your work`,
-			`2. **Close issue:** \`${config.trackerCli ?? "sd"} close ${config.taskId} --reason "summary of findings"\``,
+			`1. **Record mulch learnings:** \`ku record <domain> --type <convention|pattern|reference> --description "..."\` — capture reusable knowledge from your work`,
+			`2. **Close issue:** \`${config.trackerCli ?? "su"} close ${config.taskId} --reason "summary of findings"\``,
 			`3. **Send results:** \`ha mail send --to ${config.parentAgent ?? "coordinator"} --subject "done" --body "Summary" --type result --agent ${config.agentName}\``,
 			"",
 			"You are a read-only agent. Do NOT commit, modify files, or run quality gates.",
@@ -255,9 +255,9 @@ function formatQualityGates(config: OverlayConfig): string {
 		"",
 		...gateLines,
 		`${gateLines.length + 1}. **Commit:** all changes committed to your branch (${config.branchName})`,
-		`${gateLines.length + 2}. **Record mulch learnings:** \`ml record <domain> --type <convention|pattern|failure|decision> --description "..." --outcome-status success --outcome-agent ${config.agentName}\` — capture insights from your work`,
+		`${gateLines.length + 2}. **Record mulch learnings:** \`ku record <domain> --type <convention|pattern|failure|decision> --description "..." --outcome-status success --outcome-agent ${config.agentName}\` — capture insights from your work`,
 		`${gateLines.length + 3}. **Signal completion:** send \`worker_done\` mail to ${config.parentAgent ?? "coordinator"}: \`ha mail send --to ${config.parentAgent ?? "coordinator"} --subject "Worker done: ${config.taskId}" --body "Quality gates passed." --type worker_done --agent ${config.agentName}\``,
-		`${gateLines.length + 4}. **Close issue:** \`${config.trackerCli ?? "sd"} close ${config.taskId} --reason "summary of changes"\``,
+		`${gateLines.length + 4}. **Close issue:** \`${config.trackerCli ?? "su"} close ${config.taskId} --reason "summary of changes"\``,
 		"",
 		"Do NOT push to the canonical branch. Your work will be merged by the",
 		"coordinator via `ha merge`.",

@@ -20,7 +20,7 @@ export async function executeOvCommand(
 	timeoutMs?: number,
 ): Promise<CommandResult> {
 	const timeout = timeoutMs ?? DEFAULT_TIMEOUT_MS;
-	const proc = Bun.spawn(["ov", ...args], {
+	const proc = Bun.spawn(["ha", ...args], {
 		cwd: projectPath,
 		stdout: "pipe",
 		stderr: "pipe",

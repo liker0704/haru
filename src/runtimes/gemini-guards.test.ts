@@ -173,11 +173,11 @@ describe("generateGeminiHooks", () => {
 			expect(commands.some((c) => c.includes("ha mail check --inject"))).toBe(true);
 		});
 
-		test("SessionEnd runs session-end log and ml learn", () => {
+		test("SessionEnd runs session-end log and ku learn", () => {
 			const result = generateGeminiHooks(builderHooks);
 			const commands = h(result, "SessionEnd").flatMap((e) => e.hooks.map((hook) => hook.command));
 			expect(commands.some((c) => c.includes("ha log session-end"))).toBe(true);
-			expect(commands.some((c) => c.includes("ml learn"))).toBe(true);
+			expect(commands.some((c) => c.includes("ku learn"))).toBe(true);
 		});
 
 		test("PreCompress runs ha prime --compact", () => {

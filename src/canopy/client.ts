@@ -91,7 +91,7 @@ export function createCanopyClient(cwd: string, instrumentCtx?: InstrumentContex
 					};
 				} catch {
 					throw new AgentError(
-						`Failed to parse JSON from cn render ${name}: ${trimmed.slice(0, 200)}`,
+						`Failed to parse JSON from ta render ${name}: ${trimmed.slice(0, 200)}`,
 					);
 				}
 			});
@@ -105,7 +105,7 @@ export function createCanopyClient(cwd: string, instrumentCtx?: InstrumentContex
 				} else if (name) {
 					args.push(name);
 				}
-				// cn validate does not support --json; parse exit code and stdout/stderr
+				// ta validate does not support --json; parse exit code and stdout/stderr
 				const { stdout, stderr, exitCode } = await runCommand(["ta", ...args], cwd);
 				const output = (stdout + stderr).trim();
 				const errors: string[] = [];
@@ -157,7 +157,7 @@ export function createCanopyClient(cwd: string, instrumentCtx?: InstrumentContex
 						prompts: raw.prompts,
 					};
 				} catch {
-					throw new AgentError(`Failed to parse JSON from cn list: ${trimmed.slice(0, 200)}`);
+					throw new AgentError(`Failed to parse JSON from ta list: ${trimmed.slice(0, 200)}`);
 				}
 			});
 		},
@@ -182,7 +182,7 @@ export function createCanopyClient(cwd: string, instrumentCtx?: InstrumentContex
 					};
 				} catch {
 					throw new AgentError(
-						`Failed to parse JSON from cn show ${name}: ${trimmed.slice(0, 200)}`,
+						`Failed to parse JSON from ta show ${name}: ${trimmed.slice(0, 200)}`,
 					);
 				}
 			});

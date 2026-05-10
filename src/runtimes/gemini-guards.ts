@@ -462,7 +462,7 @@ export function generateGeminiHooks(
 			hooks: [
 				{
 					type: "command",
-					command: `${PATH_PREFIX} ${ENV_GUARD} read -r INPUT; if echo "$INPUT" | grep -qE '\\bgit\\s+commit\\b'; then ml diff HEAD~1 >/dev/null 2>&1 || true; fi; exit 0;`,
+					command: `${PATH_PREFIX} ${ENV_GUARD} read -r INPUT; if echo "$INPUT" | grep -qE '\\bgit\\s+commit\\b'; then ku diff HEAD~1 >/dev/null 2>&1 || true; fi; exit 0;`,
 				},
 			],
 		},
@@ -477,7 +477,7 @@ export function generateGeminiHooks(
 				},
 				{
 					type: "command",
-					command: `${PATH_PREFIX} ${ENV_GUARD} ml learn`,
+					command: `${PATH_PREFIX} ${ENV_GUARD} ku learn`,
 				},
 			],
 		},

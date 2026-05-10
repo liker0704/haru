@@ -6,7 +6,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "ov prime --agent orchestrator"
+						"command": "ha prime --agent orchestrator"
 					}
 				]
 			}
@@ -17,7 +17,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "ov mail check --inject --agent orchestrator"
+						"command": "ha mail check --inject --agent orchestrator"
 					}
 				]
 			}
@@ -28,7 +28,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "read -r INPUT; CMD=$(echo \"$INPUT\" | sed 's/.*\"command\": *\"\\([^\"]*\\)\".*/\\1/'); if echo \"$CMD\" | grep -qE '\\bgit\\s+push\\b'; then echo '{\"decision\":\"block\",\"reason\":\"git push is blocked by overstory — merge locally, push manually when ready\"}'; exit 0; fi;"
+						"command": "read -r INPUT; CMD=$(echo \"$INPUT\" | sed 's/.*\"command\": *\"\\([^\"]*\\)\".*/\\1/'); if echo \"$CMD\" | grep -qE '\\bgit\\s+push\\b'; then echo '{\"decision\":\"block\",\"reason\":\"git push is blocked by haru — merge locally, push manually when ready\"}'; exit 0; fi;"
 					}
 				]
 			},
@@ -37,7 +37,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "read -r INPUT; TOOL_NAME=$(echo \"$INPUT\" | sed 's/.*\"tool_name\": *\"\\([^\"]*\\)\".*/\\1/'); ov log tool-start --agent orchestrator --tool-name \"$TOOL_NAME\""
+						"command": "read -r INPUT; TOOL_NAME=$(echo \"$INPUT\" | sed 's/.*\"tool_name\": *\"\\([^\"]*\\)\".*/\\1/'); ha log tool-start --agent orchestrator --tool-name \"$TOOL_NAME\""
 					}
 				]
 			}
@@ -48,7 +48,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "read -r INPUT; TOOL_NAME=$(echo \"$INPUT\" | sed 's/.*\"tool_name\": *\"\\([^\"]*\\)\".*/\\1/'); ov log tool-end --agent orchestrator --tool-name \"$TOOL_NAME\""
+						"command": "read -r INPUT; TOOL_NAME=$(echo \"$INPUT\" | sed 's/.*\"tool_name\": *\"\\([^\"]*\\)\".*/\\1/'); ha log tool-end --agent orchestrator --tool-name \"$TOOL_NAME\""
 					}
 				]
 			},
@@ -68,7 +68,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "ov log session-end --agent orchestrator"
+						"command": "ha log session-end --agent orchestrator"
 					},
 					{
 						"type": "command",
@@ -83,7 +83,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "ov prime --agent orchestrator --compact"
+						"command": "ha prime --agent orchestrator --compact"
 					}
 				]
 			}

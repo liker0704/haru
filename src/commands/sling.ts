@@ -501,9 +501,9 @@ export function validateHierarchy(
 
 /**
  * Extract mulch record IDs and their domains from mulch prime output text.
- * Parses the markdown structure produced by ml prime: domain headings
+ * Parses the markdown structure produced by ku prime: domain headings
  * (## <name>) followed by record lines containing (mx-XXXXXX) identifiers.
- * @param primeText - The output text from ml prime
+ * @param primeText - The output text from ku prime
  * @returns Array of {id, domain} pairs. Deduplicated.
  */
 export function extractMulchRecordIds(primeText: string): Array<{ id: string; domain: string }> {

@@ -43,7 +43,7 @@ export function buildSteps(options: QuickstartOptions): QuickstartStep[] {
 			return ok ? "complete" : "pending";
 		},
 		run: async (): Promise<StepResult> => {
-			const result = await runCommand(["ov", "doctor", "--category", "dependencies", "--json"]);
+			const result = await runCommand(["ha", "doctor", "--category", "dependencies", "--json"]);
 			if (!result.ok) {
 				return { status: "failed", message: "Doctor command failed", details: [result.stderr] };
 			}
@@ -78,7 +78,7 @@ export function buildSteps(options: QuickstartOptions): QuickstartStep[] {
 			if (await isInitialized(projectRoot)) {
 				return { status: "skipped", message: "Already initialized" };
 			}
-			const result = await runCommand(["ov", "init", "--yes"]);
+			const result = await runCommand(["ha", "init", "--yes"]);
 			if (!result.ok) {
 				return { status: "failed", message: "ha init failed", details: [result.stderr] };
 			}
@@ -101,7 +101,7 @@ export function buildSteps(options: QuickstartOptions): QuickstartStep[] {
 			if (await areHooksInstalled(projectRoot)) {
 				return { status: "skipped", message: "Hooks already installed" };
 			}
-			const result = await runCommand(["ov", "hooks", "install"]);
+			const result = await runCommand(["ha", "hooks", "install"]);
 			if (!result.ok) {
 				return { status: "failed", message: "hooks install failed", details: [result.stderr] };
 			}
@@ -256,7 +256,7 @@ export function buildSteps(options: QuickstartOptions): QuickstartStep[] {
 				}
 
 				if (verbose) {
-					await runCommand(["ov", "status"]).then((r) => {
+					await runCommand(["ha", "status"]).then((r) => {
 						if (r.ok) process.stdout.write(r.stdout);
 					});
 				}
@@ -281,7 +281,7 @@ export function buildSteps(options: QuickstartOptions): QuickstartStep[] {
 		description: "Show agent status and exploration results",
 		check: async () => "pending",
 		run: async (): Promise<StepResult> => {
-			const result = await runCommand(["ov", "status"]);
+			const result = await runCommand(["ha", "status"]);
 			if (result.ok && verbose) {
 				process.stdout.write(result.stdout);
 			}
@@ -305,13 +305,13 @@ export function buildSteps(options: QuickstartOptions): QuickstartStep[] {
 
 			const active = await hasActiveAgents();
 			if (active) {
-				const stopResult = await runCommand(["ov", "stop", "quickstart-scout"]);
+				const stopResult = await runCommand(["ha", "stop", "quickstart-scout"]);
 				if (!stopResult.ok && verbose) {
 					printWarning("Could not stop agent", stopResult.stderr.trim());
 				}
 			}
 
-			await runCommand(["ov", "worktree", "clean"]);
+			await runCommand(["ha", "worktree", "clean"]);
 
 			// Close tracker task if we have a real one
 			try {

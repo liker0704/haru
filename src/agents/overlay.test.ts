@@ -143,7 +143,7 @@ describe("generateOverlay", () => {
 		const config = makeConfig({ mulchDomains: ["typescript", "testing"] });
 		const output = await generateOverlay(config);
 
-		expect(output).toContain("ml prime typescript testing");
+		expect(output).toContain("ku prime typescript testing");
 	});
 
 	test("empty mulch domains shows fallback text", async () => {
@@ -275,7 +275,7 @@ describe("generateOverlay", () => {
 		});
 		const output = await generateOverlay(config);
 
-		expect(output).toContain("sd close haru-task1");
+		expect(output).toContain("su close haru-task1");
 		expect(output).toContain("ha mail send --to lead-alpha");
 	});
 
@@ -431,51 +431,51 @@ describe("generateOverlay", () => {
 		const config = makeConfig({ capability: "builder", taskId: "haru-task1" });
 		const output = await generateOverlay(config);
 
-		expect(output).toContain("sd close haru-task1");
+		expect(output).toContain("su close haru-task1");
 	});
 
 	test("custom trackerCli replaces sd in quality gates", async () => {
 		const config = makeConfig({
 			capability: "builder",
-			trackerCli: "sd",
+			trackerCli: "su",
 			taskId: "haru-test1",
 		});
 		const output = await generateOverlay(config);
 
-		expect(output).toContain("sd close haru-test1");
+		expect(output).toContain("su close haru-test1");
 		expect(output).not.toContain("bd close");
 	});
 
 	test("custom trackerCli replaces bd in constraints", async () => {
 		const config = makeConfig({
 			capability: "builder",
-			trackerCli: "sd",
+			trackerCli: "su",
 		});
 		const output = await generateOverlay(config);
 
-		expect(output).toContain("`sd close`");
+		expect(output).toContain("`su close`");
 	});
 
 	test("custom trackerCli replaces bd in read-only completion section", async () => {
 		const config = makeConfig({
 			capability: "scout",
-			trackerCli: "sd",
+			trackerCli: "su",
 			taskId: "haru-test2",
 		});
 		const output = await generateOverlay(config);
 
-		expect(output).toContain("sd close haru-test2");
+		expect(output).toContain("su close haru-test2");
 		expect(output).not.toContain("bd close");
 	});
 
 	test("TRACKER_CLI in base definition is replaced", async () => {
 		const config = makeConfig({
-			trackerCli: "sd",
+			trackerCli: "su",
 			baseDefinition: "Run `{{TRACKER_CLI}} show` to check status.",
 		});
 		const output = await generateOverlay(config);
 
-		expect(output).toContain("Run `sd show` to check status.");
+		expect(output).toContain("Run `su show` to check status.");
 		expect(output).not.toContain("{{TRACKER_CLI}}");
 	});
 
@@ -494,7 +494,7 @@ describe("generateOverlay", () => {
 		const config = makeConfig({ capability: "builder", taskId: "haru-back" });
 		const output = await generateOverlay(config);
 
-		expect(output).toContain("sd close haru-back");
+		expect(output).toContain("su close haru-back");
 	});
 
 	test("dispatch overrides: skipReview injects SKIP REVIEW directive for leads", async () => {

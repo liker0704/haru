@@ -44,7 +44,7 @@ interface DoctorJsonOutput {
  */
 export async function areDependenciesAvailable(): Promise<{ ok: boolean; missing: string[] }> {
 	try {
-		const proc = Bun.spawn(["ov", "doctor", "--category", "dependencies", "--json"], {
+		const proc = Bun.spawn(["ha", "doctor", "--category", "dependencies", "--json"], {
 			stdout: "pipe",
 			stderr: "pipe",
 		});
@@ -88,7 +88,7 @@ interface StatusJsonOutput {
  */
 export async function hasActiveAgents(): Promise<boolean> {
 	try {
-		const proc = Bun.spawn(["ov", "status", "--json"], {
+		const proc = Bun.spawn(["ha", "status", "--json"], {
 			stdout: "pipe",
 			stderr: "pipe",
 		});

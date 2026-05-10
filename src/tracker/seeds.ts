@@ -153,7 +153,7 @@ export function createSeedsTracker(cwd: string): TrackerClient {
 			assertEnvelopeSuccess(envelope, "create");
 			const id = envelope.id ?? envelope.issue?.id;
 			if (!id) {
-				throw new AgentError("sd create did not return an issue ID");
+				throw new AgentError("su create did not return an issue ID");
 			}
 			return id;
 		},

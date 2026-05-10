@@ -71,7 +71,7 @@ export function createWatchdogControl(projectRoot: string): WatchdogControl {
 			}
 
 			// Start watchdog in background
-			const proc = Bun.spawn(["ov", "watch", "--background"], {
+			const proc = Bun.spawn(["ha", "watch", "--background"], {
 				cwd: projectRoot,
 				stdout: "pipe",
 				stderr: "pipe",

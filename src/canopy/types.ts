@@ -14,7 +14,7 @@ export interface CanopyPromptSummary {
 	sections: CanopyPromptSection[];
 }
 
-/** Result from cn render — resolved prompt with all inheritance applied. */
+/** Result from ta render — resolved prompt with all inheritance applied. */
 export interface CanopyRenderResult {
 	success: boolean;
 	name: string;
@@ -22,19 +22,19 @@ export interface CanopyRenderResult {
 	sections: CanopyPromptSection[];
 }
 
-/** Result from cn validate — validation status and errors. */
+/** Result from ta validate — validation status and errors. */
 export interface CanopyValidateResult {
 	success: boolean;
 	errors: string[];
 }
 
-/** Result from cn list — list of all prompts. */
+/** Result from ta list — list of all prompts. */
 export interface CanopyListResult {
 	success: boolean;
 	prompts: CanopyPromptSummary[];
 }
 
-/** Result from cn show — single prompt record. */
+/** Result from ta show — single prompt record. */
 export interface CanopyShowResult {
 	success: boolean;
 	prompt: CanopyPromptSummary;

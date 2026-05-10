@@ -130,7 +130,7 @@ function agentGuard(agentName: string): string {
  * (/usr/bin:/bin:/usr/sbin:/sbin). os-eco CLIs may be available either via
  * project-local node_modules/.bin or via Bun global installs in ~/.bun/bin;
  * both are absent from that PATH, causing hooks like `ha prime` (SessionStart)
- * and `ml learn` (Stop) to fail with "command not found".
+ * and `ku learn` (Stop) to fail with "command not found".
  *
  * Prepend this to any hook command that invokes one of those CLIs so they
  * resolve correctly regardless of how Claude Code was launched.

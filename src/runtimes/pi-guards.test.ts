@@ -350,7 +350,7 @@ describe("generatePiGuardExtension", () => {
 		test("generated code contains pi.exec ha log tool-start in tool_call handler", () => {
 			const generated = generatePiGuardExtension(builderHooks());
 			expect(generated).toContain(
-				'pi.exec("ov", ["log", "tool-start", "--agent", AGENT_NAME, "--tool-name", event.toolName])',
+				'pi.exec("ha", ["log", "tool-start", "--agent", AGENT_NAME, "--tool-name", event.toolName])',
 			);
 		});
 
@@ -362,7 +362,7 @@ describe("generatePiGuardExtension", () => {
 		test("generated code contains pi.exec ha log tool-end in tool_execution_end handler", () => {
 			const generated = generatePiGuardExtension(builderHooks());
 			expect(generated).toContain(
-				'pi.exec("ov", ["log", "tool-end", "--agent", AGENT_NAME, "--tool-name", event.toolName])',
+				'pi.exec("ha", ["log", "tool-end", "--agent", AGENT_NAME, "--tool-name", event.toolName])',
 			);
 		});
 
@@ -374,21 +374,21 @@ describe("generatePiGuardExtension", () => {
 		test("generated code awaits pi.exec ha log session-end in session_shutdown handler", () => {
 			const generated = generatePiGuardExtension(builderHooks());
 			expect(generated).toContain(
-				'await pi.exec("ov", ["log", "session-end", "--agent", AGENT_NAME])',
+				'await pi.exec("ha", ["log", "session-end", "--agent", AGENT_NAME])',
 			);
 		});
 
 		test("tool_call handler passes --tool-name event.toolName to tool-start", () => {
 			const generated = generatePiGuardExtension(builderHooks());
 			expect(generated).toContain(
-				'pi.exec("ov", ["log", "tool-start", "--agent", AGENT_NAME, "--tool-name", event.toolName])',
+				'pi.exec("ha", ["log", "tool-start", "--agent", AGENT_NAME, "--tool-name", event.toolName])',
 			);
 		});
 
 		test("tool_execution_end handler passes --tool-name event.toolName to tool-end", () => {
 			const generated = generatePiGuardExtension(builderHooks());
 			expect(generated).toContain(
-				'pi.exec("ov", ["log", "tool-end", "--agent", AGENT_NAME, "--tool-name", event.toolName])',
+				'pi.exec("ha", ["log", "tool-end", "--agent", AGENT_NAME, "--tool-name", event.toolName])',
 			);
 		});
 
@@ -416,7 +416,7 @@ describe("generatePiGuardExtension", () => {
 			// Extract the agent_end handler body
 			const handlerBody = generated.slice(agentEndIdx, sessionShutdownIdx);
 			expect(handlerBody).toContain(
-				'await pi.exec("ov", ["log", "session-end", "--agent", AGENT_NAME])',
+				'await pi.exec("ha", ["log", "session-end", "--agent", AGENT_NAME])',
 			);
 		});
 

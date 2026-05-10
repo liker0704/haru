@@ -21,7 +21,7 @@ async function runOv(
 	args: string[],
 	cwd: string,
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-	const proc = Bun.spawn(["ov", ...args], {
+	const proc = Bun.spawn(["ha", ...args], {
 		cwd,
 		stdout: "pipe",
 		stderr: "pipe",
