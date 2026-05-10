@@ -83,6 +83,29 @@ describe("createMissionCommand", () => {
 		expect(refresh?.options.find((option) => option.long === "--json")).toBeDefined();
 	});
 
+	test("start subcommand accepts positional intent + Stage A flags", () => {
+		const cmd = createMissionCommand();
+		const start = cmd.commands.find((command) => command.name() === "start");
+		expect(start).toBeDefined();
+		const options = start?.options ?? [];
+
+		// Positional [intent...] is accepted (registered as a command argument)
+		expect(start?.registeredArguments?.length ?? 0).toBeGreaterThan(0);
+
+		// Stage A flags
+		expect(options.find((option) => option.long === "--slug")).toBeDefined();
+		expect(options.find((option) => option.long === "--objective")).toBeDefined();
+		expect(options.find((option) => option.long === "--autonomy")).toBeDefined();
+		expect(options.find((option) => option.long === "--spec")).toBeDefined();
+	});
+
+	test("start subcommand --autonomy default is supervised", () => {
+		const cmd = createMissionCommand();
+		const start = cmd.commands.find((command) => command.name() === "start");
+		const autonomyOpt = start?.options.find((option) => option.long === "--autonomy");
+		expect(autonomyOpt?.defaultValue).toBe("supervised");
+	});
+
 	test("resolveCurrentMissionId recovers from MissionStore when current-mission.txt is missing", async () => {
 		const missionStore = createMissionStore(join(overstoryDir, "sessions.db"));
 		try {

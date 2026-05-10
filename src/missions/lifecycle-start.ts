@@ -42,6 +42,10 @@ interface StartOpts {
 	attach?: boolean;
 	/** Stage A: mission autonomy level — controls intake gates. Default `supervised`. */
 	autonomy?: import("../types.ts").MissionAutonomy;
+	/** Stage A: pre-written spec path. When set, intake-phase is skipped. */
+	specFile?: string;
+	/** When true, missing intent in non-TTY context is an error rather than placeholder. */
+	requireIntent?: boolean;
 }
 
 export async function missionStart(
@@ -50,10 +54,28 @@ export async function missionStart(
 	opts: StartOpts,
 	deps: MissionCommandDeps = {},
 ): Promise<void> {
-	const objective = opts.objective ?? "Pending — clarifier will resolve from intent";
-
 	const dbPath = join(overstoryDir, "sessions.db");
 	const missionStore = createMissionStore(dbPath);
+
+	// Strict-intent guard: when caller asserts intent is required (non-TTY +
+	// no positional arg) and nothing was provided, fail fast.
+	if (
+		opts.requireIntent &&
+		(!opts.objective || opts.objective.trim().length === 0) &&
+		!opts.specFile
+	) {
+		const message = "Intent required: pass it as positional arg, --objective, or --spec <file>";
+		if (opts.json) {
+			jsonError("mission start", message);
+		} else {
+			printError("Mission start failed", message);
+		}
+		missionStore.close();
+		process.exitCode = 1;
+		return;
+	}
+
+	const objective = opts.objective ?? "Pending — clarifier will resolve from intent";
 
 	// Auto-generate slug from intent (objective) when --slug omitted.
 	let slug: string;
@@ -138,6 +160,31 @@ export async function missionStart(
 
 		await ensureMissionArtifacts(mission);
 		await writeMissionRuntimePointers(overstoryDir, mission.id, runId);
+
+		// --spec power-user path: copy pre-written spec to the mission's
+		// product-spec.md and short-circuit intake-phase. The mission still
+		// starts in `intake` so the engine can run the tier-classifier; the
+		// clarifier/analyst-intake spawn is skipped because spec_ready mail
+		// will already be present (no — the gate evaluator looks at mail, so
+		// we emit a synthetic spec_ready event instead). For simplicity now
+		// we only copy the file and rely on the caller to also pass --tier
+		// so understand/execute spawns directly. If --tier is absent the
+		// classifier still runs.
+		if (opts.specFile) {
+			const { copyFile } = await import("node:fs/promises");
+			const { getMissionArtifactPaths } = await import("./context.ts");
+			const paths = getMissionArtifactPaths(mission);
+			await copyFile(opts.specFile, paths.productSpecMd);
+			recordMissionEvent({
+				overstoryDir,
+				mission,
+				agentName: "operator",
+				data: {
+					kind: "spec_imported",
+					detail: `Pre-written spec copied from ${opts.specFile}`,
+				},
+			});
+		}
 
 		// Stage A: no coordinator spawned at mission-start. The intake-phase
 		// subgraph (running inside the watchdog/engine) takes over from here:

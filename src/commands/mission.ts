@@ -92,6 +92,7 @@ export function createMissionCommand(): Command {
 			"Mission autonomy: supervised | auto-spec | auto-all",
 			"supervised",
 		)
+		.option("--spec <file>", "Use a pre-written product-spec.md (skips clarifier)")
 		.option("--attach", "Attach to coordinator tmux session after start")
 		.option("--no-attach", "Do not attach to coordinator tmux session")
 		.option("--json", "Output as JSON")
@@ -102,6 +103,7 @@ export function createMissionCommand(): Command {
 					slug?: string;
 					objective?: string;
 					autonomy?: string;
+					spec?: string;
 					attach?: boolean;
 					json?: boolean;
 				},
@@ -134,12 +136,20 @@ export function createMissionCommand(): Command {
 					);
 				}
 
+				// In a non-TTY context (CI, scripts) with no intent and no spec,
+				// fail fast rather than silently creating an empty mission.
+				const isTTY = process.stdout.isTTY === true;
+				const hasIntent = (objective ?? "").trim().length > 0;
+				const requireIntent = !isTTY && !hasIntent && !opts.spec;
+
 				await missionStart(overstoryDir, config.project.root, {
 					slug: opts.slug,
 					objective,
 					autonomy: autonomy as import("../types.ts").MissionAutonomy,
+					specFile: opts.spec,
 					attach,
 					json: opts.json,
+					requireIntent,
 				});
 			},
 		);

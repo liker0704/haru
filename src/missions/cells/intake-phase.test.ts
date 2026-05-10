@@ -17,11 +17,15 @@ function makeCtx(opts: {
 	mission?: ReturnType<typeof makeMission> | null;
 	checkpoint?: unknown;
 	nodeId?: string;
+	onSaveCheckpoint?: (data: unknown) => void;
 }): HandlerContext {
 	return {
 		nodeId: opts.nodeId ?? "intake-phase:ensure-context-generate",
 		checkpoint: opts.checkpoint ?? null,
 		getMission: () => opts.mission ?? null,
+		saveCheckpoint: async (data: unknown) => {
+			opts.onSaveCheckpoint?.(data);
+		},
 	} as HandlerContext;
 }
 
@@ -160,6 +164,20 @@ describe("intake-phase spec-rejected handler", () => {
 		// biome-ignore lint/style/noNonNullAssertion: registry known
 		const result = await handlers["spec-rejected"]!(makeCtx({ checkpoint: null }));
 		expect(result.trigger).toBe("retry");
+	});
+
+	test("persists incremented rejectionCount via saveCheckpoint", async () => {
+		let saved: unknown = null;
+		// biome-ignore lint/style/noNonNullAssertion: registry known
+		await handlers["spec-rejected"]!(
+			makeCtx({
+				checkpoint: { rejectionCount: 1 },
+				onSaveCheckpoint: (data) => {
+					saved = data;
+				},
+			}),
+		);
+		expect(saved).toEqual({ rejectionCount: 2 });
 	});
 });
 

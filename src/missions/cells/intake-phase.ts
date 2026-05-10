@@ -234,9 +234,7 @@ function buildHandlers(deps: PhaseCellDeps): HandlerRegistry {
 			} catch (err) {
 				// Don't block the graph — gate evaluator (`evaluateAwaitResearchComplete`)
 				// will surface stuck state via its nudge.
-				process.stderr.write(
-					`[intake-phase] dispatch-analyst-intake failed: ${String(err)}\n`,
-				);
+				process.stderr.write(`[intake-phase] dispatch-analyst-intake failed: ${String(err)}\n`);
 			}
 			return { trigger: "analyst_dispatched" };
 		},
@@ -262,8 +260,6 @@ function buildHandlers(deps: PhaseCellDeps): HandlerRegistry {
 			return { trigger: "clarifier_dispatched" };
 		},
 
-
-
 		"human-spec-review": async (ctx) => {
 			const mission = ctx.getMission();
 			if (!mission) return { trigger: "approved" };
@@ -288,6 +284,11 @@ function buildHandlers(deps: PhaseCellDeps): HandlerRegistry {
 			const checkpoint = (ctx.checkpoint ?? {}) as IntakeCheckpoint;
 			const count = (checkpoint.rejectionCount ?? 0) + 1;
 
+			// Persist the incremented count so the next rejection sees it.
+			// Without this the engine reads the same checkpoint forever and
+			// MAX_SPEC_REJECTIONS escalation never fires.
+			await ctx.saveCheckpoint({ ...checkpoint, rejectionCount: count });
+
 			if (count >= MAX_SPEC_REJECTIONS) {
 				// Escalate back to human-spec-review for manual edit/cancel decision.
 				return { trigger: "escalate" };
@@ -309,9 +310,7 @@ function buildHandlers(deps: PhaseCellDeps): HandlerRegistry {
 					projectRoot: deps.projectRoot,
 				});
 			} catch (err) {
-				process.stderr.write(
-					`[intake-phase] dispatch-tier-classifier failed: ${String(err)}\n`,
-				);
+				process.stderr.write(`[intake-phase] dispatch-tier-classifier failed: ${String(err)}\n`);
 			}
 			return { trigger: "classifier_dispatched" };
 		},
