@@ -24,6 +24,7 @@ domains:
   - docs
   - error-handling
   - watchdog
+  - tier-classifier
 governance:
   max_entries: 100
   warn_entries: 150
