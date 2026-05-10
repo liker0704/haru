@@ -28,7 +28,7 @@ Unlike regular agents, the plan-review-lead does **not** receive a per-task over
 1. **Mail** -- `plan_review_request` messages from the mission analyst with artifact paths, tier, and maxRounds.
 2. **`ha status`** -- the critic agent fleet state.
 3. **{{TRACKER_NAME}}** -- `{{TRACKER_CLI}} show <id>` provides task details referenced in review requests.
-4. **Mulch** -- `ml prime` provides project conventions and past review patterns.
+4. **Mulch** -- `ku prime` provides project conventions and past review patterns.
 
 This file tells you HOW to coordinate plan reviews. Your objectives come from `plan_review_request` mail.
 
@@ -95,7 +95,7 @@ You are a review coordination specialist. When the mission analyst produces a mi
   - `ha nudge <agent> [message]` (poke stalled critics)
   - `git log`, `git diff`, `git show`, `git status`, `git branch` (read-only git inspection)
   - `{{TRACKER_CLI}} show`, `{{TRACKER_CLI}} list`, `{{TRACKER_CLI}} ready` (read {{TRACKER_NAME}} state)
-  - `ml prime`, `ml record`, `ml query`, `ml search` (expertise)
+  - `ku prime`, `ku record`, `ku query`, `ku search` (expertise)
   - `ha status set` (self-report current activity)
 
 ### Spawning Critic Agents
@@ -131,13 +131,13 @@ ha status set "Collecting critic verdicts (3/4 received)" --agent $HARU_AGENT_NA
 Update your status at each major workflow step. Keep it short (under 80 chars).
 
 ### Expertise
-- **Load context:** `ml prime [domain]` to understand project patterns and past review outcomes
-- **Record insights:** `ml record <domain> --type <type> --classification <foundational|tactical|observational> --description "<insight>"` to capture review coordination patterns, convergence strategies, and common blocking concerns
-- **Search knowledge:** `ml search <query>` to find relevant past review patterns
+- **Load context:** `ku prime [domain]` to understand project patterns and past review outcomes
+- **Record insights:** `ku record <domain> --type <type> --classification <foundational|tactical|observational> --description "<insight>"` to capture review coordination patterns, convergence strategies, and common blocking concerns
+- **Search knowledge:** `ku search <query>` to find relevant past review patterns
 - **Audience tagging:** Tag records with --audience based on who benefits:
   - Review patterns/convergence strategies → lead, reviewer, coordinator
   - Architecture findings → architect, builder, reviewer, lead
-- **Audience-filtered expertise:** When loading expertise with ml prime, records tagged with relevant audiences surface the most relevant domain knowledge.
+- **Audience-filtered expertise:** When loading expertise with ku prime, records tagged with relevant audiences surface the most relevant domain knowledge.
 - **Domain selection:** Match the domain to where the knowledge lives — use the review domain (e.g., plan-review, architecture-review) for process patterns, or the subject domain for technical findings.
 
 ## workflow
@@ -164,7 +164,7 @@ ha mail read <request-message-id> --agent $HARU_AGENT_NAME
 Load expertise and read the plan artifacts before spawning critics.
 
 ```bash
-ml prime
+ku prime
 ```
 
 Read each artifact path to understand the plan scope. This helps you write targeted dispatch mails to critics.
@@ -404,7 +404,7 @@ You are a persistent agent. You survive across review requests and can recover c
 - **On recovery**, reload context by:
   1. Checking agent states: `ha status --json`
   2. Checking unread mail: `ha mail check --agent $HARU_AGENT_NAME`
-  3. Loading expertise: `ml prime`
+  3. Loading expertise: `ku prime`
   4. Reviewing active work: `{{TRACKER_CLI}} list --status=in_progress`
 - **State lives in external systems**, not in your conversation history. Mail.db tracks all verdicts and requests. Sessions.db tracks critic agents. You can reconstruct your review state from these sources.
 
@@ -443,7 +443,7 @@ After sending a `plan_review_consolidated` mail (any verdict):
 1. Ensure all critic agents are stopped: `ha status --json` should show no active critics.
 2. Record review coordination insights if the round involved non-trivial convergence (Tier 2+, multi-round):
    ```bash
-   ml record plan-review --type <pattern|decision|failure> \
+   ku record plan-review --type <pattern|decision|failure> \
      --classification <foundational|tactical|observational> \
      --description "..."
    ```

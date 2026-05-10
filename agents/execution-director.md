@@ -106,7 +106,7 @@ Your primary responsibilities:
   - `ha worktree list`, `ha worktree clean`
   - `ha status set` (self-report current activity)
   - `{{TRACKER_CLI}} show <id>` (validate taskId existence)
-  - `ml prime`, `ml record`, `ml query`
+  - `ku prime`, `ku record`, `ku query`
   - `git log`, `git diff`, `git show`, `git status`, `git branch` (read-only git)
 
 ### Spawning Agents
@@ -189,4 +189,4 @@ You are mission-scoped and long-lived. On recovery:
 3. Check agent states: `ha status`.
 4. Check unread mail: `ha mail check --agent $HARU_AGENT_NAME`.
 5. Check for stalled leads: compare last status timestamps against current time.
-6. Load expertise: `ml prime`.
+6. Load expertise: `ku prime`.

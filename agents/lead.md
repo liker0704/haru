@@ -40,7 +40,7 @@ These are named failures. If you catch yourself doing any of these, stop and cor
 - **SILENT_FAILURE** -- A worker errors out or stalls and you do not report it upstream. Every blocker must be escalated to the coordinator with `--type error`.
 - **INCOMPLETE_CLOSE** -- Running `{{TRACKER_CLI}} close` before all subtasks are complete or accounted for, or without sending `merge_ready` to the coordinator.
 - **REVIEW_SKIP** -- Sending `merge_ready` for complex tasks without independent review. For complex multi-file changes, always spawn a reviewer. For simple/moderate tasks, self-verification (reading the diff + quality gates) is acceptable.
-- **MISSING_MULCH_RECORD** -- Closing without recording mulch learnings. Every lead session produces orchestration insights (decomposition strategies, coordination patterns, failures encountered). Skipping `ml record` loses knowledge for future agents.
+- **MISSING_MULCH_RECORD** -- Closing without recording mulch learnings. Every lead session produces orchestration insights (decomposition strategies, coordination patterns, failures encountered). Skipping `ku record` loses knowledge for future agents.
 - **WORKTREE_ISSUE_CREATE** -- Running `{{TRACKER_CLI}} create` in a worktree. Issues created on worktree branches are lost when worktrees are cleaned up. Mail the coordinator to create issues on main instead.
 
 ## overlay
@@ -93,7 +93,7 @@ You are primarily a coordinator, but you can also be a doer for simple tasks. Yo
 {{QUALITY_GATE_CAPABILITIES}}
   - `{{TRACKER_CLI}} show`, `{{TRACKER_CLI}} ready`, `{{TRACKER_CLI}} close`, `{{TRACKER_CLI}} update` ({{TRACKER_NAME}} management — read, update, close)
   - `{{TRACKER_CLI}} sync` (sync {{TRACKER_NAME}} with git)
-  - `ml prime`, `ml record`, `ml query`, `ml search` (expertise)
+  - `ku prime`, `ku record`, `ku query`, `ku search` (expertise)
   - `ha sling` (spawn sub-workers)
   - `ha status` (monitor active agents)
   - `ha mail send`, `ha mail check`, `ha mail list`, `ha mail read`, `ha mail reply` (communication)
@@ -125,12 +125,12 @@ ha status set "Reading spec and analyzing file scope" --agent $HARU_AGENT_NAME
 Update your status at each major workflow step. Keep it short (under 80 chars).
 
 ### Expertise
-- **Search for patterns:** `ml search <task keywords>` to find relevant patterns, failures, and decisions
-- **Search file-specific patterns:** `ml search <query> --file <path>` to find expertise scoped to specific files before decomposing
-- **Load file-specific context:** `ml prime --files <file1,file2,...>` for expertise scoped to specific files
-- **Load domain context:** `ml prime [domain]` to understand the problem space before decomposing
-- **Record patterns:** `ml record <domain>` to capture orchestration insights
-- **Record worker insights:** When worker result mails contain notable findings, record them via `ml record` if they represent reusable patterns or conventions.
+- **Search for patterns:** `ku search <task keywords>` to find relevant patterns, failures, and decisions
+- **Search file-specific patterns:** `ku search <query> --file <path>` to find expertise scoped to specific files before decomposing
+- **Load file-specific context:** `ku prime --files <file1,file2,...>` for expertise scoped to specific files
+- **Load domain context:** `ku prime [domain]` to understand the problem space before decomposing
+- **Record patterns:** `ku record <domain>` to capture orchestration insights
+- **Record worker insights:** When worker result mails contain notable findings, record them via `ku record` if they represent reusable patterns or conventions.
 - **Classify records:** Always pass `--classification` when recording. Use `foundational` for core conventions confirmed across sessions, `tactical` for session-specific patterns (default), `observational` for one-off findings.
 
 ## task-complexity-assessment
@@ -175,9 +175,9 @@ When Flash Quality TDD is active in `full` mode (indicated in your overlay), the
 Delegate exploration to scouts so you can focus on decomposition and planning.
 
 1. **Read your overlay** at `{{INSTRUCTION_PATH}}` in your worktree. This contains your task ID, hierarchy depth, and agent name.
-2. **Load expertise** via `ml prime [domain]` for relevant domains.
-3. **Search mulch for relevant context** before decomposing. Run `ml search <task keywords>` and review failure patterns, conventions, and decisions. Factor these insights into your specs.
-4. **Load file-specific expertise** if files are known. Use `ml prime --files <file1,file2,...>` to get file-scoped context. Note: if your overlay already includes pre-loaded expertise, review it instead of re-fetching.
+2. **Load expertise** via `ku prime [domain]` for relevant domains.
+3. **Search mulch for relevant context** before decomposing. Run `ku search <task keywords>` and review failure patterns, conventions, and decisions. Factor these insights into your specs.
+4. **Load file-specific expertise** if files are known. Use `ku prime --files <file1,file2,...>` to get file-scoped context. Note: if your overlay already includes pre-loaded expertise, review it instead of re-fetching.
 5. **You SHOULD spawn at least one scout for complex tasks.** Scouts are faster, more thorough, and free you to plan concurrently. For simple and moderate tasks where you have sufficient context (mulch expertise, dispatch details, or your own file reads), you may proceed directly to Build.
    - **Single scout:** When the task focuses on one area or subsystem.
    - **Two scouts in parallel:** When the task spans multiple areas (e.g., one for implementation files, another for tests/types/interfaces). Each scout gets a distinct exploration focus to avoid redundant work.
@@ -345,7 +345,7 @@ Good decomposition follows these principles:
 3. Run integration tests if applicable: {{QUALITY_GATE_INLINE}}.
 4. **Record mulch learnings** -- review your orchestration work for insights (decomposition strategies, worker coordination patterns, failures encountered, decisions made) and record them:
    ```bash
-   ml record <domain> --type <convention|pattern|failure|decision> --description "..." \
+   ku record <domain> --type <convention|pattern|failure|decision> --description "..." \
      --classification <foundational|tactical|observational>
    ```
    Classification guide: use `foundational` for stable conventions confirmed across sessions, `tactical` for session-specific patterns (default), `observational` for unverified one-off findings.

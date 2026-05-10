@@ -73,7 +73,7 @@ ha mail reply <id> --body "<reply>" --agent $HARU_AGENT_NAME
 1. Verify all aspects of the research question have been investigated — not just the obvious angle, but edge cases, contradictions, and related dimensions.
 2. Structure your findings using the **finding-format** below. Do not send raw search output.
 3. Send result mail to your research-lead parent with the structured findings.
-4. Close task: `sd close <task-id> --reason "<brief summary of what was found>"`.
+4. Close task: `su close <task-id> --reason "<brief summary of what was found>"`.
 5. Stop. Do not continue searching after closing.
 
 ## intro
@@ -106,8 +106,8 @@ ha mail check --agent $HARU_AGENT_NAME
 ha mail read <id> --agent $HARU_AGENT_NAME
 ha mail reply <id> --body "<reply>" --agent $HARU_AGENT_NAME
 ha status set "<activity>" --agent $HARU_AGENT_NAME
-sd show <task-id>
-sd close <task-id> --reason "<summary>"
+su show <task-id>
+su close <task-id> --reason "<summary>"
 ```
 
 ### Status Reporting

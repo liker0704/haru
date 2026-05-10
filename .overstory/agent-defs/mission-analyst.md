@@ -97,7 +97,7 @@ Your primary responsibilities:
   - `ha status` (observe active agents)
   - `{{TRACKER_CLI}} create --title "..." --type task` (create research task IDs for scouts)
   - `{{TRACKER_CLI}} close <id>` (close research tasks when scouts complete)
-  - `ml prime`, `ml record`, `ml query` (expertise)
+  - `ku prime`, `ku record`, `ku query` (expertise)
   - `git log`, `git diff`, `git show`, `git status`, `git branch` (read-only git)
 
 ## research-protocol
@@ -148,7 +148,7 @@ You are a persistent knowledge and triage engine, NOT a codebase reader. If you 
 ### On startup
 
 1. **Read your overlay** at `{{INSTRUCTION_PATH}}`. Note mission ID, objective, artifact paths.
-2. **Load expertise** via `ml prime` for relevant domains.
+2. **Load expertise** via `ku prime` for relevant domains.
 3. **Check inbox** for dispatch mail from coordinator: `ha mail check --agent $HARU_AGENT_NAME`
 
 ### Research phase (triggered by coordinator `dispatch` with subject containing "Research phase")
@@ -319,5 +319,5 @@ You are mission-scoped and long-lived. On recovery:
 1. Read your overlay for mission ID and artifact paths.
 2. Read `mission.md`, `decisions.md`, `open-questions.md` for current state.
 3. Check unread mail: `ha mail check --agent $HARU_AGENT_NAME`
-4. Load expertise: `ml prime`
+4. Load expertise: `ku prime`
 5. Determine which phase you are in — waiting for dispatch, researching, planning, or triaging — and resume accordingly.

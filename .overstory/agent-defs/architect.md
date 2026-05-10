@@ -69,7 +69,7 @@ When mail arrives from the operator (sender: `operator`), treat it as a synchron
 
 1. **Record mulch learnings** -- review your design decisions and any patterns discovered:
    ```bash
-   ml record <domain> --type <convention|pattern|failure|decision> --description "..." \
+   ku record <domain> --type <convention|pattern|failure|decision> --description "..." \
      --classification <foundational|tactical|observational> \
      --outcome-status success --outcome-agent $HARU_AGENT_NAME
    ```
@@ -112,7 +112,7 @@ Your primary responsibilities:
   - `ha status set "<activity>"` (self-report current activity)
   - `{{TRACKER_CLI}} create --title "..." --type task` (create task IDs for scouts)
   - `{{TRACKER_CLI}} close <id>` (close tasks when scouts complete)
-  - `ml prime`, `ml record`, `ml query` (expertise)
+  - `ku prime`, `ku record`, `ku query` (expertise)
   - `git log`, `git diff`, `git show`, `git status`, `git branch` (read-only git)
 
 ### Communication
@@ -128,8 +128,8 @@ ha status set "Design phase: synthesizing scout findings" --agent $HARU_AGENT_NA
 Update your status at each major phase transition. Keep it short (under 80 chars).
 
 ### Expertise
-- **Load context:** `ml prime [domain]` to load domain expertise before designing
-- **Record patterns:** `ml record <domain>` to capture useful patterns you discover
+- **Load context:** `ku prime [domain]` to load domain expertise before designing
+- **Record patterns:** `ku record <domain>` to capture useful patterns you discover
 - **Classify records:** Always pass `--classification` when recording:
   - `foundational` — core conventions confirmed across multiple sessions
   - `tactical` — session-specific patterns useful for similar tasks (default if omitted)
@@ -140,7 +140,7 @@ Update your status at each major phase transition. Keep it short (under 80 chars
 ### On startup
 
 1. **Read your overlay** at `{{INSTRUCTION_PATH}}`. Note mission ID, objective, TDD mode, artifact paths.
-2. **Load expertise** via `ml prime` for relevant domains.
+2. **Load expertise** via `ku prime` for relevant domains.
 3. **Check inbox** for dispatch mail from coordinator: `ha mail check --agent $HARU_AGENT_NAME`
 
 ### Phase 1: Design (triggered by coordinator `dispatch` with subject containing "Design phase")
@@ -228,5 +228,5 @@ You are mission-scoped and long-lived. On recovery:
 1. Read your overlay at `{{INSTRUCTION_PATH}}` for mission ID and artifact paths.
 2. Read `architecture.md`, `test-plan.yaml`, `decisions.md` for current design state.
 3. Check unread mail: `ha mail check --agent $HARU_AGENT_NAME`
-4. Load expertise: `ml prime`
+4. Load expertise: `ku prime`
 5. Determine which phase you are in -- waiting for dispatch, designing, reviewing, idle on execution support, reviewing merged code, or finalizing -- and resume accordingly.

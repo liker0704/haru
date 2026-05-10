@@ -105,8 +105,8 @@ You operate from the ecosystem root (e.g., `os-eco/`), not from any individual s
   - `ha mail reply <id> --project <path> --body "..."` (reply to a coordinator)
   - `ha status --project <path>` (check all agent states in a sub-repo)
   - `ha group status --project <path>` (check task group progress in a sub-repo)
-  - `sd show <id>`, `sd ready`, `sd list` (read issue tracker at ecosystem root)
-  - `ml prime`, `ml search`, `ml record`, `ml status` (expertise at ecosystem root)
+  - `su show <id>`, `su ready`, `su list` (read issue tracker at ecosystem root)
+  - `ku prime`, `ku search`, `ku record`, `ku status` (expertise at ecosystem root)
   - `git log`, `git status`, `git diff` (read-only git inspection)
 
 ### What You Do NOT Have
@@ -136,16 +136,16 @@ ha mail reply <msg-id> --project <repo-path> --body "<response>"
 ```
 
 ### Expertise
-- **Load context:** `ml prime [domain]` to understand the problem space
-- **Search knowledge:** `ml search <query>` to find relevant past decisions
-- **Record insights:** `ml record ecosystem --type <type> --description "<insight>"` to capture multi-repo coordination patterns
+- **Load context:** `ku prime [domain]` to understand the problem space
+- **Search knowledge:** `ku search <query>` to find relevant past decisions
+- **Record insights:** `ku record ecosystem --type <type> --description "<insight>"` to capture multi-repo coordination patterns
 
 ## workflow
 
 ### Phase 1 — Analyze and Plan
 
-1. **Read the objective.** Understand what needs to happen across the ecosystem. Check issue tracker: `sd ready` for ecosystem-wide issues.
-2. **Load expertise** via `ml prime` at the ecosystem root.
+1. **Read the objective.** Understand what needs to happen across the ecosystem. Check issue tracker: `su ready` for ecosystem-wide issues.
+2. **Load expertise** via `ku prime` at the ecosystem root.
 3. **Identify affected sub-repos.** Read the issue descriptions, trace file references, and determine which sub-repos need work. Common sub-repos in os-eco: `mulch/`, `seeds/`, `canopy/`, `haru/`.
 4. **Group issues by repo.** Each coordinator will receive the issues relevant to its sub-repo.
 
@@ -225,7 +225,7 @@ When all coordinators have completed their work:
 2. **Stop coordinators.** Run `ha coordinator stop --project <repo-path>` for each.
 3. **Record insights.** Capture orchestration patterns and decisions:
    ```bash
-   ml record ecosystem --type <convention|pattern|failure|decision> \
+   ku record ecosystem --type <convention|pattern|failure|decision> \
      --description "<insight about multi-repo coordination>"
    ```
 4. **Report to the human operator.** Summarize:
@@ -234,6 +234,6 @@ When all coordinators have completed their work:
    - Follow-up work needed (if any).
 5. **Close ecosystem-level issues.** If you were working from ecosystem-level seeds issues:
    ```bash
-   sd close <issue-id> --reason "<summary of cross-repo changes>"
+   su close <issue-id> --reason "<summary of cross-repo changes>"
    ```
 6. **Stop.** Do not start new coordinators or dispatch new work after closing.

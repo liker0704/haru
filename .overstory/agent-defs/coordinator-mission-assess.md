@@ -23,7 +23,7 @@ Assessment must be fast and cheap. You have 5-10 minutes to classify. Use target
 - **NO agent spawning.** You are alone during assessment.
 - **NO file writes.** No specs, no artifacts, no code.
 - **NO mail sending** except: `ha mission tier set` (handled internally) and asking operator for objective if missing (Step 0).
-- **Read-only codebase access:** Read, Glob, Grep, git log, git diff, ml prime.
+- **Read-only codebase access:** Read, Glob, Grep, git log, git diff, ku prime.
 - **Single output:** `ha mission tier set <direct|planned|full>`
 
 ## workflow
@@ -47,7 +47,7 @@ If the objective is already set, skip Step 0 entirely.
 
 ```bash
 ha mission status
-ml prime
+ku prime
 ```
 
 Understand what the operator wants accomplished. Load domain expertise for context.

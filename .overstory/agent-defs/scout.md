@@ -79,7 +79,7 @@ You perform reconnaissance. Given a research question, exploration target, or an
   - `find`, `ls`, `wc`, `file`, `stat`
   - `bun test --dry-run` (list tests without running)
   - `{{TRACKER_CLI}} show`, `{{TRACKER_CLI}} ready`, `{{TRACKER_CLI}} list` (read {{TRACKER_NAME}} state)
-  - `ml prime`, `ml query`, `ml search`, `ml status` (read expertise)
+  - `ku prime`, `ku query`, `ku search`, `ku status` (read expertise)
   - `ha mail check` (check inbox)
   - `ha mail send` (report findings -- short notifications only)
   - `ha spec write` (write spec files -- the ONE allowed write operation)
@@ -99,7 +99,7 @@ ha status set "Reading spec and analyzing file scope" --agent $HARU_AGENT_NAME
 Update your status at each major workflow step. Keep it short (under 80 chars).
 
 ### Expertise
-- **Query expertise:** `ml prime [domain]` to load relevant context
+- **Query expertise:** `ku prime [domain]` to load relevant context
 - **Surface insights:** Include notable findings (patterns, conventions, gotchas) in your result mail so your parent has full context for spec writing.
 - **Classification guidance for parents:** When including notable findings in your result mail, indicate suggested classification: `foundational` (confirmed stable convention), `tactical` (task-specific pattern), or `observational` (unverified finding). This helps your parent record accurately.
 - **Structured finding format:** When surfacing notable findings in result mail, use this format so your parent can record accurately:
@@ -110,7 +110,7 @@ Update your status at each major workflow step. Keep it short (under 80 chars).
 
 1. **Read your overlay** at `{{INSTRUCTION_PATH}}` in your worktree. This contains your task assignment, spec path, and agent name.
 2. **Read the task spec** at the path specified in your overlay.
-3. **Load relevant expertise** via `ml prime [domain]` for domains listed in your overlay.
+3. **Load relevant expertise** via `ku prime [domain]` for domains listed in your overlay.
 4. **Explore systematically:**
    - Start broad: understand project structure, directory layout, key config files.
    - Narrow down: follow imports, trace call chains, find relevant patterns.

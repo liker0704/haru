@@ -88,7 +88,7 @@ ha mail reply <id> --body "<reply>" --agent $HARU_AGENT_NAME
 2. Write the synthesis report to `.overstory/research/<slug>/report.md` (see **report-format** below).
 3. Record mulch learnings from the research process:
    ```bash
-   ml record research --type <convention|pattern|failure|decision> \
+   ku record research --type <convention|pattern|failure|decision> \
      --description "..." \
      --classification <foundational|tactical|observational> \
      --outcome-status success \
@@ -100,7 +100,7 @@ ha mail reply <id> --body "<reply>" --agent $HARU_AGENT_NAME
      --body "Report written to .overstory/research/<slug>/report.md. <2-3 sentence summary of key findings>." \
      --type result --agent $HARU_AGENT_NAME
    ```
-5. Close task: `sd close <task-id> --reason "<brief summary of research outcome>"`.
+5. Close task: `su close <task-id> --reason "<brief summary of research outcome>"`.
 6. Stop. Do not continue after closing.
 
 ## intro
@@ -135,13 +135,13 @@ ha mail list [--from <agent>] [--unread]
 ha mail read <id> --agent $HARU_AGENT_NAME
 ha mail reply <id> --body "<reply>" --agent $HARU_AGENT_NAME
 ha nudge <agent-name> [message] --from $HARU_AGENT_NAME
-sd show <task-id>
-sd close <task-id> --reason "<summary>"
-sd update <task-id> --status <status>
-ml prime [domain]
-ml record <domain> --type <type> --description "..." --classification <class>
-ml query <domain>
-ml search <query>
+su show <task-id>
+su close <task-id> --reason "<summary>"
+su update <task-id> --status <status>
+ku prime [domain]
+ku record <domain> --type <type> --description "..." --classification <class>
+ku query <domain>
+ku search <query>
 ```
 
 ### Status Reporting
@@ -151,13 +151,13 @@ ha status set "<activity under 80 chars>" --agent $HARU_AGENT_NAME
 Update at each major step: decomposing topic, spawning wave 1, waiting for results, synthesizing, writing report.
 
 ### Expertise
-- **Load context:** `ml prime research` (or relevant domain) before decomposing topic
-- **Record patterns:** `ml record research` to capture what worked and what failed
+- **Load context:** `ku prime research` (or relevant domain) before decomposing topic
+- **Record patterns:** `ku record research` to capture what worked and what failed
 
 ## workflow
 
 1. **Read overlay** at `.claude/CLAUDE.md` — extract research topic, slug, output directory, parent agent name, and current depth.
-2. **Load expertise** via `ml prime research` (and any domain relevant to the topic). Read codebase context if the research relates to this project.
+2. **Load expertise** via `ku prime research` (and any domain relevant to the topic). Read codebase context if the research relates to this project.
 3. **Read project context** if the research topic involves existing code — use Read/Glob/Grep to gather relevant background that will inform question decomposition.
 4. **Decompose topic** into 3-8 specific, non-overlapping, priority-ordered questions. Each question should be answerable with ~10-15 MCP search calls. Higher-priority questions go in wave 1.
 5. **Spawn wave 1 researchers** (up to `researcherConcurrency` at once). For each researcher:

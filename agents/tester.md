@@ -65,7 +65,7 @@ Your task-specific context (task ID, file scope, spec path, branch name, parent 
 5. **Commit your scoped files** to your worktree branch: `git add <files> && git commit -m "<summary>"`.
 6. **Record mulch learnings** -- review your work for insights worth preserving:
    ```bash
-   ml record <domain> --type <convention|pattern|failure|decision> --description "..." \
+   ku record <domain> --type <convention|pattern|failure|decision> --description "..." \
      --classification <foundational|tactical|observational> \
      --outcome-status success --outcome-agent $HARU_AGENT_NAME
    ```
@@ -106,7 +106,7 @@ Builders then implement against your tests. Your tests define the contract.
   - `git add`, `git commit`, `git diff`, `git log`, `git status`
 {{QUALITY_GATE_CAPABILITIES}}
   - `{{TRACKER_CLI}} show`, `{{TRACKER_CLI}} close` ({{TRACKER_NAME}} task management)
-  - `ml prime`, `ml record`, `ml query` (expertise)
+  - `ku prime`, `ku record`, `ku query` (expertise)
   - `ha mail send`, `ha mail check` (communication)
   - `ha status set` (self-report current activity)
 
@@ -123,8 +123,8 @@ ha status set "Writing RED-phase tests for T-3 through T-7" --agent $HARU_AGENT_
 Update your status at each major workflow step. Keep it short (under 80 chars).
 
 ### Expertise
-- **Load context:** `ml prime [domain]` to load domain expertise before writing tests
-- **Record patterns:** `ml record <domain>` to capture useful patterns you discover
+- **Load context:** `ku prime [domain]` to load domain expertise before writing tests
+- **Record patterns:** `ku record <domain>` to capture useful patterns you discover
 - **Classify records:** Always pass `--classification` when recording:
   - `foundational` — core conventions confirmed across multiple sessions (e.g., "all SQLite DBs use WAL mode")
   - `tactical` — session-specific patterns useful for similar tasks (default if omitted)
@@ -134,7 +134,7 @@ Update your status at each major workflow step. Keep it short (under 80 chars).
 
 1. **Read your overlay** at `{{INSTRUCTION_PATH}}`. Note task ID, spec path, file scope, test-plan.yaml path, architect agent name.
 2. **Read the task spec** and the **test-plan.yaml**. Understand every test case (ID, description, expected behavior, interface under test).
-3. **Load expertise** via `ml prime [domain]` for the relevant domains. Study existing test files in the codebase to understand test conventions and helper patterns.
+3. **Load expertise** via `ku prime [domain]` for the relevant domains. Study existing test files in the codebase to understand test conventions and helper patterns.
 4. **Write test files:**
    - One test per test-plan.yaml entry. Use the case ID in the test name: `test("T-1: <description>", ...)`.
    - Import from where the builder will create modules. Failing imports are the correct RED state.

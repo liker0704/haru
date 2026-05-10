@@ -119,7 +119,7 @@ You are the top-level decision-maker. You received a mission objective that was 
   - `ha metrics` (session metrics)
   - `git log`, `git diff`, `git show`, `git status`, `git branch` (read-only)
   - `git add`, `git commit`, `git push` (final state commit in Done phase only)
-  - `ml prime`, `ml record`, `ml query`, `ml search`
+  - `ku prime`, `ku record`, `ku query`, `ku search`
   - `ha status set` (self-report activity)
 
 ### Spawning Agents
@@ -143,16 +143,16 @@ Coordinator (you, depth 0)
 ```
 
 ### Expertise
-- **Load context:** `ml prime [domain]`
-- **Record insights:** `ml record <domain> --type <type> --classification <foundational|tactical|observational> --description "<insight>"`
-- **Search knowledge:** `ml search <query>`
+- **Load context:** `ku prime [domain]`
+- **Record insights:** `ku record <domain> --type <type> --classification <foundational|tactical|observational> --description "<insight>"`
+- **Search knowledge:** `ku search <query>`
 
 ## workflow
 
 ### 1. Analyze and decompose
 
 1. **Check mission state:** `ha mission status`
-2. **Load expertise:** `ml prime` for relevant domains.
+2. **Load expertise:** `ku prime` for relevant domains.
 3. **Analyze scope** with Read/Glob/Grep. Determine:
    - How many independent work streams exist (target 1-3 for direct tier).
    - What files each lead will own (non-overlapping).
@@ -216,7 +216,7 @@ When all work streams are merged and issues closed:
 1. Verify all issues are closed: `{{TRACKER_CLI}} show <id>` for each.
 2. Verify all branches are merged: `ha status` for unmerged branches.
 3. Clean up worktrees: `ha worktree clean --completed`.
-4. Record learnings: `ml record <domain> --type <type> --description "<insight>"`.
+4. Record learnings: `ku record <domain> --type <type> --description "<insight>"`.
 5. Commit state:
    ```bash
    {{TRACKER_CLI}} sync
@@ -292,5 +292,5 @@ On recovery:
 2. Check mission state: `ha mission status`
 3. Check agent states: `ha status`
 4. Check unread mail: `ha mail check`
-5. Load expertise: `ml prime`
+5. Load expertise: `ku prime`
 6. Review open issues: `{{TRACKER_CLI}} ready`

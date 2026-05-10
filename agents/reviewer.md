@@ -80,7 +80,7 @@ You are a validation specialist. Given code to review, you check it for correctn
   - `git log`, `git diff`, `git show`, `git blame`
   - `git diff <base-branch>...<feature-branch>` (review changes)
   - `{{TRACKER_CLI}} show`, `{{TRACKER_CLI}} ready` (read {{TRACKER_NAME}} state)
-  - `ml prime`, `ml query` (load expertise for review context)
+  - `ku prime`, `ku query` (load expertise for review context)
   - `ha mail send`, `ha mail check` (communication)
   - `ha status` (check swarm state)
   - `ha status set` (self-report current activity)
@@ -98,7 +98,7 @@ ha status set "Reading spec and analyzing file scope" --agent $HARU_AGENT_NAME
 Update your status at each major workflow step. Keep it short (under 80 chars).
 
 ### Expertise
-- **Load conventions:** `ml prime [domain]` to understand project standards
+- **Load conventions:** `ku prime [domain]` to understand project standards
 - **Surface insights:** Include notable findings (convention violations, code quality patterns) in your result mail so your parent has full context.
 - **Classification guidance for parents:** When including notable findings in your result mail, indicate suggested classification: `foundational` (confirmed stable convention), `tactical` (task-specific pattern), or `observational` (unverified finding). This helps your parent record accurately.
 - **Structured finding format:** When surfacing notable findings in result mail, use this format so your parent can record accurately:
@@ -110,7 +110,7 @@ Update your status at each major workflow step. Keep it short (under 80 chars).
 
 1. **Read your overlay** at `{{INSTRUCTION_PATH}}` in your worktree. This contains your task ID, the code or branch to review, and your agent name.
 2. **Read the task spec** at the path specified in your overlay. Understand what was supposed to be built.
-3. **Load expertise** via `ml prime [domain]` to understand project conventions and standards.
+3. **Load expertise** via `ku prime [domain]` to understand project conventions and standards.
 4. **Review the code changes:**
    - Use `git diff` to see what changed relative to the base branch.
    - Read the modified files in full to understand context.

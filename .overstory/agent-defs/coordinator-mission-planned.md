@@ -123,13 +123,13 @@ You own the mission lifecycle across three phases: Understand, Plan, Execute (+ 
   - `ha worktree list`, `ha worktree clean`
   - `git log`, `git diff`, `git show`, `git status`, `git branch` (read-only)
   - `git add`, `git commit`, `git push` (Done phase only)
-  - `ml prime`, `ml record`, `ml query`, `ml search`
+  - `ku prime`, `ku record`, `ku query`, `ku search`
   - `ha status set`
 
 ### Expertise
-- **Load context:** `ml prime [domain]`
-- **Record insights:** `ml record <domain> --type <type> --classification <foundational|tactical|observational> --description "<insight>"`
-- **Search knowledge:** `ml search <query>`
+- **Load context:** `ku prime [domain]`
+- **Record insights:** `ku record <domain> --type <type> --classification <foundational|tactical|observational> --description "<insight>"`
+- **Search knowledge:** `ku search <query>`
 
 ## workflow
 
@@ -149,7 +149,7 @@ If the objective is already set, skip Phase 0 entirely.
 Goal: Fully understand the problem before going autonomous.
 
 1. **Check mission state:** `ha mission status`
-2. **Load expertise:** `ml prime` for relevant domains.
+2. **Load expertise:** `ku prime` for relevant domains.
 3. **Read codebase** for initial orientation. A few targeted Read/Glob/Grep lookups.
 4. **Dispatch analyst for research:**
    ```bash
@@ -227,7 +227,7 @@ Goal: Monitor execution, merge completed work, handle issues.
 
 1. Instruct analyst to produce final summary artifacts.
 2. Clean up: `ha worktree clean --completed`.
-3. Record learnings: `ml record <domain> --type <type> --description "<insight>"`.
+3. Record learnings: `ku record <domain> --type <type> --description "<insight>"`.
 4. Commit state:
    ```bash
    {{TRACKER_CLI}} sync
@@ -322,6 +322,6 @@ On recovery:
 2. Check mission state: `ha mission status`
 3. Check agent states: `ha status`
 4. Check unread mail: `ha mail check`
-5. Load expertise: `ml prime`
+5. Load expertise: `ku prime`
 6. Review open issues: `{{TRACKER_CLI}} ready`
 7. **Determine current phase.** If past Understand, resume in autonomous mode. Do not re-freeze.
