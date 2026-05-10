@@ -15,6 +15,7 @@ import {
 	evaluateAwaitTierSet,
 	evaluateDispatchPlanning,
 	evaluateGate,
+	evaluateHumanSpecReview,
 	evaluateUnderstandReady,
 	evaluateWsCompletion,
 } from "./gate-evaluators.ts";
@@ -575,5 +576,74 @@ describe("evaluateAwaitTierSet", () => {
 		const mission = makeMission({ slug: "test", tier: "direct" });
 		const result = evaluateAwaitTierSet(mission);
 		expect(result.met).toBe(true);
+	});
+});
+
+describe("evaluateHumanSpecReview", () => {
+	it("autonomy=auto-spec → auto-approves without consulting mail", () => {
+		const mission = makeMission({ slug: "test", autonomy: "auto-spec" });
+		const result = evaluateHumanSpecReview(mission, null);
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("approved");
+	});
+
+	it("autonomy=auto-all → auto-approves", () => {
+		const mission = makeMission({ slug: "test", autonomy: "auto-all" });
+		const result = evaluateHumanSpecReview(mission, null);
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("approved");
+	});
+
+	it("supervised + spec_approved mail → met:true, trigger=approved", () => {
+		const mission = makeMission({ slug: "test", autonomy: "supervised" });
+		const mailStore = createTestMailStore([
+			{
+				from: "operator",
+				to: "operator-decision-test",
+				type: "spec_approved",
+				subject: "Spec approved",
+			},
+		]);
+		const result = evaluateHumanSpecReview(mission, mailStore);
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("approved");
+	});
+
+	it("supervised + spec_rejected mail → met:true, trigger=rejected", () => {
+		const mission = makeMission({ slug: "test", autonomy: "supervised" });
+		const mailStore = createTestMailStore([
+			{
+				from: "operator",
+				to: "operator-decision-test",
+				type: "spec_rejected",
+				subject: "Spec rejected",
+			},
+		]);
+		const result = evaluateHumanSpecReview(mission, mailStore);
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("rejected");
+	});
+
+	it("supervised + no verdict mail → met:false, no nudge target", () => {
+		const mission = makeMission({ slug: "test", autonomy: "supervised" });
+		const mailStore = createTestMailStore([]);
+		const result = evaluateHumanSpecReview(mission, mailStore);
+		expect(result.met).toBe(false);
+		expect(result.nudgeTarget).toBeUndefined();
+	});
+
+	it("supervised + verdict before gateEnteredAt is ignored", () => {
+		const mission = makeMission({ slug: "test", autonomy: "supervised" });
+		const mailStore = createTestMailStore([
+			{
+				from: "operator",
+				to: "operator-decision-test",
+				type: "spec_approved",
+				subject: "old",
+				createdAt: "2025-01-01T00:00:00Z",
+			},
+		]);
+		const result = evaluateHumanSpecReview(mission, mailStore, "2026-01-01T00:00:00Z");
+		expect(result.met).toBe(false);
 	});
 });

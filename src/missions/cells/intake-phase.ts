@@ -259,23 +259,16 @@ function buildHandlers(deps: PhaseCellDeps): HandlerRegistry {
 			return { trigger: "clarifier_dispatched" };
 		},
 
-		"human-spec-review": async (ctx) => {
-			const mission = ctx.getMission();
-			if (!mission) return { trigger: "approved" };
-
-			// Auto-skip when autonomy is auto-spec or auto-all.
-			if (mission.autonomy === "auto-spec" || mission.autonomy === "auto-all") {
-				return { trigger: "approved" };
-			}
-
-			// Otherwise, this is a human gate — actual resolution happens via
-			// `ha mission answer`. The handler returning `met:false` would normally
-			// keep the gate open, but since this is a *handler* (not an evaluator),
-			// the engine treats us as already-resolved.
+		"human-spec-review": async () => {
+			// NOTE: this handler is unreachable from the production engine —
+			// `gate: "human"` nodes return gate-result BEFORE invoking node
+			// handlers (see src/missions/engine.ts). Both the auto-skip
+			// (auto-spec/auto-all) AND the supervised approve/reject wiring live
+			// in `evaluateHumanSpecReview` (src/watchdog/gate-evaluators.ts).
 			//
-			// Engine layer (mission-tick) treats `gate: "human"` as needing operator
-			// answer. The presence of this handler is a no-op for the human path —
-			// included so the auto-skip logic above can short-circuit cleanly.
+			// Kept here as a defensive default so that any future refactor that
+			// switches this node from `gate:"human"` to a non-gate node still has
+			// safe behavior.
 			return { trigger: "approved" };
 		},
 

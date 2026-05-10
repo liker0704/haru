@@ -595,6 +595,14 @@ export function evaluateHumanSpecReview(
 	mailStore: MailStore | null,
 	gateEnteredAt?: string,
 ): GateEvalResult {
+	// Auto-skip the human gate for non-supervised autonomy modes. The engine
+	// returns gate-result BEFORE invoking node handlers for `gate: "human"`
+	// nodes, so the auto-skip MUST live here in the evaluator (the inline
+	// handler in intake-phase.ts is unreachable from the engine).
+	if (mission.autonomy === "auto-spec" || mission.autonomy === "auto-all") {
+		return { met: true, trigger: "approved" };
+	}
+
 	if (!mailStore) return { met: false };
 	const decisionRecipient = `operator-decision-${mission.slug}`;
 	const verdicts = mailStore.getAll({ to: decisionRecipient });

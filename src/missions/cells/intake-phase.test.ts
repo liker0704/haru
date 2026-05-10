@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { makeMission } from "../test-mocks.ts";
+import type { makeMission } from "../test-mocks.ts";
 import type { HandlerContext } from "../types.ts";
 import { intakePhaseCell } from "./intake-phase.ts";
 import type { PhaseCellDeps } from "./types.ts";
@@ -116,23 +116,15 @@ describe("intake-phase subgraph", () => {
 });
 
 describe("intake-phase human-spec-review handler", () => {
+	// NOTE: production short-circuit + supervised approve/reject wiring lives in
+	// `evaluateHumanSpecReview` (src/watchdog/gate-evaluators.ts). The handler
+	// itself is unreachable from the engine — `gate:"human"` returns
+	// gate-result before handler invocation. Tests below verify defensive
+	// fallback behavior only; real autonomy + verdict tests are in
+	// `gate-evaluators.test.ts`.
 	const handlers = intakePhaseCell.buildHandlers(makeDeps());
 
-	test("autonomy=auto-spec → auto-approves (skips human gate)", async () => {
-		const mission = makeMission({ autonomy: "auto-spec" });
-		// biome-ignore lint/style/noNonNullAssertion: registry known
-		const result = await handlers["human-spec-review"]!(makeCtx({ mission }));
-		expect(result.trigger).toBe("approved");
-	});
-
-	test("autonomy=auto-all → auto-approves", async () => {
-		const mission = makeMission({ autonomy: "auto-all" });
-		// biome-ignore lint/style/noNonNullAssertion: registry known
-		const result = await handlers["human-spec-review"]!(makeCtx({ mission }));
-		expect(result.trigger).toBe("approved");
-	});
-
-	test("autonomy=supervised + no mission → defaults to approved (defensive)", async () => {
+	test("defensive default: returns approved regardless of autonomy", async () => {
 		// biome-ignore lint/style/noNonNullAssertion: registry known
 		const result = await handlers["human-spec-review"]!(makeCtx({ mission: null }));
 		expect(result.trigger).toBe("approved");
