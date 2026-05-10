@@ -1,0 +1,56 @@
+description: "Intake-phase clarifier: vague intent → 3-5 operator Q's → spec; detailed intent (≥200 chars) → 0 Q's → spec"
+timeout_ms: 600000
+
+# Stage A intake-phase eval. Validates that product-clarifier:
+# - Reads research/_summary.md before asking questions
+# - Routes technical Q's to analyst (clarifier_question mail)
+# - Routes intent Q's to operator (mission freeze with kind=clarification)
+# - Caps operator questions at ≤5
+# - Smart short-circuit: skips Q&A when intent is detailed enough
+# - Materializes product-spec.md with all template sections
+# - Emits spec_ready mail when done
+
+# NOTE: full e2e execution requires Wave 3 intake-phase subgraph wired.
+# This file is a behavioral contract until then.
+
+fixtures:
+  vague_intent:
+    intent: "make auth better"
+    expected_mode: full
+    expected_operator_q_min: 3
+    expected_operator_q_max: 5
+    expected_spec_sections:
+      - "## Intent"
+      - "## Goal"
+      - "## Non-goals"
+      - "## User stories"
+      - "## Acceptance criteria"
+      - "## Constraints"
+      - "## Suggested workstreams"
+
+  detailed_intent:
+    intent: |
+      Fix the JWT expiry bug in src/auth/middleware.ts where tokens with
+      'exp' claim in the past are still accepted because the comparison
+      uses '<' instead of '<='. Acceptance: reject expired tokens with 401
+      response. Files: src/auth/middleware.ts and its colocated test.
+      Backwards-compat: yes — must not break valid token handling.
+    expected_mode: zero-questions
+    expected_operator_q: 0
+    expected_spec_sections:
+      - "## Intent"
+      - "## Goal"
+      - "## Acceptance criteria"
+
+  analyst_timeout:
+    intent: "refactor auth to support OAuth2"
+    # Simulate analyst not responding within 5 minutes
+    analyst_offline_after_seconds: 30
+    expected_fallback: "operator_question"
+    description: "When analyst is unresponsive, clarifier escalates technical Q's to operator instead of waiting indefinitely."
+
+assertions:
+  - product_spec_md_exists: true
+  - spec_ready_mail_sent: true
+  - operator_questions_within_cap: 5
+  - clarifier_exited_after_spec_ready: true
