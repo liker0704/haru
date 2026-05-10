@@ -336,12 +336,12 @@ describe("SAFE_BASH_PREFIXES", () => {
 		expect(SAFE_BASH_PREFIXES).toContain("bd ");
 	});
 
-	test("includes seeds CLI 'sd '", () => {
-		expect(SAFE_BASH_PREFIXES).toContain("sd ");
+	test("includes suji CLI 'su '", () => {
+		expect(SAFE_BASH_PREFIXES).toContain("su ");
 	});
 
-	test("includes mulch CLI 'mulch '", () => {
-		expect(SAFE_BASH_PREFIXES).toContain("mulch ");
+	test("includes kura CLI 'ku '", () => {
+		expect(SAFE_BASH_PREFIXES).toContain("ku ");
 	});
 
 	test("includes read-only git commands", () => {
@@ -363,9 +363,9 @@ describe("SAFE_BASH_PREFIXES", () => {
 
 		expect(isSafe("ha mail send --to parent --subject test")).toBe(true);
 		expect(isSafe("haru status")).toBe(true);
-		expect(isSafe("sd close haru-1234")).toBe(true);
+		expect(isSafe("su close haru-1234")).toBe(true);
 		expect(isSafe("bd ready")).toBe(true);
-		expect(isSafe("mulch record cli --type convention")).toBe(true);
+		expect(isSafe("ku record cli --type convention")).toBe(true);
 		expect(isSafe("git status")).toBe(true);
 		expect(isSafe("git log --oneline")).toBe(true);
 		expect(isSafe("git diff HEAD")).toBe(true);

@@ -1389,11 +1389,11 @@ describe("buildBashFileGuardScript", () => {
 		const script = buildBashFileGuardScript("scout", "test-scout");
 		expect(script).toContain("haru ");
 		expect(script).toContain("bd ");
-		expect(script).toContain("sd ");
+		expect(script).toContain("su ");
 		expect(script).toContain("git status");
 		expect(script).toContain("git log");
 		expect(script).toContain("git diff");
-		expect(script).toContain("mulch ");
+		expect(script).toContain("ku ");
 		// Quality gate commands (bun test, bun run lint, etc.) are no longer
 		// hardcoded in SAFE_BASH_PREFIXES — they come from config via
 		// extractQualityGatePrefixes() and are passed as extraSafePrefixes
@@ -1408,7 +1408,7 @@ describe("buildBashFileGuardScript", () => {
 
 	test("sd commands pass bash file guard for non-implementation agents", () => {
 		const script = buildBashFileGuardScript("scout", "test-scout");
-		expect(script).toContain("sd ");
+		expect(script).toContain("su ");
 	});
 
 	test("includes dangerous command pattern checks", () => {
