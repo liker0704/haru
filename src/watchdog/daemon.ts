@@ -1112,12 +1112,20 @@ export async function runDaemonTick(options: DaemonOptions): Promise<void> {
 							// "rate limit" in conversation.
 							const readyState = runtime.detectReady(lastPaneContent);
 							if (readyState.phase !== "ready") {
-								// Only check the last 8 lines for rate limit indicators.
+								// Only check the last 8 non-blank lines for rate limit indicators.
 								// The real rate limit dialog takes over the entire screen,
-								// so it's always visible at the bottom. Checking the full
-								// scrollback causes false positives when agent output or
-								// nudge text mentions "rate limit".
-								const bottomLines = lastPaneContent.split("\n").slice(-8).join("\n");
+								// so it's always visible at the bottom. Strip trailing blank
+								// lines (terminal padding) first so the check works for both
+								// real ncurses UIs and simple scripts where output is at the top.
+								// Checking the full scrollback causes false positives when agent
+								// output or nudge text mentions "rate limit".
+								const allLines = lastPaneContent.split("\n");
+								let lastNonBlank = allLines.length - 1;
+								while (lastNonBlank > 0 && allLines[lastNonBlank]?.trim() === "") {
+									lastNonBlank--;
+								}
+								const trimmedLines = allLines.slice(0, lastNonBlank + 1);
+								const bottomLines = trimmedLines.slice(-8).join("\n");
 								rateLimitState = runtime.detectRateLimit(bottomLines);
 							}
 						}
