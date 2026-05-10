@@ -310,13 +310,13 @@ tsc --noEmit                          # Type checking passes
 
 When ending a work session, you MUST:
 
-1. File issues for remaining work (`sd create`)
+1. File issues for remaining work (`su create`)
 2. Run quality gates (if code changed): `bun test && biome check . && tsc --noEmit`
 3. Update issue status: close finished work, update in-progress items
 4. Push to remote (MANDATORY):
    ```bash
    git pull --rebase
-   sd sync
+   su sync
    git push
    git status  # MUST show "up to date with origin"
    ```
@@ -331,11 +331,11 @@ Overstory integrates with three os-eco tools. Each has its own CLAUDE.md with fu
 
 ```bash
 mulch prime               # Structured expertise — conventions, patterns, decisions
-sd prime                  # Issue tracking — rules, workflows, ready work
-cn prime                  # Prompt management — commands, conventions
+su prime                  # Issue tracking — rules, workflows, ready work
+ta prime                  # Prompt management — commands, conventions
 ```
 
-Before finishing: `mulch learn && mulch record <domain> ...`, `sd close <id>`, `sd sync`.
+Before finishing: `ku learn && mulch record <domain> ...`, `su close <id>`, `su sync`.
 
 <!-- mulch:start -->
 <!-- mulch-onboard-v:1 -->

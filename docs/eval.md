@@ -71,9 +71,9 @@ config_overrides:
     maxConcurrent: 4
 
 startup_actions:
-  - command: sd create --title "Write hello.txt" --type task --priority 2
+  - command: su create --title "Write hello.txt" --type task --priority 2
     description: "Create first task for dispatch"
-  - command: sd create --title "Write goodbye.txt" --type task --priority 2
+  - command: su create --title "Write goodbye.txt" --type task --priority 2
     description: "Create second task for dispatch"
 ```
 
@@ -404,7 +404,7 @@ config_overrides:
     maxConcurrent: 2
 
 startup_actions:
-  - command: sd create --title "Implement feature A" --type task --priority 1
+  - command: su create --title "Implement feature A" --type task --priority 1
 ```
 
 ### Step 3: Write `assertions.yaml`

@@ -160,13 +160,13 @@ Exit code non-zero → throws `AgentError` with detail from stderr (or the envel
 
 | TrackerClient method | `sd` command |
 |---------------------|-------------|
-| `ready()` | `sd list --status ready --json` |
-| `show(id)` | `sd show <id> --json` |
-| `create(title, opts)` | `sd create <title> --json [--type ...] [--priority ...]` |
-| `claim(id)` | `sd claim <id>` |
-| `close(id, reason)` | `sd close <id> [--reason ...]` |
-| `list(opts)` | `sd list [--status ...] [--limit ...] --json` |
-| `sync()` | `sd sync` |
+| `ready()` | `su list --status ready --json` |
+| `show(id)` | `su show <id> --json` |
+| `create(title, opts)` | `su create <title> --json [--type ...] [--priority ...]` |
+| `claim(id)` | `su claim <id>` |
+| `close(id, reason)` | `su close <id> [--reason ...]` |
+| `list(opts)` | `su list [--status ...] [--limit ...] --json` |
+| `sync()` | `su sync` |
 
 Priority normalization: Seeds issues with no explicit priority get `priority: 3`
 as the default.

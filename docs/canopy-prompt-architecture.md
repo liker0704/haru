@@ -70,7 +70,7 @@ ov-co-creation                      (collaborative co-creation profile)
 
 ### Canopy-managed standalone prompts (no inheritance, no `agents/*.md`)
 
-These are operator-invoked prompts rendered directly via `cn render`. They are
+These are operator-invoked prompts rendered directly via `ta render`. They are
 maintained inside `.canopy/prompts.jsonl` rather than `agents/*.md`:
 
 ```

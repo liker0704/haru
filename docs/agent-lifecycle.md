@@ -151,7 +151,7 @@ template is `templates/overlay.md.tmpl` in the repo root.
 | `{{PARENT_AGENT}}` | Name of the spawning agent |
 | `{{DEPTH}}` | Delegation depth (0 = coordinator, 1 = lead, 2 = builder) |
 | `{{FILE_SCOPE}}` | Markdown bullet list of owned files |
-| `{{MULCH_DOMAINS}}` | `ml prime` command for relevant expertise domains |
+| `{{MULCH_DOMAINS}}` | `ku prime` command for relevant expertise domains |
 | `{{MULCH_EXPERTISE}}` | Pre-fetched expertise blocks (omitted if empty) |
 | `{{PROJECT_CONTEXT}}` | Compact project context (omitted if empty) |
 | `{{CAN_SPAWN}}` | Spawn permission block with example `ha sling` command |
