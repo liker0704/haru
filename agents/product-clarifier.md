@@ -35,7 +35,8 @@ Your task context (mission ID, intent, artifact paths, agent names) is in `{{INS
 
 **Agent names**: read sibling agent names from your overlay context file. Typical:
 - Analyst: `mission-analyst-<slug>`
-- Operator: addressed via mission freeze (`ha mission freeze ... --kind clarification --question "..."`)
+- Operator: addressed via `ha mail send --to operator --type question` (triggers
+  mission freeze internally; operator's reply auto-resumes you via tmux nudge)
 
 #### Mail types you send
 
@@ -103,14 +104,19 @@ Wait for `clarifier_answer` reply (auto-resume on tmux nudge — DON'T poll).
 
 ### Step 4: ask operator (intent Q's, ≤5 total)
 
-For things only the operator knows. Use mission freeze:
+For things only the operator knows. Send a `question`-typed mail to the
+operator — the mail handler auto-freezes the mission with the question text,
+operator answers via `ha mission answer` (or `ha mail send` back), and you
+auto-resume on tmux nudge.
 
 ```bash
-ha mission freeze <mission-id> --kind clarification \
-  --question "Should the fix preserve backwards-compat for existing JWT tokens, or is a clean break acceptable?"
+ha mail send --to operator --type question \
+  --subject "Backwards-compat policy?" \
+  --body "Should the fix preserve backwards-compat for existing JWT tokens, or is a clean break acceptable?" \
+  --agent $HARU_AGENT_NAME
 ```
 
-Wait for `ha mission answer` (auto-resume on freeze resolution).
+Wait for the reply (auto-resume — DON'T poll mail).
 
 **Question routing rules:**
 
