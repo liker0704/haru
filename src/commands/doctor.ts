@@ -6,7 +6,7 @@
 
 import { join } from "node:path";
 import { Command } from "commander";
-import { loadConfig } from "../config.ts";
+import { detectHaruDir, loadConfig } from "../config.ts";
 import { checkAgents } from "../doctor/agents.ts";
 import { checkConfig } from "../doctor/config-check.ts";
 import { checkConsistency } from "../doctor/consistency.ts";
@@ -193,7 +193,7 @@ export function createDoctorCommand(options?: DoctorCommandOptions): Command {
 
 				const cwd = process.cwd();
 				const config = await loadConfig(cwd);
-				const overstoryDir = join(config.project.root, ".overstory");
+				const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 
 				// Filter checks by category if specified
 				const allChecks = options?.checkRunners ?? ALL_CHECKS;

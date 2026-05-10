@@ -19,6 +19,7 @@
 import { mkdir, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { Command } from "commander";
+import { detectHaruDir } from "../config.ts";
 import { ValidationError } from "../errors.ts";
 import { jsonOutput } from "../json.ts";
 import { printHint, printSuccess } from "../logging/color.ts";
@@ -58,7 +59,7 @@ export async function executeUpdate(opts: UpdateOptions): Promise<void> {
 	const dryRun = opts.dryRun ?? false;
 
 	const projectRoot = process.cwd();
-	const overstoryDir = join(projectRoot, ".overstory");
+	const overstoryDir = join(projectRoot, detectHaruDir(projectRoot));
 
 	// Verify .overstory/config.yaml exists (already initialized)
 	const configFile = Bun.file(join(overstoryDir, "config.yaml"));

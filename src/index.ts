@@ -65,7 +65,7 @@ import { createWatchCommand } from "./commands/watch.ts";
 import { createWebserverCommand } from "./commands/webserver.ts";
 import { createWorkflowCommand } from "./commands/workflow.ts";
 import { createWorktreeCommand } from "./commands/worktree.ts";
-import { setProjectRootOverride } from "./config.ts";
+import { detectHaruDir, setProjectRootOverride } from "./config.ts";
 import { ConfigError, OverstoryError, WorktreeError } from "./errors.ts";
 import { jsonError } from "./json.ts";
 import { brand, chalk, muted, setQuiet } from "./logging/color.ts";
@@ -252,10 +252,11 @@ program.hook("preAction", (thisCmd) => {
 	const projectFlag = opts.project as string | undefined;
 	if (projectFlag !== undefined) {
 		const resolvedProject = resolve(process.cwd(), projectFlag);
-		if (!existsSync(join(resolvedProject, ".overstory", "config.yaml"))) {
+		const haruDir = detectHaruDir(resolvedProject);
+		if (!existsSync(join(resolvedProject, haruDir, "config.yaml"))) {
 			throw new ConfigError(
-				`'${resolvedProject}' is not an haru project (missing .overstory/config.yaml). Run 'ha init' first.`,
-				{ configPath: join(resolvedProject, ".overstory", "config.yaml") },
+				`'${resolvedProject}' is not an haru project (missing ${haruDir}/config.yaml). Run 'ha init' first.`,
+				{ configPath: join(resolvedProject, haruDir, "config.yaml") },
 			);
 		}
 		setProjectRootOverride(resolvedProject);

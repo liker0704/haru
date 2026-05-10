@@ -7,7 +7,7 @@
 
 import { join } from "node:path";
 import { Command } from "commander";
-import { DEFAULT_CONFIG, loadConfig } from "../config.ts";
+import { DEFAULT_CONFIG, detectHaruDir, loadConfig } from "../config.ts";
 import { parseYaml, serializeConfigToYaml } from "../config-yaml.ts";
 import { jsonOutput } from "../json.ts";
 
@@ -117,7 +117,7 @@ export function createConfigCommand(): Command {
 		.action(async (key: string, value: string, opts: { local?: boolean; json?: boolean }) => {
 			const cwd = process.cwd();
 			const config = await loadConfig(cwd);
-			const overstoryDir = join(config.project.root, ".overstory");
+			const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 			const configFile = opts.local
 				? join(overstoryDir, "config.local.yaml")
 				: join(overstoryDir, "config.yaml");
@@ -152,7 +152,7 @@ export function createConfigCommand(): Command {
 		.action(async (opts: { json?: boolean }) => {
 			const cwd = process.cwd();
 			const config = await loadConfig(cwd);
-			const overstoryDir = join(config.project.root, ".overstory");
+			const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 			const configFile = join(overstoryDir, "config.yaml");
 
 			// Preserve project-specific fields

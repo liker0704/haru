@@ -11,6 +11,7 @@
 
 import { join } from "node:path";
 import { Command } from "commander";
+import { detectHaruDir } from "../config.ts";
 import { AgentError } from "../errors.ts";
 import { createEventStore } from "../events/store.ts";
 import { jsonOutput } from "../json.ts";
@@ -33,7 +34,7 @@ const DEBOUNCE_MS = 500;
  * even though it's not tracked in the SessionStore.
  */
 async function loadOrchestratorTmuxSession(projectRoot: string): Promise<string | null> {
-	const regPath = join(projectRoot, ".overstory", "orchestrator-tmux.json");
+	const regPath = join(projectRoot, detectHaruDir(projectRoot), "orchestrator-tmux.json");
 	const file = Bun.file(regPath);
 	if (!(await file.exists())) {
 		return null;
@@ -59,7 +60,7 @@ export async function resolveTargetSession(
 	agentName: string,
 ): Promise<string | null> {
 	const canonicalAgentName = canonicalizeMailAgentName(agentName);
-	const overstoryDir = join(projectRoot, ".overstory");
+	const overstoryDir = join(projectRoot, detectHaruDir(projectRoot));
 	const { store } = openSessionStore(overstoryDir);
 	try {
 		const session = store.getByName(canonicalAgentName);
@@ -238,7 +239,7 @@ export async function nudgeAgent(
 		// Check debounce (unless forced)
 		let debounced = false;
 		if (!force) {
-			const statePath = join(projectRoot, ".overstory", "nudge-state.json");
+			const statePath = join(projectRoot, detectHaruDir(projectRoot), "nudge-state.json");
 			debounced = await isDebounced(statePath, canonicalAgentName);
 		}
 
@@ -258,7 +259,7 @@ export async function nudgeAgent(
 
 				if (delivered) {
 					// Record nudge for debounce tracking
-					const statePath = join(projectRoot, ".overstory", "nudge-state.json");
+					const statePath = join(projectRoot, detectHaruDir(projectRoot), "nudge-state.json");
 					await recordNudge(statePath, canonicalAgentName);
 					result = { delivered: true };
 				} else {
@@ -273,7 +274,7 @@ export async function nudgeAgent(
 
 	// Record event to EventStore (fire-and-forget)
 	try {
-		const overstoryDir = join(projectRoot, ".overstory");
+		const overstoryDir = join(projectRoot, detectHaruDir(projectRoot));
 		const eventsDbPath = join(overstoryDir, "events.db");
 		const eventStore = createEventStore(eventsDbPath);
 		try {

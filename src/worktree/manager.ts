@@ -1,5 +1,6 @@
 import { mkdir, unlink } from "node:fs/promises";
 import { join } from "node:path";
+import { detectHaruDir } from "../config.ts";
 import { WorktreeError } from "../errors.ts";
 
 /**
@@ -310,7 +311,7 @@ export async function preserveSeedsChanges(
 	}
 
 	// Step 4: Write diff to a temp file.
-	const tmpFile = join(repoRoot, ".overstory", `_seeds-patch-${Date.now()}.diff`);
+	const tmpFile = join(repoRoot, detectHaruDir(repoRoot), `_seeds-patch-${Date.now()}.diff`);
 	try {
 		await Bun.write(tmpFile, diff);
 

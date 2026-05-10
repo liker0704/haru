@@ -8,6 +8,7 @@
 
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
+import { detectHaruDir } from "../config.ts";
 import { AgentError } from "../errors.ts";
 import { getRuntime } from "../runtimes/registry.ts";
 import type { OverstoryConfig } from "../types.ts";
@@ -36,7 +37,7 @@ export async function triageAgent(options: {
 	config?: OverstoryConfig;
 }): Promise<"retry" | "terminate" | "extend"> {
 	const { agentName, root, lastActivity, timeoutMs, config } = options;
-	const logsDir = join(root, ".overstory", "logs", agentName);
+	const logsDir = join(root, detectHaruDir(root), "logs", agentName);
 
 	let logContent: string;
 	try {

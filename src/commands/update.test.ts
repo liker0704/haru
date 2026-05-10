@@ -23,25 +23,38 @@ import { executeUpdate } from "./update.ts";
 const noopSpawner: Spawner = async () => ({ exitCode: 1, stdout: "", stderr: "not found" });
 
 const AGENT_DEF_FILES = [
+	"architect.md",
+	"architecture-review-lead.md",
+	"architecture-sync.md",
 	"builder.md",
+	"coordinator-mission-assess.md",
+	"coordinator-mission-direct.md",
+	"coordinator-mission-full.md",
+	"coordinator-mission-planned.md",
 	"coordinator-mission.md",
 	"coordinator.md",
 	"execution-director.md",
 	"lead-mission.md",
 	"lead.md",
 	"merger.md",
+	"mission-analyst-planned.md",
 	"mission-analyst.md",
 	"monitor.md",
 	"orchestrator.md",
 	"ov-co-creation.md",
+	"plan-architecture-critic.md",
 	"plan-devil-advocate.md",
 	"plan-performance-critic.md",
 	"plan-review-lead.md",
 	"plan-second-opinion.md",
 	"plan-security-critic.md",
 	"plan-simulator.md",
+	"research-lead.md",
+	"researcher.md",
 	"reviewer.md",
 	"scout.md",
+	"shared-mandate.md",
+	"tester.md",
 ];
 
 /** Resolve the source agents directory (same logic as init.ts). */
@@ -106,20 +119,20 @@ describe("executeUpdate: refresh all (no flags)", () => {
 
 	test("refreshes all managed files when no flags given", async () => {
 		// Tamper with agent defs
-		const scoutPath = join(tempDir, ".overstory", "agent-defs", "scout.md");
+		const scoutPath = join(tempDir, ".haru", "agent-defs", "scout.md");
 		await Bun.write(scoutPath, "# tampered\n");
 
 		// Tamper with manifest
-		await Bun.write(join(tempDir, ".overstory", "agent-manifest.json"), "{}");
+		await Bun.write(join(tempDir, ".haru", "agent-manifest.json"), "{}");
 
 		// Tamper with hooks
-		await Bun.write(join(tempDir, ".overstory", "hooks.json"), "{}");
+		await Bun.write(join(tempDir, ".haru", "hooks.json"), "{}");
 
 		// Tamper with gitignore
-		await Bun.write(join(tempDir, ".overstory", ".gitignore"), "# old\n");
+		await Bun.write(join(tempDir, ".haru", ".gitignore"), "# old\n");
 
 		// Tamper with readme
-		await Bun.write(join(tempDir, ".overstory", "README.md"), "# old\n");
+		await Bun.write(join(tempDir, ".haru", "README.md"), "# old\n");
 
 		await executeUpdate({});
 
@@ -128,24 +141,22 @@ describe("executeUpdate: refresh all (no flags)", () => {
 		const sourceScout = await Bun.file(join(SOURCE_AGENTS_DIR, "scout.md")).text();
 		expect(scoutContent).toBe(sourceScout);
 
-		const manifestContent = await Bun.file(
-			join(tempDir, ".overstory", "agent-manifest.json"),
-		).text();
+		const manifestContent = await Bun.file(join(tempDir, ".haru", "agent-manifest.json")).text();
 		const expectedManifest = `${JSON.stringify(buildAgentManifest(), null, "\t")}\n`;
 		expect(manifestContent).toBe(expectedManifest);
 
-		const hooksContent = await Bun.file(join(tempDir, ".overstory", "hooks.json")).text();
+		const hooksContent = await Bun.file(join(tempDir, ".haru", "hooks.json")).text();
 		expect(hooksContent).toBe(buildHooksJson());
 
-		const gitignoreContent = await Bun.file(join(tempDir, ".overstory", ".gitignore")).text();
+		const gitignoreContent = await Bun.file(join(tempDir, ".haru", ".gitignore")).text();
 		expect(gitignoreContent).toBe(HARU_GITIGNORE);
 
-		const readmeContent = await Bun.file(join(tempDir, ".overstory", "README.md")).text();
+		const readmeContent = await Bun.file(join(tempDir, ".haru", "README.md")).text();
 		expect(readmeContent).toBe(HARU_README);
 	});
 
 	test("does not touch config.yaml", async () => {
-		const configPath = join(tempDir, ".overstory", "config.yaml");
+		const configPath = join(tempDir, ".haru", "config.yaml");
 		const originalConfig = await Bun.file(configPath).text();
 
 		await executeUpdate({});
@@ -156,8 +167,8 @@ describe("executeUpdate: refresh all (no flags)", () => {
 
 	test("does not touch databases", async () => {
 		// Create fake database files
-		const mailDbPath = join(tempDir, ".overstory", "mail.db");
-		const sessionsDbPath = join(tempDir, ".overstory", "sessions.db");
+		const mailDbPath = join(tempDir, ".haru", "mail.db");
+		const sessionsDbPath = join(tempDir, ".haru", "sessions.db");
 		await Bun.write(mailDbPath, "fake-mail-db");
 		await Bun.write(sessionsDbPath, "fake-sessions-db");
 
@@ -224,77 +235,67 @@ describe("executeUpdate: granular flags", () => {
 
 	test("--agents only refreshes agent-defs", async () => {
 		// Tamper with agent def and manifest
-		await Bun.write(join(tempDir, ".overstory", "agent-defs", "scout.md"), "# tampered\n");
-		await Bun.write(join(tempDir, ".overstory", "agent-manifest.json"), "{}");
-		await Bun.write(join(tempDir, ".overstory", "hooks.json"), "{}");
+		await Bun.write(join(tempDir, ".haru", "agent-defs", "scout.md"), "# tampered\n");
+		await Bun.write(join(tempDir, ".haru", "agent-manifest.json"), "{}");
+		await Bun.write(join(tempDir, ".haru", "hooks.json"), "{}");
 
 		await executeUpdate({ agents: true });
 
 		// Agent def should be restored
-		const scoutContent = await Bun.file(
-			join(tempDir, ".overstory", "agent-defs", "scout.md"),
-		).text();
+		const scoutContent = await Bun.file(join(tempDir, ".haru", "agent-defs", "scout.md")).text();
 		const sourceScout = await Bun.file(join(SOURCE_AGENTS_DIR, "scout.md")).text();
 		expect(scoutContent).toBe(sourceScout);
 
 		// Manifest should NOT be restored (--agents only)
-		const manifestContent = await Bun.file(
-			join(tempDir, ".overstory", "agent-manifest.json"),
-		).text();
+		const manifestContent = await Bun.file(join(tempDir, ".haru", "agent-manifest.json")).text();
 		expect(manifestContent).toBe("{}");
 
 		// Hooks should NOT be restored (--agents only)
-		const hooksContent = await Bun.file(join(tempDir, ".overstory", "hooks.json")).text();
+		const hooksContent = await Bun.file(join(tempDir, ".haru", "hooks.json")).text();
 		expect(hooksContent).toBe("{}");
 	});
 
 	test("--manifest only refreshes agent-manifest.json", async () => {
-		await Bun.write(join(tempDir, ".overstory", "agent-manifest.json"), "{}");
-		await Bun.write(join(tempDir, ".overstory", "agent-defs", "scout.md"), "# tampered\n");
+		await Bun.write(join(tempDir, ".haru", "agent-manifest.json"), "{}");
+		await Bun.write(join(tempDir, ".haru", "agent-defs", "scout.md"), "# tampered\n");
 
 		await executeUpdate({ manifest: true });
 
 		// Manifest should be restored
-		const manifestContent = await Bun.file(
-			join(tempDir, ".overstory", "agent-manifest.json"),
-		).text();
+		const manifestContent = await Bun.file(join(tempDir, ".haru", "agent-manifest.json")).text();
 		const expectedManifest = `${JSON.stringify(buildAgentManifest(), null, "\t")}\n`;
 		expect(manifestContent).toBe(expectedManifest);
 
 		// Agent def should NOT be restored
-		const scoutContent = await Bun.file(
-			join(tempDir, ".overstory", "agent-defs", "scout.md"),
-		).text();
+		const scoutContent = await Bun.file(join(tempDir, ".haru", "agent-defs", "scout.md")).text();
 		expect(scoutContent).toBe("# tampered\n");
 	});
 
 	test("--hooks only refreshes hooks.json", async () => {
-		await Bun.write(join(tempDir, ".overstory", "hooks.json"), "{}");
-		await Bun.write(join(tempDir, ".overstory", "agent-manifest.json"), "{}");
+		await Bun.write(join(tempDir, ".haru", "hooks.json"), "{}");
+		await Bun.write(join(tempDir, ".haru", "agent-manifest.json"), "{}");
 
 		await executeUpdate({ hooks: true });
 
 		// Hooks should be restored
-		const hooksContent = await Bun.file(join(tempDir, ".overstory", "hooks.json")).text();
+		const hooksContent = await Bun.file(join(tempDir, ".haru", "hooks.json")).text();
 		expect(hooksContent).toBe(buildHooksJson());
 
 		// Manifest should NOT be restored
-		const manifestContent = await Bun.file(
-			join(tempDir, ".overstory", "agent-manifest.json"),
-		).text();
+		const manifestContent = await Bun.file(join(tempDir, ".haru", "agent-manifest.json")).text();
 		expect(manifestContent).toBe("{}");
 	});
 
 	test("granular flags do not refresh gitignore or readme", async () => {
-		await Bun.write(join(tempDir, ".overstory", ".gitignore"), "# old\n");
-		await Bun.write(join(tempDir, ".overstory", "README.md"), "# old\n");
+		await Bun.write(join(tempDir, ".haru", ".gitignore"), "# old\n");
+		await Bun.write(join(tempDir, ".haru", "README.md"), "# old\n");
 
 		await executeUpdate({ agents: true });
 
-		const gitignoreContent = await Bun.file(join(tempDir, ".overstory", ".gitignore")).text();
+		const gitignoreContent = await Bun.file(join(tempDir, ".haru", ".gitignore")).text();
 		expect(gitignoreContent).toBe("# old\n");
 
-		const readmeContent = await Bun.file(join(tempDir, ".overstory", "README.md")).text();
+		const readmeContent = await Bun.file(join(tempDir, ".haru", "README.md")).text();
 		expect(readmeContent).toBe("# old\n");
 	});
 });
@@ -323,8 +324,8 @@ describe("executeUpdate: --dry-run", () => {
 
 	test("reports changes without writing files", async () => {
 		// Tamper with files
-		await Bun.write(join(tempDir, ".overstory", "agent-defs", "scout.md"), "# tampered\n");
-		await Bun.write(join(tempDir, ".overstory", "agent-manifest.json"), "{}");
+		await Bun.write(join(tempDir, ".haru", "agent-defs", "scout.md"), "# tampered\n");
+		await Bun.write(join(tempDir, ".haru", "agent-manifest.json"), "{}");
 
 		let captured = "";
 		const restoreWrite = process.stdout.write;
@@ -347,14 +348,10 @@ describe("executeUpdate: --dry-run", () => {
 		expect(parsed.manifest).toEqual({ updated: true });
 
 		// Verify files were NOT actually modified
-		const scoutContent = await Bun.file(
-			join(tempDir, ".overstory", "agent-defs", "scout.md"),
-		).text();
+		const scoutContent = await Bun.file(join(tempDir, ".haru", "agent-defs", "scout.md")).text();
 		expect(scoutContent).toBe("# tampered\n");
 
-		const manifestContent = await Bun.file(
-			join(tempDir, ".overstory", "agent-manifest.json"),
-		).text();
+		const manifestContent = await Bun.file(join(tempDir, ".haru", "agent-manifest.json")).text();
 		expect(manifestContent).toBe("{}");
 	});
 });
@@ -406,7 +403,7 @@ describe("executeUpdate: --json output", () => {
 
 	test("JSON envelope includes updated file lists", async () => {
 		// Tamper with scout
-		await Bun.write(join(tempDir, ".overstory", "agent-defs", "scout.md"), "# tampered\n");
+		await Bun.write(join(tempDir, ".haru", "agent-defs", "scout.md"), "# tampered\n");
 
 		let captured = "";
 		const restoreWrite = process.stdout.write;
@@ -451,7 +448,7 @@ describe("executeUpdate: agent def exclusions", () => {
 	test("does not deploy supervisor.md (deprecated)", async () => {
 		await executeUpdate({ agents: true });
 
-		const agentDefsDir = join(tempDir, ".overstory", "agent-defs");
+		const agentDefsDir = join(tempDir, ".haru", "agent-defs");
 		const files = await readdir(agentDefsDir);
 		expect(files).not.toContain("supervisor.md");
 	});
@@ -461,7 +458,7 @@ describe("executeUpdate: agent def exclusions", () => {
 		for (const f of AGENT_DEF_FILES) {
 			try {
 				const { unlink } = await import("node:fs/promises");
-				await unlink(join(tempDir, ".overstory", "agent-defs", f));
+				await unlink(join(tempDir, ".haru", "agent-defs", f));
 			} catch {
 				// May not exist
 			}
@@ -469,7 +466,7 @@ describe("executeUpdate: agent def exclusions", () => {
 
 		await executeUpdate({ agents: true });
 
-		const agentDefsDir = join(tempDir, ".overstory", "agent-defs");
+		const agentDefsDir = join(tempDir, ".haru", "agent-defs");
 		const files = (await readdir(agentDefsDir)).filter((f) => f.endsWith(".md")).sort();
 		expect(files).toEqual(AGENT_DEF_FILES);
 	});

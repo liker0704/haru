@@ -280,7 +280,7 @@ describe("restoreBundle", () => {
 		expect(report.bundleId).toBe(manifest.bundleId);
 		expect(report.restoredAt).toBeTruthy();
 		// Target should have no sessions.db (dry run writes nothing)
-		expect(existsSync(join(targetDir, ".overstory", "sessions.db"))).toBe(false);
+		expect(existsSync(join(targetDir, ".haru", "sessions.db"))).toBe(false);
 	});
 
 	test("empty snapshot restore — all components marked restored", async () => {
@@ -315,7 +315,7 @@ describe("restoreBundle", () => {
 
 		await restoreBundle(targetDir, { bundlePath }, { reconcile: tmuxAlwaysDead });
 
-		const targetStore = createSessionStore(join(targetDir, ".overstory", "sessions.db"));
+		const targetStore = createSessionStore(join(targetDir, ".haru", "sessions.db"));
 		const sessions = targetStore.getAll();
 		targetStore.close();
 
@@ -337,7 +337,7 @@ describe("restoreBundle", () => {
 
 		await restoreBundle(targetDir, { bundlePath }, { reconcile: tmuxAlwaysDead });
 
-		const targetRunStore = createRunStore(join(targetDir, ".overstory", "sessions.db"));
+		const targetRunStore = createRunStore(join(targetDir, ".haru", "sessions.db"));
 		const runs = targetRunStore.listRuns();
 		targetRunStore.close();
 
@@ -368,7 +368,7 @@ describe("restoreBundle", () => {
 
 		await restoreBundle(targetDir, { bundlePath }, { reconcile: tmuxAlwaysDead });
 
-		const targetMailStore = createMailStore(join(targetDir, ".overstory", "mail.db"));
+		const targetMailStore = createMailStore(join(targetDir, ".haru", "mail.db"));
 		const messages = targetMailStore.getAll();
 		targetMailStore.close();
 
@@ -404,7 +404,7 @@ describe("restoreBundle", () => {
 
 		await restoreBundle(targetDir, { bundlePath }, { reconcile: tmuxAlwaysDead });
 
-		const targetMq = createMergeQueue(join(targetDir, ".overstory", "merge-queue.db"));
+		const targetMq = createMergeQueue(join(targetDir, ".haru", "merge-queue.db"));
 		const entries = targetMq.list();
 		targetMq.close();
 
@@ -424,10 +424,8 @@ describe("restoreBundle", () => {
 
 		await restoreBundle(targetDir, { bundlePath }, { reconcile: tmuxAlwaysDead });
 
-		const currentRun = await Bun.file(join(targetDir, ".overstory", "current-run.txt")).text();
-		const sessionBranch = await Bun.file(
-			join(targetDir, ".overstory", "session-branch.txt"),
-		).text();
+		const currentRun = await Bun.file(join(targetDir, ".haru", "current-run.txt")).text();
+		const sessionBranch = await Bun.file(join(targetDir, ".haru", "session-branch.txt")).text();
 
 		expect(currentRun.trim()).toBe("run-abc");
 		expect(sessionBranch.trim()).toBe("main");

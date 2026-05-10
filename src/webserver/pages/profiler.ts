@@ -8,6 +8,7 @@
 
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { detectHaruDir } from "../../config.ts";
 import { buildProfilerTrace, listAvailableRuns } from "../../profiler/build.ts";
 import { createRunStore } from "../../sessions/store.ts";
 import type { RunStore } from "../../sessions/types.ts";
@@ -35,7 +36,7 @@ export async function handleProfilerPage(
 	const stores = await acquireStores(projectPath);
 
 	try {
-		const overstoryDir = join(projectPath, ".overstory");
+		const overstoryDir = join(projectPath, detectHaruDir(projectPath));
 		const runStore = createRunStore(join(overstoryDir, "sessions.db"));
 
 		try {

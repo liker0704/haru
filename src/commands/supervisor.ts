@@ -17,7 +17,7 @@ import { join } from "node:path";
 import { Command } from "commander";
 import { createIdentity, loadIdentity } from "../agents/identity.ts";
 import { createManifestLoader, resolveModel } from "../agents/manifest.ts";
-import { loadConfig } from "../config.ts";
+import { detectHaruDir, loadConfig } from "../config.ts";
 import { AgentError, ValidationError } from "../errors.ts";
 import { jsonOutput } from "../json.ts";
 import { printHint, printSuccess } from "../logging/color.ts";
@@ -115,7 +115,7 @@ async function startSupervisor(opts: {
 	}
 
 	// Check for existing supervisor with same name
-	const overstoryDir = join(projectRoot, ".overstory");
+	const overstoryDir = join(projectRoot, detectHaruDir(projectRoot));
 	const { store } = openSessionStore(overstoryDir);
 	try {
 		const existing = store.getByName(opts.name);
@@ -167,7 +167,7 @@ async function startSupervisor(opts: {
 		});
 
 		// Create supervisor identity if first run
-		const identityBaseDir = join(projectRoot, ".overstory", "agents");
+		const identityBaseDir = join(projectRoot, detectHaruDir(projectRoot), "agents");
 		await mkdir(identityBaseDir, { recursive: true });
 		const existingIdentity = await loadIdentity(identityBaseDir, opts.name);
 		if (!existingIdentity) {
@@ -185,7 +185,12 @@ async function startSupervisor(opts: {
 		// Inject the supervisor base definition via --append-system-prompt.
 		// Pass file path (not content) to avoid tmux "command too long" (haru#45).
 		const tmuxSession = `haru-${sanitizeTmuxName(config.project.name)}-supervisor-${opts.name}`;
-		const agentDefPath = join(projectRoot, ".overstory", "agent-defs", "supervisor.md");
+		const agentDefPath = join(
+			projectRoot,
+			detectHaruDir(projectRoot),
+			"agent-defs",
+			"supervisor.md",
+		);
 		const agentDefFile = Bun.file(agentDefPath);
 		let appendSystemPromptFile: string | undefined;
 		if (await agentDefFile.exists()) {
@@ -303,7 +308,7 @@ async function stopSupervisor(opts: { name: string; json: boolean }): Promise<vo
 	const config = await loadConfig(cwd);
 	const projectRoot = config.project.root;
 
-	const overstoryDir = join(projectRoot, ".overstory");
+	const overstoryDir = join(projectRoot, detectHaruDir(projectRoot));
 	const { store } = openSessionStore(overstoryDir);
 	try {
 		const session = store.getByName(opts.name);
@@ -363,7 +368,7 @@ async function statusSupervisor(opts: { name?: string; json: boolean }): Promise
 	const config = await loadConfig(cwd);
 	const projectRoot = config.project.root;
 
-	const overstoryDir = join(projectRoot, ".overstory");
+	const overstoryDir = join(projectRoot, detectHaruDir(projectRoot));
 	const { store } = openSessionStore(overstoryDir);
 	try {
 		if (opts.name) {

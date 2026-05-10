@@ -71,7 +71,7 @@ describe("checkVersion", () => {
 		const versionCheck = checks.find((c) => c.name === "version-current");
 		expect(versionCheck).toBeDefined();
 		expect(versionCheck?.status).toBeOneOf(["pass", "warn", "fail"]);
-		expect(versionCheck?.message).toContain("ov");
+		expect(versionCheck?.message).toContain("ha");
 	});
 
 	test("includes package-json-sync check", async () => {

@@ -9,7 +9,7 @@
 
 import { join } from "node:path";
 import { Command } from "commander";
-import { loadConfig } from "../config.ts";
+import { detectHaruDir, loadConfig } from "../config.ts";
 import { GroupError, ValidationError } from "../errors.ts";
 import { jsonOutput } from "../json.ts";
 import { accent, printHint, printSuccess } from "../logging/color.ts";
@@ -20,7 +20,7 @@ import type { TaskGroup, TaskGroupProgress } from "../types.ts";
  * Resolve the groups.json path from the project root.
  */
 function groupsPath(projectRoot: string): string {
-	return join(projectRoot, ".overstory", "groups.json");
+	return join(projectRoot, detectHaruDir(projectRoot), "groups.json");
 }
 
 /**
@@ -254,7 +254,7 @@ async function getGroupProgress(
 
 		// Notify coordinator via mail (best-effort)
 		try {
-			const mailDbPath = join(projectRoot, ".overstory", "mail.db");
+			const mailDbPath = join(projectRoot, detectHaruDir(projectRoot), "mail.db");
 			const mailDbFile = Bun.file(mailDbPath);
 			if (await mailDbFile.exists()) {
 				const { createMailStore } = await import("../mail/store.ts");

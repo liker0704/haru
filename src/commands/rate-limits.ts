@@ -8,7 +8,7 @@
 
 import { join } from "node:path";
 import { Command } from "commander";
-import { loadConfig } from "../config.ts";
+import { detectHaruDir, loadConfig } from "../config.ts";
 import { ValidationError } from "../errors.ts";
 import { createHeadroomStore } from "../headroom/store.ts";
 import type { HeadroomSnapshot } from "../headroom/types.ts";
@@ -170,7 +170,7 @@ async function executeRateLimits(opts: RateLimitsOpts): Promise<void> {
 
 	const cwd = process.cwd();
 	const config = await loadConfig(cwd);
-	const overstoryDir = join(config.project.root, ".overstory");
+	const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 	const headroomDbPath = join(overstoryDir, "headroom.db");
 
 	const dbFile = Bun.file(headroomDbPath);

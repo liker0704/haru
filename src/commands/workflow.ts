@@ -11,7 +11,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import chalk from "chalk";
 import { Command } from "commander";
-import { loadConfig } from "../config.ts";
+import { detectHaruDir, loadConfig } from "../config.ts";
 import { jsonError, jsonOutput } from "../json.ts";
 import { createMissionStore } from "../missions/store.ts";
 import { loadWorkstreamsFile, persistWorkstreamsFile } from "../missions/workstreams.ts";
@@ -144,7 +144,7 @@ export async function executeWorkflowImport(
 		return;
 	}
 
-	const overstoryDir = join(config.project.root, ".overstory");
+	const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 	const sessionsDbPath = join(overstoryDir, "sessions.db");
 
 	if (!existsSync(sessionsDbPath)) {
@@ -249,7 +249,7 @@ export async function executeWorkflowSync(opts: WorkflowSyncOptions): Promise<vo
 		return;
 	}
 
-	const overstoryDir = join(config.project.root, ".overstory");
+	const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 	const sessionsDbPath = join(overstoryDir, "sessions.db");
 
 	if (!existsSync(sessionsDbPath)) {

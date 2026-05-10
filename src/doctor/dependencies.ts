@@ -13,8 +13,8 @@ interface ToolSpec {
 
 /**
  * External dependency checks.
- * Validates that required CLI tools (git, bun, tmux, tracker, mulch, haru)
- * and optional tools (cn) are available, including short alias availability.
+ * Validates that required CLI tools (git, bun, tmux, tracker, ku, ha)
+ * and optional tools (ta) are available, including long-name alias availability.
  */
 export const checkDependencies: DoctorCheckFn = async (
 	config,
@@ -32,14 +32,14 @@ export const checkDependencies: DoctorCheckFn = async (
 			name: trackerName,
 			versionFlag: "--version",
 			required: true,
-			installHint: trackerName === "su" ? "@os-eco/seeds-cli" : undefined,
+			installHint: trackerName === "su" ? "@hana/suji-cli" : undefined,
 		},
 		{
-			name: "mulch",
+			name: "ku",
 			versionFlag: "--version",
 			required: true,
-			alias: "ku",
-			installHint: "@os-eco/mulch-cli",
+			alias: "kura",
+			installHint: "@hana/kura-cli",
 		},
 		{
 			name: "ha",
@@ -52,7 +52,8 @@ export const checkDependencies: DoctorCheckFn = async (
 			name: "ta",
 			versionFlag: "--version",
 			required: false,
-			installHint: "@os-eco/canopy-cli",
+			alias: "tane",
+			installHint: "@hana/tane-cli",
 		},
 	];
 

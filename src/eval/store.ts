@@ -6,6 +6,7 @@
 
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
+import { detectHaruDir } from "../config.ts";
 import { createEventStore } from "../events/store.ts";
 import { createSessionStore } from "../sessions/store.ts";
 import type { EvalArtifacts, EvalResult, ProbabilisticEvalResult } from "./types.ts";
@@ -27,7 +28,7 @@ export async function writeArtifacts(
 	result: EvalResult,
 	projectRoot: string,
 ): Promise<EvalArtifacts> {
-	const dir = join(projectRoot, ".overstory", "eval-runs", result.runId);
+	const dir = join(projectRoot, detectHaruDir(projectRoot), "eval-runs", result.runId);
 	mkdirSync(dir, { recursive: true });
 
 	// manifest.json
@@ -58,7 +59,11 @@ export async function writeArtifacts(
 	// sessions.json — raw sessions from fixture sessions.db
 	let sessionsData: unknown[] = [];
 	if (result.fixtureRoot) {
-		const sessionsDbPath = join(result.fixtureRoot, ".overstory", "sessions.db");
+		const sessionsDbPath = join(
+			result.fixtureRoot,
+			detectHaruDir(result.fixtureRoot),
+			"sessions.db",
+		);
 		const dbFile = Bun.file(sessionsDbPath);
 		if (await dbFile.exists()) {
 			try {
@@ -79,7 +84,7 @@ export async function writeArtifacts(
 	// events.jsonl — raw events from fixture events.db, one JSON line per event
 	let eventsLines = "";
 	if (result.fixtureRoot) {
-		const eventsDbPath = join(result.fixtureRoot, ".overstory", "events.db");
+		const eventsDbPath = join(result.fixtureRoot, detectHaruDir(result.fixtureRoot), "events.db");
 		const dbFile = Bun.file(eventsDbPath);
 		if (await dbFile.exists()) {
 			try {
@@ -118,7 +123,7 @@ export async function writeProbabilisticArtifacts(
 	result: ProbabilisticEvalResult,
 	projectRoot: string,
 ): Promise<ProbabilisticEvalArtifacts> {
-	const dir = join(projectRoot, ".overstory", "eval-runs", result.runId);
+	const dir = join(projectRoot, detectHaruDir(projectRoot), "eval-runs", result.runId);
 	mkdirSync(dir, { recursive: true });
 
 	// manifest.json

@@ -124,7 +124,7 @@ describe("generateZsh", () => {
 describe("generateFish", () => {
 	it("should return a fish completion script", () => {
 		const script = generateFish();
-		expect(script).toContain("complete -c ov");
+		expect(script).toContain("complete -c ha");
 		expect(script).toContain("__fish_use_subcommand");
 	});
 
@@ -202,7 +202,7 @@ describe("completionsCommand", () => {
 
 		try {
 			completionsCommand(["fish"]);
-			expect(output).toContain("complete -c ov");
+			expect(output).toContain("complete -c ha");
 		} finally {
 			process.stdout.write = originalWrite;
 		}

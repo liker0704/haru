@@ -7,7 +7,7 @@
 
 import { join } from "node:path";
 import { Command } from "commander";
-import { loadConfig } from "../config.ts";
+import { detectHaruDir, loadConfig } from "../config.ts";
 import { jsonOutput } from "../json.ts";
 import { formatDuration } from "../logging/format.ts";
 import { renderHeader } from "../logging/theme.ts";
@@ -24,7 +24,7 @@ async function executeMetrics(opts: MetricsOpts): Promise<void> {
 
 	const cwd = process.cwd();
 	const config = await loadConfig(cwd);
-	const dbPath = join(config.project.root, ".overstory", "metrics.db");
+	const dbPath = join(config.project.root, detectHaruDir(config.project.root), "metrics.db");
 
 	const dbFile = Bun.file(dbPath);
 	if (!(await dbFile.exists())) {

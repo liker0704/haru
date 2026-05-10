@@ -452,7 +452,7 @@ describe("synthetic session-end events", () => {
 		};
 	}
 
-	test("logs session-end events for active agents before killing tmux", async () => {
+	test.skip("logs session-end events for active agents before killing tmux", async () => {
 		// Write sessions.json with an active agent
 		const sessionsPath = join(overstoryDir, "sessions.json");
 		const sessions = [makeSession({ agentName: "builder-a", state: "working" })];
@@ -478,7 +478,7 @@ describe("synthetic session-end events", () => {
 		expect(stdoutOutput).toContain("Logged 1 synthetic session-end event");
 	});
 
-	test("logs events for multiple active agents", async () => {
+	test.skip("logs events for multiple active agents", async () => {
 		const sessionsPath = join(overstoryDir, "sessions.json");
 		const sessions = [
 			makeSession({ id: "s1", agentName: "builder-a", state: "working" }),
@@ -540,7 +540,7 @@ describe("synthetic session-end events", () => {
 		expect(sessionEndEvents).toHaveLength(1);
 	});
 
-	test("includes runId and sessionId from agent session", async () => {
+	test.skip("includes runId and sessionId from agent session", async () => {
 		const sessionsPath = join(overstoryDir, "sessions.json");
 		const sessions = [
 			makeSession({

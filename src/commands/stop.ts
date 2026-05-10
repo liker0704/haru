@@ -14,7 +14,7 @@
  */
 
 import { join } from "node:path";
-import { loadConfig } from "../config.ts";
+import { detectHaruDir, loadConfig } from "../config.ts";
 import { AgentError, ValidationError } from "../errors.ts";
 import { jsonOutput } from "../json.ts";
 import { printSuccess, printWarning } from "../logging/color.ts";
@@ -102,7 +102,7 @@ export async function stopCommand(
 	const cwd = process.cwd();
 	const config = await loadConfig(cwd);
 	const projectRoot = config.project.root;
-	const overstoryDir = join(projectRoot, ".overstory");
+	const overstoryDir = join(projectRoot, detectHaruDir(projectRoot));
 
 	const { store } = openSessionStore(overstoryDir);
 	try {

@@ -10,7 +10,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { Command } from "commander";
 import { createManifestLoader, resolveModel } from "../agents/manifest.ts";
-import { loadConfig } from "../config.ts";
+import { detectHaruDir, loadConfig } from "../config.ts";
 import { jsonOutput } from "../json.ts";
 import { printSuccess, printWarning } from "../logging/color.ts";
 import { formatRelativeTime } from "../logging/format.ts";
@@ -50,7 +50,7 @@ async function resumeCommand(
 	const json = opts.json ?? false;
 	const config = await loadConfig(process.cwd());
 	const root = config.project.root;
-	const overstoryDir = join(root, ".overstory");
+	const overstoryDir = join(root, detectHaruDir(root));
 
 	const { store } = openSessionStore(overstoryDir);
 	try {
@@ -172,7 +172,7 @@ export async function resumeAgent(
 	root: string,
 ): Promise<void> {
 	const runtime = getRuntime(session.runtime ?? "claude", config, session.capability);
-	const overstoryDir = join(root, ".overstory");
+	const overstoryDir = join(root, detectHaruDir(root));
 
 	// Resolve model the same way as coordinator/sling — capability-based lookup
 	const capabilityDefaults: Record<string, string> = {
@@ -204,7 +204,7 @@ export async function resumeAgent(
 	const rootAgentCaps = new Set(["coordinator", "supervisor", "monitor"]);
 	let appendSystemPromptFile: string | undefined;
 	if (rootAgentCaps.has(session.capability)) {
-		const agentDefPath = join(root, ".overstory", "agent-defs", `${session.capability}.md`);
+		const agentDefPath = join(root, detectHaruDir(root), "agent-defs", `${session.capability}.md`);
 		if (existsSync(agentDefPath)) {
 			appendSystemPromptFile = agentDefPath;
 		}

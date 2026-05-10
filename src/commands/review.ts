@@ -9,7 +9,7 @@
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { Command } from "commander";
-import { loadConfig } from "../config.ts";
+import { detectHaruDir, loadConfig } from "../config.ts";
 import { createEventStore } from "../events/store.ts";
 import { jsonOutput } from "../json.ts";
 import { color } from "../logging/color.ts";
@@ -69,7 +69,7 @@ async function executeReviewSessions(opts: ReviewSessionsOpts): Promise<void> {
 	const limit = opts.recent ? Number.parseInt(opts.recent, 10) : 10;
 
 	const config = await loadConfig(process.cwd());
-	const overstoryDir = join(config.project.root, ".overstory");
+	const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 
 	const reviewStore = createReviewStore(join(overstoryDir, "reviews.db"));
 	const { store: sessionStore } = openSessionStore(overstoryDir);
@@ -167,7 +167,7 @@ async function executeReviewSession(sessionId: string, opts: ReviewSessionOpts):
 	const json = opts.json ?? false;
 
 	const config = await loadConfig(process.cwd());
-	const overstoryDir = join(config.project.root, ".overstory");
+	const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 
 	const reviewStore = createReviewStore(join(overstoryDir, "reviews.db"));
 	const { store: sessionStore } = openSessionStore(overstoryDir);
@@ -251,7 +251,7 @@ async function executeReviewHandoffs(opts: ReviewHandoffsOpts): Promise<void> {
 	const limit = opts.recent ? Number.parseInt(opts.recent, 10) : 10;
 
 	const config = await loadConfig(process.cwd());
-	const overstoryDir = join(config.project.root, ".overstory");
+	const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 	const agentsDir = join(overstoryDir, "agents");
 
 	const reviewStore = createReviewStore(join(overstoryDir, "reviews.db"));
@@ -342,7 +342,7 @@ async function executeReviewSpecs(opts: ReviewSpecsOpts): Promise<void> {
 	const json = opts.json ?? false;
 
 	const config = await loadConfig(process.cwd());
-	const overstoryDir = join(config.project.root, ".overstory");
+	const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 	const specsDir = join(overstoryDir, "specs");
 
 	const reviewStore = createReviewStore(join(overstoryDir, "reviews.db"));
@@ -427,7 +427,7 @@ async function executeReviewMissions(opts: ReviewMissionsOpts): Promise<void> {
 	const limit = opts.recent ? Number.parseInt(opts.recent, 10) : 10;
 
 	const config = await loadConfig(process.cwd());
-	const overstoryDir = join(config.project.root, ".overstory");
+	const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 	const missionStore = createMissionStore(join(overstoryDir, "sessions.db"));
 
 	try {
@@ -496,7 +496,7 @@ async function executeReviewMission(idOrSlug: string, opts: ReviewMissionOpts): 
 	const json = opts.json ?? false;
 
 	const config = await loadConfig(process.cwd());
-	const overstoryDir = join(config.project.root, ".overstory");
+	const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 	const missionStore = createMissionStore(join(overstoryDir, "sessions.db"));
 
 	try {
@@ -587,7 +587,7 @@ async function executeReviewStale(opts: ReviewStaleOpts): Promise<void> {
 	const json = opts.json ?? false;
 
 	const config = await loadConfig(process.cwd());
-	const overstoryDir = join(config.project.root, ".overstory");
+	const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 	const repoRoot = config.project.root;
 
 	const reviewStore = createReviewStore(join(overstoryDir, "reviews.db"));

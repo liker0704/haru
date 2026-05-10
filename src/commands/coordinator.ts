@@ -22,7 +22,7 @@ import {
 	startPersistentAgent,
 	stopPersistentAgent,
 } from "../agents/persistent-root.ts";
-import { loadConfig } from "../config.ts";
+import { detectHaruDir, loadConfig } from "../config.ts";
 import { AgentError, ValidationError } from "../errors.ts";
 import { jsonOutput } from "../json.ts";
 import { printHint, printSuccess, printWarning } from "../logging/color.ts";
@@ -117,7 +117,7 @@ export interface CoordinatorDeps {
  * Returns null if the file doesn't exist or can't be parsed.
  */
 async function readAutoPullPid(projectRoot: string): Promise<number | null> {
-	const pidFilePath = join(projectRoot, ".overstory", "autopull.pid");
+	const pidFilePath = join(projectRoot, detectHaruDir(projectRoot), "autopull.pid");
 	const file = Bun.file(pidFilePath);
 	if (!(await file.exists())) return null;
 	try {
@@ -133,7 +133,7 @@ async function readAutoPullPid(projectRoot: string): Promise<number | null> {
  * Remove the autopull PID file.
  */
 async function removeAutoPullPid(projectRoot: string): Promise<void> {
-	const pidFilePath = join(projectRoot, ".overstory", "autopull.pid");
+	const pidFilePath = join(projectRoot, detectHaruDir(projectRoot), "autopull.pid");
 	try {
 		await unlink(pidFilePath);
 	} catch {
@@ -224,7 +224,7 @@ function createDefaultAutoPull(projectRoot: string): NonNullable<CoordinatorDeps
 				stderr: "ignore",
 			});
 			const pid = proc.pid;
-			await Bun.write(join(projectRoot, ".overstory", "autopull.pid"), String(pid));
+			await Bun.write(join(projectRoot, detectHaruDir(projectRoot), "autopull.pid"), String(pid));
 			return { pid };
 		},
 
@@ -339,7 +339,7 @@ async function startCoordinator(
 	const cwd = process.cwd();
 	const config = await loadConfig(cwd);
 	const projectRoot = config.project.root;
-	const overstoryDir = join(projectRoot, ".overstory");
+	const overstoryDir = join(projectRoot, detectHaruDir(projectRoot));
 	const watchdog = deps._watchdog ?? createDefaultWatchdog(projectRoot);
 	const monitor = deps._monitor ?? createDefaultMonitor(projectRoot);
 	const autoPull = deps._autoPull ?? createDefaultAutoPull(projectRoot);
@@ -453,7 +453,7 @@ async function stopCoordinator(opts: { json: boolean }, deps: CoordinatorDeps = 
 	const cwd = process.cwd();
 	const config = await loadConfig(cwd);
 	const projectRoot = config.project.root;
-	const overstoryDir = join(projectRoot, ".overstory");
+	const overstoryDir = join(projectRoot, detectHaruDir(projectRoot));
 	const watchdog = deps._watchdog ?? createDefaultWatchdog(projectRoot);
 	const monitor = deps._monitor ?? createDefaultMonitor(projectRoot);
 	const autoPull = deps._autoPull ?? createDefaultAutoPull(projectRoot);
@@ -517,7 +517,7 @@ async function statusCoordinator(
 	const cwd = process.cwd();
 	const config = await loadConfig(cwd);
 	const projectRoot = config.project.root;
-	const overstoryDir = join(projectRoot, ".overstory");
+	const overstoryDir = join(projectRoot, detectHaruDir(projectRoot));
 	const watchdog = deps._watchdog ?? createDefaultWatchdog(projectRoot);
 	const monitor = deps._monitor ?? createDefaultMonitor(projectRoot);
 
@@ -596,7 +596,7 @@ async function sendToCoordinator(
 	const config = await loadConfig(cwd);
 	const projectRoot = config.project.root;
 
-	const overstoryDir = join(projectRoot, ".overstory");
+	const overstoryDir = join(projectRoot, detectHaruDir(projectRoot));
 	const { store } = openSessionStore(overstoryDir);
 	try {
 		const session = store.getByName(COORDINATOR_NAME);
@@ -702,7 +702,7 @@ export async function askCoordinator(
 	const config = await loadConfig(cwd);
 	const projectRoot = config.project.root;
 
-	const overstoryDir = join(projectRoot, ".overstory");
+	const overstoryDir = join(projectRoot, detectHaruDir(projectRoot));
 	const { store } = openSessionStore(overstoryDir);
 	try {
 		const session = store.getByName(COORDINATOR_NAME);
@@ -822,7 +822,7 @@ async function outputCoordinator(
 	const cwd = process.cwd();
 	const config = await loadConfig(cwd);
 	const projectRoot = config.project.root;
-	const overstoryDir = join(projectRoot, ".overstory");
+	const overstoryDir = join(projectRoot, detectHaruDir(projectRoot));
 
 	// Validate the coordinator session is alive before entering the output loop
 	const agentStatus = await getPersistentAgentStatus(
@@ -929,11 +929,19 @@ export async function checkComplete(
 
 	// allAgentsDone: read current-run.txt, query SessionStore
 	if (triggers.allAgentsDone) {
-		const runIdPath = join(config.project.root, ".overstory", "current-run.txt");
+		const runIdPath = join(
+			config.project.root,
+			detectHaruDir(config.project.root),
+			"current-run.txt",
+		);
 		const runIdFile = Bun.file(runIdPath);
 		if (await runIdFile.exists()) {
 			const runId = (await runIdFile.text()).trim();
-			const sessionsDb = join(config.project.root, ".overstory", "sessions.db");
+			const sessionsDb = join(
+				config.project.root,
+				detectHaruDir(config.project.root),
+				"sessions.db",
+			);
 			const store = createSessionStore(sessionsDb);
 			try {
 				const sessions = store.getByRun(runId);
@@ -946,7 +954,11 @@ export async function checkComplete(
 				// not yet merged. This prevents premature issue closure when a builder
 				// finishes but its lead hasn't merged yet (haru-5c08).
 				if (allDone) {
-					const mergeQueuePath = join(config.project.root, ".overstory", "merge-queue.db");
+					const mergeQueuePath = join(
+						config.project.root,
+						detectHaruDir(config.project.root),
+						"merge-queue.db",
+					);
 					const mergeQueueFile = Bun.file(mergeQueuePath);
 					if (await mergeQueueFile.exists()) {
 						const { createMergeQueue } = await import("../merge/queue.ts");
@@ -1014,7 +1026,7 @@ export async function checkComplete(
 
 	// onShutdownSignal: check mail for shutdown messages to coordinator
 	if (triggers.onShutdownSignal) {
-		const mailDb = join(config.project.root, ".overstory", "mail.db");
+		const mailDb = join(config.project.root, detectHaruDir(config.project.root), "mail.db");
 		const mailStore = createMailStore(mailDb);
 		try {
 			const unread = mailStore.getUnread("coordinator");

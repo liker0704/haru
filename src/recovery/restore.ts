@@ -2,6 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { saveCheckpoint } from "../agents/checkpoint.ts";
 import { createIdentity } from "../agents/identity.ts";
+import { detectHaruDir } from "../config.ts";
 import { RecoveryError } from "../errors.ts";
 import { createMailStore } from "../mail/store.ts";
 import { createMergeQueue } from "../merge/queue.ts";
@@ -302,7 +303,7 @@ export async function restoreBundle(
 		return reconcileSnapshot(snapshot, bundleId, deps?.reconcile);
 	}
 
-	const overstoryDir = join(projectRoot, ".overstory");
+	const overstoryDir = join(projectRoot, detectHaruDir(projectRoot));
 	const sessionsDbPath = join(overstoryDir, "sessions.db");
 	const mailDbPath = join(overstoryDir, "mail.db");
 	const mergeQueueDbPath = join(overstoryDir, "merge-queue.db");

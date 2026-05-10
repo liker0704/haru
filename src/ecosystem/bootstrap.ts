@@ -49,9 +49,9 @@ export interface SiblingTool {
 }
 
 export const SIBLING_TOOLS: SiblingTool[] = [
-	{ name: "mulch", cli: "ml", dotDir: ".mulch", initCmd: ["init"], onboardCmd: ["onboard"] },
-	{ name: "seeds", cli: "sd", dotDir: ".seeds", initCmd: ["init"], onboardCmd: ["onboard"] },
-	{ name: "canopy", cli: "cn", dotDir: ".canopy", initCmd: ["init"], onboardCmd: ["onboard"] },
+	{ name: "kura", cli: "ku", dotDir: ".kura", initCmd: ["init"], onboardCmd: ["onboard"] },
+	{ name: "suji", cli: "su", dotDir: ".suji", initCmd: ["init"], onboardCmd: ["onboard"] },
+	{ name: "tane", cli: "ta", dotDir: ".tane", initCmd: ["init"], onboardCmd: ["onboard"] },
 ];
 
 export type ToolStatus = "initialized" | "already_initialized" | "skipped";
@@ -79,9 +79,9 @@ export function resolveToolSet(opts: ToolSetOptions): SiblingTool[] {
 		return SIBLING_TOOLS.filter((t) => requested.includes(t.name));
 	}
 	return SIBLING_TOOLS.filter((t) => {
-		if (t.name === "mulch" && opts.skipMulch) return false;
-		if (t.name === "seeds" && opts.skipSeeds) return false;
-		if (t.name === "canopy" && opts.skipCanopy) return false;
+		if (t.name === "kura" && opts.skipMulch) return false;
+		if (t.name === "suji" && opts.skipSeeds) return false;
+		if (t.name === "tane" && opts.skipCanopy) return false;
 		return true;
 	});
 }

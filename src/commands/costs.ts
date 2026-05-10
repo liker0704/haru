@@ -9,7 +9,7 @@
 import { readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { Command } from "commander";
-import { loadConfig } from "../config.ts";
+import { detectHaruDir, loadConfig } from "../config.ts";
 import { ValidationError } from "../errors.ts";
 import { jsonError, jsonOutput } from "../json.ts";
 import { color } from "../logging/color.ts";
@@ -269,7 +269,7 @@ async function executeCosts(opts: CostsOpts): Promise<void> {
 
 	const cwd = process.cwd();
 	const config = await loadConfig(cwd);
-	const overstoryDir = join(config.project.root, ".overstory");
+	const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 
 	// Handle --self flag (early return for self-scan)
 	if (self) {

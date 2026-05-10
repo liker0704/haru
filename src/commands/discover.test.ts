@@ -74,7 +74,7 @@ describe("buildScoutArgs()", () => {
 		expect(args).toContain("--name");
 		expect(args).toContain(`discover-${category.name}`);
 		expect(args).toContain("--profile");
-		expect(args).toContain("ov-discovery");
+		expect(args).toContain("ha-discovery");
 		expect(args).toContain("--parent");
 		expect(args).toContain("discover-coordinator");
 		expect(args).toContain("--skip-task-check");
@@ -210,7 +210,7 @@ describe("discoverCommand() delegation", () => {
 		await discoverCommand({ attach: false }, deps);
 
 		expect(capturedOpts).toBeDefined();
-		expect(capturedOpts?.profile).toBe("ov-discovery");
+		expect(capturedOpts?.profile).toBe("ha-discovery");
 	});
 
 	test("uses default coordinator name 'discover-coordinator'", async () => {

@@ -17,7 +17,7 @@
 
 import { join } from "node:path";
 import { Command } from "commander";
-import { loadConfig } from "../config.ts";
+import { detectHaruDir, loadConfig } from "../config.ts";
 import {
 	closeDashboardStores,
 	type DashboardStores,
@@ -83,7 +83,7 @@ async function executeDashboard(opts: DashboardOpts): Promise<void> {
 	// Read current run ID unless --all flag is set
 	let runId: string | null | undefined;
 	if (!showAll) {
-		const overstoryDir = join(root, ".overstory");
+		const overstoryDir = join(root, detectHaruDir(root));
 		runId = await readCurrentRunId(overstoryDir);
 	}
 

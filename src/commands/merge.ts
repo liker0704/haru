@@ -16,7 +16,7 @@ import { join } from "node:path";
 import { createSurfaceCache, runCompatGate } from "../compat/gate.ts";
 import { formatCompatReport } from "../compat/report.ts";
 import type { CompatConfig } from "../compat/types.ts";
-import { loadConfig } from "../config.ts";
+import { detectHaruDir, loadConfig } from "../config.ts";
 import { MergeError, ValidationError } from "../errors.ts";
 import { jsonOutput } from "../json.ts";
 import { accent, printHint } from "../logging/color.ts";
@@ -153,7 +153,11 @@ export async function mergeCommand(opts: MergeOptions): Promise<void> {
 	// Resolution chain: --into flag > session-start branch > config canonicalBranch
 	let sessionBranch: string | null = null;
 	if (into === undefined) {
-		const sessionBranchPath = join(config.project.root, ".overstory", "session-branch.txt");
+		const sessionBranchPath = join(
+			config.project.root,
+			detectHaruDir(config.project.root),
+			"session-branch.txt",
+		);
 		const sessionBranchFile = Bun.file(sessionBranchPath);
 		if (await sessionBranchFile.exists()) {
 			const content = (await sessionBranchFile.text()).trim();
@@ -163,7 +167,7 @@ export async function mergeCommand(opts: MergeOptions): Promise<void> {
 		}
 	}
 	const targetBranch = into ?? sessionBranch ?? config.project.canonicalBranch;
-	const queuePath = join(config.project.root, ".overstory", "merge-queue.db");
+	const queuePath = join(config.project.root, detectHaruDir(config.project.root), "merge-queue.db");
 	const queue = createMergeQueue(queuePath, config.project.root);
 	const mulchClient = createMulchClient(config.project.root);
 	const resolver = createMergeResolver({
@@ -186,7 +190,7 @@ export async function mergeCommand(opts: MergeOptions): Promise<void> {
 		strictMode: config.compat?.strictMode ?? false,
 	};
 	const surfaceCache = createSurfaceCache();
-	const eventsDbPath = join(config.project.root, ".overstory", "events.db");
+	const eventsDbPath = join(config.project.root, detectHaruDir(config.project.root), "events.db");
 
 	if (branchName) {
 		await handleBranch(
@@ -303,7 +307,7 @@ async function handleBranch(
 				value: entry.branchName,
 			});
 		}
-		const reportDir = join(repoRoot, ".overstory", "compat-reports");
+		const reportDir = join(repoRoot, detectHaruDir(repoRoot), "compat-reports");
 		await mkdir(reportDir, { recursive: true });
 		const reportPath = join(reportDir, `${sanitizedBranch}.md`);
 		await Bun.write(reportPath, formatCompatReport(gateDecision.result));
@@ -337,7 +341,10 @@ async function handleBranch(
 	// all planned workstreams have merged. Workstream id must be known at
 	// dispatch time (ha sling) and threaded through MergeEntry.
 	if (result.success) {
-		await recordWorkstreamMerge(entry, join(config.project.root, ".overstory"));
+		await recordWorkstreamMerge(
+			entry,
+			join(config.project.root, detectHaruDir(config.project.root)),
+		);
 	}
 
 	if (json) {
@@ -360,7 +367,6 @@ async function handleBranch(
  * so `ha merge --all` does not open/close a fresh handle per entry.
  */
 function openSessionsDbForWrite(overstoryDir: string): import("bun:sqlite").Database {
-	// biome-ignore lint/style/useNodejsImportProtocol: bun:sqlite is Bun-specific
 	const { Database } = require("bun:sqlite") as typeof import("bun:sqlite");
 	const db = new Database(`${overstoryDir}/sessions.db`);
 	db.exec("PRAGMA journal_mode=WAL");
@@ -464,7 +470,7 @@ async function handleAll(
 
 	// Shared sessions.db handle for recordWorkstreamMerge across the loop.
 	// Avoids N open/close cycles per `ha merge --all` invocation.
-	const overstoryDir = join(config.project.root, ".overstory");
+	const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 	const sharedDb = openSessionsDbForWrite(overstoryDir);
 
 	try {
@@ -478,7 +484,7 @@ async function handleAll(
 			if (gateDecision.action !== "admit") {
 				const sanitizedBranch = entry.branchName.replace(/\//g, "-");
 				if (!sanitizedBranch.includes("..")) {
-					const reportDir = join(repoRoot, ".overstory", "compat-reports");
+					const reportDir = join(repoRoot, detectHaruDir(repoRoot), "compat-reports");
 					await mkdir(reportDir, { recursive: true });
 					const reportPath = join(reportDir, `${sanitizedBranch}.md`);
 					await Bun.write(reportPath, formatCompatReport(gateDecision.result));

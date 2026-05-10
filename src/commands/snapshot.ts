@@ -7,7 +7,7 @@
 import { join } from "node:path";
 import chalk from "chalk";
 import { Command } from "commander";
-import { loadConfig } from "../config.ts";
+import { detectHaruDir, loadConfig } from "../config.ts";
 import { jsonError, jsonOutput } from "../json.ts";
 import { createSnapshot, exportSnapshotBundle } from "../recovery/snapshot.ts";
 
@@ -64,7 +64,7 @@ export async function executeSnapshot(opts: SnapshotCommandOptions): Promise<voi
 	}
 
 	const outputDir =
-		opts.output ?? join(projectRoot, ".overstory", "snapshots", snapshot.snapshotId);
+		opts.output ?? join(projectRoot, detectHaruDir(projectRoot), "snapshots", snapshot.snapshotId);
 
 	let manifest: Awaited<ReturnType<typeof exportSnapshotBundle>>;
 	try {

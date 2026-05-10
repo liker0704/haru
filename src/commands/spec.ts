@@ -10,6 +10,7 @@
 
 import { mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { detectHaruDir } from "../config.ts";
 import { ValidationError } from "../errors.ts";
 import { jsonOutput } from "../json.ts";
 import { printSuccess } from "../logging/color.ts";
@@ -54,7 +55,7 @@ export async function writeSpec(
 	body: string,
 	agent?: string,
 ): Promise<string> {
-	const specsDir = join(projectRoot, ".overstory", "specs");
+	const specsDir = join(projectRoot, detectHaruDir(projectRoot), "specs");
 	await mkdir(specsDir, { recursive: true });
 
 	// Build the spec content with optional attribution header

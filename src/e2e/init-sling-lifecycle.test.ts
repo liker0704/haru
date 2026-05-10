@@ -70,7 +70,7 @@ describe("E2E: init→sling lifecycle on external project", () => {
 	test("init creates all expected artifacts", async () => {
 		await initCommand({ _spawner: noopSpawner });
 
-		const overstoryDir = join(tempDir, ".overstory");
+		const overstoryDir = join(tempDir, ".haru");
 
 		// config.yaml exists
 		const configFile = Bun.file(join(overstoryDir, "config.yaml"));
@@ -116,7 +116,7 @@ describe("E2E: init→sling lifecycle on external project", () => {
 		expect(config.project.root).toBe(tempDir);
 
 		// agents.baseDir should be the relative path to agent-defs
-		expect(config.agents.baseDir).toBe(".overstory/agent-defs");
+		expect(config.agents.baseDir).toBe(".haru/agent-defs");
 
 		// canonicalBranch should be detected (main for our test repos)
 		expect(config.project.canonicalBranch).toBeTruthy();
@@ -128,8 +128,8 @@ describe("E2E: init→sling lifecycle on external project", () => {
 	test("manifest loads successfully with all 8 agents (supervisor deprecated)", async () => {
 		await initCommand({ _spawner: noopSpawner });
 
-		const manifestPath = join(tempDir, ".overstory", "agent-manifest.json");
-		const agentDefsDir = join(tempDir, ".overstory", "agent-defs");
+		const manifestPath = join(tempDir, ".haru", "agent-manifest.json");
+		const agentDefsDir = join(tempDir, ".haru", "agent-defs");
 		const loader = createManifestLoader(manifestPath, agentDefsDir);
 
 		const manifest = await loader.load();
@@ -162,8 +162,8 @@ describe("E2E: init→sling lifecycle on external project", () => {
 	test("manifest capability index is consistent", async () => {
 		await initCommand({ _spawner: noopSpawner });
 
-		const manifestPath = join(tempDir, ".overstory", "agent-manifest.json");
-		const agentDefsDir = join(tempDir, ".overstory", "agent-defs");
+		const manifestPath = join(tempDir, ".haru", "agent-manifest.json");
+		const agentDefsDir = join(tempDir, ".haru", "agent-defs");
 		const loader = createManifestLoader(manifestPath, agentDefsDir);
 
 		const manifest = await loader.load();
@@ -184,7 +184,7 @@ describe("E2E: init→sling lifecycle on external project", () => {
 	test("overlay generation works for external project", async () => {
 		await initCommand({ _spawner: noopSpawner });
 
-		const agentDefsDir = join(tempDir, ".overstory", "agent-defs");
+		const agentDefsDir = join(tempDir, ".haru", "agent-defs");
 		const baseDefinition = await Bun.file(join(agentDefsDir, "builder.md")).text();
 
 		const overlayConfig: OverlayConfig = {
@@ -192,7 +192,7 @@ describe("E2E: init→sling lifecycle on external project", () => {
 			taskId: "test-bead-001",
 			specPath: null,
 			branchName: "haru/test-agent/test-bead-001",
-			worktreePath: join(tempDir, ".overstory", "worktrees", "test-agent"),
+			worktreePath: join(tempDir, ".haru", "worktrees", "test-agent"),
 			fileScope: [],
 			mulchDomains: [],
 			parentAgent: null,
@@ -203,7 +203,7 @@ describe("E2E: init→sling lifecycle on external project", () => {
 		};
 
 		// Write the overlay into a subdirectory of the temp dir (simulating a worktree)
-		const worktreePath = join(tempDir, ".overstory", "worktrees", "test-agent");
+		const worktreePath = join(tempDir, ".haru", "worktrees", "test-agent");
 		const { mkdir } = await import("node:fs/promises");
 		await mkdir(worktreePath, { recursive: true });
 
@@ -257,9 +257,9 @@ describe("E2E: init→sling lifecycle on external project", () => {
 		const overlayConfig: OverlayConfig = {
 			agentName: "lifecycle-builder",
 			taskId: "lifecycle-001",
-			specPath: join(tempDir, ".overstory", "specs", "lifecycle-001.md"),
+			specPath: join(tempDir, ".haru", "specs", "lifecycle-001.md"),
 			branchName: "haru/lifecycle-builder/lifecycle-001",
-			worktreePath: join(tempDir, ".overstory", "worktrees", "lifecycle-builder"),
+			worktreePath: join(tempDir, ".haru", "worktrees", "lifecycle-builder"),
 			fileScope: ["src/main.ts", "src/utils.ts"],
 			mulchDomains: ["typescript"],
 			parentAgent: "orchestrator",
@@ -269,7 +269,7 @@ describe("E2E: init→sling lifecycle on external project", () => {
 			baseDefinition: builderDef,
 		};
 
-		const worktreePath = join(tempDir, ".overstory", "worktrees", "lifecycle-builder");
+		const worktreePath = join(tempDir, ".haru", "worktrees", "lifecycle-builder");
 		const { mkdir } = await import("node:fs/promises");
 		await mkdir(worktreePath, { recursive: true });
 

@@ -352,23 +352,23 @@ describe("shouldShowScoutWarning", () => {
 
 describe("getSharedWritableDirs", () => {
 	test("returns only .overstory for non-lead agents", () => {
-		expect(getSharedWritableDirs("/repo", "builder")).toEqual(["/repo/.overstory"]);
-		expect(getSharedWritableDirs("/repo", "scout")).toEqual(["/repo/.overstory"]);
+		expect(getSharedWritableDirs("/repo", "builder")).toEqual(["/repo/.haru"]);
+		expect(getSharedWritableDirs("/repo", "scout")).toEqual(["/repo/.haru"]);
 	});
 
 	test("includes canonical .git for lead agents", () => {
-		expect(getSharedWritableDirs("/repo", "lead")).toEqual(["/repo/.overstory", "/repo/.git"]);
+		expect(getSharedWritableDirs("/repo", "lead")).toEqual(["/repo/.haru", "/repo/.git"]);
 	});
 
 	test("includes canonical .git for execution-director agents", () => {
 		expect(getSharedWritableDirs("/repo", "execution-director")).toEqual([
-			"/repo/.overstory",
+			"/repo/.haru",
 			"/repo/.git",
 		]);
 	});
 
 	test("returns only .overstory for mission-analyst agents", () => {
-		expect(getSharedWritableDirs("/repo", "mission-analyst")).toEqual(["/repo/.overstory"]);
+		expect(getSharedWritableDirs("/repo", "mission-analyst")).toEqual(["/repo/.haru"]);
 	});
 });
 
@@ -633,23 +633,23 @@ describe("slingCommand mission spec enforcement", () => {
 	let originalCwd: string;
 
 	async function writeMissionConfig(root: string): Promise<void> {
-		await mkdir(join(root, ".overstory", "agent-defs"), { recursive: true });
+		await mkdir(join(root, ".haru", "agent-defs"), { recursive: true });
 		await Bun.write(
-			join(root, ".overstory", "config.yaml"),
+			join(root, ".haru", "config.yaml"),
 			[
 				"project:",
 				"  name: sling-mission-test",
 				`  root: ${root}`,
 				"  canonicalBranch: main",
 				"agents:",
-				"  manifestPath: .overstory/agent-manifest.json",
-				"  baseDir: .overstory/agent-defs",
+				"  manifestPath: .haru/agent-manifest.json",
+				"  baseDir: .haru/agent-defs",
 				"taskTracker:",
 				"  enabled: false",
 			].join("\n"),
 		);
 		await Bun.write(
-			join(root, ".overstory", "agent-manifest.json"),
+			join(root, ".haru", "agent-manifest.json"),
 			JSON.stringify(
 				{
 					version: "1",
@@ -668,7 +668,7 @@ describe("slingCommand mission spec enforcement", () => {
 				2,
 			),
 		);
-		await Bun.write(join(root, ".overstory", "agent-defs", "builder.md"), "# Builder\n");
+		await Bun.write(join(root, ".haru", "agent-defs", "builder.md"), "# Builder\n");
 	}
 
 	beforeEach(async () => {
@@ -677,14 +677,14 @@ describe("slingCommand mission spec enforcement", () => {
 		process.chdir(repoDir);
 		await writeMissionConfig(repoDir);
 
-		const missionStore = createMissionStore(join(repoDir, ".overstory", "sessions.db"));
+		const missionStore = createMissionStore(join(repoDir, ".haru", "sessions.db"));
 		try {
 			missionStore.create({
 				id: "mission-sling-001",
 				slug: "sling-guard",
 				objective: "Exercise mission builder guards",
 				runId: "run-sling-001",
-				artifactRoot: join(repoDir, ".overstory", "missions", "mission-sling-001"),
+				artifactRoot: join(repoDir, ".haru", "missions", "mission-sling-001"),
 			});
 		} finally {
 			missionStore.close();
@@ -709,11 +709,11 @@ describe("slingCommand mission spec enforcement", () => {
 	});
 
 	test("rejects stale mission spec metadata even when mission pointer is missing", async () => {
-		const artifactRoot = join(repoDir, ".overstory", "missions", "mission-sling-001");
+		const artifactRoot = join(repoDir, ".haru", "missions", "mission-sling-001");
 		const briefPath = join(artifactRoot, "plan", "ws-auth.md");
-		const specPath = join(repoDir, ".overstory", "specs", "task-001.md");
+		const specPath = join(repoDir, ".haru", "specs", "task-001.md");
 		await mkdir(join(artifactRoot, "plan"), { recursive: true });
-		await mkdir(join(repoDir, ".overstory", "specs"), { recursive: true });
+		await mkdir(join(repoDir, ".haru", "specs"), { recursive: true });
 		await Bun.write(briefPath, "# Brief v1\n");
 		await Bun.write(specPath, "# Spec v1\n");
 
@@ -721,7 +721,7 @@ describe("slingCommand mission spec enforcement", () => {
 		await writeSpecMeta(repoDir, "task-001", {
 			taskId: "task-001",
 			workstreamId: "ws-auth",
-			briefPath: ".overstory/missions/mission-sling-001/plan/ws-auth.md",
+			briefPath: ".haru/missions/mission-sling-001/plan/ws-auth.md",
 			briefRevision: initialRevision,
 			specRevision: "spec-rev-1",
 			status: "current",
@@ -736,11 +736,11 @@ describe("slingCommand mission spec enforcement", () => {
 	});
 
 	test("rejects a mission spec whose task does not match the requested spawn task", async () => {
-		const artifactRoot = join(repoDir, ".overstory", "missions", "mission-sling-001");
+		const artifactRoot = join(repoDir, ".haru", "missions", "mission-sling-001");
 		const briefPath = join(artifactRoot, "plan", "ws-other.md");
-		const specPath = join(repoDir, ".overstory", "specs", "task-002.md");
+		const specPath = join(repoDir, ".haru", "specs", "task-002.md");
 		await mkdir(join(artifactRoot, "plan"), { recursive: true });
-		await mkdir(join(repoDir, ".overstory", "specs"), { recursive: true });
+		await mkdir(join(repoDir, ".haru", "specs"), { recursive: true });
 		await Bun.write(briefPath, "# Brief v1\n");
 		await Bun.write(specPath, "# Spec v1\n");
 
@@ -748,7 +748,7 @@ describe("slingCommand mission spec enforcement", () => {
 		await writeSpecMeta(repoDir, "task-002", {
 			taskId: "task-002",
 			workstreamId: "ws-other",
-			briefPath: ".overstory/missions/mission-sling-001/plan/ws-other.md",
+			briefPath: ".haru/missions/mission-sling-001/plan/ws-other.md",
 			briefRevision: currentRevision,
 			specRevision: "spec-rev-2",
 			status: "current",
@@ -1707,7 +1707,7 @@ describe("slingCommand circuit breaker gate", () => {
 	let originalCwd: string;
 
 	async function writeBreakerConfig(root: string, withResilience: boolean): Promise<void> {
-		await mkdir(join(root, ".overstory", "agent-defs"), { recursive: true });
+		await mkdir(join(root, ".haru", "agent-defs"), { recursive: true });
 		const resilienceBlock = withResilience
 			? [
 					"resilience:",
@@ -1719,15 +1719,15 @@ describe("slingCommand circuit breaker gate", () => {
 				].join("\n")
 			: "";
 		await Bun.write(
-			join(root, ".overstory", "config.yaml"),
+			join(root, ".haru", "config.yaml"),
 			[
 				"project:",
 				"  name: sling-breaker-test",
 				`  root: ${root}`,
 				"  canonicalBranch: main",
 				"agents:",
-				"  manifestPath: .overstory/agent-manifest.json",
-				"  baseDir: .overstory/agent-defs",
+				"  manifestPath: .haru/agent-manifest.json",
+				"  baseDir: .haru/agent-defs",
 				"taskTracker:",
 				"  enabled: false",
 				resilienceBlock,
@@ -1736,7 +1736,7 @@ describe("slingCommand circuit breaker gate", () => {
 				.join("\n"),
 		);
 		await Bun.write(
-			join(root, ".overstory", "agent-manifest.json"),
+			join(root, ".haru", "agent-manifest.json"),
 			JSON.stringify(
 				{
 					version: "1",
@@ -1755,7 +1755,7 @@ describe("slingCommand circuit breaker gate", () => {
 				2,
 			),
 		);
-		await Bun.write(join(root, ".overstory", "agent-defs", "builder.md"), "# Builder\n");
+		await Bun.write(join(root, ".haru", "agent-defs", "builder.md"), "# Builder\n");
 	}
 
 	beforeEach(async () => {
@@ -1773,7 +1773,7 @@ describe("slingCommand circuit breaker gate", () => {
 		await writeBreakerConfig(repoDir, true);
 
 		// Seed an open breaker for "builder" capability
-		const resilienceStore = createResilienceStore(join(repoDir, ".overstory", "resilience.db"));
+		const resilienceStore = createResilienceStore(join(repoDir, ".haru", "resilience.db"));
 		try {
 			resilienceStore.upsertBreaker(
 				{
@@ -1816,7 +1816,7 @@ describe("slingCommand circuit breaker gate", () => {
 	test("sends error mail to coordinator when breaker is tripped with no parent", async () => {
 		await writeBreakerConfig(repoDir, true);
 
-		const resilienceStore = createResilienceStore(join(repoDir, ".overstory", "resilience.db"));
+		const resilienceStore = createResilienceStore(join(repoDir, ".haru", "resilience.db"));
 		try {
 			resilienceStore.upsertBreaker(
 				{
@@ -1839,7 +1839,7 @@ describe("slingCommand circuit breaker gate", () => {
 
 		// Verify mail was sent to the default recipient (coordinator)
 		const { createMailStore: makeMailStore } = await import("../mail/store.ts");
-		const mailStore = makeMailStore(join(repoDir, ".overstory", "mail.db"));
+		const mailStore = makeMailStore(join(repoDir, ".haru", "mail.db"));
 		try {
 			const messages = mailStore.getAll({ to: "coordinator" });
 			expect(messages.some((m) => m.subject.includes("breaker_tripped"))).toBe(true);

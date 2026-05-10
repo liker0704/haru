@@ -11,7 +11,7 @@
  */
 
 import { join } from "node:path";
-import { loadConfig } from "../config.ts";
+import { detectHaruDir, loadConfig } from "../config.ts";
 import { AgentError } from "../errors.ts";
 import { createMailClient } from "../mail/client.ts";
 import { createMailStore } from "../mail/store.ts";
@@ -202,7 +202,7 @@ export async function runPollerTick(
 	cwd: string,
 	gh: GhRunner = defaultGhRunner,
 ): Promise<PollerTickResult> {
-	const stateFile = join(projectRoot, ".overstory", "autopull-state.json");
+	const stateFile = join(projectRoot, detectHaruDir(projectRoot), "autopull-state.json");
 	const state = await readPollerState(stateFile);
 	const errors: string[] = [];
 
@@ -247,7 +247,7 @@ export async function runPollerTick(
 		return { dispatched: 0, skipped, errors };
 	}
 
-	const mailDbPath = join(projectRoot, ".overstory", "mail.db");
+	const mailDbPath = join(projectRoot, detectHaruDir(projectRoot), "mail.db");
 	const mailStore = createMailStore(mailDbPath);
 	const mailClient = createMailClient(mailStore);
 	let dispatched = 0;

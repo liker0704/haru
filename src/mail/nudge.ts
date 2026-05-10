@@ -9,6 +9,7 @@
  */
 
 import { join } from "node:path";
+import { detectHaruDir } from "../config.ts";
 import type { MailMessage, MailMessageType } from "../types.ts";
 import { canonicalizeMailAgentName, expandMailAgentNames } from "./identity.ts";
 
@@ -45,7 +46,7 @@ export function isDispatchNudge(type: MailMessageType): boolean {
 
 /** Directory where pending nudge markers are stored. */
 function pendingNudgeDir(cwd: string): string {
-	return join(cwd, ".overstory", "pending-nudges");
+	return join(cwd, detectHaruDir(cwd), "pending-nudges");
 }
 
 /** Shape of a pending nudge marker file. */

@@ -1,6 +1,7 @@
 import { mkdir, readdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
+import { detectHaruDir } from "../config.ts";
 import type { ProjectEntry, ProjectRegistry } from "./types.js";
 
 function expandTilde(p: string): string {
@@ -28,7 +29,7 @@ async function readdirNames(dir: string): Promise<string[]> {
 }
 
 async function isOvProject(dir: string): Promise<boolean> {
-	return Bun.file(join(dir, ".overstory", "config.yaml")).exists();
+	return Bun.file(join(dir, detectHaruDir(dir), "config.yaml")).exists();
 }
 
 function makeEntry(slug: string, name: string, path: string): ProjectEntry {

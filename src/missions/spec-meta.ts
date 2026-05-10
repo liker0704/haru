@@ -11,6 +11,7 @@
 
 import { mkdir, stat } from "node:fs/promises";
 import { join } from "node:path";
+import { detectHaruDir } from "../config.ts";
 
 // === Types ===
 
@@ -46,7 +47,7 @@ export interface SpecMeta {
 // === Path helpers ===
 
 function specsDir(projectRoot: string): string {
-	return join(projectRoot, ".overstory", "specs");
+	return join(projectRoot, detectHaruDir(projectRoot), "specs");
 }
 
 function metaPath(projectRoot: string, taskId: string): string {

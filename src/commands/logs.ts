@@ -11,7 +11,7 @@
 import { readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { Command } from "commander";
-import { loadConfig } from "../config.ts";
+import { detectHaruDir, loadConfig } from "../config.ts";
 import { ValidationError } from "../errors.ts";
 import { jsonOutput } from "../json.ts";
 import { color } from "../logging/color.ts";
@@ -407,7 +407,7 @@ async function executeLogs(opts: LogsOpts): Promise<void> {
 
 	const cwd = process.cwd();
 	const config = await loadConfig(cwd);
-	const logsDir = join(config.project.root, ".overstory", "logs");
+	const logsDir = join(config.project.root, detectHaruDir(config.project.root), "logs");
 
 	// Follow mode: tail logs in real time
 	if (follow) {

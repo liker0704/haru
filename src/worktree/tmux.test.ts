@@ -309,7 +309,7 @@ describe("listSessions", () => {
 	});
 
 	test("parses session list output", async () => {
-		spawnSpy.mockImplementation(() => mockSpawnResult("haru-auth:42\noverstory-data:99\n", "", 0));
+		spawnSpy.mockImplementation(() => mockSpawnResult("haru-auth:42\nharu-data:99\n", "", 0));
 
 		const sessions = await listSessions();
 

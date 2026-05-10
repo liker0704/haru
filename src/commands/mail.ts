@@ -8,7 +8,7 @@
 
 import { join } from "node:path";
 import { Command } from "commander";
-import { resolveProjectRoot } from "../config.ts";
+import { detectHaruDir, resolveProjectRoot } from "../config.ts";
 import { ValidationError } from "../errors.ts";
 import { createEventStore } from "../events/store.ts";
 import { jsonOutput } from "../json.ts";
@@ -72,7 +72,7 @@ function formatMessage(msg: MailMessage): string {
  * The cwd must already be resolved to the canonical project root.
  */
 function openStore(cwd: string) {
-	const dbPath = join(cwd, ".overstory", "mail.db");
+	const dbPath = join(cwd, detectHaruDir(cwd), "mail.db");
 	return createMailStore(dbPath);
 }
 
@@ -94,7 +94,7 @@ async function tryResumeWaitingAgent(cwd: string, agentName: string): Promise<vo
 		const { canonicalizeMailAgentName } = await import("../mail/identity.ts");
 		const { openSessionStore } = await import("../sessions/compat.ts");
 		const canonical = canonicalizeMailAgentName(agentName);
-		const overstoryDir = join(cwd, ".overstory");
+		const overstoryDir = join(cwd, detectHaruDir(cwd));
 		const { store } = openSessionStore(overstoryDir);
 		try {
 			const session = store.getByName(canonical);
@@ -251,7 +251,7 @@ async function handleSend(opts: SendOpts, cwd: string): Promise<void> {
 	// Resolve active mission context (non-fatal)
 	let missionId: string | undefined;
 	try {
-		const overstoryDir = join(cwd, ".overstory");
+		const overstoryDir = join(cwd, detectHaruDir(cwd));
 		const ctx = await resolveActiveMissionContext(overstoryDir);
 		missionId = ctx?.missionId ?? undefined;
 	} catch {
@@ -293,7 +293,7 @@ async function handleSend(opts: SendOpts, cwd: string): Promise<void> {
 
 	// Handle broadcast messages (group addresses)
 	if (isGroupAddress(to)) {
-		const overstoryDir = join(cwd, ".overstory");
+		const overstoryDir = join(cwd, detectHaruDir(cwd));
 		const { store: sessionStore } = openSessionStore(overstoryDir);
 
 		try {
@@ -322,7 +322,7 @@ async function handleSend(opts: SendOpts, cwd: string): Promise<void> {
 				// EventStore opened once for all recipients
 				let runId: string | null = null;
 				try {
-					const runIdPath = join(cwd, ".overstory", "current-run.txt");
+					const runIdPath = join(cwd, detectHaruDir(cwd), "current-run.txt");
 					const runIdFile = Bun.file(runIdPath);
 					if (await runIdFile.exists()) {
 						const text = await runIdFile.text();
@@ -335,7 +335,7 @@ async function handleSend(opts: SendOpts, cwd: string): Promise<void> {
 					// runId read failure is non-fatal
 				}
 
-				const eventsDbPath = join(cwd, ".overstory", "events.db");
+				const eventsDbPath = join(cwd, detectHaruDir(cwd), "events.db");
 				let eventStore: ReturnType<typeof createEventStore> | null = null;
 				try {
 					eventStore = createEventStore(eventsDbPath);
@@ -447,11 +447,11 @@ async function handleSend(opts: SendOpts, cwd: string): Promise<void> {
 
 		// Record mail_sent event to EventStore (fire-and-forget)
 		try {
-			const eventsDbPath = join(cwd, ".overstory", "events.db");
+			const eventsDbPath = join(cwd, detectHaruDir(cwd), "events.db");
 			const eventStore = createEventStore(eventsDbPath);
 			try {
 				let runId: string | null = null;
-				const runIdPath = join(cwd, ".overstory", "current-run.txt");
+				const runIdPath = join(cwd, detectHaruDir(cwd), "current-run.txt");
 				const runIdFile = Bun.file(runIdPath);
 				if (await runIdFile.exists()) {
 					const text = await runIdFile.text();
@@ -533,7 +533,7 @@ async function handleSend(opts: SendOpts, cwd: string): Promise<void> {
 		// Reviewer coverage check for merge_ready (advisory warning)
 		if (type === "merge_ready") {
 			try {
-				const overstoryDir = join(cwd, ".overstory");
+				const overstoryDir = join(cwd, detectHaruDir(cwd));
 				const { store: sessionStore } = openSessionStore(overstoryDir);
 				try {
 					const allSessions = sessionStore.getAll();

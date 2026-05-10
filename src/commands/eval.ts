@@ -9,7 +9,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { Command } from "commander";
-import { loadConfig } from "../config.ts";
+import { detectHaruDir, loadConfig } from "../config.ts";
 import { runProbabilisticEval } from "../eval/probabilistic.ts";
 import {
 	renderProbabilisticReport,
@@ -224,7 +224,7 @@ async function executeEvalShow(runId: string, opts: EvalShowOpts): Promise<void>
 	const config = await loadConfig(cwd);
 	const projectRoot = config.project.root;
 
-	const runDir = join(projectRoot, ".overstory", "eval-runs", runId);
+	const runDir = join(projectRoot, detectHaruDir(projectRoot), "eval-runs", runId);
 	const probSummaryPath = join(runDir, "probabilistic-summary.json");
 	const probSummaryFile = Bun.file(probSummaryPath);
 
@@ -291,7 +291,7 @@ async function executeEvalList(opts: EvalListOpts): Promise<void> {
 
 	const config = await loadConfig(process.cwd());
 	const projectRoot = config.project.root;
-	const evalRunsDir = join(projectRoot, ".overstory", "eval-runs");
+	const evalRunsDir = join(projectRoot, detectHaruDir(projectRoot), "eval-runs");
 
 	if (!existsSync(evalRunsDir)) {
 		if (json) {
@@ -392,7 +392,7 @@ async function executeEvalCompare(
 
 	const config = await loadConfig(process.cwd());
 	const projectRoot = config.project.root;
-	const evalRunsDir = join(projectRoot, ".overstory", "eval-runs");
+	const evalRunsDir = join(projectRoot, detectHaruDir(projectRoot), "eval-runs");
 
 	const loadedA = await loadEvalRun(evalRunsDir, runIdA);
 	const loadedB = await loadEvalRun(evalRunsDir, runIdB);

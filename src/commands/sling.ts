@@ -19,7 +19,7 @@ import { createManifestLoader, resolveMissionCapability } from "../agents/manife
 import { createSpawnService, type SpawnDeps } from "../agents/spawn.ts";
 import { isCoordinatorCapability } from "../agents/types.ts";
 import { createCanopyClient } from "../canopy/client.ts";
-import { loadConfig } from "../config.ts";
+import { detectHaruDir, loadConfig } from "../config.ts";
 import { AgentError, HierarchyError, ValidationError } from "../errors.ts";
 import { checkHeadroomForSpawn, type SpawnGuardPolicy } from "../headroom/guard.ts";
 import { createHeadroomStore } from "../headroom/store.ts";
@@ -293,7 +293,7 @@ export function shouldShowScoutWarning(
  * @param capability - Capability being launched
  */
 export function getSharedWritableDirs(projectRoot: string, capability: string): string[] {
-	const sharedWritableDirs = [join(projectRoot, ".overstory")];
+	const sharedWritableDirs = [join(projectRoot, detectHaruDir(projectRoot))];
 
 	if (capability === "lead" || capability === "execution-director") {
 		sharedWritableDirs.push(join(projectRoot, ".git"));
@@ -657,7 +657,7 @@ export async function slingCommand(taskId: string, opts: SlingOptions): Promise<
 	const cwd = process.cwd();
 	const config = await loadConfig(cwd);
 	const resolvedBackend = await resolveBackend(config.taskTracker.backend, config.project.root);
-	const overstoryDir = join(config.project.root, ".overstory");
+	const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 	const missionContext = await resolveActiveMissionContext(overstoryDir);
 	const hasMission = missionContext !== null;
 

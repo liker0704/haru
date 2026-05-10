@@ -1,5 +1,6 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { detectHaruDir } from "../../config.ts";
 import type { DashboardData } from "../../dashboard/data.ts";
 import { loadDashboardData } from "../../dashboard/data.ts";
 import { createMailStore } from "../../mail/store.ts";
@@ -278,7 +279,9 @@ export async function handleMissionDetailPage(
 	}
 
 	const projectPath = project.path;
-	const missionStore = createMissionStore(join(projectPath, ".overstory", "sessions.db"));
+	const missionStore = createMissionStore(
+		join(projectPath, detectHaruDir(projectPath), "sessions.db"),
+	);
 
 	try {
 		const missionId = params.id ?? "";
@@ -322,7 +325,7 @@ export async function handleMissionDetailPage(
 		// Frozen: pending input section
 		let frozenSection = html``;
 		if (mission.state === "frozen") {
-			const mailStore = createMailStore(join(projectPath, ".overstory", "mail.db"));
+			const mailStore = createMailStore(join(projectPath, detectHaruDir(projectPath), "mail.db"));
 			try {
 				const messages = mailStore.getAll({ to: "operator", limit: 10 });
 				const questionMsg = messages.find((m) => m.type === "question");

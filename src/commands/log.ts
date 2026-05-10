@@ -14,7 +14,7 @@ import { join } from "node:path";
 import { Command } from "commander";
 import { PERSISTENT_CAPABILITIES } from "../agents/capabilities.ts";
 import { updateIdentity } from "../agents/identity.ts";
-import { loadConfig } from "../config.ts";
+import { detectHaruDir, loadConfig } from "../config.ts";
 import { ValidationError } from "../errors.ts";
 import { createEventStore } from "../events/store.ts";
 import { filterToolArgs } from "../events/tool-filter.ts";
@@ -60,7 +60,7 @@ async function getSessionDir(logsBase: string, agentName: string): Promise<strin
  */
 function updateLastActivity(projectRoot: string, agentName: string, _event?: string): void {
 	try {
-		const overstoryDir = join(projectRoot, ".overstory");
+		const overstoryDir = join(projectRoot, detectHaruDir(projectRoot));
 		const { store } = openSessionStore(overstoryDir);
 		try {
 			const session = store.getByName(agentName);
@@ -97,7 +97,7 @@ function updateLastActivity(projectRoot: string, agentName: string, _event?: str
  */
 function handleSessionEnd(projectRoot: string, agentName: string): void {
 	try {
-		const overstoryDir = join(projectRoot, ".overstory");
+		const overstoryDir = join(projectRoot, detectHaruDir(projectRoot));
 		const { store } = openSessionStore(overstoryDir);
 		try {
 			const session = store.getByName(agentName);
@@ -129,7 +129,7 @@ function handleSessionEnd(projectRoot: string, agentName: string): void {
  */
 function getAgentSession(projectRoot: string, agentName: string): AgentSession | null {
 	try {
-		const overstoryDir = join(projectRoot, ".overstory");
+		const overstoryDir = join(projectRoot, detectHaruDir(projectRoot));
 		const { store } = openSessionStore(overstoryDir);
 		try {
 			return store.getByName(agentName);
@@ -187,7 +187,7 @@ async function resolveTranscriptPath(
 ): Promise<string | null> {
 	// Check SessionStore for a runtime-provided transcript path
 	try {
-		const { store } = openSessionStore(join(projectRoot, ".overstory"));
+		const { store } = openSessionStore(join(projectRoot, detectHaruDir(projectRoot)));
 		try {
 			const session = store.getByName(agentName);
 			if (session?.transcriptPath) {
@@ -222,7 +222,7 @@ async function resolveTranscriptPath(
 		await Bun.write(cachePath, directPath);
 		// Save discovered path to SessionStore for future lookups
 		try {
-			const { store: writeStore } = openSessionStore(join(projectRoot, ".overstory"));
+			const { store: writeStore } = openSessionStore(join(projectRoot, detectHaruDir(projectRoot)));
 			try {
 				writeStore.updateTranscriptPath(agentName, directPath);
 			} finally {
@@ -244,7 +244,9 @@ async function resolveTranscriptPath(
 				await Bun.write(cachePath, candidate);
 				// Save discovered path to SessionStore for future lookups
 				try {
-					const { store: writeStore } = openSessionStore(join(projectRoot, ".overstory"));
+					const { store: writeStore } = openSessionStore(
+						join(projectRoot, detectHaruDir(projectRoot)),
+					);
 					try {
 						writeStore.updateTranscriptPath(agentName, candidate);
 					} finally {
@@ -306,7 +308,7 @@ export async function autoRecordExpertise(params: {
 	// Analyze session events for deeper insights (tool usage, file edits, errors)
 	let insightSummary = "";
 	try {
-		const eventsDbPath = join(params.projectRoot, ".overstory", "events.db");
+		const eventsDbPath = join(params.projectRoot, detectHaruDir(params.projectRoot), "events.db");
 		const eventStore = createEventStore(eventsDbPath);
 
 		const events = eventStore.getByAgent(params.agentName, {
@@ -404,7 +406,7 @@ export async function appendOutcomeToAppliedRecords(params: {
 }): Promise<number> {
 	const appliedRecordsPath = join(
 		params.projectRoot,
-		".overstory",
+		detectHaruDir(params.projectRoot),
 		"agents",
 		params.agentName,
 		"applied-records.json",
@@ -490,7 +492,7 @@ async function runLog(opts: {
 
 	const cwd = process.cwd();
 	const config = await loadConfig(cwd);
-	const logsBase = join(config.project.root, ".overstory", "logs");
+	const logsBase = join(config.project.root, detectHaruDir(config.project.root), "logs");
 	const sessionDir = await getSessionDir(logsBase, opts.agent);
 
 	const logger = createLogger({
@@ -509,7 +511,11 @@ async function runLog(opts: {
 			// Always write to EventStore for structured observability
 			// (works for both Claude Code --stdin and Pi runtime --tool-name agents)
 			try {
-				const eventsDbPath = join(config.project.root, ".overstory", "events.db");
+				const eventsDbPath = join(
+					config.project.root,
+					detectHaruDir(config.project.root),
+					"events.db",
+				);
 				const eventStore = createEventStore(eventsDbPath);
 				const filtered = toolInput
 					? filterToolArgs(toolName, toolInput)
@@ -539,7 +545,11 @@ async function runLog(opts: {
 			// Always write to EventStore for structured observability
 			// (works for both Claude Code --stdin and Pi runtime --tool-name agents)
 			try {
-				const eventsDbPath = join(config.project.root, ".overstory", "events.db");
+				const eventsDbPath = join(
+					config.project.root,
+					detectHaruDir(config.project.root),
+					"events.db",
+				);
 				const eventStore = createEventStore(eventsDbPath);
 				const filtered = toolInput
 					? filterToolArgs(toolName, toolInput)
@@ -590,7 +600,11 @@ async function runLog(opts: {
 						if (resolvedTranscriptPath) {
 							const usage = await parseTranscriptUsage(resolvedTranscriptPath);
 							const cost = estimateCost(usage);
-							const metricsDbPath = join(config.project.root, ".overstory", "metrics.db");
+							const metricsDbPath = join(
+								config.project.root,
+								detectHaruDir(config.project.root),
+								"metrics.db",
+							);
 							const metricsStore = createMetricsStore(metricsDbPath);
 							const agentSession = getAgentSession(config.project.root, opts.agent);
 							metricsStore.recordSnapshot({
@@ -624,7 +638,11 @@ async function runLog(opts: {
 				const taskId = agentSession?.taskId ?? null;
 
 				// Update agent identity with completed session
-				const identityBaseDir = join(config.project.root, ".overstory", "agents");
+				const identityBaseDir = join(
+					config.project.root,
+					detectHaruDir(config.project.root),
+					"agents",
+				);
 				try {
 					await updateIdentity(identityBaseDir, opts.agent, {
 						sessionsCompleted: 1,
@@ -639,7 +657,11 @@ async function runLog(opts: {
 				// for user input (see decision mx-728f8d).
 				if (agentSession?.capability === "lead") {
 					try {
-						const nudgesDir = join(config.project.root, ".overstory", "pending-nudges");
+						const nudgesDir = join(
+							config.project.root,
+							detectHaruDir(config.project.root),
+							"pending-nudges",
+						);
 						const { mkdir } = await import("node:fs/promises");
 						await mkdir(nudgesDir, { recursive: true });
 						const markerPath = join(nudgesDir, "coordinator.json");
@@ -665,7 +687,11 @@ async function runLog(opts: {
 					// or the watchdog daemon detecting a dead coordinator process.
 
 					try {
-						const metricsDbPath = join(config.project.root, ".overstory", "metrics.db");
+						const metricsDbPath = join(
+							config.project.root,
+							detectHaruDir(config.project.root),
+							"metrics.db",
+						);
 						const metricsStore = createMetricsStore(metricsDbPath);
 						const now = new Date().toISOString();
 						const durationMs = new Date(now).getTime() - new Date(agentSession.startedAt).getTime();
@@ -720,7 +746,11 @@ async function runLog(opts: {
 					if (!PERSISTENT_CAPABILITIES.has(agentSession.capability)) {
 						try {
 							const mulchClient = createMulchClient(config.project.root);
-							const mailDbPath = join(config.project.root, ".overstory", "mail.db");
+							const mailDbPath = join(
+								config.project.root,
+								detectHaruDir(config.project.root),
+								"mail.db",
+							);
 							await autoRecordExpertise({
 								mulchClient,
 								agentName: opts.agent,
@@ -756,7 +786,11 @@ async function runLog(opts: {
 
 				// Always write session-end event to EventStore (not just when --stdin is used)
 				try {
-					const eventsDbPath = join(config.project.root, ".overstory", "events.db");
+					const eventsDbPath = join(
+						config.project.root,
+						detectHaruDir(config.project.root),
+						"events.db",
+					);
 					const eventStore = createEventStore(eventsDbPath);
 					eventStore.insert({
 						runId: null,

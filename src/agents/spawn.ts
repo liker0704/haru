@@ -31,6 +31,7 @@ import {
 	getSharedWritableDirs,
 	inferDomainsFromFiles,
 } from "../commands/sling.ts";
+import { detectHaruDir } from "../config.ts";
 import type { OverstoryConfig } from "../config-types.ts";
 import type { ProjectContext } from "../context/types.ts";
 import { AgentError, LifecycleError } from "../errors.ts";
@@ -215,7 +216,7 @@ export function createSpawnService(deps: SpawnDeps): SpawnService {
 	return {
 		async spawn(opts: SpawnOptions): Promise<SpawnResult> {
 			const { config, agentDef } = deps;
-			const overstoryDir = join(config.project.root, ".overstory");
+			const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 
 			// Check spawn-paused sentinel
 			const spawnPausedPath = join(overstoryDir, "spawn-paused");
@@ -453,7 +454,7 @@ async function executePostWorktreeSteps(
 	}
 
 	// 11. Create agent identity (if new)
-	const identityBaseDir = join(config.project.root, ".overstory", "agents");
+	const identityBaseDir = join(config.project.root, detectHaruDir(config.project.root), "agents");
 	const existingIdentity = await loadIdentity(identityBaseDir, name);
 	if (!existingIdentity) {
 		await createIdentity(identityBaseDir, {

@@ -7,6 +7,7 @@
 
 import { existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import { detectHaruDir } from "../config.ts";
 import { EvalScenarioError } from "../errors.ts";
 import { createEventStore } from "../events/store.ts";
 import { createMailStore } from "../mail/store.ts";
@@ -57,7 +58,7 @@ async function applyConfigOverrides(
 	fixtureRoot: string,
 	overrides: Record<string, unknown>,
 ): Promise<void> {
-	const configPath = join(fixtureRoot, ".overstory", "config.yaml");
+	const configPath = join(fixtureRoot, detectHaruDir(fixtureRoot), "config.yaml");
 	if (!existsSync(configPath)) return;
 
 	const text = await Bun.file(configPath).text();
@@ -127,7 +128,7 @@ async function waitForCompletion(
 
 /** Read metrics from the fixture's SQLite databases. Returns counts and aggregates. */
 function collectMetrics(fixtureRoot: string, durationMs: number): EvalMetrics {
-	const ovDir = join(fixtureRoot, ".overstory");
+	const ovDir = join(fixtureRoot, detectHaruDir(fixtureRoot));
 
 	// Sessions
 	let totalAgents = 0;
@@ -262,7 +263,7 @@ function collectMetrics(fixtureRoot: string, durationMs: number): EvalMetrics {
 /** Collect full eval context: metrics + raw events + mail messages. */
 function collectContext(fixtureRoot: string, durationMs: number): EvalContext {
 	const metrics = collectMetrics(fixtureRoot, durationMs);
-	const ovDir = join(fixtureRoot, ".overstory");
+	const ovDir = join(fixtureRoot, detectHaruDir(fixtureRoot));
 
 	// Events timeline
 	let events: import("../events/types.ts").StoredEvent[] = [];

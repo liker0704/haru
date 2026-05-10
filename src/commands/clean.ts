@@ -23,7 +23,7 @@ import { existsSync } from "node:fs";
 import { readdir, rm, unlink } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { loadConfig } from "../config.ts";
+import { detectHaruDir, loadConfig } from "../config.ts";
 import { AgentError, ValidationError } from "../errors.ts";
 import { createEventStore } from "../events/store.ts";
 import { jsonOutput } from "../json.ts";
@@ -681,7 +681,7 @@ export async function cleanCommand(opts: CleanOptions): Promise<void> {
 
 	const config = await loadConfig(process.cwd());
 	const root = config.project.root;
-	const overstoryDir = join(root, ".overstory");
+	const overstoryDir = join(root, detectHaruDir(root));
 
 	// Per-agent cleanup: targeted single-agent cleanup
 	if (agentName) {

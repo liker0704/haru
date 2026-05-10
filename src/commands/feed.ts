@@ -8,7 +8,7 @@
 
 import { join } from "node:path";
 import { Command } from "commander";
-import { loadConfig } from "../config.ts";
+import { detectHaruDir, loadConfig } from "../config.ts";
 import { ValidationError } from "../errors.ts";
 import { createEventStore } from "../events/store.ts";
 import { jsonOutput } from "../json.ts";
@@ -70,7 +70,7 @@ async function executeFeed(opts: FeedOpts): Promise<void> {
 
 	const cwd = process.cwd();
 	const config = await loadConfig(cwd);
-	const overstoryDir = join(config.project.root, ".overstory");
+	const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 
 	// Open event store
 	const eventsDbPath = join(overstoryDir, "events.db");

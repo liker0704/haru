@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import {
 	detectConfigVersion,
@@ -62,8 +63,8 @@ export const DEFAULT_CONFIG: OverstoryConfig = {
 		qualityGates: DEFAULT_QUALITY_GATES,
 	},
 	agents: {
-		manifestPath: ".overstory/agent-manifest.json",
-		baseDir: ".overstory/agent-defs",
+		manifestPath: ".haru/agent-manifest.json",
+		baseDir: ".haru/agent-defs",
 		maxConcurrent: 25,
 		staggerDelayMs: 2_000,
 		maxDepth: 3,
@@ -71,7 +72,7 @@ export const DEFAULT_CONFIG: OverstoryConfig = {
 		maxAgentsPerLead: 5,
 	},
 	worktrees: {
-		baseDir: ".overstory/worktrees",
+		baseDir: ".haru/worktrees",
 	},
 	taskTracker: {
 		backend: "auto" as TaskTrackerBackend,
@@ -184,14 +185,35 @@ export const DEFAULT_CONFIG: OverstoryConfig = {
 	},
 	context: {
 		enabled: true,
-		cachePath: ".overstory/project-context.json",
+		cachePath: ".haru/project-context.json",
 	},
 	observability: { enabled: false, exporters: [] },
 };
 
 const CONFIG_FILENAME = "config.yaml";
 const CONFIG_LOCAL_FILENAME = "config.local.yaml";
-const HARU_DIR = ".overstory";
+
+/** Primary haru state directory name used for new projects. */
+export const HARU_DIR_PRIMARY = ".haru";
+/** Legacy haru state directory name (pre-rebrand). Detected for back-compat. */
+export const HARU_DIR_LEGACY = ".overstory";
+
+/**
+ * Detect which haru state directory to use for a given project root.
+ *
+ * Order of preference:
+ * 1. `.haru/` (primary, used for all new projects)
+ * 2. `.overstory/` (legacy, kept working for existing installs)
+ * 3. `.haru/` (default for projects with no state dir yet)
+ *
+ * @param root - Absolute path to the project root
+ * @returns Relative directory name (".haru" or ".overstory")
+ */
+export function detectHaruDir(root: string): string {
+	if (existsSync(join(root, HARU_DIR_PRIMARY))) return HARU_DIR_PRIMARY;
+	if (existsSync(join(root, HARU_DIR_LEGACY))) return HARU_DIR_LEGACY;
+	return HARU_DIR_PRIMARY;
+}
 
 /**
  * Validate that a config object has the required structure and sane values.
@@ -885,7 +907,7 @@ async function mergeLocalConfig(
 	resolvedRoot: string,
 	config: OverstoryConfig,
 ): Promise<OverstoryConfig> {
-	const localPath = join(resolvedRoot, HARU_DIR, CONFIG_LOCAL_FILENAME);
+	const localPath = join(resolvedRoot, detectHaruDir(resolvedRoot), CONFIG_LOCAL_FILENAME);
 	const localFile = Bun.file(localPath);
 
 	if (!(await localFile.exists())) {
@@ -939,11 +961,9 @@ export async function resolveProjectRoot(startDir: string): Promise<string> {
 		return _projectRootOverride;
 	}
 
-	const { existsSync } = require("node:fs") as typeof import("node:fs");
-
 	// Check git worktree FIRST. When running from an agent worktree
-	// (e.g., .overstory/worktrees/{name}/), the worktree may contain
-	// tracked copies of .overstory/config.yaml. We must resolve to the
+	// (e.g., .haru/worktrees/{name}/), the worktree may contain
+	// tracked copies of .haru/config.yaml. We must resolve to the
 	// main repository root so runtime state (mail.db, metrics.db, etc.)
 	// is shared across all agents, not siloed per worktree.
 	try {
@@ -959,7 +979,11 @@ export async function resolveProjectRoot(startDir: string): Promise<string> {
 			// Main repo root is the parent of the .git directory
 			const mainRoot = dirname(absGitCommon);
 			// If mainRoot differs from startDir, we're in a worktree — resolve to canonical root
-			if (mainRoot !== startDir && existsSync(join(mainRoot, HARU_DIR, CONFIG_FILENAME))) {
+			if (
+				mainRoot !== startDir &&
+				(existsSync(join(mainRoot, HARU_DIR_PRIMARY, CONFIG_FILENAME)) ||
+					existsSync(join(mainRoot, HARU_DIR_LEGACY, CONFIG_FILENAME)))
+			) {
 				return mainRoot;
 			}
 		}
@@ -968,8 +992,11 @@ export async function resolveProjectRoot(startDir: string): Promise<string> {
 	}
 
 	// Not inside a worktree (or git not available).
-	// Check if .overstory/config.yaml exists at startDir.
-	if (existsSync(join(startDir, HARU_DIR, CONFIG_FILENAME))) {
+	// Check if .haru/config.yaml or .overstory/config.yaml exists at startDir.
+	if (
+		existsSync(join(startDir, HARU_DIR_PRIMARY, CONFIG_FILENAME)) ||
+		existsSync(join(startDir, HARU_DIR_LEGACY, CONFIG_FILENAME))
+	) {
 		return startDir;
 	}
 
@@ -994,12 +1021,23 @@ export async function loadConfig(projectRoot: string): Promise<OverstoryConfig> 
 	// Resolve the actual project root (handles git worktrees)
 	const resolvedRoot = await resolveProjectRoot(projectRoot);
 
-	const configPath = join(resolvedRoot, HARU_DIR, CONFIG_FILENAME);
+	const haruDir = detectHaruDir(resolvedRoot);
+	const configPath = join(resolvedRoot, haruDir, CONFIG_FILENAME);
 
 	// Start with defaults, setting the project root
 	const defaults = structuredClone(DEFAULT_CONFIG);
 	defaults.project.root = resolvedRoot;
 	defaults.project.name = resolvedRoot.split("/").pop() ?? "unknown";
+
+	// Re-base default haru-relative paths on the detected dir. This keeps
+	// existing projects with `.overstory/` working when their config.yaml
+	// omits these fields (defaults would otherwise point at `.haru/`).
+	defaults.agents.manifestPath = `${haruDir}/agent-manifest.json`;
+	defaults.agents.baseDir = `${haruDir}/agent-defs`;
+	defaults.worktrees.baseDir = `${haruDir}/worktrees`;
+	if (defaults.context) {
+		defaults.context.cachePath = `${haruDir}/project-context.json`;
+	}
 
 	// Try to read the config file
 	const file = Bun.file(configPath);

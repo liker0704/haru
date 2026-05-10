@@ -9,7 +9,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { Command } from "commander";
-import { loadConfig } from "../config.ts";
+import { detectHaruDir, loadConfig } from "../config.ts";
 import { createEventStore } from "../events/store.ts";
 import { createEvalSource } from "../health/eval-source.ts";
 import { loadRecentActions } from "../health/policy/history.ts";
@@ -56,7 +56,7 @@ export async function executeHealth(opts: HealthOptions): Promise<void> {
 		return;
 	}
 
-	const overstoryDir = join(config.project.root, ".overstory");
+	const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 
 	let signals: ReturnType<typeof collectSignals>;
 	try {

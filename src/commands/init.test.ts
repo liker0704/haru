@@ -33,6 +33,7 @@ const AGENT_DEF_FILES = [
 	"coordinator-mission-direct.md",
 	"coordinator-mission-full.md",
 	"coordinator-mission-planned.md",
+	"coordinator-mission.md",
 	"coordinator.md",
 	"execution-director.md",
 	"lead-mission.md",
@@ -54,6 +55,7 @@ const AGENT_DEF_FILES = [
 	"researcher.md",
 	"reviewer.md",
 	"scout.md",
+	"shared-mandate.md",
 	"tester.md",
 ];
 
@@ -84,7 +86,7 @@ describe("initCommand: agent-defs deployment", () => {
 	test("creates .overstory/agent-defs/ with all agent definition files (supervisor deprecated)", async () => {
 		await initCommand({ _spawner: noopSpawner });
 
-		const agentDefsDir = join(tempDir, ".overstory", "agent-defs");
+		const agentDefsDir = join(tempDir, ".haru", "agent-defs");
 		const files = await readdir(agentDefsDir);
 		const mdFiles = files.filter((f) => f.endsWith(".md")).sort();
 
@@ -96,7 +98,7 @@ describe("initCommand: agent-defs deployment", () => {
 
 		for (const fileName of AGENT_DEF_FILES) {
 			const sourcePath = join(SOURCE_AGENTS_DIR, fileName);
-			const targetPath = join(tempDir, ".overstory", "agent-defs", fileName);
+			const targetPath = join(tempDir, ".haru", "agent-defs", fileName);
 
 			const sourceContent = await Bun.file(sourcePath).text();
 			const targetContent = await Bun.file(targetPath).text();
@@ -128,7 +130,7 @@ describe("initCommand: agent-defs deployment", () => {
 		await initCommand({ _spawner: noopSpawner });
 
 		// Tamper with one of the deployed files
-		const tamperPath = join(tempDir, ".overstory", "agent-defs", "scout.md");
+		const tamperPath = join(tempDir, ".haru", "agent-defs", "scout.md");
 		await Bun.write(tamperPath, "# tampered content\n");
 
 		// Verify tamper worked
@@ -147,7 +149,7 @@ describe("initCommand: agent-defs deployment", () => {
 	test("Stop hook includes mulch learn command", async () => {
 		await initCommand({ _spawner: noopSpawner });
 
-		const hooksPath = join(tempDir, ".overstory", "hooks.json");
+		const hooksPath = join(tempDir, ".haru", "hooks.json");
 		const content = await Bun.file(hooksPath).text();
 		const parsed = JSON.parse(content);
 		const stopHooks = parsed.hooks.Stop[0].hooks;
@@ -160,7 +162,7 @@ describe("initCommand: agent-defs deployment", () => {
 	test("PostToolUse hooks include Bash-matched mulch diff hook", async () => {
 		await initCommand({ _spawner: noopSpawner });
 
-		const hooksPath = join(tempDir, ".overstory", "hooks.json");
+		const hooksPath = join(tempDir, ".haru", "hooks.json");
 		const content = await Bun.file(hooksPath).text();
 		const parsed = JSON.parse(content);
 		const postToolUseHooks = parsed.hooks.PostToolUse;
@@ -202,7 +204,7 @@ describe("initCommand: .overstory/.gitignore", () => {
 	test("creates .overstory/.gitignore with wildcard+whitelist model", async () => {
 		await initCommand({ _spawner: noopSpawner });
 
-		const gitignorePath = join(tempDir, ".overstory", ".gitignore");
+		const gitignorePath = join(tempDir, ".haru", ".gitignore");
 		const content = await Bun.file(gitignorePath).text();
 
 		// Verify wildcard+whitelist pattern
@@ -223,7 +225,7 @@ describe("initCommand: .overstory/.gitignore", () => {
 		// Init should write gitignore
 		await initCommand({ _spawner: noopSpawner });
 
-		const gitignorePath = join(tempDir, ".overstory", ".gitignore");
+		const gitignorePath = join(tempDir, ".haru", ".gitignore");
 		const content = await Bun.file(gitignorePath).text();
 
 		// Verify gitignore was written with correct content
@@ -238,7 +240,7 @@ describe("initCommand: .overstory/.gitignore", () => {
 		// First init
 		await initCommand({ _spawner: noopSpawner });
 
-		const gitignorePath = join(tempDir, ".overstory", ".gitignore");
+		const gitignorePath = join(tempDir, ".haru", ".gitignore");
 
 		// Tamper with the gitignore file (simulate old deny-list format)
 		await Bun.write(gitignorePath, "# old format\nworktrees/\nlogs/\nmail.db\n");
@@ -262,7 +264,7 @@ describe("initCommand: .overstory/.gitignore", () => {
 		// First init
 		await initCommand({ _spawner: noopSpawner });
 
-		const gitignorePath = join(tempDir, ".overstory", ".gitignore");
+		const gitignorePath = join(tempDir, ".haru", ".gitignore");
 
 		// Tamper with the gitignore file
 		await Bun.write(gitignorePath, "# custom content\n");
@@ -304,7 +306,7 @@ describe("initCommand: .overstory/README.md", () => {
 	test("creates .overstory/README.md with expected content", async () => {
 		await initCommand({ _spawner: noopSpawner });
 
-		const readmePath = join(tempDir, ".overstory", "README.md");
+		const readmePath = join(tempDir, ".haru", "README.md");
 		const exists = await Bun.file(readmePath).exists();
 		expect(exists).toBe(true);
 
@@ -320,7 +322,7 @@ describe("initCommand: .overstory/README.md", () => {
 		// First init
 		await initCommand({ _spawner: noopSpawner });
 
-		const readmePath = join(tempDir, ".overstory", "README.md");
+		const readmePath = join(tempDir, ".haru", "README.md");
 
 		// Tamper with the README
 		await Bun.write(readmePath, "# tampered\n");
@@ -339,7 +341,7 @@ describe("initCommand: .overstory/README.md", () => {
 		// First init
 		await initCommand({ _spawner: noopSpawner });
 
-		const readmePath = join(tempDir, ".overstory", "README.md");
+		const readmePath = join(tempDir, ".haru", "README.md");
 
 		// Tamper with the README
 		await Bun.write(readmePath, "# custom content\n");
@@ -385,7 +387,7 @@ describe("initCommand: canonical branch detection", () => {
 
 		await initCommand({ _spawner: noopSpawner });
 
-		const configPath = join(tempDir, ".overstory", "config.yaml");
+		const configPath = join(tempDir, ".haru", "config.yaml");
 		const content = await Bun.file(configPath).text();
 		expect(content).toContain("canonicalBranch: trunk");
 	});
@@ -394,7 +396,7 @@ describe("initCommand: canonical branch detection", () => {
 		// createTempGitRepo defaults to main branch
 		await initCommand({ _spawner: noopSpawner });
 
-		const configPath = join(tempDir, ".overstory", "config.yaml");
+		const configPath = join(tempDir, ".haru", "config.yaml");
 		const content = await Bun.file(configPath).text();
 		expect(content).toContain("canonicalBranch: main");
 	});
@@ -426,7 +428,7 @@ describe("initCommand: --yes flag", () => {
 		await initCommand({ _spawner: noopSpawner });
 
 		// Tamper with config to verify reinit happens
-		const configPath = join(tempDir, ".overstory", "config.yaml");
+		const configPath = join(tempDir, ".haru", "config.yaml");
 		await Bun.write(configPath, "# tampered\n");
 
 		// Second init with --yes should reinitialize (not return early)
@@ -441,7 +443,7 @@ describe("initCommand: --yes flag", () => {
 	test("--yes works on fresh project (no .overstory/ yet)", async () => {
 		await initCommand({ yes: true, _spawner: noopSpawner });
 
-		const configPath = join(tempDir, ".overstory", "config.yaml");
+		const configPath = join(tempDir, ".haru", "config.yaml");
 		const exists = await Bun.file(configPath).exists();
 		expect(exists).toBe(true);
 
@@ -454,7 +456,7 @@ describe("initCommand: --yes flag", () => {
 		await initCommand({ _spawner: noopSpawner });
 
 		// Tamper with an agent def
-		const scoutPath = join(tempDir, ".overstory", "agent-defs", "scout.md");
+		const scoutPath = join(tempDir, ".haru", "agent-defs", "scout.md");
 		await Bun.write(scoutPath, "TAMPERED CONTENT");
 
 		// Reinit with --yes should overwrite
@@ -489,7 +491,7 @@ describe("initCommand: --name flag", () => {
 	test("--name overrides auto-detected project name", async () => {
 		await initCommand({ name: "custom-project", _spawner: noopSpawner });
 
-		const configPath = join(tempDir, ".overstory", "config.yaml");
+		const configPath = join(tempDir, ".haru", "config.yaml");
 		const content = await Bun.file(configPath).text();
 		expect(content).toContain("name: custom-project");
 	});
@@ -497,7 +499,7 @@ describe("initCommand: --name flag", () => {
 	test("--name combined with --yes works for fully non-interactive init", async () => {
 		await initCommand({ yes: true, name: "scripted-project", _spawner: noopSpawner });
 
-		const configPath = join(tempDir, ".overstory", "config.yaml");
+		const configPath = join(tempDir, ".haru", "config.yaml");
 		const content = await Bun.file(configPath).text();
 		expect(content).toContain("name: scripted-project");
 		expect(content).toContain("# Overstory configuration");
@@ -537,48 +539,48 @@ function createMockSpawner(
 describe("resolveToolSet", () => {
 	test("default (no opts) returns all three tools in order", () => {
 		const tools = resolveToolSet({});
-		expect(tools.map((t) => t.name)).toEqual(["mulch", "seeds", "canopy"]);
+		expect(tools.map((t) => t.name)).toEqual(["kura", "suji", "tane"]);
 	});
 
 	test("--skip-mulch removes mulch", () => {
 		const tools = resolveToolSet({ skipMulch: true });
-		expect(tools.map((t) => t.name)).toEqual(["seeds", "canopy"]);
+		expect(tools.map((t) => t.name)).toEqual(["suji", "tane"]);
 	});
 
 	test("--skip-seeds removes seeds", () => {
 		const tools = resolveToolSet({ skipSeeds: true });
-		expect(tools.map((t) => t.name)).toEqual(["mulch", "canopy"]);
+		expect(tools.map((t) => t.name)).toEqual(["kura", "tane"]);
 	});
 
 	test("--skip-canopy removes canopy", () => {
 		const tools = resolveToolSet({ skipCanopy: true });
-		expect(tools.map((t) => t.name)).toEqual(["mulch", "seeds"]);
+		expect(tools.map((t) => t.name)).toEqual(["kura", "suji"]);
 	});
 
 	test("multiple skip flags combine", () => {
 		const tools = resolveToolSet({ skipMulch: true, skipSeeds: true });
-		expect(tools.map((t) => t.name)).toEqual(["canopy"]);
+		expect(tools.map((t) => t.name)).toEqual(["tane"]);
 	});
 
 	test("--tools overrides to specific tools", () => {
-		const tools = resolveToolSet({ tools: "mulch,seeds" });
-		expect(tools.map((t) => t.name)).toEqual(["mulch", "seeds"]);
+		const tools = resolveToolSet({ tools: "kura,suji" });
+		expect(tools.map((t) => t.name)).toEqual(["kura", "suji"]);
 	});
 
 	test("--tools single tool", () => {
-		const tools = resolveToolSet({ tools: "canopy" });
-		expect(tools.map((t) => t.name)).toEqual(["canopy"]);
+		const tools = resolveToolSet({ tools: "tane" });
+		expect(tools.map((t) => t.name)).toEqual(["tane"]);
 	});
 
 	test("--tools with unknown name filters it out", () => {
-		const tools = resolveToolSet({ tools: "mulch,unknown" });
-		expect(tools.map((t) => t.name)).toEqual(["mulch"]);
+		const tools = resolveToolSet({ tools: "kura,unknown" });
+		expect(tools.map((t) => t.name)).toEqual(["kura"]);
 	});
 
 	test("--tools overrides skip flags", () => {
 		// --tools takes precedence over --skip-* flags
-		const tools = resolveToolSet({ tools: "mulch", skipMulch: true });
-		expect(tools.map((t) => t.name)).toEqual(["mulch"]);
+		const tools = resolveToolSet({ tools: "kura", skipMulch: true });
+		expect(tools.map((t) => t.name)).toEqual(["kura"]);
 	});
 
 	test("all skip flags returns empty array", () => {
@@ -608,48 +610,48 @@ describe("initCommand: ecosystem bootstrap", () => {
 
 	test("all tools installed and init succeeds → status initialized", async () => {
 		const { spawner, calls } = createMockSpawner({
-			"ml --version": { exitCode: 0, stdout: "0.6.3", stderr: "" },
-			"ml init": { exitCode: 0, stdout: "initialized", stderr: "" },
-			"ml onboard": { exitCode: 0, stdout: "appended", stderr: "" },
-			"sd --version": { exitCode: 0, stdout: "0.2.4", stderr: "" },
-			"sd init": { exitCode: 0, stdout: "initialized", stderr: "" },
-			"sd onboard": { exitCode: 0, stdout: "appended", stderr: "" },
-			"cn --version": { exitCode: 0, stdout: "0.2.0", stderr: "" },
-			"cn init": { exitCode: 0, stdout: "initialized", stderr: "" },
-			"cn onboard": { exitCode: 0, stdout: "appended", stderr: "" },
+			"ku --version": { exitCode: 0, stdout: "0.6.3", stderr: "" },
+			"ku init": { exitCode: 0, stdout: "initialized", stderr: "" },
+			"ku onboard": { exitCode: 0, stdout: "appended", stderr: "" },
+			"su --version": { exitCode: 0, stdout: "0.2.4", stderr: "" },
+			"su init": { exitCode: 0, stdout: "initialized", stderr: "" },
+			"su onboard": { exitCode: 0, stdout: "appended", stderr: "" },
+			"ta --version": { exitCode: 0, stdout: "0.2.0", stderr: "" },
+			"ta init": { exitCode: 0, stdout: "initialized", stderr: "" },
+			"ta onboard": { exitCode: 0, stdout: "appended", stderr: "" },
 		});
 
 		await initCommand({ _spawner: spawner });
 
 		// All three init commands were called
-		expect(calls).toContainEqual(["ml", "init"]);
-		expect(calls).toContainEqual(["sd", "init"]);
-		expect(calls).toContainEqual(["cn", "init"]);
+		expect(calls).toContainEqual(["ku", "init"]);
+		expect(calls).toContainEqual(["su", "init"]);
+		expect(calls).toContainEqual(["ta", "init"]);
 
 		// All three onboard commands were called
-		expect(calls).toContainEqual(["ml", "onboard"]);
-		expect(calls).toContainEqual(["sd", "onboard"]);
-		expect(calls).toContainEqual(["cn", "onboard"]);
+		expect(calls).toContainEqual(["ku", "onboard"]);
+		expect(calls).toContainEqual(["su", "onboard"]);
+		expect(calls).toContainEqual(["ta", "onboard"]);
 	});
 
 	test("tool not installed → init and onboard not called", async () => {
 		const { spawner, calls } = createMockSpawner({
-			"ml --version": { exitCode: 1, stdout: "", stderr: "command not found" },
-			"sd --version": { exitCode: 0, stdout: "0.2.4", stderr: "" },
-			"sd init": { exitCode: 0, stdout: "initialized", stderr: "" },
-			"sd onboard": { exitCode: 0, stdout: "appended", stderr: "" },
-			"cn --version": { exitCode: 0, stdout: "0.2.0", stderr: "" },
-			"cn init": { exitCode: 0, stdout: "initialized", stderr: "" },
-			"cn onboard": { exitCode: 0, stdout: "appended", stderr: "" },
+			"ku --version": { exitCode: 1, stdout: "", stderr: "command not found" },
+			"su --version": { exitCode: 0, stdout: "0.2.4", stderr: "" },
+			"su init": { exitCode: 0, stdout: "initialized", stderr: "" },
+			"su onboard": { exitCode: 0, stdout: "appended", stderr: "" },
+			"ta --version": { exitCode: 0, stdout: "0.2.0", stderr: "" },
+			"ta init": { exitCode: 0, stdout: "initialized", stderr: "" },
+			"ta onboard": { exitCode: 0, stdout: "appended", stderr: "" },
 		});
 
 		await initCommand({ _spawner: spawner });
 
 		// mulch init should NOT have been called
-		expect(calls).not.toContainEqual(["ml", "init"]);
+		expect(calls).not.toContainEqual(["ku", "init"]);
 		// seeds and canopy should still be called
-		expect(calls).toContainEqual(["sd", "init"]);
-		expect(calls).toContainEqual(["cn", "init"]);
+		expect(calls).toContainEqual(["su", "init"]);
+		expect(calls).toContainEqual(["ta", "init"]);
 	});
 
 	test("tool init non-zero + dir exists → already_initialized", async () => {
@@ -658,15 +660,15 @@ describe("initCommand: ecosystem bootstrap", () => {
 		await mkdir(join(tempDir, ".mulch"), { recursive: true });
 
 		const { spawner } = createMockSpawner({
-			"ml --version": { exitCode: 0, stdout: "0.6.3", stderr: "" },
-			"ml init": { exitCode: 1, stdout: "", stderr: "already initialized" },
-			"ml onboard": { exitCode: 0, stdout: "appended", stderr: "" },
-			"sd --version": { exitCode: 0, stdout: "0.2.4", stderr: "" },
-			"sd init": { exitCode: 0, stdout: "initialized", stderr: "" },
-			"sd onboard": { exitCode: 0, stdout: "appended", stderr: "" },
-			"cn --version": { exitCode: 0, stdout: "0.2.0", stderr: "" },
-			"cn init": { exitCode: 0, stdout: "initialized", stderr: "" },
-			"cn onboard": { exitCode: 0, stdout: "appended", stderr: "" },
+			"ku --version": { exitCode: 0, stdout: "0.6.3", stderr: "" },
+			"ku init": { exitCode: 1, stdout: "", stderr: "already initialized" },
+			"ku onboard": { exitCode: 0, stdout: "appended", stderr: "" },
+			"su --version": { exitCode: 0, stdout: "0.2.4", stderr: "" },
+			"su init": { exitCode: 0, stdout: "initialized", stderr: "" },
+			"su onboard": { exitCode: 0, stdout: "appended", stderr: "" },
+			"ta --version": { exitCode: 0, stdout: "0.2.0", stderr: "" },
+			"ta init": { exitCode: 0, stdout: "initialized", stderr: "" },
+			"ta onboard": { exitCode: 0, stdout: "appended", stderr: "" },
 		});
 
 		// Should not throw — already_initialized is not an error
@@ -675,29 +677,29 @@ describe("initCommand: ecosystem bootstrap", () => {
 
 	test("--skip-onboard skips onboard calls", async () => {
 		const { spawner, calls } = createMockSpawner({
-			"ml --version": { exitCode: 0, stdout: "0.6.3", stderr: "" },
-			"ml init": { exitCode: 0, stdout: "initialized", stderr: "" },
-			"sd --version": { exitCode: 0, stdout: "0.2.4", stderr: "" },
-			"sd init": { exitCode: 0, stdout: "initialized", stderr: "" },
-			"cn --version": { exitCode: 0, stdout: "0.2.0", stderr: "" },
-			"cn init": { exitCode: 0, stdout: "initialized", stderr: "" },
+			"ku --version": { exitCode: 0, stdout: "0.6.3", stderr: "" },
+			"ku init": { exitCode: 0, stdout: "initialized", stderr: "" },
+			"su --version": { exitCode: 0, stdout: "0.2.4", stderr: "" },
+			"su init": { exitCode: 0, stdout: "initialized", stderr: "" },
+			"ta --version": { exitCode: 0, stdout: "0.2.0", stderr: "" },
+			"ta init": { exitCode: 0, stdout: "initialized", stderr: "" },
 		});
 
 		await initCommand({ skipOnboard: true, _spawner: spawner });
 
-		expect(calls).not.toContainEqual(["ml", "onboard"]);
-		expect(calls).not.toContainEqual(["sd", "onboard"]);
-		expect(calls).not.toContainEqual(["cn", "onboard"]);
+		expect(calls).not.toContainEqual(["ku", "onboard"]);
+		expect(calls).not.toContainEqual(["su", "onboard"]);
+		expect(calls).not.toContainEqual(["ta", "onboard"]);
 	});
 
 	test("--skip-mulch skips mulch entirely", async () => {
 		const { spawner, calls } = createMockSpawner({
-			"sd --version": { exitCode: 0, stdout: "0.2.4", stderr: "" },
-			"sd init": { exitCode: 0, stdout: "initialized", stderr: "" },
-			"sd onboard": { exitCode: 0, stdout: "appended", stderr: "" },
-			"cn --version": { exitCode: 0, stdout: "0.2.0", stderr: "" },
-			"cn init": { exitCode: 0, stdout: "initialized", stderr: "" },
-			"cn onboard": { exitCode: 0, stdout: "appended", stderr: "" },
+			"su --version": { exitCode: 0, stdout: "0.2.4", stderr: "" },
+			"su init": { exitCode: 0, stdout: "initialized", stderr: "" },
+			"su onboard": { exitCode: 0, stdout: "appended", stderr: "" },
+			"ta --version": { exitCode: 0, stdout: "0.2.0", stderr: "" },
+			"ta init": { exitCode: 0, stdout: "initialized", stderr: "" },
+			"ta onboard": { exitCode: 0, stdout: "appended", stderr: "" },
 		});
 
 		await initCommand({ skipMulch: true, _spawner: spawner });
@@ -707,15 +709,15 @@ describe("initCommand: ecosystem bootstrap", () => {
 
 	test("--json outputs JSON envelope with tools and onboard status", async () => {
 		const { spawner } = createMockSpawner({
-			"ml --version": { exitCode: 0, stdout: "0.6.3", stderr: "" },
-			"ml init": { exitCode: 0, stdout: "initialized", stderr: "" },
-			"ml onboard": { exitCode: 0, stdout: "appended", stderr: "" },
-			"sd --version": { exitCode: 0, stdout: "0.2.4", stderr: "" },
-			"sd init": { exitCode: 0, stdout: "initialized", stderr: "" },
-			"sd onboard": { exitCode: 0, stdout: "appended", stderr: "" },
-			"cn --version": { exitCode: 0, stdout: "0.2.0", stderr: "" },
-			"cn init": { exitCode: 0, stdout: "initialized", stderr: "" },
-			"cn onboard": { exitCode: 0, stdout: "appended", stderr: "" },
+			"ku --version": { exitCode: 0, stdout: "0.6.3", stderr: "" },
+			"ku init": { exitCode: 0, stdout: "initialized", stderr: "" },
+			"ku onboard": { exitCode: 0, stdout: "appended", stderr: "" },
+			"su --version": { exitCode: 0, stdout: "0.2.4", stderr: "" },
+			"su init": { exitCode: 0, stdout: "initialized", stderr: "" },
+			"su onboard": { exitCode: 0, stdout: "appended", stderr: "" },
+			"ta --version": { exitCode: 0, stdout: "0.2.0", stderr: "" },
+			"ta init": { exitCode: 0, stdout: "initialized", stderr: "" },
+			"ta onboard": { exitCode: 0, stdout: "appended", stderr: "" },
 		});
 
 		let capturedOutput = "";
@@ -741,10 +743,10 @@ describe("initCommand: ecosystem bootstrap", () => {
 		expect(typeof parsed.gitattributes).toBe("boolean");
 
 		const tools = parsed.tools as Record<string, { status: string }>;
-		expect(tools.overstory?.status).toBe("initialized");
-		expect(tools.mulch?.status).toBe("initialized");
-		expect(tools.seeds?.status).toBe("initialized");
-		expect(tools.canopy?.status).toBe("initialized");
+		expect(tools.haru?.status).toBe("initialized");
+		expect(tools.kura?.status).toBe("initialized");
+		expect(tools.suji?.status).toBe("initialized");
+		expect(tools.tane?.status).toBe("initialized");
 	});
 });
 
@@ -831,7 +833,7 @@ describe("initCommand: scaffold commit", () => {
 		await expect(initCommand({ _spawner: spawner })).resolves.toBeUndefined();
 
 		// .overstory files should still be created
-		const configPath = join(tempDir, ".overstory", "config.yaml");
+		const configPath = join(tempDir, ".haru", "config.yaml");
 		const exists = await Bun.file(configPath).exists();
 		expect(exists).toBe(true);
 	});
@@ -917,7 +919,7 @@ describe("initCommand: spawner error resilience", () => {
 		await expect(initCommand({ _spawner: throwingSpawner })).resolves.toBeUndefined();
 
 		// Core .overstory files should still be created
-		const configPath = join(tempDir, ".overstory", "config.yaml");
+		const configPath = join(tempDir, ".haru", "config.yaml");
 		expect(await Bun.file(configPath).exists()).toBe(true);
 	});
 
@@ -933,12 +935,12 @@ describe("initCommand: spawner error resilience", () => {
 		await initCommand({ _spawner: throwingSpawner });
 
 		// init and onboard should NOT be called when --version throws
-		expect(calls).not.toContainEqual(["ml", "init"]);
-		expect(calls).not.toContainEqual(["sd", "init"]);
-		expect(calls).not.toContainEqual(["cn", "init"]);
-		expect(calls).not.toContainEqual(["ml", "onboard"]);
-		expect(calls).not.toContainEqual(["sd", "onboard"]);
-		expect(calls).not.toContainEqual(["cn", "onboard"]);
+		expect(calls).not.toContainEqual(["ku", "init"]);
+		expect(calls).not.toContainEqual(["su", "init"]);
+		expect(calls).not.toContainEqual(["ta", "init"]);
+		expect(calls).not.toContainEqual(["ku", "onboard"]);
+		expect(calls).not.toContainEqual(["su", "onboard"]);
+		expect(calls).not.toContainEqual(["ta", "onboard"]);
 	});
 
 	test("spawner that throws only on init (not --version) still skips gracefully", async () => {
@@ -954,7 +956,7 @@ describe("initCommand: spawner error resilience", () => {
 
 		await expect(initCommand({ _spawner: throwingInitSpawner })).resolves.toBeUndefined();
 
-		const configPath = join(tempDir, ".overstory", "config.yaml");
+		const configPath = join(tempDir, ".haru", "config.yaml");
 		expect(await Bun.file(configPath).exists()).toBe(true);
 	});
 });

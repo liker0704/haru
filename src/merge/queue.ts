@@ -9,6 +9,7 @@
 import { Database } from "bun:sqlite";
 import { existsSync, readFileSync } from "node:fs";
 import { join as joinPath } from "node:path";
+import { detectHaruDir } from "../config.ts";
 import {
 	applyMigrations,
 	bootstrapSchemaVersion,
@@ -155,7 +156,7 @@ const MIGRATIONS: Migration[] = [
 				try {
 					const metaPath = joinPath(
 						projectRootForMigration,
-						".overstory",
+						detectHaruDir(projectRootForMigration),
 						"specs",
 						`${row.task_id}.meta.json`,
 					);

@@ -17,6 +17,7 @@ import { join } from "node:path";
 import { initiateHandoff } from "../agents/lifecycle.ts";
 import { createManifestLoader, resolveModel } from "../agents/manifest.ts";
 import { nudgeAgent } from "../commands/nudge.ts";
+import { detectHaruDir } from "../config.ts";
 import { sanitize } from "../logging/sanitizer.ts";
 import { getRuntime } from "../runtimes/registry.ts";
 import { openSessionStore } from "../sessions/compat.ts";
@@ -89,7 +90,7 @@ export async function swapRuntime(options: SwapOptions | RerouteOptions): Promis
 
 	const targetRuntime = getRuntime(targetRuntimeName, config, session.capability);
 	const oldRuntime = getRuntime(session.runtime, config, session.capability);
-	const overstoryDir = join(root, ".overstory");
+	const overstoryDir = join(root, detectHaruDir(root));
 
 	try {
 		// 1. Build handoff context
@@ -203,7 +204,12 @@ export async function swapRuntime(options: SwapOptions | RerouteOptions): Promis
 		const rootAgentCaps = new Set(["coordinator", "supervisor", "monitor"]);
 		let appendSystemPromptFile: string | undefined;
 		if (rootAgentCaps.has(session.capability)) {
-			const agentDefPath = join(root, ".overstory", "agent-defs", `${session.capability}.md`);
+			const agentDefPath = join(
+				root,
+				detectHaruDir(root),
+				"agent-defs",
+				`${session.capability}.md`,
+			);
 			if (existsSync(agentDefPath)) {
 				appendSystemPromptFile = agentDefPath;
 			}

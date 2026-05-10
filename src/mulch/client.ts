@@ -10,6 +10,7 @@
  */
 
 import { join } from "node:path";
+import { detectHaruDir } from "../config.ts";
 import { AgentError } from "../errors.ts";
 import type { InstrumentContext } from "../observability/instrument.js";
 import { withEcosystemSpan } from "../observability/instrument.js";
@@ -756,7 +757,7 @@ export function createMulchClient(
 					return [];
 				}
 
-				const embeddingsDir = join(cwd, ".overstory", "embeddings");
+				const embeddingsDir = join(cwd, detectHaruDir(cwd), "embeddings");
 
 				// Fetch records via programmatic API
 				let records: Array<{ id?: string; domain: string; [key: string]: unknown }> = [];

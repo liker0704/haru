@@ -8,7 +8,7 @@
 import { join } from "node:path";
 import { Command } from "commander";
 import type { AgentState } from "../agents/types.ts";
-import { loadConfig } from "../config.ts";
+import { detectHaruDir, loadConfig } from "../config.ts";
 import { ValidationError } from "../errors.ts";
 import { createHeadroomStore } from "../headroom/store.ts";
 import type { HeadroomSnapshot } from "../headroom/types.ts";
@@ -145,7 +145,7 @@ export async function gatherStatus(
 	verbose = false,
 	runId?: string | null,
 ): Promise<StatusData> {
-	const overstoryDir = join(root, ".overstory");
+	const overstoryDir = join(root, detectHaruDir(root));
 	const { store } = openSessionStore(overstoryDir);
 
 	let sessions: AgentSession[];
@@ -192,7 +192,7 @@ export async function gatherStatus(
 		let unreadMailCount = 0;
 		let mailStore: ReturnType<typeof createMailStore> | null = null;
 		try {
-			const mailDbPath = join(root, ".overstory", "mail.db");
+			const mailDbPath = join(root, detectHaruDir(root), "mail.db");
 			const mailFile = Bun.file(mailDbPath);
 			if (await mailFile.exists()) {
 				mailStore = createMailStore(mailDbPath);
@@ -205,7 +205,7 @@ export async function gatherStatus(
 
 		let mergeQueueCount = 0;
 		try {
-			const queuePath = join(root, ".overstory", "merge-queue.db");
+			const queuePath = join(root, detectHaruDir(root), "merge-queue.db");
 			const queue = createMergeQueue(queuePath);
 			mergeQueueCount = queue.list("pending").length;
 			queue.close();
@@ -215,7 +215,7 @@ export async function gatherStatus(
 
 		let recentMetricsCount = 0;
 		try {
-			const metricsDbPath = join(root, ".overstory", "metrics.db");
+			const metricsDbPath = join(root, detectHaruDir(root), "metrics.db");
 			const metricsFile = Bun.file(metricsDbPath);
 			if (await metricsFile.exists()) {
 				const metricsStore = createMetricsStore(metricsDbPath);
@@ -230,7 +230,7 @@ export async function gatherStatus(
 		if (verbose && sessions.length > 0) {
 			verboseDetails = {};
 			for (const session of sessions) {
-				const logsDir = join(root, ".overstory", "logs", session.agentName);
+				const logsDir = join(root, detectHaruDir(root), "logs", session.agentName);
 
 				let lastMailSent: string | null = null;
 				let lastMailReceived: string | null = null;
@@ -356,7 +356,7 @@ export async function gatherStatus(
 
 		let resilience: StatusData["resilience"];
 		try {
-			const resilienceDbPath = join(root, ".overstory", "resilience.db");
+			const resilienceDbPath = join(root, detectHaruDir(root), "resilience.db");
 			const resilienceFile = Bun.file(resilienceDbPath);
 			if (await resilienceFile.exists()) {
 				const resilienceStore = createResilienceStore(resilienceDbPath);
@@ -382,7 +382,7 @@ export async function gatherStatus(
 
 		let headroom: HeadroomSnapshot[] | undefined;
 		try {
-			const headroomDbPath = join(root, ".overstory", "headroom.db");
+			const headroomDbPath = join(root, detectHaruDir(root), "headroom.db");
 			const headroomFile = Bun.file(headroomDbPath);
 			if (await headroomFile.exists()) {
 				const headroomStore = createHeadroomStore(headroomDbPath);
@@ -658,7 +658,7 @@ async function executeStatus(opts: StatusOpts): Promise<void> {
 
 	let runId: string | null | undefined;
 	if (!all) {
-		const overstoryDir = join(root, ".overstory");
+		const overstoryDir = join(root, detectHaruDir(root));
 		runId = await readCurrentRunId(overstoryDir);
 	}
 
@@ -695,7 +695,7 @@ async function executeStatusSet(
 	const cwd = process.cwd();
 	const config = await loadConfig(cwd);
 	const root = config.project.root;
-	const overstoryDir = join(root, ".overstory");
+	const overstoryDir = join(root, detectHaruDir(root));
 
 	const validStates = new Set(["booting", "working", "waiting", "completed", "stalled", "zombie"]);
 

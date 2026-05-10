@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { loadCheckpoint } from "../agents/checkpoint.ts";
 import { loadIdentity } from "../agents/identity.ts";
 import { createManifestLoader } from "../agents/manifest.ts";
-import { loadConfig } from "../config.ts";
+import { detectHaruDir, loadConfig } from "../config.ts";
 import type { ProjectContext } from "../context/types.ts";
 import { jsonOutput } from "../json.ts";
 import { printWarning } from "../logging/color.ts";
@@ -234,7 +234,7 @@ export async function primeCommand(opts: PrimeOptions): Promise<void> {
 	const config = await loadConfig(process.cwd());
 
 	// 2. Auto-heal .overstory/.gitignore
-	const overstoryDir = join(config.project.root, ".overstory");
+	const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 	await healGitignore(overstoryDir);
 
 	// Resolve optional semantic config (field may not be present in config type)
@@ -250,7 +250,7 @@ export async function primeCommand(opts: PrimeOptions): Promise<void> {
 	// Resolve audience from agent session capability if not explicitly provided
 	if (!resolvedAudience && agentName !== null) {
 		try {
-			const overstoryDir = join(config.project.root, ".overstory");
+			const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 			const { store } = openSessionStore(overstoryDir);
 			try {
 				const agentSession = store.getByName(agentName);
@@ -355,7 +355,7 @@ async function outputAgentContext(
 	sections.push(`# Agent Context: ${agentName}`);
 
 	// Check if the agent exists in the SessionStore or has an identity file
-	const overstoryDir = join(config.project.root, ".overstory");
+	const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 	const { store } = openSessionStore(overstoryDir);
 	let sessionExists = false;
 	let boundSession: { taskId: string } | null = null;
@@ -377,7 +377,7 @@ async function outputAgentContext(
 	// Identity section
 	let identity: AgentIdentity | null = null;
 	try {
-		const baseDir = join(config.project.root, ".overstory", "agents");
+		const baseDir = join(config.project.root, detectHaruDir(config.project.root), "agents");
 		identity = await loadIdentity(baseDir, agentName);
 	} catch {
 		// Identity may not exist yet
@@ -405,7 +405,7 @@ async function outputAgentContext(
 
 	// In compact mode, check for checkpoint recovery
 	if (compact) {
-		const baseDir = join(config.project.root, ".overstory", "agents");
+		const baseDir = join(config.project.root, detectHaruDir(config.project.root), "agents");
 		const checkpoint = await loadCheckpoint(baseDir, agentName);
 		if (checkpoint !== null) {
 			sections.push(formatCheckpointRecovery(checkpoint));
@@ -446,7 +446,11 @@ async function outputOrchestratorContext(
 	try {
 		const tmuxSession = await getCurrentSessionName();
 		if (tmuxSession) {
-			const regPath = join(config.project.root, ".overstory", "orchestrator-tmux.json");
+			const regPath = join(
+				config.project.root,
+				detectHaruDir(config.project.root),
+				"orchestrator-tmux.json",
+			);
 			await Bun.write(
 				regPath,
 				`${JSON.stringify({ tmuxSession, registeredAt: new Date().toISOString() }, null, "\t")}\n`,
@@ -469,7 +473,11 @@ async function outputOrchestratorContext(
 			const branch = (await new Response(branchProc.stdout).text()).trim();
 			if (branch) {
 				sessionBranch = branch;
-				const sessionBranchPath = join(config.project.root, ".overstory", "session-branch.txt");
+				const sessionBranchPath = join(
+					config.project.root,
+					detectHaruDir(config.project.root),
+					"session-branch.txt",
+				);
 				await Bun.write(sessionBranchPath, `${branch}\n`);
 			}
 		}
@@ -506,7 +514,11 @@ async function outputOrchestratorContext(
 		// Recent activity section
 		sections.push("\n## Recent Activity");
 		try {
-			const metricsPath = join(config.project.root, ".overstory", "metrics.db");
+			const metricsPath = join(
+				config.project.root,
+				detectHaruDir(config.project.root),
+				"metrics.db",
+			);
 			const store = createMetricsStore(metricsPath);
 			try {
 				const sessions = store.getRecentSessions(5);

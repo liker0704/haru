@@ -74,7 +74,7 @@ describe("trackerCliName", () => {
 	test("returns bd for beads", () => {
 		expect(trackerCliName("beads")).toBe("bd");
 	});
-	test("returns sd for seeds", () => {
-		expect(trackerCliName("seeds")).toBe("sd");
+	test("returns su for seeds", () => {
+		expect(trackerCliName("seeds")).toBe("su");
 	});
 });

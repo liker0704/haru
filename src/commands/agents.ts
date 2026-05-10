@@ -6,7 +6,7 @@
 
 import { join } from "node:path";
 import { Command } from "commander";
-import { loadConfig } from "../config.ts";
+import { detectHaruDir, loadConfig } from "../config.ts";
 import { ValidationError } from "../errors.ts";
 import { jsonOutput } from "../json.ts";
 import { accent, color } from "../logging/color.ts";
@@ -117,7 +117,7 @@ export async function discoverAgents(
 	root: string,
 	opts?: { capability?: string; includeAll?: boolean },
 ): Promise<DiscoveredAgent[]> {
-	const overstoryDir = join(root, ".overstory");
+	const overstoryDir = join(root, detectHaruDir(root));
 	const { store } = openSessionStore(overstoryDir);
 
 	// Resolve runtime instruction path from config; fall back gracefully if config is absent.

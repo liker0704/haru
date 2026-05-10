@@ -8,7 +8,7 @@
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { Command } from "commander";
-import { loadConfig } from "../config.ts";
+import { detectHaruDir, loadConfig } from "../config.ts";
 import { ValidationError } from "../errors.ts";
 import { createEventStore } from "../events/store.ts";
 import { jsonOutput } from "../json.ts";
@@ -283,7 +283,7 @@ export async function gatherInspectData(
 		tmuxLines?: number;
 	} = {},
 ): Promise<InspectData> {
-	const overstoryDir = join(root, ".overstory");
+	const overstoryDir = join(root, detectHaruDir(root));
 	const { store } = openSessionStore(overstoryDir);
 
 	let session: AgentSession | null = null;

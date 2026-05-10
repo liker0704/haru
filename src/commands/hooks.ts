@@ -13,7 +13,7 @@
 import { mkdir, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { Command } from "commander";
-import { loadConfig } from "../config.ts";
+import { detectHaruDir, loadConfig } from "../config.ts";
 import { ValidationError } from "../errors.ts";
 import { jsonOutput } from "../json.ts";
 import { printHint, printSuccess, printWarning } from "../logging/color.ts";
@@ -79,7 +79,7 @@ async function installHooks(force: boolean): Promise<void> {
 	const projectRoot = config.project.root;
 
 	// Read source hooks from .overstory/hooks.json
-	const sourcePath = join(projectRoot, ".overstory", "hooks.json");
+	const sourcePath = join(projectRoot, detectHaruDir(projectRoot), "hooks.json");
 	const sourceFile = Bun.file(sourcePath);
 	if (!(await sourceFile.exists())) {
 		throw new ValidationError("No hooks.json found in .overstory/. Run 'ha init' first.", {
@@ -176,7 +176,7 @@ async function statusHooks(json: boolean): Promise<void> {
 	const config = await loadConfig(cwd);
 	const projectRoot = config.project.root;
 
-	const sourcePath = join(projectRoot, ".overstory", "hooks.json");
+	const sourcePath = join(projectRoot, detectHaruDir(projectRoot), "hooks.json");
 	const targetPath = join(projectRoot, ".claude", "settings.local.json");
 
 	const sourceExists = await Bun.file(sourcePath).exists();

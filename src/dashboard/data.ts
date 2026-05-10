@@ -8,6 +8,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { getCachedTmuxSessions, getCachedWorktrees, type StatusData } from "../commands/status.ts";
+import { detectHaruDir } from "../config.ts";
 import { createEventStore } from "../events/store.ts";
 import { createHeadroomStore } from "../headroom/store.ts";
 import type { HeadroomSnapshot, HeadroomStore } from "../headroom/types.ts";
@@ -53,7 +54,7 @@ export interface DashboardStores {
  * Returns null handles for databases that do not exist on disk.
  */
 export function openDashboardStores(root: string): DashboardStores {
-	const overstoryDir = join(root, ".overstory");
+	const overstoryDir = join(root, detectHaruDir(root));
 	const { store: sessionStore } = openSessionStore(overstoryDir);
 
 	let mailStore: MailStore | null = null;
@@ -498,7 +499,7 @@ export async function loadDashboardData(
 	const missionRolesMap: Record<string, MissionRoleStates> = {};
 	let graphExecution: DashboardData["graphExecution"];
 	try {
-		const sessionsDbPath = join(root, ".overstory", "sessions.db");
+		const sessionsDbPath = join(root, detectHaruDir(root), "sessions.db");
 		if (existsSync(sessionsDbPath)) {
 			const missionStore = createMissionStore(sessionsDbPath);
 			try {
@@ -553,7 +554,7 @@ export async function loadDashboardData(
 
 	let resilience: DashboardData["resilience"];
 	try {
-		const resilienceDbPath = join(root, ".overstory", "resilience.db");
+		const resilienceDbPath = join(root, detectHaruDir(root), "resilience.db");
 		if (existsSync(resilienceDbPath)) {
 			const resilienceStore = createResilienceStore(resilienceDbPath);
 			try {

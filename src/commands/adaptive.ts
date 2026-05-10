@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { Command } from "commander";
 import { readEffectiveMaxConcurrent } from "../adaptive/index.ts";
 import type { ScalingDecision } from "../adaptive/types.ts";
-import { loadConfig } from "../config.ts";
+import { detectHaruDir, loadConfig } from "../config.ts";
 import { jsonError, jsonOutput } from "../json.ts";
 import { chalk, muted } from "../logging/color.ts";
 
@@ -49,7 +49,7 @@ export async function executeAdaptive(opts: AdaptiveOptions): Promise<void> {
 		return;
 	}
 
-	const overstoryDir = join(config.project.root, ".overstory");
+	const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 
 	const effectiveMax = readEffectiveMaxConcurrent(overstoryDir, config);
 

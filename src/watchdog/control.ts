@@ -7,6 +7,7 @@
 
 import { unlink } from "node:fs/promises";
 import { join } from "node:path";
+import { detectHaruDir } from "../config.ts";
 import { isProcessRunning } from "../process/util.ts";
 
 /** Minimal control surface for the watchdog daemon. */
@@ -21,7 +22,7 @@ export interface WatchdogControl {
  * Returns null if the file doesn't exist or can't be parsed.
  */
 export async function readWatchdogPid(projectRoot: string): Promise<number | null> {
-	const pidFilePath = join(projectRoot, ".overstory", "watchdog.pid");
+	const pidFilePath = join(projectRoot, detectHaruDir(projectRoot), "watchdog.pid");
 	const file = Bun.file(pidFilePath);
 	const exists = await file.exists();
 	if (!exists) {
@@ -44,7 +45,7 @@ export async function readWatchdogPid(projectRoot: string): Promise<number | nul
  * Remove the watchdog PID file.
  */
 export async function removeWatchdogPid(projectRoot: string): Promise<void> {
-	const pidFilePath = join(projectRoot, ".overstory", "watchdog.pid");
+	const pidFilePath = join(projectRoot, detectHaruDir(projectRoot), "watchdog.pid");
 	try {
 		await unlink(pidFilePath);
 	} catch {

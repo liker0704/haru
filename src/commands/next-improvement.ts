@@ -7,7 +7,7 @@
 
 import { join } from "node:path";
 import { Command } from "commander";
-import { loadConfig } from "../config.ts";
+import { detectHaruDir, loadConfig } from "../config.ts";
 import { createEvalSource } from "../health/eval-source.ts";
 import { selectRecommendations } from "../health/recommendations.ts";
 import { renderRecommendation } from "../health/render.ts";
@@ -46,7 +46,7 @@ export async function executeNextImprovement(opts: NextImprovementOptions): Prom
 		return;
 	}
 
-	const overstoryDir = join(config.project.root, ".overstory");
+	const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 
 	let signals: ReturnType<typeof collectSignals>;
 	try {

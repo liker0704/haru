@@ -65,10 +65,10 @@ describe("checkDependencies", () => {
 		expect(toolNames).toContain("git availability");
 		expect(toolNames).toContain("bun availability");
 		expect(toolNames).toContain("tmux availability");
-		expect(toolNames).toContain("sd availability");
-		expect(toolNames).toContain("mulch availability");
+		expect(toolNames).toContain("su availability");
+		expect(toolNames).toContain("ku availability");
 		expect(toolNames).toContain("ha availability");
-		expect(toolNames).toContain("cn availability");
+		expect(toolNames).toContain("ta availability");
 	});
 
 	test("includes bd CGO support check when bd is available", async () => {
@@ -157,21 +157,21 @@ describe("checkDependencies", () => {
 		}
 	});
 
-	test("checks for sd when backend is seeds", async () => {
+	test("checks for su when backend is seeds", async () => {
 		const seedsConfig: typeof mockConfig = {
 			...mockConfig,
 			taskTracker: { backend: "seeds", enabled: true },
 		};
 		const checks = await checkDependencies(seedsConfig, "/tmp/.overstory");
 		const toolNames = checks.map((c) => c.name);
-		expect(toolNames).toContain("sd availability");
+		expect(toolNames).toContain("su availability");
 		expect(toolNames).not.toContain("bd availability");
 	});
 
-	test("checks for sd when backend is auto (seeds is default)", async () => {
+	test("checks for su when backend is auto (seeds is default)", async () => {
 		const checks = await checkDependencies(mockConfig, "/tmp/.overstory");
 		const toolNames = checks.map((c) => c.name);
-		expect(toolNames).toContain("sd availability");
+		expect(toolNames).toContain("su availability");
 		expect(toolNames).not.toContain("bd availability");
 	});
 
@@ -185,9 +185,9 @@ describe("checkDependencies", () => {
 		expect(cgoCheck).toBeUndefined();
 	});
 
-	test("cn check is warn (not fail) when missing", async () => {
+	test("ta check is warn (not fail) when missing", async () => {
 		const checks = await checkDependencies(mockConfig, "/tmp/.overstory");
-		const cnCheck = checks.find((c) => c.name === "cn availability");
+		const cnCheck = checks.find((c) => c.name === "ta availability");
 		expect(cnCheck).toBeDefined();
 		// cn is optional — should never be "fail", only "pass" or "warn"
 		expect(cnCheck?.status).not.toBe("fail");
@@ -195,12 +195,12 @@ describe("checkDependencies", () => {
 
 	test("checks short aliases for available tools", async () => {
 		const checks = await checkDependencies(mockConfig, "/tmp/.overstory");
-		const mulchCheck = checks.find((c) => c.name === "mulch availability");
-		if (mulchCheck?.status === "pass") {
-			const mlAlias = checks.find((c) => c.name === "ml alias");
-			expect(mlAlias).toBeDefined();
-			expect(mlAlias?.category).toBe("dependencies");
-			expect(["pass", "warn"]).toContain(mlAlias?.status ?? "");
+		const kuCheck = checks.find((c) => c.name === "ku availability");
+		if (kuCheck?.status === "pass") {
+			const kuraAlias = checks.find((c) => c.name === "kura alias");
+			expect(kuraAlias).toBeDefined();
+			expect(kuraAlias?.category).toBe("dependencies");
+			expect(["pass", "warn"]).toContain(kuraAlias?.status ?? "");
 		}
 		const ovCheck = checks.find((c) => c.name === "ha availability");
 		if (ovCheck?.status === "pass") {
@@ -213,7 +213,7 @@ describe("checkDependencies", () => {
 	test("alias checks are only run when primary tool passes", async () => {
 		const checks = await checkDependencies(mockConfig, "/tmp/.overstory");
 		// If mulch failed, ml alias should NOT be present
-		const mulchCheck = checks.find((c) => c.name === "mulch availability");
+		const mulchCheck = checks.find((c) => c.name === "ku availability");
 		const mlAlias = checks.find((c) => c.name === "ml alias");
 		if (mulchCheck?.status !== "pass") {
 			expect(mlAlias).toBeUndefined();
@@ -223,7 +223,7 @@ describe("checkDependencies", () => {
 	test("install hints appear in details for missing tools", async () => {
 		const checks = await checkDependencies(mockConfig, "/tmp/.overstory");
 		// Check any failing/warning check with an installHint has npm install guidance
-		const cnCheck = checks.find((c) => c.name === "cn availability");
+		const cnCheck = checks.find((c) => c.name === "ta availability");
 		if (cnCheck?.status === "warn" || cnCheck?.status === "fail") {
 			const hasInstallHint = cnCheck.details?.some((d) => d.includes("npm install -g"));
 			expect(hasInstallHint).toBe(true);

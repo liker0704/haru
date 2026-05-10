@@ -8,7 +8,7 @@
 
 import { join } from "node:path";
 import { Command } from "commander";
-import { loadConfig } from "../config.ts";
+import { detectHaruDir, loadConfig } from "../config.ts";
 import { missionRefreshBriefsCommand } from "../missions/brief-refresh.ts";
 import { missionBundle } from "../missions/bundle.ts";
 import {
@@ -75,7 +75,7 @@ export function createMissionCommand(): Command {
 	cmd.option("--json", "Output as JSON").action(async (opts: MissionDefaultOpts) => {
 		const cwd = process.cwd();
 		const config = await loadConfig(cwd);
-		const overstoryDir = join(config.project.root, ".overstory");
+		const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 		await missionStatus(overstoryDir, opts.json ?? false);
 	});
 
@@ -91,7 +91,7 @@ export function createMissionCommand(): Command {
 			async (opts: { slug?: string; objective?: string; attach?: boolean; json?: boolean }) => {
 				const cwd = process.cwd();
 				const config = await loadConfig(cwd);
-				const overstoryDir = join(config.project.root, ".overstory");
+				const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 				const attach = opts.attach ?? (opts.json ? false : process.stdout.isTTY === true);
 				await missionStart(overstoryDir, config.project.root, { ...opts, attach });
 			},
@@ -104,7 +104,7 @@ export function createMissionCommand(): Command {
 		.action(async (opts: MissionDefaultOpts) => {
 			const cwd = process.cwd();
 			const config = await loadConfig(cwd);
-			const overstoryDir = join(config.project.root, ".overstory");
+			const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 			await missionStatus(overstoryDir, opts.json ?? false);
 		});
 
@@ -119,7 +119,7 @@ export function createMissionCommand(): Command {
 			async (opts: { slug?: string; objective?: string; mission?: string; json?: boolean }) => {
 				const cwd = process.cwd();
 				const config = await loadConfig(cwd);
-				const overstoryDir = join(config.project.root, ".overstory");
+				const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 				const resolved = resolveExplicitMission(overstoryDir, opts.mission);
 				await missionUpdate(overstoryDir, { ...opts, missionId: resolved });
 			},
@@ -132,7 +132,7 @@ export function createMissionCommand(): Command {
 		.action(async (opts: MissionDefaultOpts) => {
 			const cwd = process.cwd();
 			const config = await loadConfig(cwd);
-			const overstoryDir = join(config.project.root, ".overstory");
+			const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 			await missionOutput(overstoryDir, opts.json ?? false);
 		});
 
@@ -146,7 +146,7 @@ export function createMissionCommand(): Command {
 		.action(async (opts: { body?: string; file?: string; mission?: string; json?: boolean }) => {
 			const cwd = process.cwd();
 			const config = await loadConfig(cwd);
-			const overstoryDir = join(config.project.root, ".overstory");
+			const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 			const missionId = resolveExplicitMission(overstoryDir, opts.mission);
 			await missionAnswer(overstoryDir, { ...opts, missionId });
 		});
@@ -158,7 +158,7 @@ export function createMissionCommand(): Command {
 		.action(async (opts: MissionDefaultOpts) => {
 			const cwd = process.cwd();
 			const config = await loadConfig(cwd);
-			const overstoryDir = join(config.project.root, ".overstory");
+			const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 			await missionArtifacts(overstoryDir, opts.json ?? false);
 		});
 
@@ -170,7 +170,7 @@ export function createMissionCommand(): Command {
 		.action(async (opts: MissionDefaultOpts & { mission?: string }) => {
 			const cwd = process.cwd();
 			const config = await loadConfig(cwd);
-			const overstoryDir = join(config.project.root, ".overstory");
+			const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 			const missionId = resolveExplicitMission(overstoryDir, opts.mission);
 			await missionHandoff(overstoryDir, config.project.root, opts.json ?? false, {}, missionId);
 		});
@@ -186,7 +186,7 @@ export function createMissionCommand(): Command {
 			async (workstreamId: string, opts: { reason?: string; mission?: string; json?: boolean }) => {
 				const cwd = process.cwd();
 				const config = await loadConfig(cwd);
-				const overstoryDir = join(config.project.root, ".overstory");
+				const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 				const missionId = resolveExplicitMission(overstoryDir, opts.mission);
 				await missionPause(overstoryDir, workstreamId, { ...opts, missionId });
 			},
@@ -202,7 +202,7 @@ export function createMissionCommand(): Command {
 			async (workstreamId: string | undefined, opts: MissionDefaultOpts & { mission?: string }) => {
 				const cwd = process.cwd();
 				const config = await loadConfig(cwd);
-				const overstoryDir = join(config.project.root, ".overstory");
+				const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 				const missionId = resolveExplicitMission(overstoryDir, opts.mission);
 				if (workstreamId) {
 					await missionResume(
@@ -228,7 +228,7 @@ export function createMissionCommand(): Command {
 		.action(async (opts: { workstream?: string; mission?: string; json?: boolean }) => {
 			const cwd = process.cwd();
 			const config = await loadConfig(cwd);
-			const overstoryDir = join(config.project.root, ".overstory");
+			const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 			const missionId = resolveExplicitMission(overstoryDir, opts.mission);
 			await missionRefreshBriefsCommand(overstoryDir, config.project.root, opts, {}, missionId);
 		});
@@ -241,7 +241,7 @@ export function createMissionCommand(): Command {
 		.action(async (opts: MissionDefaultOpts & { mission?: string }) => {
 			const cwd = process.cwd();
 			const config = await loadConfig(cwd);
-			const overstoryDir = join(config.project.root, ".overstory");
+			const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 			const missionId = resolveExplicitMission(overstoryDir, opts.mission);
 			await missionComplete(overstoryDir, config.project.root, opts.json ?? false, {}, missionId);
 		});
@@ -255,7 +255,7 @@ export function createMissionCommand(): Command {
 		.action(async (opts: MissionDefaultOpts & { kill?: boolean; mission?: string }) => {
 			const cwd = process.cwd();
 			const config = await loadConfig(cwd);
-			const overstoryDir = join(config.project.root, ".overstory");
+			const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 			const missionId = resolveExplicitMission(overstoryDir, opts.mission);
 			await missionStop(
 				overstoryDir,
@@ -274,7 +274,7 @@ export function createMissionCommand(): Command {
 		.action(async (opts: MissionDefaultOpts) => {
 			const cwd = process.cwd();
 			const config = await loadConfig(cwd);
-			const overstoryDir = join(config.project.root, ".overstory");
+			const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 			await missionList(overstoryDir, opts.json ?? false);
 		});
 
@@ -286,7 +286,7 @@ export function createMissionCommand(): Command {
 		.action(async (idOrSlug: string, opts: MissionDefaultOpts) => {
 			const cwd = process.cwd();
 			const config = await loadConfig(cwd);
-			const overstoryDir = join(config.project.root, ".overstory");
+			const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 			await missionShow(overstoryDir, idOrSlug, opts.json ?? false);
 		});
 
@@ -299,7 +299,7 @@ export function createMissionCommand(): Command {
 		.action(async (opts: { mission?: string; force?: boolean; json?: boolean }) => {
 			const cwd = process.cwd();
 			const config = await loadConfig(cwd);
-			const overstoryDir = join(config.project.root, ".overstory");
+			const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 			const missionId = resolveExplicitMission(overstoryDir, opts.mission);
 			await missionBundle(overstoryDir, { ...opts, missionId });
 		});
@@ -313,7 +313,7 @@ export function createMissionCommand(): Command {
 		.action(async (idOrSlug: string | undefined, opts: { force?: boolean; json?: boolean }) => {
 			const cwd = process.cwd();
 			const config = await loadConfig(cwd);
-			const overstoryDir = join(config.project.root, ".overstory");
+			const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 			await missionExtractLearnings(overstoryDir, config.project.root, idOrSlug, opts);
 		});
 
@@ -325,7 +325,7 @@ export function createMissionCommand(): Command {
 		.action(async (opts: { format?: string; json?: boolean }) => {
 			const cwd = process.cwd();
 			const config = await loadConfig(cwd);
-			const overstoryDir = join(config.project.root, ".overstory");
+			const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 			const format = (opts.format ?? "text") as "text" | "mermaid" | "json";
 			await missionGraph(overstoryDir, opts.json ?? false, format);
 		});
@@ -339,7 +339,7 @@ export function createMissionCommand(): Command {
 		.action(async (opts: { mission?: string; level?: string; json?: boolean }) => {
 			const cwd = process.cwd();
 			const config = await loadConfig(cwd);
-			const overstoryDir = join(config.project.root, ".overstory");
+			const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 			const dbPath = join(overstoryDir, "sessions.db");
 
 			const { createMissionStore } = await import("../missions/store.ts");

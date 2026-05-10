@@ -12,7 +12,7 @@
 import { Database } from "bun:sqlite";
 import { mkdir, readdir, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
-import { DEFAULT_CONFIG } from "../config.ts";
+import { DEFAULT_CONFIG, detectHaruDir } from "../config.ts";
 import { serializeConfigToYaml } from "../config-yaml.ts";
 import type { OnboardStatus, Spawner, ToolStatus } from "../ecosystem/bootstrap.ts";
 import {
@@ -27,8 +27,6 @@ import { ValidationError } from "../errors.ts";
 import { jsonOutput } from "../json.ts";
 import { printHint, printSuccess, printWarning } from "../logging/color.ts";
 import type { AgentManifest } from "../types.ts";
-
-const HARU_DIR = ".overstory";
 
 // Re-export types and functions that external consumers import from this module.
 export type { Spawner } from "../ecosystem/bootstrap.ts";
@@ -662,7 +660,9 @@ export async function initCommand(opts: InitOptions): Promise<void> {
 	const yes = opts.yes ?? false;
 	const projectRoot = process.cwd();
 	const spawner = opts._spawner ?? defaultSpawner;
-	const overstoryPath = join(projectRoot, HARU_DIR);
+	// Detect: existing .overstory/ wins for back-compat; otherwise create .haru/.
+	const haruDir = detectHaruDir(projectRoot);
+	const overstoryPath = join(projectRoot, haruDir);
 
 	// 0. Verify we're inside a git repository
 	const gitCheck = Bun.spawn(["git", "rev-parse", "--is-inside-work-tree"], {
@@ -699,12 +699,12 @@ export async function initCommand(opts: InitOptions): Promise<void> {
 
 	// 3. Create directory structure
 	const dirs = [
-		HARU_DIR,
-		join(HARU_DIR, "agents"),
-		join(HARU_DIR, "agent-defs"),
-		join(HARU_DIR, "worktrees"),
-		join(HARU_DIR, "specs"),
-		join(HARU_DIR, "logs"),
+		haruDir,
+		join(haruDir, "agents"),
+		join(haruDir, "agent-defs"),
+		join(haruDir, "worktrees"),
+		join(haruDir, "specs"),
+		join(haruDir, "logs"),
 	];
 
 	for (const dir of dirs) {
@@ -722,39 +722,48 @@ export async function initCommand(opts: InitOptions): Promise<void> {
 		const source = Bun.file(join(overstoryAgentsDir, fileName));
 		const content = await source.text();
 		await Bun.write(join(agentDefsTarget, fileName), content);
-		printCreated(`${HARU_DIR}/agent-defs/${fileName}`);
+		printCreated(`${haruDir}/agent-defs/${fileName}`);
 	}
 
 	// 4. Write config.yaml
+	// Clone defaults and pin paths to the detected haru dir so existing projects
+	// using the legacy .overstory/ layout get config that points at .overstory/,
+	// and new projects get config that points at .haru/.
 	const config = structuredClone(DEFAULT_CONFIG);
 	config.project.name = projectName;
 	config.project.root = projectRoot;
 	config.project.canonicalBranch = canonicalBranch;
+	config.agents.manifestPath = `${haruDir}/agent-manifest.json`;
+	config.agents.baseDir = `${haruDir}/agent-defs`;
+	config.worktrees.baseDir = `${haruDir}/worktrees`;
+	if (config.context) {
+		config.context.cachePath = `${haruDir}/project-context.json`;
+	}
 
 	const configYaml = serializeConfigToYaml(config as unknown as Record<string, unknown>);
 	const configPath = join(overstoryPath, "config.yaml");
 	await Bun.write(configPath, configYaml);
-	printCreated(`${HARU_DIR}/config.yaml`);
+	printCreated(`${haruDir}/config.yaml`);
 
 	// 5. Write agent-manifest.json
 	const manifest = buildAgentManifest();
 	const manifestPath = join(overstoryPath, "agent-manifest.json");
 	await Bun.write(manifestPath, `${JSON.stringify(manifest, null, "\t")}\n`);
-	printCreated(`${HARU_DIR}/agent-manifest.json`);
+	printCreated(`${haruDir}/agent-manifest.json`);
 
 	// 6. Write hooks.json
 	const hooksContent = buildHooksJson();
 	const hooksPath = join(overstoryPath, "hooks.json");
 	await Bun.write(hooksPath, hooksContent);
-	printCreated(`${HARU_DIR}/hooks.json`);
+	printCreated(`${haruDir}/hooks.json`);
 
-	// 7. Write .overstory/.gitignore for runtime state
+	// 7. Write {haruDir}/.gitignore for runtime state
 	await writeOverstoryGitignore(overstoryPath);
-	printCreated(`${HARU_DIR}/.gitignore`);
+	printCreated(`${haruDir}/.gitignore`);
 
-	// 7b. Write .overstory/README.md
+	// 7b. Write {haruDir}/README.md
 	await writeOverstoryReadme(overstoryPath);
-	printCreated(`${HARU_DIR}/README.md`);
+	printCreated(`${haruDir}/README.md`);
 
 	// 8. Bootstrap SQLite databases (create with schema if they don't exist)
 	await bootstrapDatabases(overstoryPath);
@@ -807,7 +816,7 @@ export async function initCommand(opts: InitOptions): Promise<void> {
 	// Without this, agent branches that add files to .mulch/.seeds/.canopy cause
 	// untracked-vs-tracked conflicts in ha merge (haru-fe42).
 	let scaffoldCommitted = false;
-	const pathsToAdd: string[] = [HARU_DIR];
+	const pathsToAdd: string[] = [haruDir];
 
 	// Add .gitattributes if it exists
 	try {

@@ -26,6 +26,7 @@ import { evaluateAdaptivePolicy } from "../adaptive/policy.ts";
 import { collectParallelismContext } from "../adaptive/signals.ts";
 import type { ScalingDecision } from "../adaptive/types.ts";
 import { nudgeAgent } from "../commands/nudge.ts";
+import { detectHaruDir } from "../config.ts";
 import { createEventStore } from "../events/store.ts";
 import {
 	findLatestStdoutLog,
@@ -771,7 +772,7 @@ export async function runDaemonTick(options: DaemonOptions): Promise<void> {
 	const capturePane = options._capturePaneContent ?? capturePaneContent;
 	const rateLimitConfig = options.config?.rateLimit;
 
-	const overstoryDir = join(root, ".overstory");
+	const overstoryDir = join(root, detectHaruDir(root));
 	const { store } = openSessionStore(overstoryDir);
 
 	// Open MailStore for decision gate detection (fire-and-forget: non-fatal if unavailable)

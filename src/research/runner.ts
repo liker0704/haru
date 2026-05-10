@@ -5,7 +5,7 @@ import {
 	startPersistentAgent,
 	stopPersistentAgent,
 } from "../agents/persistent-root.ts";
-import { loadConfig } from "../config.ts";
+import { detectHaruDir, loadConfig } from "../config.ts";
 import { AgentError, ValidationError } from "../errors.ts";
 import { openSessionStore } from "../sessions/compat.ts";
 import { validateMcpKeys } from "./mcp.ts";
@@ -122,7 +122,7 @@ export async function startResearch(
 
 	const config = await loadConfig(process.cwd());
 	const projectRoot = config.project.root;
-	const overstoryDir = join(projectRoot, ".overstory");
+	const overstoryDir = join(projectRoot, detectHaruDir(projectRoot));
 	const outputBase = config.research?.outputDir ?? join(overstoryDir, "research");
 
 	const slug = resolveUniqueSlug(baseSlug, outputBase);
@@ -155,7 +155,7 @@ export async function startResearch(
 export async function stopResearch(nameOrSlug?: string): Promise<void> {
 	const config = await loadConfig(process.cwd());
 	const projectRoot = config.project.root;
-	const overstoryDir = join(projectRoot, ".overstory");
+	const overstoryDir = join(projectRoot, detectHaruDir(projectRoot));
 
 	let agentName: string;
 	if (nameOrSlug !== undefined) {
@@ -230,7 +230,7 @@ export async function stopResearch(nameOrSlug?: string): Promise<void> {
 export async function getResearchStatus(nameOrSlug?: string): Promise<ResearchSession | null> {
 	const config = await loadConfig(process.cwd());
 	const projectRoot = config.project.root;
-	const overstoryDir = join(projectRoot, ".overstory");
+	const overstoryDir = join(projectRoot, detectHaruDir(projectRoot));
 	const outputBase = config.research?.outputDir ?? join(overstoryDir, "research");
 
 	let agentName: string;
@@ -283,7 +283,7 @@ export async function getResearchStatus(nameOrSlug?: string): Promise<ResearchSe
 export async function listResearch(): Promise<ResearchSession[]> {
 	const config = await loadConfig(process.cwd());
 	const projectRoot = config.project.root;
-	const overstoryDir = join(projectRoot, ".overstory");
+	const overstoryDir = join(projectRoot, detectHaruDir(projectRoot));
 	const outputBase = config.research?.outputDir ?? join(overstoryDir, "research");
 
 	const { store } = openSessionStore(overstoryDir);
@@ -323,7 +323,7 @@ export async function getResearchOutput(
 ): Promise<string | null> {
 	const config = await loadConfig(process.cwd());
 	const projectRoot = config.project.root;
-	const overstoryDir = join(projectRoot, ".overstory");
+	const overstoryDir = join(projectRoot, detectHaruDir(projectRoot));
 	const outputBase = config.research?.outputDir ?? join(overstoryDir, "research");
 
 	let agentName: string;

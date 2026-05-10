@@ -7,6 +7,7 @@
 
 import { join } from "node:path";
 import { Command } from "commander";
+import { detectHaruDir } from "../config.ts";
 import { createMissionStore } from "../missions/store.ts";
 
 export function createWorkstreamCompleteCommand(): Command {
@@ -16,7 +17,7 @@ export function createWorkstreamCompleteCommand(): Command {
 		.option("--json", "JSON output")
 		.description("Mark a workstream as completed (operator escape hatch)")
 		.action(async (workstreamId: string, opts: { mission?: string; json?: boolean }) => {
-			const overstoryDir = join(process.cwd(), ".overstory");
+			const overstoryDir = join(process.cwd(), detectHaruDir(process.cwd()));
 			const dbPath = join(overstoryDir, "sessions.db");
 			const store = createMissionStore(dbPath);
 

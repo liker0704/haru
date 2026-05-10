@@ -163,6 +163,11 @@ export async function resolveActiveMissionContext(
 			return null;
 		}
 		const active = activeList[0]!;
+		// Remove the stale terminal-pointed mission before writing the new active
+		// pointer — otherwise current-mission.txt accumulates terminal IDs.
+		if (pointedMissionId && pointedMissionId !== active.id) {
+			await removeActiveMission(overstoryDir, pointedMissionId);
+		}
 		await writeMissionRuntimePointers(overstoryDir, active.id, active.runId);
 		return { missionId: active.id, runId: active.runId };
 	} finally {

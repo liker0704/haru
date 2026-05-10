@@ -8,7 +8,7 @@
 
 import { join } from "node:path";
 import { Command } from "commander";
-import { loadConfig } from "../config.ts";
+import { detectHaruDir, loadConfig } from "../config.ts";
 import { OverstoryError } from "../errors.ts";
 import { jsonOutput } from "../json.ts";
 import { printError, printHint, printSuccess } from "../logging/color.ts";
@@ -127,7 +127,7 @@ async function runWatch(opts: {
 
 	const staleThresholdMs = config.watchdog.staleThresholdMs;
 	const zombieThresholdMs = config.watchdog.zombieThresholdMs;
-	const pidFilePath = join(config.project.root, ".overstory", "watchdog.pid");
+	const pidFilePath = join(config.project.root, detectHaruDir(config.project.root), "watchdog.pid");
 
 	const useJson = opts.json ?? false;
 

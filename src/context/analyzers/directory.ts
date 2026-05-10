@@ -19,6 +19,7 @@ function categorizeDir(name: string): ZoneCategory | null {
 	if (
 		lower === "config" ||
 		lower === "configs" ||
+		lower === ".haru" ||
 		lower === ".overstory" ||
 		lower === ".claude" ||
 		lower.endsWith(".json") ||

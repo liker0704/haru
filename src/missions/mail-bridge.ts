@@ -7,7 +7,7 @@
  */
 
 import { join } from "node:path";
-import { loadConfig } from "../config.ts";
+import { detectHaruDir, loadConfig } from "../config.ts";
 import { ValidationError } from "../errors.ts";
 import type { MailMessageType, MissionFindingPayload } from "../types.ts";
 import { recordMissionEvent } from "./events.ts";
@@ -43,7 +43,7 @@ export async function syncMissionPendingInputFromMail(
 		return;
 	}
 
-	const overstoryDir = join(cwd, ".overstory");
+	const overstoryDir = join(cwd, detectHaruDir(cwd));
 	const dbPath = join(overstoryDir, "sessions.db");
 	const missionStore = createMissionStore(dbPath);
 	try {
@@ -93,7 +93,7 @@ const DEFAULT_FREEZE_TIMEOUT_MS = 1_800_000; // 30 minutes
  * those that have exceeded the configured timeout.
  */
 export async function checkMissionFreezeTimeouts(cwd: string): Promise<void> {
-	const overstoryDir = join(cwd, ".overstory");
+	const overstoryDir = join(cwd, detectHaruDir(cwd));
 	const dbPath = join(overstoryDir, "sessions.db");
 	const missionStore = createMissionStore(dbPath);
 	try {

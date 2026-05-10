@@ -11,7 +11,7 @@
 import { existsSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Command } from "commander";
-import { loadConfig } from "../config.ts";
+import { detectHaruDir, loadConfig } from "../config.ts";
 import { createEventStore } from "../events/store.ts";
 import { evaluatePolicy } from "../health/policy/evaluator.ts";
 import { loadRecentActions } from "../health/policy/history.ts";
@@ -49,7 +49,7 @@ export function createHealthPolicyCommand(): Command {
 				return;
 			}
 
-			const overstoryDir = join(config.project.root, ".overstory");
+			const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 
 			let signals: ReturnType<typeof collectSignals>;
 			try {
@@ -104,7 +104,7 @@ export function createHealthPolicyCommand(): Command {
 				return;
 			}
 
-			const overstoryDir = join(config.project.root, ".overstory");
+			const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 			const eventsDb = join(overstoryDir, "events.db");
 			const eventStore = createEventStore(eventsDb);
 
@@ -132,7 +132,7 @@ export function createHealthPolicyCommand(): Command {
 				return;
 			}
 
-			const overstoryDir = join(config.project.root, ".overstory");
+			const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 			const sentinelPath = join(overstoryDir, "health-policy-disabled");
 			writeFileSync(sentinelPath, "");
 			process.stdout.write("Health policy disabled (kill switch active).\n");
@@ -152,7 +152,7 @@ export function createHealthPolicyCommand(): Command {
 				return;
 			}
 
-			const overstoryDir = join(config.project.root, ".overstory");
+			const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 			const sentinelPath = join(overstoryDir, "health-policy-disabled");
 			if (existsSync(sentinelPath)) {
 				rmSync(sentinelPath);

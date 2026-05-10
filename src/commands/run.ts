@@ -13,7 +13,7 @@
 
 import { join } from "node:path";
 import { Command, CommanderError } from "commander";
-import { loadConfig } from "../config.ts";
+import { detectHaruDir, loadConfig } from "../config.ts";
 import { ValidationError } from "../errors.ts";
 import { jsonError, jsonOutput } from "../json.ts";
 import { accent, printError, printHint, printSuccess } from "../logging/color.ts";
@@ -282,7 +282,7 @@ export function createRunCommand(): Command {
 	cmd.option("--json", "Output as JSON").action(async (opts: RunDefaultOpts) => {
 		const cwd = process.cwd();
 		const config = await loadConfig(cwd);
-		const overstoryDir = join(config.project.root, ".overstory");
+		const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 		await showCurrentRun(overstoryDir, opts.json ?? false);
 	});
 
@@ -303,7 +303,7 @@ export function createRunCommand(): Command {
 			}
 			const cwd = process.cwd();
 			const config = await loadConfig(cwd);
-			const overstoryDir = join(config.project.root, ".overstory");
+			const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 			await listRuns(overstoryDir, limit, opts.json ?? false);
 		});
 
@@ -316,7 +316,7 @@ export function createRunCommand(): Command {
 		.action(async (id: string, opts: RunShowOpts) => {
 			const cwd = process.cwd();
 			const config = await loadConfig(cwd);
-			const overstoryDir = join(config.project.root, ".overstory");
+			const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 			await showRun(overstoryDir, id, opts.json ?? false);
 		});
 
@@ -328,7 +328,7 @@ export function createRunCommand(): Command {
 		.action(async (opts: RunCompleteOpts) => {
 			const cwd = process.cwd();
 			const config = await loadConfig(cwd);
-			const overstoryDir = join(config.project.root, ".overstory");
+			const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 			await completeCurrentRun(overstoryDir, opts.json ?? false);
 		});
 

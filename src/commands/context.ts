@@ -12,7 +12,7 @@ import { existsSync } from "node:fs";
 import { unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { Command } from "commander";
-import { loadConfig } from "../config.ts";
+import { detectHaruDir, loadConfig } from "../config.ts";
 import { analyzeProject } from "../context/analyze.ts";
 import { isCacheValid, readCachedContext, writeCachedContext } from "../context/cache.ts";
 import { renderContext } from "../context/render.ts";
@@ -44,7 +44,7 @@ export async function executeContextGenerate(opts: ContextGenerateOptions): Prom
 		return;
 	}
 
-	const overstoryDir = join(config.project.root, ".overstory");
+	const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 	const cachePath = join(overstoryDir, CACHE_FILENAME);
 	const projectRoot = config.project.root;
 
@@ -144,7 +144,7 @@ export async function executeContextShow(opts: ContextShowOptions): Promise<void
 		return;
 	}
 
-	const cachePath = join(config.project.root, ".overstory", CACHE_FILENAME);
+	const cachePath = join(config.project.root, detectHaruDir(config.project.root), CACHE_FILENAME);
 	const cached = readCachedContext(cachePath);
 
 	if (cached === null) {
@@ -213,7 +213,7 @@ export async function executeContextInvalidate(opts: ContextInvalidateOptions): 
 		return;
 	}
 
-	const cachePath = join(config.project.root, ".overstory", CACHE_FILENAME);
+	const cachePath = join(config.project.root, detectHaruDir(config.project.root), CACHE_FILENAME);
 
 	if (!existsSync(cachePath)) {
 		if (json) {

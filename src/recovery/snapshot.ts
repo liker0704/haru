@@ -4,6 +4,7 @@ import { mkdir, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { loadCheckpoint } from "../agents/checkpoint.ts";
 import { loadIdentity } from "../agents/identity.ts";
+import { detectHaruDir } from "../config.ts";
 import { SnapshotError } from "../errors.ts";
 import { createMailStore } from "../mail/store.ts";
 import { createMergeQueue } from "../merge/queue.ts";
@@ -98,7 +99,7 @@ export async function createSnapshot(
 	const snapshotId = makeSnapshotId();
 
 	try {
-		const overstoryDir = join(projectRoot, ".overstory");
+		const overstoryDir = join(projectRoot, detectHaruDir(projectRoot));
 		const agentsDir = join(overstoryDir, "agents");
 
 		// --- SQLite stores ---
@@ -294,7 +295,13 @@ export async function exportSnapshotBundle(
 	outputDir?: string,
 ): Promise<RecoveryBundleManifest> {
 	const dir =
-		outputDir ?? join(snapshot.projectRoot, ".overstory", "snapshots", snapshot.snapshotId);
+		outputDir ??
+		join(
+			snapshot.projectRoot,
+			detectHaruDir(snapshot.projectRoot),
+			"snapshots",
+			snapshot.snapshotId,
+		);
 	await mkdir(dir, { recursive: true });
 
 	const bundleId = `bundle-${snapshot.snapshotId}`;

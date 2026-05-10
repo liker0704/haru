@@ -8,7 +8,7 @@
 
 import { join } from "node:path";
 import { Command } from "commander";
-import { loadConfig } from "../config.ts";
+import { detectHaruDir, loadConfig } from "../config.ts";
 import { ValidationError } from "../errors.ts";
 import { jsonOutput } from "../json.ts";
 import { printHint, printSuccess, printWarning } from "../logging/color.ts";
@@ -28,7 +28,7 @@ import { isSessionAlive, killSession } from "../worktree/tmux.ts";
  */
 async function handleList(root: string, json: boolean): Promise<void> {
 	const worktrees = await listWorktrees(root);
-	const overstoryDir = join(root, ".overstory");
+	const overstoryDir = join(root, detectHaruDir(root));
 	const { store } = openSessionStore(overstoryDir);
 	let sessions: AgentSession[];
 	try {
@@ -84,7 +84,7 @@ async function handleClean(
 	const { force, completedOnly } = opts;
 
 	const worktrees = await listWorktrees(root);
-	const overstoryDir = join(root, ".overstory");
+	const overstoryDir = join(root, detectHaruDir(root));
 	const { store } = openSessionStore(overstoryDir);
 
 	let sessions: AgentSession[];
@@ -198,7 +198,7 @@ async function handleClean(
 		// Purge mail for cleaned agents
 		let mailPurged = 0;
 		if (cleaned.length > 0) {
-			const mailDbPath = join(root, ".overstory", "mail.db");
+			const mailDbPath = join(root, detectHaruDir(root), "mail.db");
 			const mailDbFile = Bun.file(mailDbPath);
 			if (await mailDbFile.exists()) {
 				const mailStore = createMailStore(mailDbPath);

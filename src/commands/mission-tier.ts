@@ -8,7 +8,7 @@
 import { join } from "node:path";
 import chalk from "chalk";
 import { Command } from "commander";
-import { loadConfig } from "../config.ts";
+import { detectHaruDir, loadConfig } from "../config.ts";
 import { materializeMissionRolePrompt } from "../missions/context.ts";
 import { ensureMissionAnalyst } from "../missions/roles.ts";
 import { createMissionStore } from "../missions/store.ts";
@@ -27,7 +27,7 @@ export function createMissionTierCommand(): Command {
 		.action(async (opts: { json?: boolean }) => {
 			const cwd = process.cwd();
 			const config = await loadConfig(cwd);
-			const overstoryDir = join(config.project.root, ".overstory");
+			const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 			const store = createMissionStore(join(overstoryDir, "sessions.db"));
 			try {
 				const mission = store.getActive();
@@ -77,7 +77,7 @@ async function tierSetCommand(tierArg: string, opts: { json?: boolean }): Promis
 
 	const cwd = process.cwd();
 	const config = await loadConfig(cwd);
-	const overstoryDir = join(config.project.root, ".overstory");
+	const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
 	const missionStore = createMissionStore(join(overstoryDir, "sessions.db"));
 
 	try {
