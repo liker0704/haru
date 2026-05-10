@@ -54,6 +54,7 @@ const AGENT_DEF_FILES = [
 	"plan-simulator.md",
 	"product-clarifier.md",
 	"research-lead.md",
+	"tier-classifier.md",
 	"researcher.md",
 	"reviewer.md",
 	"scout.md",
