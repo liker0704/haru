@@ -33,7 +33,11 @@ export type MailProtocolType =
 	| "breaker_reset"
 	| "task_rerouted"
 	| "reroute_recommendation"
-	| "health_policy_action";
+	| "health_policy_action"
+	| "clarifier_question"
+	| "clarifier_answer"
+	| "research_complete"
+	| "spec_ready";
 
 /** All valid mail message types. */
 export type MailMessageType = MailSemanticType | MailProtocolType;
@@ -70,6 +74,10 @@ export const MAIL_MESSAGE_TYPES: readonly MailMessageType[] = [
 	"task_rerouted",
 	"reroute_recommendation",
 	"health_policy_action",
+	"clarifier_question",
+	"clarifier_answer",
+	"research_complete",
+	"spec_ready",
 ] as const;
 
 /** Delivery state for mail reliability v2 (claim/ack semantics). */
@@ -398,6 +406,63 @@ export interface HealthPolicyActionPayload {
 	details: string;
 }
 
+// === Intake-phase mail payloads (Stage A) ===
+
+/**
+ * Question from product-clarifier to mission-analyst about codebase.
+ *
+ * Routed via mail because clarifier and analyst run in separate sessions.
+ * Analyst responds with `clarifier_answer`.
+ */
+export interface ClarifierQuestionPayload {
+	missionId: string;
+	question: string;
+	/** Optional context (file paths, prior conversation) the analyst should consider. */
+	context?: string;
+}
+
+/** Analyst's reply to a `clarifier_question`. */
+export interface ClarifierAnswerPayload {
+	missionId: string;
+	/** Echo the original question for traceability. */
+	question: string;
+	answer: string;
+	/** File:line references the answer is based on. */
+	citations?: string[];
+}
+
+/**
+ * Signal that mission-analyst-intake has produced research/_summary.md.
+ *
+ * Triggers `await-research-complete` gate in intake-phase subgraph.
+ */
+export interface ResearchCompletePayload {
+	missionId: string;
+	/** Path to research/_summary.md (canonical artifact). */
+	summaryPath: string;
+	/** Number of scouts that contributed. */
+	scoutCount: number;
+	/** Wall-clock duration in milliseconds. Useful for adaptive timeout tuning. */
+	durationMs: number;
+	/** True if research timed out and summary is partial. */
+	partial?: boolean;
+}
+
+/**
+ * Signal that product-clarifier has materialized product-spec.md.
+ *
+ * Triggers `await-spec-ready` gate in intake-phase subgraph.
+ */
+export interface SpecReadyPayload {
+	missionId: string;
+	/** Path to product-spec.md (canonical artifact). */
+	specPath: string;
+	/** Number of operator questions asked (≤5). 0 means smart short-circuit. */
+	operatorQuestionCount: number;
+	/** Number of analyst questions asked (unbounded). */
+	analystQuestionCount: number;
+}
+
 /** Maps protocol message types to their payload interfaces. */
 export interface MailPayloadMap {
 	worker_done: WorkerDonePayload;
@@ -426,4 +491,8 @@ export interface MailPayloadMap {
 	task_rerouted: TaskReroutedPayload;
 	reroute_recommendation: RerouteRecommendationPayload;
 	health_policy_action: HealthPolicyActionPayload;
+	clarifier_question: ClarifierQuestionPayload;
+	clarifier_answer: ClarifierAnswerPayload;
+	research_complete: ResearchCompletePayload;
+	spec_ready: SpecReadyPayload;
 }

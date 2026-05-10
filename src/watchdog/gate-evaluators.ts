@@ -515,6 +515,86 @@ export function evaluateArchReviewComplete(
 	};
 }
 
+// === Intake-phase gate evaluators (Stage A) ===
+
+/**
+ * Wait for `research_complete` mail from mission-analyst-intake.
+ *
+ * Fired by analyst once research/_summary.md materializes. Until then,
+ * nudge the analyst with the standard "still working" message.
+ */
+export function evaluateAwaitResearchComplete(
+	mission: Mission,
+	mailStore: MailStore | null,
+	gateEnteredAt?: string,
+): GateEvalResult {
+	if (!mailStore) return { met: false };
+
+	const analystName = `mission-analyst-${mission.slug}`;
+	// Look for research_complete signal in any inbox tied to this mission
+	// (analyst may address it to a coordinator or the mission system).
+	const fromAnalyst = mailStore.getAll({ from: analystName });
+	const ready = fromAnalyst.find(
+		(m) => m.type === "research_complete" && (!gateEnteredAt || m.createdAt >= gateEnteredAt),
+	);
+	if (ready) {
+		return { met: true, trigger: "research_ready" };
+	}
+
+	return {
+		met: false,
+		nudgeTarget: analystName,
+		nudgeMessage:
+			"Research summary not yet emitted — finish synthesizing scout findings and send `research_complete` mail.",
+	};
+}
+
+/**
+ * Wait for `spec_ready` mail from product-clarifier.
+ *
+ * Clarifier emits this once product-spec.md is materialized at the canonical
+ * artifact path.
+ */
+export function evaluateAwaitSpecReady(
+	mission: Mission,
+	mailStore: MailStore | null,
+	gateEnteredAt?: string,
+): GateEvalResult {
+	if (!mailStore) return { met: false };
+
+	const clarifierName = `product-clarifier-${mission.slug}`;
+	const fromClarifier = mailStore.getAll({ from: clarifierName });
+	const ready = fromClarifier.find(
+		(m) => m.type === "spec_ready" && (!gateEnteredAt || m.createdAt >= gateEnteredAt),
+	);
+	if (ready) {
+		return { met: true, trigger: "spec_ready" };
+	}
+
+	return {
+		met: false,
+		nudgeTarget: clarifierName,
+		nudgeMessage:
+			"product-spec.md not yet emitted — synthesize intent + research into the spec template and send `spec_ready` mail.",
+	};
+}
+
+/**
+ * Wait for tier to be set by tier-classifier (mission.tier transitions from
+ * null to direct/planned/full).
+ */
+export function evaluateAwaitTierSet(mission: Mission): GateEvalResult {
+	if (mission.tier !== null) {
+		return { met: true, trigger: "tier_set" };
+	}
+	return {
+		met: false,
+		nudgeTarget: `tier-classifier-${mission.slug}`,
+		nudgeMessage:
+			"Mission tier not set — read product-spec.md, classify, and call `ha mission tier set <tier>`.",
+	};
+}
+
 /** Dispatch gate evaluator based on the current node ID. */
 export async function evaluateGate(
 	nodeId: string,
@@ -573,6 +653,16 @@ export async function evaluateGate(
 		case "frozen":
 			// Human gates are resolved by ha mission answer, not by evaluators.
 			// Return met:false without unknown flag to suppress missing-evaluator warnings.
+			return { met: false };
+		case "await-research-complete":
+			return evaluateAwaitResearchComplete(mission, stores.mailStore, gateEnteredAt);
+		case "await-spec-ready":
+			return evaluateAwaitSpecReady(mission, stores.mailStore, gateEnteredAt);
+		case "await-tier-set":
+			return evaluateAwaitTierSet(mission);
+		case "human-spec-review":
+			// Human gate — resolved by `ha mission answer` (or auto-skip when
+			// mission.autonomy != 'supervised', handled at engine layer).
 			return { met: false };
 		default:
 			return { met: false, unknown: true };
