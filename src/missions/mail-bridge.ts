@@ -17,7 +17,6 @@ import { appendMissionThreadId, checkMissionFreezeTimeout, createMissionStore } 
 const MISSION_PENDING_SENDER_PREFIXES = [
 	"mission-analyst",
 	"execution-director",
-	"coordinator-mission-assess",
 	"coordinator-mission-direct",
 	"coordinator-mission-planned",
 	"coordinator-mission",

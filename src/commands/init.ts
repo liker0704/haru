@@ -164,14 +164,6 @@ export function buildAgentManifest(): AgentManifest {
 			canSpawn: true,
 			constraints: ["read-only", "no-worktree"],
 		},
-		"coordinator-mission-assess": {
-			file: "coordinator-mission-assess.md",
-			model: "opus",
-			tools: ["Read", "Glob", "Grep", "Bash"],
-			capabilities: ["coordinate", "assess", "mission"],
-			canSpawn: false,
-			constraints: ["read-only", "no-worktree"],
-		},
 		"coordinator-mission-direct": {
 			file: "coordinator-mission-direct.md",
 			model: "opus",

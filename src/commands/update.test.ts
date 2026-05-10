@@ -27,7 +27,6 @@ const AGENT_DEF_FILES = [
 	"architecture-review-lead.md",
 	"architecture-sync.md",
 	"builder.md",
-	"coordinator-mission-assess.md",
 	"coordinator-mission-direct.md",
 	"coordinator-mission-full.md",
 	"coordinator-mission-planned.md",

@@ -6,7 +6,6 @@ const CAPABILITY_AUDIENCE_MAP: Record<string, string> = {
 	"lead-mission": "lead",
 	coordinator: "coordinator",
 	"coordinator-mission": "coordinator",
-	"coordinator-mission-assess": "coordinator",
 	"coordinator-mission-direct": "coordinator",
 	"coordinator-mission-planned": "coordinator",
 	merger: "merger",

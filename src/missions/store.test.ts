@@ -49,7 +49,7 @@ describe("create", () => {
 		expect(mission.slug).toBe("test-mission");
 		expect(mission.objective).toBe("Test the mission store");
 		expect(mission.state).toBe("active");
-		expect(mission.phase).toBe("understand");
+		expect(mission.phase).toBe("intake");
 		expect(mission.pendingUserInput).toBe(false);
 		expect(mission.pendingInputKind).toBeNull();
 		expect(mission.pendingInputThreadId).toBeNull();
@@ -458,7 +458,8 @@ describe("updateArtifactRoot", () => {
 describe("updateCurrentNode phase sync", () => {
 	test("auto-syncs phase when nodeId is a lifecycle node", () => {
 		store.create(makeMission());
-		expect(store.getById("mission-001")?.phase).toBe("understand");
+		// Stage A: new missions default to phase=intake
+		expect(store.getById("mission-001")?.phase).toBe("intake");
 
 		store.updateCurrentNode("mission-001", "plan:active");
 		expect(store.getById("mission-001")?.phase).toBe("plan");
@@ -480,16 +481,16 @@ describe("updateCurrentNode phase sync", () => {
 	test("does NOT sync phase for subgraph nodes", () => {
 		store.create(makeMission());
 		store.updateCurrentNode("mission-001", "understand-phase:evaluate");
-		// Subgraph node — phase should stay at original "understand"
-		expect(store.getById("mission-001")?.phase).toBe("understand");
+		// Subgraph node — phase should stay at original "intake" default
+		expect(store.getById("mission-001")?.phase).toBe("intake");
 		expect(store.getById("mission-001")?.currentNode).toBe("understand-phase:evaluate");
 	});
 
 	test("does NOT sync phase for non-phase prefixes", () => {
 		store.create(makeMission());
 		store.updateCurrentNode("mission-001", "custom:node");
-		// "custom" is not a valid MissionPhase
-		expect(store.getById("mission-001")?.phase).toBe("understand");
+		// "custom" is not a valid MissionPhase — phase stays at intake default
+		expect(store.getById("mission-001")?.phase).toBe("intake");
 	});
 });
 

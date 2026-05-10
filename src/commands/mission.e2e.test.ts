@@ -770,6 +770,9 @@ describe("mission command e2e", () => {
 		expect(afterAnswer?.pendingUserInput).toBe(false);
 		expect(afterAnswer?.state).toBe("active");
 
+		// Stage A: advance phase to plan (intake → ... → plan) before handoff
+		missionStore.updatePhase(mission.id, "plan");
+
 		// Handoff after freeze should succeed
 		process.exitCode = 0;
 		await missionHandoff(overstoryDir, tempDir, true, deps);
@@ -791,14 +794,9 @@ describe("mission command e2e", () => {
 		expect(mission).not.toBeNull();
 		if (!mission) throw new Error("expected mission");
 		expect(mission?.slug).toMatch(/^mission-\d+$/);
-		expect(mission?.objective).toBe("Pending — coordinator will clarify with operator");
-		expect(deps.started).toEqual(["coordinator", "mission-analyst"]);
-
-		// Verify dispatch mail tells coordinator to discover objective
-		const mailStore = createMailStore(join(overstoryDir, "mail.db"));
-		const dispatchMail = mailStore.getAll({ to: "coordinator" }).find((m) => m.type === "dispatch");
-		expect(dispatchMail?.body).toContain("No objective was provided at start");
-		expect(dispatchMail?.body).toContain("ha mission update");
+		expect(mission?.objective).toBe("Pending — clarifier will resolve from intent");
+		// Stage A: no roles spawned at start; intake-phase subgraph drives.
+		expect(deps.started).toEqual([]);
 
 		// Update slug and objective
 		await missionUpdate(overstoryDir, {
@@ -824,14 +822,13 @@ describe("mission command e2e", () => {
 		await missionUpdate(overstoryDir, { json: true });
 		expect(process.exitCode).toBe(1);
 
-		mailStore.close();
 		missionStore.close();
 	});
 
 	test("mission graph: currentNode is tracked through lifecycle", async () => {
 		const deps = makeRoleDeps(tempDir, overstoryDir);
 
-		// Start mission → should be at understand:active
+		// Start mission → Stage A starts at intake:active
 		await missionStart(
 			overstoryDir,
 			tempDir,
@@ -843,7 +840,7 @@ describe("mission command e2e", () => {
 		const mission = missionStore.getActive();
 		expect(mission).not.toBeNull();
 		if (!mission) throw new Error("expected mission");
-		expect(mission.phase).toBe("understand");
+		expect(mission.phase).toBe("intake");
 		expect(mission.state).toBe("active");
 
 		// Manually update currentNode to verify store works
@@ -875,7 +872,7 @@ describe("mission command e2e", () => {
 		missionStore.close();
 	});
 
-	test("mission graph: currentNode is set to understand:active on start", async () => {
+	test("mission graph: currentNode is set to intake:active on start", async () => {
 		const deps = makeRoleDeps(tempDir, overstoryDir);
 
 		await missionStart(
@@ -889,7 +886,7 @@ describe("mission command e2e", () => {
 		const mission = missionStore.getActive();
 		expect(mission).not.toBeNull();
 		if (!mission) throw new Error("expected mission");
-		expect(mission.currentNode).toBe("understand:active");
+		expect(mission.currentNode).toBe("intake:active");
 
 		missionStore.close();
 	});

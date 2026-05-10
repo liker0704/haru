@@ -136,8 +136,16 @@ export const MISSION_STATES: readonly MissionState[] = [
 	"suspended",
 ] as const;
 
-export type MissionPhase = "understand" | "align" | "decide" | "plan" | "execute" | "done";
+export type MissionPhase =
+	| "intake"
+	| "understand"
+	| "align"
+	| "decide"
+	| "plan"
+	| "execute"
+	| "done";
 export const MISSION_PHASES: readonly MissionPhase[] = [
+	"intake",
 	"understand",
 	"align",
 	"decide",

@@ -90,6 +90,7 @@ const GRADE_THRESHOLDS: Array<{ min: number; grade: MissionGrade }> = [
 ];
 
 const PHASE_SCORES: Record<MissionPhase, number> = {
+	intake: 5,
 	understand: 10,
 	align: 25,
 	decide: 40,

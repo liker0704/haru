@@ -26,7 +26,6 @@ export const SUPPORTED_CAPABILITIES = [
 	"merger",
 	"coordinator",
 	"coordinator-mission",
-	"coordinator-mission-assess",
 	"coordinator-mission-direct",
 	"coordinator-mission-planned",
 	"supervisor",
