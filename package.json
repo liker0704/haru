@@ -7,9 +7,9 @@
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "https://github.com/jayminwest/haru.git"
+    "url": "https://github.com/liker0704/haru.git"
   },
-  "homepage": "https://github.com/jayminwest/haru",
+  "homepage": "https://github.com/liker0704/haru",
   "keywords": [
     "ai",
     "agents",
@@ -53,5 +53,8 @@
     "@biomejs/biome": "^2.3.15",
     "@types/bun": "latest",
     "@types/js-yaml": "^4.0.9"
+  },
+  "bugs": {
+    "url": "https://github.com/liker0704/haru/issues"
   }
 }
