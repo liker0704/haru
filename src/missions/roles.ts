@@ -105,7 +105,7 @@ export async function startMissionAnalyst(
 	const storeFactory = _deps?.createStore ?? createMissionStore;
 
 	const analystName = opts.agentName ?? "mission-analyst";
-	const tmuxSession = opts.missionSlug ? `ov-analyst-${opts.missionSlug}` : "ov-mission-analyst";
+	const tmuxSession = opts.missionSlug ? `ha-analyst-${opts.missionSlug}` : "ha-mission-analyst";
 
 	const result = await startAgent({
 		agentName: analystName,
@@ -289,8 +289,8 @@ export async function startMissionCoordinator(
 
 	const coordName = opts.agentName ?? "coordinator";
 	const tmuxSession = opts.missionSlug
-		? `ov-coordinator-${opts.missionSlug}`
-		: "ov-mission-coordinator";
+		? `ha-coordinator-${opts.missionSlug}`
+		: "ha-mission-coordinator";
 
 	const result = await startAgent({
 		agentName: coordName,
@@ -334,7 +334,7 @@ export async function startExecutionDirector(
 	const storeFactory = _deps?.createStore ?? createMissionStore;
 
 	const edName = opts.agentName ?? "execution-director";
-	const tmuxSession = opts.missionSlug ? `ov-ed-${opts.missionSlug}` : "ov-execution-director";
+	const tmuxSession = opts.missionSlug ? `ha-ed-${opts.missionSlug}` : "ha-execution-director";
 
 	const result = await startAgent({
 		agentName: edName,
@@ -382,7 +382,7 @@ export async function startArchitectRole(
 	const storeFactory = _deps?.createStore ?? createMissionStore;
 
 	const architectName = opts.agentName ?? "architect";
-	const tmuxSession = opts.missionSlug ? `ov-architect-${opts.missionSlug}` : "ov-architect";
+	const tmuxSession = opts.missionSlug ? `ha-architect-${opts.missionSlug}` : "ha-architect";
 
 	const result = await startAgent({
 		agentName: architectName,
@@ -432,8 +432,8 @@ export async function startPlanReviewLead(
 	const startAgent = _deps?.startAgent ?? startPersistentAgent;
 
 	const tmuxSession = opts.missionSlug
-		? `ov-plan-review-${opts.missionSlug}`
-		: "ov-plan-review-lead";
+		? `ha-plan-review-${opts.missionSlug}`
+		: "ha-plan-review-lead";
 
 	return startAgent({
 		agentName: "plan-review-lead",

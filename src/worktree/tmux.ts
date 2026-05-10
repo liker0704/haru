@@ -863,7 +863,7 @@ export async function sendFileContent(
 	maxRetries = 3,
 ): Promise<void> {
 	const target = primaryPaneTarget(sessionName);
-	const bufferName = `ov-paste-${Date.now()}`;
+	const bufferName = `ha-paste-${Date.now()}`;
 
 	for (let attempt = 0; attempt <= maxRetries; attempt++) {
 		// Load file into a named tmux buffer

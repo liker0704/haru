@@ -81,15 +81,15 @@ function planRoleRenames(
 		{
 			sessionId: current.coordinatorSessionId,
 			prefix: "coordinator",
-			tmuxPrefix: "ov-coordinator",
+			tmuxPrefix: "ha-coordinator",
 		},
-		{ sessionId: current.analystSessionId, prefix: "mission-analyst", tmuxPrefix: "ov-analyst" },
+		{ sessionId: current.analystSessionId, prefix: "mission-analyst", tmuxPrefix: "ha-analyst" },
 		{
 			sessionId: current.executionDirectorSessionId,
 			prefix: "execution-director",
-			tmuxPrefix: "ov-ed",
+			tmuxPrefix: "ha-ed",
 		},
-		{ sessionId: current.architectSessionId, prefix: "architect", tmuxPrefix: "ov-architect" },
+		{ sessionId: current.architectSessionId, prefix: "architect", tmuxPrefix: "ha-architect" },
 	];
 	for (const role of roles) {
 		if (!role.sessionId) continue;

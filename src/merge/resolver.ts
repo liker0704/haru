@@ -729,7 +729,7 @@ export function createMergeResolver(options: {
 					"stash",
 					"push",
 					"-m",
-					"ov-merge: auto-stash dirty files",
+					"ha-merge: auto-stash dirty files",
 				]);
 				if (stashCode !== 0) {
 					throw new MergeError(

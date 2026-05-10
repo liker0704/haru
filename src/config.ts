@@ -78,8 +78,8 @@ export const DEFAULT_CONFIG: OverstoryConfig = {
 		enabled: true,
 		github: {
 			pollIntervalMs: 30_000,
-			readyLabel: "ov-ready",
-			activeLabel: "ov-active",
+			readyLabel: "ha-ready",
+			activeLabel: "ha-active",
 			maxConcurrent: 5,
 		},
 	},

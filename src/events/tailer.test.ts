@@ -401,7 +401,9 @@ describe("daemon tailer integration", () => {
 			taskId: "task-1",
 			tmuxSession: "", // headless
 			state: "working",
-			pid: process.pid,
+			// Use a non-existent PID — never process.pid, which would kill the test runner
+			// when the daemon's killProcessTree runs.
+			pid: 999999999,
 			parentAgent: null,
 			depth: 0,
 			runId: null,

@@ -170,11 +170,13 @@ export function startEventTailer(opts: TailerOptions): TailerHandle {
 
 		if (!stopped) {
 			timer = setTimeout(poll, pollIntervalMs);
+			timer.unref();
 		}
 	};
 
 	// Schedule first poll.
 	timer = setTimeout(poll, pollIntervalMs);
+	timer.unref();
 
 	return {
 		agentName,

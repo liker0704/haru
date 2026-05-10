@@ -92,7 +92,10 @@ async function terminalizeMission(opts: {
 
 	// Detect if we're running inside a mission tmux session (coordinator calling ha mission complete).
 	// If so, skip killing our own session until all cleanup is done.
-	const selfTmuxSession = await getCurrentSessionName();
+	// Only set when the current tmux session actually corresponds to a mission role —
+	// avoids self-killing when called from non-role contexts (e.g. operator terminal, tests).
+	const currentTmuxSession = await getCurrentSessionName();
+	let selfTmuxSession: string | null = null;
 
 	try {
 		const roleStopFailures: string[] = [];
@@ -110,7 +113,7 @@ async function terminalizeMission(opts: {
 			: ["coordinator", "mission-analyst", "execution-director"];
 		const stoppedRoles = new Set<string>();
 		// Open session store once for self-detection lookups
-		const { store: selfCheckStore } = selfTmuxSession
+		const { store: selfCheckStore } = currentTmuxSession
 			? openSessionStore(overstoryDir)
 			: { store: null };
 		try {
@@ -119,9 +122,10 @@ async function terminalizeMission(opts: {
 				const baseRole = roleName.replace(`-${slug}`, "");
 				if (stoppedRoles.has(baseRole)) continue;
 				// Skip killing our own session — defer until all cleanup is done
-				if (selfTmuxSession && selfCheckStore) {
+				if (currentTmuxSession && selfCheckStore) {
 					const roleSession = selfCheckStore.getByName(roleName);
-					if (roleSession?.tmuxSession === selfTmuxSession) {
+					if (roleSession?.tmuxSession === currentTmuxSession) {
+						selfTmuxSession = currentTmuxSession;
 						stoppedRoles.add(baseRole);
 						continue;
 					}
@@ -154,14 +158,14 @@ async function terminalizeMission(opts: {
 		// Try slug-scoped names first, then legacy singleton names
 		const roleTmuxNames: Record<string, string[]> = {
 			coordinator: slug
-				? [`ov-coordinator-${slug}`, "ov-mission-coordinator"]
-				: ["ov-mission-coordinator"],
+				? [`ha-coordinator-${slug}`, "ha-mission-coordinator"]
+				: ["ha-mission-coordinator"],
 			"mission-analyst": slug
-				? [`ov-analyst-${slug}`, "ov-mission-analyst"]
-				: ["ov-mission-analyst"],
+				? [`ha-analyst-${slug}`, "ha-mission-analyst"]
+				: ["ha-mission-analyst"],
 			"execution-director": slug
-				? [`ov-ed-${slug}`, "ov-execution-director"]
-				: ["ov-execution-director"],
+				? [`ha-ed-${slug}`, "ha-execution-director"]
+				: ["ha-execution-director"],
 		};
 		for (const roleName of roleStopFailures) {
 			const tmuxNames = roleTmuxNames[roleName];
@@ -432,7 +436,7 @@ async function terminalizeMission(opts: {
 					const taskId = `${mission.id}-sync`;
 					const slingProc = Bun.spawn(
 						[
-							"ov",
+							"ha",
 							"sling",
 							taskId,
 							"--capability",
@@ -448,7 +452,7 @@ async function terminalizeMission(opts: {
 					await slingProc.exited;
 					Bun.spawn(
 						[
-							"ov",
+							"ha",
 							"mail",
 							"send",
 							"--to",

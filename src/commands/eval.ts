@@ -116,7 +116,7 @@ async function executeEvalRun(scenarioPath: string, opts: EvalRunOpts): Promise<
 	}
 
 	const runId = crypto.randomUUID();
-	const fixtureRepoPath = join(tmpdir(), `ov-eval-${runId}`);
+	const fixtureRepoPath = join(tmpdir(), `ha-eval-${runId}`);
 
 	const timeoutMs = opts.timeout
 		? Number.parseInt(opts.timeout, 10)

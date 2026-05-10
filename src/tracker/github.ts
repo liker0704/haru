@@ -86,7 +86,7 @@ export function createGitHubTracker(cwd: string): TrackerClient {
 	return {
 		async ready() {
 			const { stdout } = await runGh(
-				["issue", "list", "--label", "ov-ready", "--state", "open", "--json", GH_JSON_FIELDS],
+				["issue", "list", "--label", "ha-ready", "--state", "open", "--json", GH_JSON_FIELDS],
 				cwd,
 				"ready",
 			);
@@ -127,11 +127,11 @@ export function createGitHubTracker(cwd: string): TrackerClient {
 
 		async claim(id) {
 			await runGh(
-				["issue", "edit", id, "--remove-label", "ov-ready"],
+				["issue", "edit", id, "--remove-label", "ha-ready"],
 				cwd,
 				`claim remove-label ${id}`,
 			);
-			await runGh(["issue", "edit", id, "--add-label", "ov-active"], cwd, `claim add-label ${id}`);
+			await runGh(["issue", "edit", id, "--add-label", "ha-active"], cwd, `claim add-label ${id}`);
 		},
 
 		async close(id, reason) {

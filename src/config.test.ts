@@ -41,7 +41,7 @@ describe("loadConfig", () => {
 		expect(config.project.root).toBe(tempDir);
 		expect(config.project.canonicalBranch).toBe("main");
 		expect(config.agents.maxConcurrent).toBe(25);
-		expect(config.agents.maxDepth).toBe(2);
+		expect(config.agents.maxDepth).toBe(3);
 		expect(config.taskTracker.enabled).toBe(true);
 		expect(config.mulch.enabled).toBe(true);
 		expect(config.mulch.primeFormat).toBe("markdown");
@@ -69,7 +69,7 @@ agents:
 		expect(config.project.canonicalBranch).toBe("develop");
 		expect(config.agents.maxConcurrent).toBe(10);
 		// Non-overridden values keep defaults
-		expect(config.agents.maxDepth).toBe(2);
+		expect(config.agents.maxDepth).toBe(3);
 		expect(config.taskTracker.enabled).toBe(true);
 	});
 
@@ -1286,7 +1286,7 @@ describe("DEFAULT_CONFIG", () => {
 	test("has sensible default values", () => {
 		expect(DEFAULT_CONFIG.project.canonicalBranch).toBe("main");
 		expect(DEFAULT_CONFIG.agents.maxConcurrent).toBe(25);
-		expect(DEFAULT_CONFIG.agents.maxDepth).toBe(2);
+		expect(DEFAULT_CONFIG.agents.maxDepth).toBe(3);
 		expect(DEFAULT_CONFIG.agents.staggerDelayMs).toBe(2_000);
 		expect(DEFAULT_CONFIG.agents.maxSessionsPerRun).toBe(0);
 		expect(DEFAULT_CONFIG.watchdog.tier0IntervalMs).toBe(30_000);

@@ -108,7 +108,7 @@ export interface OverstoryConfig {
 		baseDir: string; // Path to base agent definitions
 		maxConcurrent: number; // Rate limit ceiling
 		staggerDelayMs: number; // Delay between spawns
-		maxDepth: number; // Hierarchy depth limit (default 2)
+		maxDepth: number; // Hierarchy depth limit (default 3)
 		maxSessionsPerRun: number; // Max total sessions per run (0 = unlimited)
 		maxAgentsPerLead: number; // Max children a single lead can spawn (0 = unlimited)
 		adaptive?: AdaptiveConfig;
