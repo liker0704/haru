@@ -89,6 +89,65 @@ describe("create", () => {
 		store.create(makeMission({ slug: "same-slug", id: "mission-001" }));
 		expect(() => store.create(makeMission({ slug: "same-slug", id: "mission-002" }))).toThrow();
 	});
+
+	test("autonomy defaults to 'supervised' when omitted", () => {
+		const mission = store.create(makeMission());
+		expect(mission.autonomy).toBe("supervised");
+	});
+
+	test("accepts explicit autonomy values", () => {
+		const supervised = store.create(makeMission({ id: "m1", slug: "s1", autonomy: "supervised" }));
+		const autoSpec = store.create(makeMission({ id: "m2", slug: "s2", autonomy: "auto-spec" }));
+		const autoAll = store.create(makeMission({ id: "m3", slug: "s3", autonomy: "auto-all" }));
+		expect(supervised.autonomy).toBe("supervised");
+		expect(autoSpec.autonomy).toBe("auto-spec");
+		expect(autoAll.autonomy).toBe("auto-all");
+	});
+
+	test("rejects invalid autonomy via DB CHECK constraint", () => {
+		expect(() =>
+			// @ts-expect-error — testing runtime DB constraint with invalid value
+			store.create(makeMission({ autonomy: "rogue" })),
+		).toThrow();
+	});
+});
+
+// === migration v9: autonomy column ===
+
+describe("migration v9: autonomy column", () => {
+	test("autonomy column exists with default 'supervised' after migration", () => {
+		const probe = new Database(dbPath);
+		const cols = probe.prepare("PRAGMA table_info(missions)").all() as Array<{
+			name: string;
+			dflt_value: string | null;
+		}>;
+		const autonomyCol = cols.find((c) => c.name === "autonomy");
+		expect(autonomyCol).toBeDefined();
+		expect(autonomyCol?.dflt_value).toContain("supervised");
+		probe.close();
+	});
+
+	test("rows inserted via raw SQL without autonomy still parse with default", () => {
+		// Simulates a row inserted by older code paths that don't pass autonomy.
+		// SQLite default kicks in.
+		const raw = new Database(dbPath);
+		raw.exec(
+			"INSERT INTO missions (id, slug, objective, created_at, updated_at) " +
+				"VALUES ('raw-1', 'raw-slug', 'raw obj', '2026-01-01', '2026-01-01')",
+		);
+		raw.close();
+
+		const mission = store.getById("raw-1");
+		expect(mission).not.toBeNull();
+		expect(mission?.autonomy).toBe("supervised");
+	});
+
+	test("migration is idempotent (re-opening store does not fail)", () => {
+		store.close();
+		store = createMissionStore(dbPath);
+		const mission = store.create(makeMission());
+		expect(mission.autonomy).toBe("supervised");
+	});
 });
 
 // === getById / getBySlug ===

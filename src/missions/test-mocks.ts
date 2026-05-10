@@ -157,6 +157,7 @@ export function createMockMissionStore(): MissionStore & { currentNode: string |
 			learningsExtracted: false,
 			hasEmittedWsProducerWrite: false,
 			tier: null,
+			autonomy: "supervised",
 		}),
 		getBySlug: () => null,
 		getByRunId: () => null,
@@ -188,6 +189,7 @@ export function createMockMissionStore(): MissionStore & { currentNode: string |
 			learningsExtracted: false,
 			hasEmittedWsProducerWrite: false,
 			tier: m.tier ?? null,
+			autonomy: m.autonomy ?? "supervised",
 		}),
 		list: () => [],
 		delete: noop,
@@ -268,6 +270,7 @@ export function makeMission(overrides?: Partial<Mission>): Mission {
 		learningsExtracted: false,
 		hasEmittedWsProducerWrite: false,
 		tier: null,
+		autonomy: "supervised",
 		...overrides,
 	};
 }

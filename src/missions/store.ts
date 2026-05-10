@@ -12,6 +12,7 @@ import { ensureMigrations, hasColumn, type Migration, rebuildTable } from "../db
 import type {
 	InsertMission,
 	Mission,
+	MissionAutonomy,
 	MissionPhase,
 	MissionState,
 	MissionStore,
@@ -62,6 +63,7 @@ interface MissionRow {
 	learnings_extracted: number;
 	tier: string | null;
 	has_emitted_ws_producer_write: number;
+	autonomy: string;
 }
 
 const CREATE_TABLE = `
@@ -129,6 +131,7 @@ const REQUIRED_MISSION_COLUMNS = [
 	"updated_at",
 	"learnings_extracted",
 	"has_emitted_ws_producer_write",
+	"autonomy",
 ] as const;
 
 function getMissionColumns(db: Database): Set<string> {
@@ -567,6 +570,19 @@ const MISSION_MIGRATIONS: Migration[] = [
 			return checkExtended && hasColumn(db, "missions", "has_emitted_ws_producer_write");
 		},
 	},
+	{
+		version: 9,
+		description: "Add autonomy column to missions for intake-phase gate control",
+		up: (db) => {
+			if (!hasColumn(db, "missions", "autonomy")) {
+				db.exec(
+					"ALTER TABLE missions ADD COLUMN autonomy TEXT NOT NULL DEFAULT 'supervised' " +
+						"CHECK(autonomy IN ('supervised','auto-spec','auto-all'))",
+				);
+			}
+		},
+		detect: (db) => hasColumn(db, "missions", "autonomy"),
+	},
 ];
 
 /** Convert a database row (snake_case) to a Mission object (camelCase). */
@@ -599,6 +615,7 @@ function rowToMission(row: MissionRow): Mission {
 		learningsExtracted: row.learnings_extracted === 1,
 		tier: (row.tier as MissionTier | null) ?? null,
 		hasEmittedWsProducerWrite: (row.has_emitted_ws_producer_write ?? 0) === 1,
+		autonomy: (row.autonomy as MissionAutonomy | null) ?? "supervised",
 	};
 }
 
@@ -635,12 +652,13 @@ export function createMissionStore(dbPath: string): MissionStore {
 			$created_at: string;
 			$updated_at: string;
 			$tier: string | null;
+			$autonomy: string;
 		}
 	>(`
 		INSERT INTO missions
-			(id, slug, objective, run_id, artifact_root, started_at, created_at, updated_at, tier)
+			(id, slug, objective, run_id, artifact_root, started_at, created_at, updated_at, tier, autonomy)
 		VALUES
-			($id, $slug, $objective, $run_id, $artifact_root, $started_at, $created_at, $updated_at, $tier)
+			($id, $slug, $objective, $run_id, $artifact_root, $started_at, $created_at, $updated_at, $tier, $autonomy)
 	`);
 
 	const getByIdStmt = db.prepare<MissionRow, { $id: string }>(`
@@ -840,6 +858,7 @@ export function createMissionStore(dbPath: string): MissionStore {
 				$created_at: now,
 				$updated_at: now,
 				$tier: mission.tier ?? null,
+				$autonomy: mission.autonomy ?? "supervised",
 			});
 			const row = getByIdStmt.get({ $id: mission.id });
 			if (!row) {

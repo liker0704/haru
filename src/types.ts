@@ -14,6 +14,7 @@ export {
 	PLAN_REVIEW_TIER_CRITICS,
 } from "./mail/types.ts";
 export {
+	MISSION_AUTONOMIES,
 	MISSION_PHASES,
 	MISSION_STATES,
 	PENDING_INPUT_KINDS,
@@ -202,6 +203,7 @@ export type {
 	HoldoutResult,
 	InsertMission,
 	Mission,
+	MissionAutonomy,
 	MissionGraph,
 	MissionGraphEdge,
 	MissionGraphNode,

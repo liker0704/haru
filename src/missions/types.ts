@@ -185,6 +185,8 @@ export interface Mission {
 	 * Used to permanently disable the "status table not populated" fallback path in
 	 * gate evaluators once real producer wiring has demonstrated it works. */
 	hasEmittedWsProducerWrite: boolean;
+	/** Autonomy level — controls human-in-the-loop gates. Default `supervised`. */
+	autonomy: MissionAutonomy;
 }
 
 export type InsertMission = Pick<Mission, "id" | "slug" | "objective"> & {
@@ -192,6 +194,7 @@ export type InsertMission = Pick<Mission, "id" | "slug" | "objective"> & {
 	artifactRoot?: string | null;
 	startedAt?: string | null;
 	tier?: MissionTier | null;
+	autonomy?: MissionAutonomy;
 };
 
 export interface MissionSummary {
@@ -283,6 +286,21 @@ export const MISSION_TIERS: readonly MissionTier[] = ["direct", "planned", "full
 
 /** Tier ordering for transition validation. Only UP transitions allowed. */
 export const TIER_ORDER: Record<MissionTier, number> = { direct: 0, planned: 1, full: 2 };
+
+// === Mission Autonomy Types ===
+
+/**
+ * Mission autonomy level — controls which human-in-the-loop gates fire.
+ * - `supervised`: all gates active (default; safest for early dev)
+ * - `auto-spec`: skip `human-spec-review` (clarifier's spec auto-approved); plan review still active
+ * - `auto-all`: skip both `human-spec-review` and plan-review (full autonomous)
+ */
+export type MissionAutonomy = "supervised" | "auto-spec" | "auto-all";
+export const MISSION_AUTONOMIES: readonly MissionAutonomy[] = [
+	"supervised",
+	"auto-spec",
+	"auto-all",
+] as const;
 
 // === Flash Quality Types ===
 
