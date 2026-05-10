@@ -28,6 +28,16 @@ export interface MissionArtifactPaths {
 	testPlanYaml: string;
 	refactorSpecsDir: string;
 	resultsDir: string;
+	/**
+	 * Canonical product spec produced by intake-phase clarifier.
+	 *
+	 * Sections: Intent / Goal / Non-goals / User stories / Acceptance criteria /
+	 * Constraints / Suggested workstreams.
+	 *
+	 * Materialized at the artifact root (peer of mission.md) — `understand-phase`
+	 * reads it as the contract between product layer and technical planning.
+	 */
+	productSpecMd: string;
 }
 
 export interface MaterializedMissionRolePrompt {
@@ -105,6 +115,7 @@ export function getMissionArtifactPaths(
 		testPlanYaml: join(planDir, "test-plan.yaml"),
 		refactorSpecsDir: join(planDir, "refactor-specs"),
 		resultsDir: join(root, "results"),
+		productSpecMd: join(root, "product-spec.md"),
 	};
 }
 
