@@ -23,6 +23,7 @@ domains:
   - documentation
   - docs
   - error-handling
+  - watchdog
 governance:
   max_entries: 100
   warn_entries: 150
