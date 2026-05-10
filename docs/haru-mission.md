@@ -1,7 +1,7 @@
 # `ha mission`
 
 This document captures the design agreements and rationale behind `ha mission`
-mode in Overstory. It started as the RFC for the feature and now serves as the
+mode in Haru. It started as the RFC for the feature and now serves as the
 design reference for the shipped `v1`.
 
 Current references:
@@ -1052,7 +1052,7 @@ The exact filenames may differ, but the retention goal should be similar:
 mission runs must be inspectable after the fact without replaying the whole
 system from raw tmux output.
 
-### 7.3 Reuse Existing Overstory Analysis Layers
+### 7.3 Reuse Existing Haru Analysis Layers
 
 `ha mission` should not invent a parallel analytics stack if the current
 haru ecosystem already provides the right primitives.
@@ -1094,7 +1094,7 @@ That means the system should preserve enough data to later record:
 - partial outcomes
 - useful decisions and conventions that are worth carrying forward
 
-The intended direction is closer to `mulch`-style outcome history than to
+The intended direction is closer to `kura`-style outcome history than to
 throwaway debug logging.
 
 ### 7.5 Mission Result Bundle
@@ -1334,11 +1334,11 @@ The intended direction is:
 - repeated mission failure patterns can later become reusable failure records
 - partial outcomes can be tracked rather than collapsed into binary success/failure
 
-This is intentionally closer to `mulch` outcome history than to raw debug logs.
+This is intentionally closer to `kura` outcome history than to raw debug logs.
 
 ---
 
-## 8. Reuse Existing Overstory Infrastructure
+## 8. Reuse Existing Haru Infrastructure
 
 `ha mission` should be built as a product layer on top of the existing
 haru coordinator/session/mail infrastructure whenever possible.

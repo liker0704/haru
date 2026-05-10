@@ -1,4 +1,4 @@
-# Overstory Documentation
+# Haru Documentation
 
 ## Getting Started
 - [Onboarding](onboarding.md) — operator setup, first mission, agent overview
@@ -17,7 +17,7 @@
 - [Mission Implementation Plan (historical)](haru-mission-implementation.md)
 - [Runtime Adapters](runtime-adapters.md) — adding a new runtime
 - [Runtime Abstraction (design)](runtime-abstraction.md)
-- [Canopy Prompt Architecture](canopy-prompt-architecture.md)
+- [Tane Prompt Architecture](tane-prompt-architecture.md)
 - [Config Versioning](config-versioning.md)
 - [Health Scoring](health-scoring.md)
 - [Eval Framework](eval.md)
@@ -28,7 +28,7 @@
 - [Recovery](recovery.md) — snapshot/restore
 - [Agent Lifecycle](agent-lifecycle.md) — spawn/overlay/state machine
 - [Dashboard TUI](dashboard.md)
-- [Tracker Adapters](tracker-adapters.md) — seeds/beads/github
+- [Tracker Adapters](tracker-adapters.md) — suji/beads/github
 - [DB Migrations](db-migrations.md)
 
 ## Audits & Analysis

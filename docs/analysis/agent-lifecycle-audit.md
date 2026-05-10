@@ -89,7 +89,7 @@
    - Calls `transitionToCompleted()` (line 672)
    - Since capability is NOT in `PERSISTENT_CAPABILITIES`, it checks for rate limit
    - If not rate-limited, sets `state = "completed"` in SessionStore
-   - Records metrics, auto-records mulch expertise
+   - Records metrics, auto-records kura expertise
    - Clears `.current-session` marker file
 
 2. **tmux behavior**: The tmux pane command was `claude --session-id ... --append-system-prompt-file ...`. When Claude Code exits, the pane's shell exits too (the command was the shell's only job). The tmux session lingers as a dead pane but tmux eventually cleans up, or the watchdog kills it.

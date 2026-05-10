@@ -3,7 +3,7 @@
 > **Status:** Historical delivery record. Sections §3-§16 describe the original PR sequence for Epic #13 (now shipped). Section §21 is current and reflects the live `TIER_PHASES` and cell registry.
 
 This document turns the agreed `ha mission` RFC into a concrete implementation
-plan and implementation reference for Overstory.
+plan and implementation reference for Haru.
 
 Primary design source:
 
@@ -35,7 +35,7 @@ The goal is to land `ha mission` without destabilizing the current fast path.
 Implementation should follow these rules:
 
 - keep the current `ha coordinator` fast path working
-- reuse existing Overstory primitives wherever possible
+- reuse existing Haru primitives wherever possible
 - land infrastructure before prompts
 - land persistence before UI polish
 - land mission-mode features behind explicit `ha mission` entrypoints

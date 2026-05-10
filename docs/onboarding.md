@@ -1,6 +1,6 @@
-# Overstory Onboarding Guide
+# Haru Onboarding Guide
 
-Welcome to Overstory — a project-agnostic swarm system for Claude Code agent orchestration. This guide covers everything you need to get started: CLI commands, agent types, and mission lifecycle.
+Welcome to Haru — a project-agnostic swarm system for Claude Code agent orchestration. This guide covers everything you need to get started: CLI commands, agent types, and mission lifecycle.
 
 ---
 
@@ -18,7 +18,7 @@ Welcome to Overstory — a project-agnostic swarm system for Claude Code agent o
 
 ### Setup and Initialization
 
-These commands bootstrap Overstory in a new project. `ha init` creates the `.overstory/` directory containing `config.yaml`, SQLite databases (`sessions.db`, `mail.db`, `events.db`, etc.), and hooks configuration.
+These commands bootstrap Haru in a new project. `ha init` creates the `.overstory/` directory containing `config.yaml`, SQLite databases (`sessions.db`, `mail.db`, `events.db`, etc.), and hooks configuration.
 
 | Command | Purpose |
 |---------|---------|
@@ -31,7 +31,7 @@ These commands bootstrap Overstory in a new project. `ha init` creates the `.ove
 | `ha config get <key>` | Get a specific config value |
 | `ha config set <key> <value>` | Set a config value |
 | `ha update` | Refresh managed files from the installed package |
-| `ha upgrade` | Upgrade Overstory (use `--all` for all ecosystem tools) |
+| `ha upgrade` | Upgrade Haru (use `--all` for all ecosystem tools) |
 
 ---
 
@@ -71,7 +71,7 @@ See `ha sling --help` for the full flag list.
 
 ### Messaging
 
-Overstory uses a custom SQLite mail system (`mail.db`) for inter-agent communication. All messages are typed and stored durably.
+Haru uses a custom SQLite mail system (`mail.db`) for inter-agent communication. All messages are typed and stored durably.
 
 | Command | Purpose |
 |---------|---------|
@@ -183,7 +183,7 @@ Merges are handled sequentially by the coordinator to avoid conflicts. Agents ne
 
 ### Hierarchy
 
-Overstory uses a strict three-tier hierarchy with a default maximum depth of 2:
+Haru uses a strict three-tier hierarchy with a default maximum depth of 2:
 
 ```
 Orchestrator (your Claude Code session)
@@ -562,7 +562,7 @@ Additional commands not covered above. Run `ha <command> --help` for full option
 | `ha recover` | Restore from snapshot bundle |
 | `ha workflow import|sync` | Import and sync workflows from task directory |
 | `ha group create|status|add|remove|list` | Batch coordination |
-| `ha compact [domain]` | Compact mulch expertise records |
+| `ha compact [domain]` | Compact kura expertise records |
 | `ha clean` | Wipe runtime state (`--all`, `--mail`, `--sessions`, etc.) |
 | `ha spec write <task-id>` | Write task specification |
 | `ha context generate|show|invalidate` | Manage project context cache |
@@ -576,7 +576,7 @@ Additional commands not covered above. Run `ha <command> --help` for full option
 ## Quick Start Checklist
 
 ```bash
-# 1. Initialize Overstory in your project
+# 1. Initialize Haru in your project
 ha init
 
 # 2. Run the guided setup wizard (first time only)

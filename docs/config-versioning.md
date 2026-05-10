@@ -1,6 +1,6 @@
 # Versioned Config
 
-This document is the contributor guide for Overstory's config versioning system.
+This document is the contributor guide for Haru's config versioning system.
 It covers the schema version constant, the migration pipeline, strict
 unknown-field validation, and step-by-step instructions for adding new fields
 and migrations.
@@ -9,7 +9,7 @@ and migrations.
 
 ## 1. Problem: Config Drift
 
-As Overstory evolves, new config fields are added and existing fields are
+As Haru evolves, new config fields are added and existing fields are
 renamed or restructured. Without versioning:
 
 - Users on older config files get silent failures when new fields are expected.
@@ -55,7 +55,7 @@ is rejected by `validateUnknownFields()`.
 export const KNOWN_FIELDS = {
 	root: new Set([
 		"version", "project", "agents", "worktrees", "taskTracker",
-		"mulch", "merge", "providers", "watchdog", "models",
+		"kura", "merge", "providers", "watchdog", "models",
 		"logging", "coordinator", "rateLimit", "runtime",
 		"mission", "mail", "resilience", "compat", "headroom",
 		"reminders", "research", "observability", "healthPolicy",
@@ -94,7 +94,7 @@ parseYaml(text)                          # Minimal YAML parser
         |
         v
 migrateDeprecatedWatchdogKeys(parsed)    # Rename old tier1→tier0, tier2→tier1
-migrateDeprecatedTaskTrackerKeys(parsed) # Convert beads:/seeds: → taskTracker:
+migrateDeprecatedTaskTrackerKeys(parsed) # Convert beads:/suji: → taskTracker:
         |
         v
 detectConfigVersion(parsed)              # Returns ConfigVersion (1 or 2)
@@ -184,7 +184,7 @@ renamed keys:
 - `migrateDeprecatedWatchdogKeys()` -- renames old `tier1*` keys to `tier0*`
   and `tier2*` to `tier1*` (Phase 4 tier renumbering).
 - `migrateDeprecatedTaskTrackerKeys()` -- converts top-level `beads:` or
-  `seeds:` sections to the unified `taskTracker:` format.
+  `suji:` sections to the unified `taskTracker:` format.
 
 These run on both `config.yaml` and `config.local.yaml`.
 
@@ -217,7 +217,7 @@ are validated by `validateConfig()`.
 The `ha doctor` command's config category checks:
 
 - Whether `version` is present and equals `CURRENT_CONFIG_VERSION`.
-- Whether any deprecated keys remain (watchdog tier names, beads/seeds).
+- Whether any deprecated keys remain (watchdog tier names, beads/suji).
 - Whether unknown fields would fail validation.
 
 Running `ha doctor --fix` can auto-set `version: 2` in configs that lack it.

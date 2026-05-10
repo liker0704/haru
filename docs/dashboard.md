@@ -82,7 +82,7 @@ All data is collected in `loadDashboardData()` and returned as `DashboardData`.
 | Quota Headroom | `headroom.db` via pre-opened `HeadroomStore` |
 | Agents | `sessions.db` via pre-opened `SessionStore` + `getCachedWorktrees()` + `getCachedTmuxSessions()` |
 | Feed | `events.db` via pre-opened `EventStore`, buffered via `EventBuffer` |
-| Tasks | `sd`/`bd`/`gh` CLI via `TrackerClient`, cached 10s |
+| Tasks | `su`/`bd`/`gh` CLI via `TrackerClient`, cached 10s |
 | Mail | `mail.db` via pre-opened `MailStore` |
 | Merge Queue | `merge-queue.db` via pre-opened `MergeQueue` |
 | Metrics | `metrics.db` via pre-opened `MetricsStore` |
@@ -137,8 +137,7 @@ and updates the agent color map incrementally.
 ### Tracker Cache (10-second TTL)
 
 Tracker data (task list) is cached in a module-level `trackerCache` variable with
-a 10-second TTL. CLI subprocess spawning is expensive; this avoids spawning `sd
-list` on every 500ms tick.
+a 10-second TTL. CLI subprocess spawning is expensive; this avoids spawning `su list` on every 500ms tick.
 
 ### Session Fallback Cache
 
@@ -229,7 +228,7 @@ restores the terminal cursor (`CURSOR.showCursor`) before exiting.
 - **Subprocess caching:** `getCachedWorktrees()` and `getCachedTmuxSessions()`
   cache subprocess results for a short TTL to avoid spawning `git worktree list`
   and `tmux ls` on every tick.
-- **Tracker 10s cache:** `sd`/`bd`/`gh` CLI calls are expensive; the 10-second
+- **Tracker 10s cache:** `su`/`bd`/`gh` CLI calls are expensive; the 10-second
   cache prevents excessive subprocess spawning during short refresh intervals.
 
 ---

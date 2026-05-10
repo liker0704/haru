@@ -1,4 +1,4 @@
-# Overstory Architecture Review
+# Haru Architecture Review
 
 Repository review date: 2026-04-05
 Inspected commit: `e370026`
@@ -135,7 +135,7 @@ Evidence:
 
 Why this matters:
 
-- Overstory is state-heavy.
+- Haru is state-heavy.
 - Recovery, upgrades, and long-lived project state depend on predictable schema evolution.
 - Right now each store solves migration differently.
 

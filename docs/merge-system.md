@@ -1,6 +1,6 @@
 # Merge System
 
-This document is the contributor guide for Overstory's merge system. It covers
+This document is the contributor guide for Haru's merge system. It covers
 the 4-tier conflict resolution algorithm, the merge queue, conflict history
 tracking, compat checking, CLI usage, and instructions for extending the
 resolver with new resolution strategies.
@@ -19,7 +19,7 @@ The merge pipeline:
 1. Reads pending entries from the merge queue (`merge-queue.db`)
 2. Checks compatibility between the incoming branch and canonical surfaces (`ha compat check`)
 3. Attempts resolution through up to 4 tiers in order
-4. Records conflict patterns to mulch for future learning
+4. Records conflict patterns to kura for future learning
 5. Updates queue entry status and notifies the caller
 
 ---
@@ -70,7 +70,7 @@ export interface MergeResult {
 tier 2 below). `compat_failed` is a terminal status set when the compat gate
 blocks the merge before any tier is attempted (`src/commands/merge.ts:175`).
 
-`ConflictHistory` is assembled from mulch records and used to skip tiers that
+`ConflictHistory` is assembled from kura records and used to skip tiers that
 have historically failed for the same files:
 
 ```typescript
@@ -98,10 +98,10 @@ Before any tier runs, the resolver:
 
 1. Checks out the canonical branch (skips if already on it)
 2. Detects dirty tracked files — auto-commits os-eco runtime state files
-   (`.overstory/`, `.seeds/`, `.mulch/`, etc.) and stashes any remaining dirty
+   (`.overstory/`, `.suji/`, `.kura/`, etc.) and stashes any remaining dirty
    files so the merge can start cleanly (`src/merge/resolver.ts:710-741`)
 3. Removes untracked files that would be overwritten by the incoming branch
-4. Queries mulch for conflict history (`queryConflictHistory`, line 625)
+4. Queries kura for conflict history (`queryConflictHistory`, line 625)
 
 ### Tier 1: Clean Merge
 
@@ -248,7 +248,7 @@ Pass `projectRoot` when creating from a live session so migration v3 can backfil
 **Source:** `src/merge/resolver.ts:518` (`parseConflictPatterns`,
 `buildConflictHistory`)
 
-After each non-clean merge, the resolver records a pattern to mulch via
+After each non-clean merge, the resolver records a pattern to kura via
 `recordConflictPattern()` (line 643). The description follows a fixed format so
 `parseConflictPatterns()` can regex-extract it on future merges:
 

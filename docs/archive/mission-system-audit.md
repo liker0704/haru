@@ -54,7 +54,7 @@ The mission system is a **13,580 LOC** subsystem across **40 source files** (+76
 | `events.ts` | Mission event recording |
 | `narrative.ts` | Narrative builder for mission output |
 | `bundle.ts` | Export mission artifacts to results/ |
-| `learnings.ts` | Extract mulch learnings from completed missions |
+| `learnings.ts` | Extract kura learnings from completed missions |
 | `review.ts` | Post-mission review generation |
 | `holdout.ts` | 3-level holdout validation |
 | `pause.ts` | Workstream pause/resume in store |

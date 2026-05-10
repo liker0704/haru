@@ -5,17 +5,17 @@
 > pi, copilot, cursor, gemini, sapling, opencode, qwen). For the contributor
 > guide, see [runtime-adapters.md](runtime-adapters.md).
 
-> Design document for decoupling Overstory from Claude Code and enabling
+> Design document for decoupling Haru from Claude Code and enabling
 > alternative coding agent runtimes (Codex, Pi, OpenCode, Cline, others).
 
 ## Problem
 
-Overstory is tightly coupled to Claude Code. The `claude` binary name, its CLI
+Haru is tightly coupled to Claude Code. The `claude` binary name, its CLI
 flags, TUI readiness strings, hook system, `.claude/` directory conventions, and
 transcript format are hardcoded across 35 coupling points in 15+ source files.
 This locks every agent in the swarm to a single runtime.
 
-The goal is a thin abstraction layer that lets Overstory spawn agents using
+The goal is a thin abstraction layer that lets Haru spawn agents using
 **any** compatible coding agent runtime — without requiring a massive per-provider
 build-out. Each new runtime should be a ~200–400 line adapter file, not a fork of
 the orchestration engine.
@@ -191,7 +191,7 @@ Codex has two primary modes:
 - **Interactive:** `codex` launches a full-screen TUI (similar to Claude Code)
 - **Headless:** `codex exec "prompt"` processes one task and exits
 
-For Overstory, headless mode is the right fit. The agent runs, completes its
+For Haru, headless mode is the right fit. The agent runs, completes its
 task, and exits — no TUI readiness detection needed.
 
 ### Spawning a Codex Agent
@@ -202,7 +202,7 @@ codex exec --full-auto --json "Read your instructions at AGENTS.md and begin."
 
 Key flags:
 
-| Flag | Purpose | Overstory equivalent |
+| Flag | Purpose | Haru equivalent |
 |------|---------|---------------------|
 | `exec` | Headless mode, exits on completion | Replaces interactive tmux session |
 | `--full-auto` | `workspace-write` sandbox + auto-approve | `--permission-mode bypassPermissions` |
@@ -213,7 +213,7 @@ Key flags:
 ### Instruction Delivery
 
 Codex reads **`AGENTS.md`** (not `CLAUDE.md`) from the project root and any
-parent directory. Overstory's overlay generator would write to `AGENTS.md`
+parent directory. Haru's overlay generator would write to `AGENTS.md`
 instead of `.claude/CLAUDE.md` when the runtime is Codex:
 
 ```typescript
@@ -241,22 +241,22 @@ With `--json`, Codex emits NDJSON to stdout. Key event types:
 {"type":"thread.completed"}
 ```
 
-Overstory would parse this stream to populate `events.db` and `metrics.db`,
+Haru would parse this stream to populate `events.db` and `metrics.db`,
 replacing the current Claude Code hook-based event logging.
 
 ### Sandbox Model
 
 Codex has OS-level sandboxing (Seatbelt on macOS, Landlock on Linux) with three tiers:
 
-| Tier | Writes | Network | Overstory use |
+| Tier | Writes | Network | Haru use |
 |------|--------|---------|--------------|
 | `read-only` | None | No | Scout agents |
 | `workspace-write` | Project only | Configurable | Builder agents (default via `--full-auto`) |
 | `danger-full-access` | Unrestricted | Yes | Not recommended |
 
 This is stronger than Claude Code's current setup (which relies entirely on
-Overstory's PreToolUse hook guards). With Codex, the OS enforces filesystem
-boundaries — Overstory's hook-based guards become defense-in-depth rather than
+Haru's PreToolUse hook guards). With Codex, the OS enforces filesystem
+boundaries — Haru's hook-based guards become defense-in-depth rather than
 the only line of defense.
 
 Scout agents can use `--sandbox read-only` for zero-write-risk exploration.
@@ -273,7 +273,7 @@ NDJSON stream is the source of truth for lifecycle state, not pane content.
 ### Transcript Parsing
 
 Codex sessions can be persisted to disk (opt-in) or captured via the `--json`
-stdout stream. For cost tracking, Overstory captures `turn.completed` events
+stdout stream. For cost tracking, Haru captures `turn.completed` events
 which include `usage.input_tokens` and `usage.output_tokens`.
 
 ```typescript
@@ -294,7 +294,7 @@ function parseCodexEvent(line: string): TokenSnapshot | null {
 Pricing would need a separate table for OpenAI model tiers (extending the
 current Anthropic-only `MODEL_PRICING` in `transcript.ts`).
 
-### What Overstory's Hook System Becomes
+### What Haru's Hook System Becomes
 
 Claude Code hooks serve four purposes. Here's how each maps to Codex:
 
@@ -306,7 +306,7 @@ Claude Code hooks serve four purposes. Here's how each maps to Codex:
 | **Event logging** (PostToolUse, Stop) | Shell hook runs `ha log` | Parse NDJSON events directly from stdout |
 
 The key architectural shift: instead of hooks inside the agent pushing events
-out, Overstory pulls events from the agent's stdout stream. This is actually
+out, Haru pulls events from the agent's stdout stream. This is actually
 cleaner — no hook deployment, no stdin/stdout protocol differences, no shell
 script generation.
 
@@ -434,7 +434,7 @@ export const codexRuntime: AgentRuntime = {
 [Pi](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent)
 (`@mariozechner/pi-coding-agent`) is an MIT-licensed coding agent with the
 cleanest integration surface of any runtime surveyed. Its RPC mode and extension
-system make it a natural fit for Overstory's orchestration model.
+system make it a natural fit for Haru's orchestration model.
 
 ### Why Pi Stands Out
 
@@ -448,9 +448,9 @@ an afterthought, Pi has three first-class programmatic interfaces:
 | SDK (`createAgentSession`) | In-process TypeScript API | Embedded agents (no subprocess) |
 
 The RPC mode is the standout. It provides commands that map directly to
-Overstory's orchestration needs:
+Haru's orchestration needs:
 
-| RPC command | What it does | Overstory use |
+| RPC command | What it does | Haru use |
 |-------------|-------------|---------------|
 | `prompt` | Send a message to the agent | Deliver mail, follow-up instructions |
 | `steer` | Interrupt current work, redirect | Urgent orchestrator overrides |
@@ -469,7 +469,7 @@ Pi already reads the same instruction files as Claude Code:
 | `AGENTS.md` | Read as context file at startup |
 | `.claude/CLAUDE.md` | Read (traverses `.claude/` directory) |
 
-This means Overstory's existing overlay system works with Pi out of the box.
+This means Haru's existing overlay system works with Pi out of the box.
 The overlay generator writes `.claude/CLAUDE.md` in the worktree, and Pi reads
 it automatically. No adapter-level file path translation needed.
 
@@ -502,7 +502,7 @@ context, and transform messages.
 | *(none)* | `before_agent_start` | Inject messages into LLM context |
 | *(none)* | `message_update` | Stream deltas in real-time |
 
-Overstory would deploy a guard extension to each worktree:
+Haru would deploy a guard extension to each worktree:
 
 ```typescript
 // .pi/extensions/haru-guard.ts
@@ -681,7 +681,7 @@ export const piRuntime: AgentRuntime = {
 
 ACP is an emerging standard for driving coding agents via bidirectional JSON-RPC
 over stdio. Both **OpenCode** and **Cline** implement it. If ACP reaches
-critical mass, Overstory could support any ACP-compliant runtime with a single
+critical mass, Haru could support any ACP-compliant runtime with a single
 generic adapter instead of per-runtime implementations.
 
 ### What ACP Provides

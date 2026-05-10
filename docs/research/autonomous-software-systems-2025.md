@@ -292,7 +292,7 @@ autonomous coding agents:
 The most impactful memory investment is **procedural memory**: codified conventions,
 architectural decisions, known gotchas, and team norms. This is what Addyosmani's
 AGENTS.md pattern captures, what Factory's org-level memory stores, and what the
-Overstory mulch system implements.
+Haru kura system implements.
 
 **Key failure mode**: systems that lack persistent memory are junior every time they
 start. Systems with good procedural memory compound their effectiveness.
@@ -509,7 +509,7 @@ All production-grade autonomous systems use branch/worktree isolation:
 - Cursor's self-driving codebase: each worker gets an isolated repo copy
 - OpenHands: sandboxed workspace per agent session
 - GitHub Copilot Coding Agent: ephemeral Actions environment per task
-- Overstory: git worktree per spawned agent
+- Haru: git worktree per spawned agent
 
 **Why**: parallel agents inevitably produce conflicts; isolation at the worktree level
 means conflicts are surfaced explicitly at merge time rather than silently overwriting
@@ -521,7 +521,7 @@ Agents without persistent memory are perpetually junior. The most productive
 autonomous systems accumulate three types of persistent memory:
 
 1. **Procedural**: team conventions, architectural decisions, known patterns and gotchas
-   (AGENTS.md, MentorScripts, mulch records)
+   (AGENTS.md, MentorScripts, kura records)
 2. **Episodic**: past task outcomes, what approaches succeeded and failed
 3. **Semantic**: codebase structure, dependency maps, service contracts
 

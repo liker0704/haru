@@ -1,6 +1,6 @@
 # Operational Health Scoring
 
-This document is the contributor guide for Overstory's health scoring and
+This document is the contributor guide for Haru's health scoring and
 recommendation system. It covers signal collection, score computation, the
 recommendation engine, CLI commands, and instructions for adding new signals.
 

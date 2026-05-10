@@ -1,6 +1,6 @@
 # Doctor System
 
-This document is the contributor guide for Overstory's `ha doctor` health check
+This document is the contributor guide for Haru's `ha doctor` health check
 system. It covers the 11 check categories, the `DoctorCheckFn` interface, how
 `--fix` closures work, CLI usage, integration with the health scoring system, and
 instructions for adding a new category.
@@ -9,7 +9,7 @@ instructions for adding a new category.
 
 ## 1. What `ha doctor` Does
 
-`ha doctor` runs a set of modular health checks across Overstory's subsystems and
+`ha doctor` runs a set of modular health checks across Haru's subsystems and
 reports any problems. Each check produces a `pass`, `warn`, or `fail` status with
 a human-readable message and optional auto-fix.
 
@@ -96,10 +96,10 @@ Detects whether required and optional CLI tools are available on `PATH`.
 | `git` | Yes | — |
 | `bun` | Yes | — |
 | `tmux` | Yes | — |
-| `sd` or `bd` (task tracker) | Yes | — |
-| `mulch` | Yes | `ml` |
+| `su` or `bd` (task tracker) | Yes | — |
+| `kura` | Yes | `ku` |
 | `ov` | Yes | `haru` |
-| `cn` | No | — |
+| `ta` | No | — |
 
 Each tool is probed with its `--version` flag via `Bun.spawn`. A non-zero exit
 code or spawn failure produces a `fail` (required tools) or `warn` (optional).
@@ -262,7 +262,7 @@ external log management.
 
 **Source:** `src/doctor/ecosystem.ts`
 
-Validates that `ml`, `sd`, and `cn` report parseable semver versions. Unlike the
+Validates that `ku`, `su`, and `ta` report parseable semver versions. Unlike the
 `dependencies` category (which checks binary existence), `ecosystem` focuses on
 version string quality and mutual compatibility.
 
@@ -273,9 +273,9 @@ Tested tools:
 
 | Name | Binary | Package |
 |------|--------|---------|
-| mulch | `ml` | `@os-eco/mulch-cli` |
-| seeds | `sd` | `@os-eco/seeds-cli` |
-| canopy | `cn` | `@os-eco/canopy-cli` |
+| kura | `ku` | `@hana/kura-cli` |
+| suji | `su` | `@hana/suji-cli` |
+| tane | `ta` | `@hana/tane-cli` |
 
 **`--fix` support:** Yes — reinstalls the package for tools with invalid version
 strings.

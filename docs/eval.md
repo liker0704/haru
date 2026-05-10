@@ -1,6 +1,6 @@
 # Scenario-Based Eval Framework
 
-This document is the contributor guide for Overstory's eval framework. It covers
+This document is the contributor guide for Haru's eval framework. It covers
 scenario definition, assertion kinds, the runner pipeline, artifact storage, and
 a step-by-step walkthrough for writing custom scenarios.
 
@@ -365,7 +365,7 @@ loadScenario(scenarioPath)
 runEval(config)
         |
         +-- 1. Copy repo-template (if exists) or init empty git repo
-        +-- 2. ha init --yes --skip-mulch --skip-seeds --skip-canopy
+        +-- 2. ha init --yes --skip-kura --skip-suji --skip-tane
         +-- 3. Apply config_overrides to .overstory/config.yaml
         +-- 4. Run startup_actions (sequentially)
         +-- 5. ha coordinator start --no-attach

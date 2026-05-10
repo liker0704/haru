@@ -1,12 +1,12 @@
-# Overstory как автономная система разработки ПО
+# Haru как автономная система разработки ПО
 
 ## Короткий вывод
 
-Overstory уже не выглядит как “сырой агентный эксперимент”. По аудиту репозитория это зрелый CLI-фреймворк оркестрации агентов на Bun и TypeScript с graph engine миссий, DAG-фазами, SQLite mail-bus, runtime-адаптерами, watchdog, merge resolver, observability, recovery и eval framework. Самое важное: core переписывать не надо. Реалистичный путь к autonomous software development: добавить вокруг существующего `missions` graph engine несколько недостающих фаз и capabilities.
+Haru уже не выглядит как “сырой агентный эксперимент”. По аудиту репозитория это зрелый CLI-фреймворк оркестрации агентов на Bun и TypeScript с graph engine миссий, DAG-фазами, SQLite mail-bus, runtime-адаптерами, watchdog, merge resolver, observability, recovery и eval framework. Самое важное: core переписывать не надо. Реалистичный путь к autonomous software development: добавить вокруг существующего `missions` graph engine несколько недостающих фаз и capabilities.
 
 Главный разрыв сейчас не в оркестрации, а во входе и выходе. На входе не хватает слоя `intent → clarification → product-spec`. На выходе не хватает `debug/test-fix loop`, post-execution reviewers, native PR lifecycle, CI/sandbox gates и hard budget/permission enforcement. Именно поэтому самые высокие ROI-изменения: Stage A `Intake & Spec` и Stage C `Debug Loop`.
 
-## Что Overstory уже умеет
+## Что Haru уже умеет
 
 | Компонент | Текущее состояние | Почему это ценно для autonomous dev |
 |---|---|---|
@@ -22,15 +22,15 @@ Overstory уже не выглядит как “сырой агентный э�
 
 ## Сравнение с готовыми решениями
 
-| Решение | Что важно заимствовать для Overstory | Что не стоит копировать напрямую |
+| Решение | Что важно заимствовать для Haru | Что не стоит копировать напрямую |
 |---|---|---|
-| Cognition Devin | Interactive Planning, DeepWiki-like repo knowledge, fleet-mode, pre-PR review, playbooks. Devin продвигает модель, где агент сначала исследует codebase и согласует план, а не сразу пишет код ([Cognition Devin 2.0](https://cognition.ai/blog/devin-2)). | Закрытую enterprise-модель и “магический” fully autonomous UX. Overstory лучше строить как прозрачный orchestrator с трассами и gates. |
-| OpenHands | Event-sourced state, Action→Execution→Observation контракт, SecurityAnalyzer, ConfirmationPolicy. OpenHands SDK явно делает separation между agent logic, workspace и applications ([OpenHands SDK](https://arxiv.org/html/2511.03690v1)). | Полный переход на их runtime. У Overstory уже есть свой mail-bus, event store и graph engine. |
-| Aider | Repo Map через tree-sitter, graph ranking, token-budget-aware context, Architect/Editor split. Aider описывает repo map как AST + graph + ranking, а не как naive vector search ([Aider Repo Map](https://aider.chat/docs/repomap.html)). | Интерактивный pair-programming UX как основной режим. Overstory нужен async mission pipeline. |
-| Claude Code | Простая master-loop модель, project memory через `CLAUDE.md`, subagents с ограниченной глубиной, checkpoints и hooks. Anthropic формулирует routing, chaining, parallelization и evaluator-optimizer как базовые agent patterns ([Anthropic](https://www.anthropic.com/research/building-effective-agents)). | Не надо превращать Overstory в один большой Claude Code wrapper. Ценность Overstory именно в orchestration, mail-bus и multi-runtime. |
+| Cognition Devin | Interactive Planning, DeepWiki-like repo knowledge, fleet-mode, pre-PR review, playbooks. Devin продвигает модель, где агент сначала исследует codebase и согласует план, а не сразу пишет код ([Cognition Devin 2.0](https://cognition.ai/blog/devin-2)). | Закрытую enterprise-модель и “магический” fully autonomous UX. Haru лучше строить как прозрачный orchestrator с трассами и gates. |
+| OpenHands | Event-sourced state, Action→Execution→Observation контракт, SecurityAnalyzer, ConfirmationPolicy. OpenHands SDK явно делает separation между agent logic, workspace и applications ([OpenHands SDK](https://arxiv.org/html/2511.03690v1)). | Полный переход на их runtime. У Haru уже есть свой mail-bus, event store и graph engine. |
+| Aider | Repo Map через tree-sitter, graph ranking, token-budget-aware context, Architect/Editor split. Aider описывает repo map как AST + graph + ranking, а не как naive vector search ([Aider Repo Map](https://aider.chat/docs/repomap.html)). | Интерактивный pair-programming UX как основной режим. Haru нужен async mission pipeline. |
+| Claude Code | Простая master-loop модель, project memory через `CLAUDE.md`, subagents с ограниченной глубиной, checkpoints и hooks. Anthropic формулирует routing, chaining, parallelization и evaluator-optimizer как базовые agent patterns ([Anthropic](https://www.anthropic.com/research/building-effective-agents)). | Не надо превращать Haru в один большой Claude Code wrapper. Ценность Haru именно в orchestration, mail-bus и multi-runtime. |
 | GitHub Copilot Coding Agent | GitHub-native PR workflow: issue/task → branch → commits → PR → checks → review steering. GitHub описывает coding agent как cloud agent, который работает в GitHub Actions-like environment и возвращает PR ([GitHub Docs](https://docs.github.com/copilot/concepts/agents/coding-agent/about-coding-agent)). | Auto-merge по умолчанию. Для planned/full tiers merge должен оставаться human-approved. |
-| Cursor | Plan Mode, clarifying questions до execution, editable Markdown plan, parallel agents via worktrees. Cursor прямо рекомендует не запускать agent mode blindly и сначала уточнять задачу ([Cursor Agent Best Practices](https://cursor.com/blog/agent-best-practices)). | IDE-first UX. Overstory лучше держать CLI/API-first и позже добавить web UI. |
-| SWE-agent | Agent-Computer Interface, replayable trajectories, lint-on-edit guard, Docker/Modal sandbox, test failure as feedback. SWE-agent показывает, что интерфейс инструментов надо проектировать под LM, а не под человека ([SWE-agent paper](https://proceedings.neurips.cc/paper_files/paper/2024/file/5a7c947568c1b1328ccc5230172e1e7c-Paper-Conference.pdf)). | Оптимизацию только под SWE-bench. Для Overstory важнее production metrics и internal held-out benchmark. |
+| Cursor | Plan Mode, clarifying questions до execution, editable Markdown plan, parallel agents via worktrees. Cursor прямо рекомендует не запускать agent mode blindly и сначала уточнять задачу ([Cursor Agent Best Practices](https://cursor.com/blog/agent-best-practices)). | IDE-first UX. Haru лучше держать CLI/API-first и позже добавить web UI. |
+| SWE-agent | Agent-Computer Interface, replayable trajectories, lint-on-edit guard, Docker/Modal sandbox, test failure as feedback. SWE-agent показывает, что интерфейс инструментов надо проектировать под LM, а не под человека ([SWE-agent paper](https://proceedings.neurips.cc/paper_files/paper/2024/file/5a7c947568c1b1328ccc5230172e1e7c-Paper-Conference.pdf)). | Оптимизацию только под SWE-bench. Для Haru важнее production metrics и internal held-out benchmark. |
 
 ## Целевая архитектура
 
@@ -45,7 +45,7 @@ Intake phase
       ↓
 Understand phase
   existing scout/research agents
-  codebase index: AST + FTS + optional vectors + mulch
+  codebase index: AST + FTS + optional vectors + kura
       ↓
 Plan phase
   existing architect + workstream DAG
@@ -68,10 +68,10 @@ PR lifecycle
   human approval for planned/full
       ↓
 Done/deploy
-  summary, mulch learnings, optional deployer
+  summary, kura learnings, optional deployer
 ```
 
-Ключевой принцип: не делать “одного универсального агента”. Overstory уже имеет правильную форму: orchestrator + specialized capabilities + mail-bus + graph phases. Нужно усилить contract между фазами через артефакты: `intent.md`, `product-spec.md`, `technical-plan.md`, `test-report.json`, `merge-readiness-pack.json`.
+Ключевой принцип: не делать “одного универсального агента”. Haru уже имеет правильную форму: orchestrator + specialized capabilities + mail-bus + graph phases. Нужно усилить contract между фазами через артефакты: `intent.md`, `product-spec.md`, `technical-plan.md`, `test-report.json`, `merge-readiness-pack.json`.
 
 ## Стадии развития
 
@@ -101,7 +101,7 @@ Done/deploy
 - `src/memory/retrieve.ts`: API `keyword → file → symbol → snippet`.
 - Optional adapter: LanceDB/Qdrant/OpenAI/Voyage embeddings, но не как mandatory dependency.
 - Post-merge hook: incremental reindex.
-- `OVERSTORY.md`: project-level memory file с conventions, commands, architecture notes, forbidden patterns.
+- `HARU.md`: project-level memory file с conventions, commands, architecture notes, forbidden patterns.
 
 Критерий готовности: planner может получить ranked file map и suggested file scope без полного grep по репозиторию, а debugger может локализовать failing symbol через structural index.
 
@@ -144,7 +144,7 @@ Done/deploy
 
 ### Stage E: Native GitHub PR Lifecycle
 
-Цель: сделать Overstory не просто локальным orchestrator, а системой, которая доставляет изменения через нормальный PR loop. GitHub Copilot Coding Agent показывает сильный pattern: async task работает в GitHub-native workflow и возвращает PR для review ([GitHub Docs](https://docs.github.com/copilot/concepts/agents/coding-agent/about-coding-agent)).
+Цель: сделать Haru не просто локальным orchestrator, а системой, которая доставляет изменения через нормальный PR loop. GitHub Copilot Coding Agent показывает сильный pattern: async task работает в GitHub-native workflow и возвращает PR для review ([GitHub Docs](https://docs.github.com/copilot/concepts/agents/coding-agent/about-coding-agent)).
 
 Изменения:
 
@@ -155,11 +155,11 @@ Done/deploy
 - `src/notifications/external.ts`: Slack/Discord/email уведомление “PR ready for review”.
 - Policy: `direct` может auto-create PR, `planned/full` требуют human approval before merge.
 
-Критерий готовности: Overstory сам открывает PR, пишет description с evidence, ingest-ит CI checks и реагирует на review comments.
+Критерий готовности: Haru сам открывает PR, пишет description с evidence, ingest-ит CI checks и реагирует на review comments.
 
 ### Stage F: Budget Enforcement & Hard Permission Gates
 
-Цель: сделать unattended mode безопасным. В текущем Overstory есть cost tracking, но нет hard kill-switch. Для autonomous режима это критично, потому что runaway loop быстро превращается в cost amplification.
+Цель: сделать unattended mode безопасным. В текущем Haru есть cost tracking, но нет hard kill-switch. Для autonomous режима это критично, потому что runaway loop быстро превращается в cost amplification.
 
 Изменения:
 
@@ -201,7 +201,7 @@ Done/deploy
 
 ## Debugger-agent: нужен ли он
 
-Да, обязателен. Если выбирать один новый агент после product-clarifier, это debugger. Без него Overstory будет хорошо планировать и запускать workstreams, но будет ломаться на самом частом месте autonomous development: тесты красные, typecheck упал, lint упал, CI failure непонятен, acceptance criteria частично не выполнены.
+Да, обязателен. Если выбирать один новый агент после product-clarifier, это debugger. Без него Haru будет хорошо планировать и запускать workstreams, но будет ломаться на самом частом месте autonomous development: тесты красные, typecheck упал, lint упал, CI failure непонятен, acceptance criteria частично не выполнены.
 
 Debugger не должен быть “еще одним builder”. Его работа: диагностировать, ограничить scope, сделать минимальный fix, rerun gates и эскалировать, если confidence низкий. Он должен быть встроен не рядом с `execute-phase`, а прямо в нее через `verify-merge-quality`: `passed → ws_merged`, `failed → debug-phase`.
 
@@ -251,7 +251,7 @@ Output:
 
 ## Что не делать
 
-- Не переписывать `missions` на LangGraph. У Overstory уже есть хороший graph engine, mail-bus, watchdog и recovery.
+- Не переписывать `missions` на LangGraph. У Haru уже есть хороший graph engine, mail-bus, watchdog и recovery.
 - Не делать vector DB mandatory dependency. Начать с SQLite FTS5 + tree-sitter, vector backend оставить adapter-ом.
 - Не запускать code execution сразу после intent. Сначала clarification и spec approval.
 - Не делать auto-merge для `planned/full`. AI PRs требуют human review, особенно если меняются API, auth, migrations, billing или security-sensitive code.
@@ -265,12 +265,12 @@ Output:
 | 1 неделя | Stage A skeleton: `product-clarifier`, `intake-phase`, `product-spec.md`, CLI flag | Можно запускать миссию из raw intent |
 | 2-4 недели | Stage C: `debug-phase`, `test-report.json`, rerun gates, eval scenario | Система чинит красные тесты без ручного вмешательства |
 | 1-2 месяца | Stage B + D: AST/FTS repo map, security/perf reviewers, MRP | Planner/debugger получают code intelligence, PR имеет evidence pack |
-| 2-3 месяца | Stage E + F: PR lifecycle, GitHub checks, budget and permission policies | Overstory становится real async coding agent platform |
+| 2-3 месяца | Stage E + F: PR lifecycle, GitHub checks, budget and permission policies | Haru становится real async coding agent platform |
 | 3-6 месяцев | Stage G: sandbox adapters, eval-as-CI, web auth, pruning | Безопасный unattended mode |
 | 6+ месяцев | Stage H: background maintenance, CVE watcher, doc sync, deployer | Платформа начинает сама поддерживать проект |
 
 ## Финальная рекомендация
 
-Overstory стоит развивать не как “еще один coding agent”, а как orchestration substrate для autonomous software engineering. Сильная сторона проекта: он уже решает сложные engineering-проблемы, которые многие agent frameworks откладывают на потом: mail-bus, watchdog, recovery, cost metrics, runtime abstraction, review subgraphs и merge tiers.
+Haru стоит развивать не как “еще один coding agent”, а как orchestration substrate для autonomous software engineering. Сильная сторона проекта: он уже решает сложные engineering-проблемы, которые многие agent frameworks откладывают на потом: mail-bus, watchdog, recovery, cost metrics, runtime abstraction, review subgraphs и merge tiers.
 
-Первый реальный milestone: raw product intent превращается в reviewed `product-spec.md`, дальше Overstory строит plan, реализует workstreams, сам чинит test failures через debugger, собирает MRP и открывает PR. Когда этот loop стабилен, можно добавлять sandbox, security gates, budget kill-switch и background maintenance agents. После этого система уже будет не MVP, а настоящей автономной dev-платформой с controlled human-in-the-loop.
+Первый реальный milestone: raw product intent превращается в reviewed `product-spec.md`, дальше Haru строит plan, реализует workstreams, сам чинит test failures через debugger, собирает MRP и открывает PR. Когда этот loop стабилен, можно добавлять sandbox, security gates, budget kill-switch и background maintenance agents. После этого система уже будет не MVP, а настоящей автономной dev-платформой с controlled human-in-the-loop.

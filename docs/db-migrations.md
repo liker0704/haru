@@ -1,6 +1,6 @@
 # Database Migrations
 
-This document is the contributor guide for Overstory's SQLite migration
+This document is the contributor guide for Haru's SQLite migration
 framework. It covers the framework API, PRAGMA user_version versioning, the
 shared-version constraint for co-resident stores, idempotency requirements,
 WAL mode setup, and walkthroughs for adding migrations to existing stores
@@ -10,7 +10,7 @@ and bootstrapping new stores.
 
 ## 1. Overview
 
-All SQLite stores in Overstory use a shared migration framework in
+All SQLite stores in Haru use a shared migration framework in
 `src/db/migrate.ts`. Migrations are defined as a `Migration[]` array with
 a `version` number, a description, an `up()` function, and an optional
 `detect()` function for bootstrapping pre-versioned databases.
@@ -41,7 +41,7 @@ db.exec("PRAGMA busy_timeout=5000");
 ```
 
 **WAL mode** enables concurrent reads from multiple agent processes without
-blocking writes. Overstory agents read and write concurrently; the default
+blocking writes. Haru agents read and write concurrently; the default
 journal mode causes deadlocks under load.
 
 **busy_timeout=5000** instructs SQLite to retry for up to 5 seconds when it

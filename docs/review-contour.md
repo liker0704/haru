@@ -1,6 +1,6 @@
 # Review Contour
 
-This document is the contributor guide for Overstory's review contour system.
+This document is the contributor guide for Haru's review contour system.
 It covers the six scoring dimensions, the three subject types, analyzers,
 staleness detection, the ReviewStore, CLI commands, and instructions for
 adding new analyzers.

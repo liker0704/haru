@@ -1,6 +1,6 @@
-# Canopy Prompt Architecture
+# Tane Prompt Architecture
 
-How haru uses canopy for agent prompt management: inheritance chains, shared sections, variable substitution, and runtime flow.
+How haru uses tane for agent prompt management: inheritance chains, shared sections, variable substitution, and runtime flow.
 
 ## Prompt Inheritance Tree
 
@@ -68,10 +68,10 @@ shared-mandate                      (shared cross-agent mandate text)
 ov-co-creation                      (collaborative co-creation profile)
 ```
 
-### Canopy-managed standalone prompts (no inheritance, no `agents/*.md`)
+### Tane-managed standalone prompts (no inheritance, no `agents/*.md`)
 
 These are operator-invoked prompts rendered directly via `ta render`. They are
-maintained inside `.canopy/prompts.jsonl` rather than `agents/*.md`:
+maintained inside `.tane/prompts.jsonl` rather than `agents/*.md`:
 
 ```
 prioritize                          (issue prioritization)
@@ -159,7 +159,7 @@ Which specialized prompts override which inherited sections:
 
 ### Quality Gate Variables (4 formats, same content)
 
-Used in completion/capabilities sections. Canopy resolves these at render time based on the project's configured quality gates.
+Used in completion/capabilities sections. Tane resolves these at render time based on the project's configured quality gates.
 
 | Variable | Format | Example Output |
 |---|---|---|
@@ -172,8 +172,8 @@ Used in completion/capabilities sections. Canopy resolves these at render time b
 
 | Variable | Purpose | Values |
 |---|---|---|
-| `{{TRACKER_CLI}}` | CLI command name | `sd` or `bd` |
-| `{{TRACKER_NAME}}` | Human-readable name | `seeds` or `beads` |
+| `{{TRACKER_CLI}}` | CLI command name | `su` or `bd` |
+| `{{TRACKER_NAME}}` | Human-readable name | `suji` or `beads` |
 
 ### Instruction Path
 
@@ -209,7 +209,7 @@ Control                         Content
 
 ## Runtime Flow
 
-How canopy prompts are assembled and delivered to an agent:
+How tane prompts are assembled and delivered to an agent:
 
 ```
                          ha sling <task-id> --capability builder --profile ov-architecture
@@ -220,12 +220,12 @@ How canopy prompts are assembled and delivered to an agent:
            agent definition            (if --profile set)         from template
                     │                         │                          │
                     ▼                         ▼                          ▼
-           cn render builder           cn render                  Read templates/
+           ta render builder           ta render                  Read templates/
            --json                      ov-architecture            overlay.md.tmpl
                     │                  --json                          │
                     ▼                         │                        │
-           Canopy resolves:                   ▼                        │
-           base-agent                  Canopy resolves:                │
+           Tane resolves:                   ▼                        │
+           base-agent                  Tane resolves:                │
              → leaf-worker             ov-delivery                    │
                → builder                → ov-architecture             │
            Joins all sections                 │                        │
@@ -264,11 +264,11 @@ How canopy prompts are assembled and delivered to an agent:
 
 | File | Purpose |
 |---|---|
-| `.canopy/config.yaml` | Project canopy configuration |
-| `.canopy/prompts.jsonl` | All prompt versions (source of truth) |
-| `.canopy/schemas.jsonl` | Validation schemas for prompt sections |
-| `src/canopy/client.ts` | Canopy CLI wrapper (render, validate, list, show) |
-| `src/canopy/types.ts` | Domain types for canopy prompts and render results |
+| `.tane/config.yaml` | Project tane configuration |
+| `.tane/prompts.jsonl` | All prompt versions (source of truth) |
+| `.tane/schemas.jsonl` | Validation schemas for prompt sections |
+| `src/tane/client.ts` | Tane CLI wrapper (render, validate, list, show) |
+| `src/tane/types.ts` | Domain types for tane prompts and render results |
 | `src/agents/overlay.ts` | Overlay generation with variable substitution |
 | `src/commands/sling.ts` | Profile rendering during agent spawn (lines ~790-804) |
 | `templates/overlay.md.tmpl` | Overlay template with all placeholders |

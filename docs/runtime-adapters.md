@@ -1,6 +1,6 @@
 # Runtime Adapters
 
-This document is the contributor guide for Overstory's runtime adapter system.
+This document is the contributor guide for Haru's runtime adapter system.
 It covers the `AgentRuntime` interface, the nine built-in adapters, the registry
 pattern, and a step-by-step walkthrough for adding a new runtime.
 
@@ -994,7 +994,7 @@ DANGEROUS_BASH_PATTERNS = [
 // Safe Bash prefixes — checked before the blocklist
 SAFE_BASH_PREFIXES = [
   "ha ", "haru ", "bd ", "sd ",
-  "git status", "git log", "git diff", "mulch ", ...
+  "git status", "git log", "git diff", "kura ", ...
 ]
 ```
 

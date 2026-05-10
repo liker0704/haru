@@ -1,6 +1,6 @@
 # Mail System
 
-This document is the contributor guide for Overstory's inter-agent mail system.
+This document is the contributor guide for Haru's inter-agent mail system.
 It covers the SQLite store schema, message types, delivery semantics, the dead
 letter queue, broadcast topology, the nudge system, mailbox identity, concurrency
 model, and instructions for adding new message types.
@@ -10,7 +10,7 @@ model, and instructions for adding new message types.
 ## 1. What the Mail System Does
 
 The mail system is the primary communication channel between agents in an
-Overstory swarm. It replaces ad-hoc tmux key injection with a durable,
+Haru swarm. It replaces ad-hoc tmux key injection with a durable,
 inspectable, crash-safe message queue backed by SQLite.
 
 Key properties:

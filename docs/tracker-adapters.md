@@ -1,7 +1,7 @@
 # Tracker Adapters
 
-This document is the contributor guide for Overstory's task tracker subsystem.
-It covers the `TrackerClient` interface, the three built-in adapters (seeds,
+This document is the contributor guide for Haru's task tracker subsystem.
+It covers the `TrackerClient` interface, the three built-in adapters (suji,
 beads, GitHub), the factory and auto-detection logic, the GitHub poller, and
 a walkthrough for adding a new adapter.
 
@@ -9,7 +9,7 @@ a walkthrough for adding a new adapter.
 
 ## 1. Architecture Overview
 
-Every tracker operation in Overstory goes through a unified `TrackerClient`
+Every tracker operation in Haru goes through a unified `TrackerClient`
 interface. The orchestrator never calls tracker CLIs directly — it obtains a
 client from the factory and calls interface methods.
 
@@ -17,7 +17,7 @@ client from the factory and calls interface methods.
 src/tracker/
   types.ts          # TrackerClient interface + TrackerIssue type
   factory.ts        # createTrackerClient() + resolveBackend()
-  seeds.ts          # Seeds adapter (sd CLI)
+  suji.ts          # Suji adapter (su CLI)
   beads.ts          # Beads adapter (bd CLI via createBeadsClient)
   github.ts         # GitHub Issues adapter (gh CLI)
   github-poller.ts  # Background GitHub → coordinator dispatch daemon
@@ -92,12 +92,12 @@ lack a concept (e.g. GitHub has no `blocks`/`blockedBy`) leave those fields as
 function createTrackerClient(backend: TrackerBackend, cwd: string): TrackerClient
 ```
 
-`TrackerBackend` is `"seeds" | "beads" | "github"`. The factory delegates to the
+`TrackerBackend` is `"suji" | "beads" | "github"`. The factory delegates to the
 appropriate adapter constructor:
 
 | Backend | Adapter |
 |---------|---------|
-| `"seeds"` | `createSeedsTracker(cwd)` |
+| `"suji"` | `createSujiTracker(cwd)` |
 | `"beads"` | `createBeadsTracker(cwd)` |
 | `"github"` | `createGitHubTracker(cwd)` |
 
@@ -118,12 +118,12 @@ async function resolveBackend(
 Auto-detection probes the filesystem and git remote in this order:
 
 1. `"beads"` if `configBackend === "beads"` (pass-through)
-2. `"seeds"` if `configBackend === "seeds"` (pass-through)
+2. `"suji"` if `configBackend === "suji"` (pass-through)
 3. `"github"` if `configBackend === "github"` (pass-through)
-4. `"seeds"` if `.seeds/` directory exists
+4. `"suji"` if `.suji/` directory exists
 5. `"beads"` if `.beads/` directory exists
 6. `"github"` if `git remote get-url origin` returns a URL containing `github.com`
-7. `"seeds"` as the default fallback (preferred tracker for new projects)
+7. `"suji"` as the default fallback (preferred tracker for new projects)
 
 ### Configuration
 
@@ -132,18 +132,18 @@ The backend is configured in `.overstory/config.yaml`:
 ```yaml
 taskTracker:
   enabled: true
-  backend: auto   # "seeds" | "beads" | "github" | "auto"
+  backend: auto   # "suji" | "beads" | "github" | "auto"
 ```
 
 Local overrides belong in `.overstory/config.local.yaml` (not committed to git).
 
 ---
 
-## 4. Seeds Adapter
+## 4. Suji Adapter
 
-**Source:** [`src/tracker/seeds.ts`](../src/tracker/seeds.ts)
+**Source:** [`src/tracker/suji.ts`](../src/tracker/suji.ts)
 
-The seeds adapter invokes the `sd` CLI via `Bun.spawn`. Seeds uses a
+The suji adapter invokes the `su` CLI via `Bun.spawn`. Suji uses a
 `{ success, command, ...data }` JSON envelope for all responses.
 
 ### CLI Invocation Pattern
@@ -153,12 +153,12 @@ async function runSd(args, cwd, context): Promise<{ stdout, stderr }>
 ```
 
 Exit code non-zero → throws `AgentError` with detail from stderr (or the envelope's
-`error` field as fallback). Seeds may emit non-JSON lines before the JSON object;
+`error` field as fallback). Suji may emit non-JSON lines before the JSON object;
 `parseSdJson()` finds the first `{` or `[` and parses from there.
 
 ### Method Mapping
 
-| TrackerClient method | `sd` command |
+| TrackerClient method | `su` command |
 |---------------------|-------------|
 | `ready()` | `su list --status ready --json` |
 | `show(id)` | `su show <id> --json` |
@@ -168,7 +168,7 @@ Exit code non-zero → throws `AgentError` with detail from stderr (or the envel
 | `list(opts)` | `su list [--status ...] [--limit ...] --json` |
 | `sync()` | `su sync` |
 
-Priority normalization: Seeds issues with no explicit priority get `priority: 3`
+Priority normalization: Suji issues with no explicit priority get `priority: 3`
 as the default.
 
 ---
@@ -192,7 +192,7 @@ than calling the `bd` CLI directly. `createBeadsTracker(cwd)` creates a
 **Source:** [`src/tracker/github.ts`](../src/tracker/github.ts)
 
 The GitHub adapter invokes the `gh` CLI (GitHub CLI) via `Bun.spawn`. Unlike
-seeds, `gh --json` returns clean JSON arrays/objects with no envelope.
+suji, `gh --json` returns clean JSON arrays/objects with no envelope.
 
 ### Fields and Normalization
 
@@ -280,16 +280,16 @@ and may trigger GitHub API rate limits.
 
 ---
 
-## 8. Bidirectional Sync (Seeds ↔ GitHub)
+## 8. Bidirectional Sync (Suji ↔ GitHub)
 
 When `github_enabled: true` and `github_sync_on_write: true` are set in
-`.seeds/config.yaml`, the seeds CLI mirrors create/close/status-change operations
+`.suji/config.yaml`, the suji CLI mirrors create/close/status-change operations
 to GitHub Issues automatically. This bidirectional sync is handled entirely inside
-the `sd` CLI and is transparent to Overstory's tracker adapter layer.
+the `su` CLI and is transparent to Haru's tracker adapter layer.
 
-From Overstory's perspective, the seeds adapter always calls `sd <command>` and
-seeds handles propagation to GitHub. The GitHub adapter is used independently
-when the project's primary tracker is GitHub Issues (no seeds layer).
+From Haru's perspective, the suji adapter always calls `su <command>` and
+suji handles propagation to GitHub. The GitHub adapter is used independently
+when the project's primary tracker is GitHub Issues (no suji layer).
 
 ---
 
@@ -339,7 +339,7 @@ invocations; never import or bundle the tracker tool as a library dependency.
 Add the new backend to `TrackerBackend` in `src/tracker/types.ts`:
 
 ```typescript
-export type TrackerBackend = "beads" | "seeds" | "github" | "mytracker";
+export type TrackerBackend = "beads" | "suji" | "github" | "mytracker";
 ```
 
 Add the import and case to `src/tracker/factory.ts`:

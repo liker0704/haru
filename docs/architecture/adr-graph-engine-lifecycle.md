@@ -4,7 +4,7 @@
 
 **Date**: 2026-04-04
 
-**Deciders**: Overstory core team
+**Deciders**: Haru core team
 
 **References**: Issue #98 (design proposal), Bug #96 (mission stuck in understand), Bug #97 (WS2 never dispatched after WS1 merge)
 
@@ -612,7 +612,7 @@ Per-gate overrides: execution WS gates get longer ceilings (4 hours) since real 
 
 ### 11. Backward compatibility: enabling engine on existing missions
 
-**Decision**: When `graphExecution` transitions from `false` to `true` for an existing mission, the engine seeds its checkpoint from the mission's current `phase:state` instead of starting from `understand:active`.
+**Decision**: When `graphExecution` transitions from `false` to `true` for an existing mission, the engine suji its checkpoint from the mission's current `phase:state` instead of starting from `understand:active`.
 
 **Implementation**: In `runMissionTick()`, on first tick where no checkpoint exists for a mission:
 ```typescript
@@ -823,7 +823,7 @@ These events are queryable via `ha trace` and visible in `ha dashboard`.
 
 [cleanup]
   handler:
-    1. Extract learnings (ml record)
+    1. Extract learnings (ku record)
     2. Stop remaining persistent agents (analyst, architect, ED)
     3. Coordinator commits state (git add + commit, NO push)
   --cleanup_done--> [terminal: mission-complete]

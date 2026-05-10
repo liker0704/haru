@@ -1,4 +1,4 @@
-# Overstory Architecture Overview
+# Haru Architecture Overview
 
 Repository review date: 2026-04-04
 Inspected commit: `8f67ed6c`
@@ -6,7 +6,7 @@ Delta from previous review (2026-03-22, `6359e58`): 637 commits, 77.6K insertion
 
 ## 1. What This System Is
 
-Overstory is a CLI-first multi-agent orchestration engine for coding agents.
+Haru is a CLI-first multi-agent orchestration engine for coding agents.
 
 At the repository level, the project is best described as:
 
@@ -168,9 +168,9 @@ State model style:
 | Category | Primary paths | Responsibility |
 | --- | --- | --- |
 | Runtime adapters | `src/runtimes/*` | spawn, instruction deployment, readiness detection, transcripts, RPC/headless modes |
-| Task tracker adapters | `src/tracker/*` | seeds, beads, GitHub issue bridge |
+| Task tracker adapters | `src/tracker/*` | suji, beads, GitHub issue bridge |
 | Worktree control | `src/worktree/*` | git worktrees, tmux sessions, headless subprocesses |
-| Sibling tool clients | `src/mulch/*`, `src/canopy/*`, `src/beads/*` | os-eco integrations |
+| Sibling tool clients | `src/kura/*`, `src/tane/*`, `src/beads/*` | os-eco integrations |
 
 ### 3.5 Observability, Evaluation, And Operational Quality
 
@@ -199,7 +199,7 @@ State model style:
 | Observability pipeline | `src/observability/*` | async span export pipeline with bounded queue |
 | Process utilities | `src/process/*` | shared process/file helpers (extracted from watchdog) |
 | Quickstart wizard | `src/quickstart/*` | guided project setup, state detection, step engine |
-| Reminders | `src/reminders/*` | completion trends, domain coverage, mulch signals |
+| Reminders | `src/reminders/*` | completion trends, domain coverage, kura signals |
 | Research | `src/research/*` | MCP-based research runner, report parsing, output formatting |
 | Resilience | `src/resilience/*` | circuit breaker, retry with backoff, reroute decisions |
 | Web server | `src/webserver/*` | HTTP daemon, SSE connections, action routing |
@@ -302,7 +302,7 @@ Observed directionality from production code imports:
 - `commands -> config/json/logging/errors/types`
 - `commands -> sessions/worktree/events/mail/missions/runtimes`
 - `missions -> sessions/events/review/metrics`
-- `watchdog -> runtimes/sessions/worktree/events/mail/mulch`
+- `watchdog -> runtimes/sessions/worktree/events/mail/kura`
 - `runtimes -> agents/types/config`
 
 Most important non-ideal edge:
@@ -320,7 +320,7 @@ flowchart LR
 
     Commands --> Orchestration["agents | missions | merge | watchdog | recovery"]
     Commands --> Stores["sessions | mail | events | metrics | review"]
-    Commands --> Adapters["runtimes | tracker | worktree | mulch | canopy"]
+    Commands --> Adapters["runtimes | tracker | worktree | kura | tane"]
 
     Orchestration --> Stores
     Orchestration --> Adapters

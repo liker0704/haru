@@ -1,7 +1,7 @@
 # Agent Lifecycle
 
 This document is the contributor guide for the agent lifecycle subsystem in
-Overstory. It covers the spawn pipeline, overlay generation, hooks deployment,
+Haru. It covers the spawn pipeline, overlay generation, hooks deployment,
 identity and manifest management, state machine transitions, guard rules, the
 checkpoint mechanism, and a walkthrough for adding a new agent type.
 
@@ -62,8 +62,8 @@ export interface SpawnDeps {
   tracker: () => TrackerClient;
   mailStore: () => MailStore;
   mailClient: (store: MailStore) => MailClient;
-  canopy: () => CanopyClient;
-  mulch: () => MulchClient;
+  tane: () => TaneClient;
+  kura: () => KuraClient;
   runtime: () => AgentRuntime;
   missionStore?: () => MissionStore;
 
@@ -80,14 +80,14 @@ constructed on early-exit paths (validation failures, spawn-paused sentinel).
 |------|--------------|--------------|
 | 7 | `createWorktree()` | Create git worktree + branch under `.overstory/worktrees/` |
 | 8 | `writeOverlay()` | Generate + write `CLAUDE.md` (or runtime-specific instruction file) |
-| 8a | `mulch.prime()` | Pre-fetch file-scoped expertise if mulch is enabled and files are scoped |
-| 8b | `canopy.render()` | Resolve canopy profile overlay if configured |
+| 8a | `kura.prime()` | Pre-fetch file-scoped expertise if kura is enabled and files are scoped |
+| 8b | `tane.render()` | Resolve tane profile overlay if configured |
 | 8c | Project context | Load `.overstory/project-context.json` for overlay injection |
 | 9 | `runtime.deployConfig()` | Deploy capability-specific hooks guard |
 | 9b | `buildAutoDispatch()` | Queue the auto-dispatch mail before session start |
 | 10 | `tracker().claim()` | Claim tracker issue |
 | 11 | `createIdentity()` | Create identity YAML if new agent |
-| 11b | `applied-records.json` | Save applied mulch record IDs for outcome tracking |
+| 11b | `applied-records.json` | Save applied kura record IDs for outcome tracking |
 | 12 | tmux or headless | Create tmux session or `Bun.spawn()` for headless runtimes |
 | 13 | `store.upsert()` | Record session in SessionStore **before** sending beacon |
 | 13b–d | Beacon + verification | Send initial prompt, adaptive follow-up Enters, verify receipt |
@@ -142,7 +142,7 @@ template is `templates/overlay.md.tmpl` in the repo root.
 |------------|-------|
 | `{{BASE_DEFINITION}}` | Full text of the agent's `agents/<name>.md` base definition |
 | `{{SHARED_MANDATE}}` | Contents of `.overstory/agent-defs/shared-mandate.md` (if present) |
-| `{{PROFILE_INSTRUCTIONS}}` | Canopy profile content rendered at spawn time |
+| `{{PROFILE_INSTRUCTIONS}}` | Tane profile content rendered at spawn time |
 | `{{AGENT_NAME}}` | Unique agent name (e.g. `builder-abc123`) |
 | `{{TASK_ID}}` | Tracker issue ID |
 | `{{SPEC_PATH}}` | Absolute path to the task spec file |
@@ -157,7 +157,7 @@ template is `templates/overlay.md.tmpl` in the repo root.
 | `{{CAN_SPAWN}}` | Spawn permission block with example `ha sling` command |
 | `{{QUALITY_GATES}}` | Full quality gates section with gate commands |
 | `{{CONSTRAINTS}}` | Worktree isolation and write-scope constraints |
-| `{{TRACKER_CLI}}` | `sd`, `bd`, or `gh` depending on resolved backend |
+| `{{TRACKER_CLI}}` | `su`, `bd`, or `gh` depending on resolved backend |
 | `{{TRACKER_NAME}}` | Human-readable tracker name |
 | `{{INSTRUCTION_PATH}}` | Runtime-specific instruction file path |
 
@@ -377,7 +377,7 @@ affects both runtimes.
 | `SAFE_BASH_PREFIXES` | `string[]` | Bash prefixes exempt from blocklist checks |
 
 The safe prefix check runs before the blocklist. `ha `, `sd `, `git status`,
-`git log`, `git diff`, `mulch `, and similar read-only commands always pass.
+`git log`, `git diff`, `kura `, and similar read-only commands always pass.
 
 ---
 

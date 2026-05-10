@@ -1,4 +1,4 @@
-# Overstory Workflows And Diagrams
+# Haru Workflows And Diagrams
 
 Repository review date: 2026-04-05  
 Inspected commit: `e370026`
@@ -39,7 +39,7 @@ sequenceDiagram
     participant Init as ha init
     participant FS as Filesystem
     participant Git as git
-    participant Tools as mulch/seeds/canopy
+    participant Tools as kura/suji/tane
 
     User->>Init: ha init
     Init->>Git: detect project name and canonical branch
@@ -164,7 +164,7 @@ sequenceDiagram
     participant SessionStore as sessions.db
     participant Metrics as metrics.db
     participant Logs as logs/
-    participant Mulch as mulch
+    participant Kura as kura
 
     Agent->>Hooks: tool start / tool end / stop hook
     Hooks->>LogCmd: ha log <event> --stdin
@@ -172,7 +172,7 @@ sequenceDiagram
     LogCmd->>SessionStore: update last activity / completion state
     LogCmd->>EventStore: store normalized event
     LogCmd->>Metrics: parse transcript usage and cost
-    LogCmd->>Mulch: optional insight recording
+    LogCmd->>Kura: optional insight recording
 ```
 
 Headless runtime variant:
@@ -421,4 +421,4 @@ The runtime says "a few dominant loops":
 5. merge and review outcomes
 6. optionally wrap all of that in mission mode
 
-That is the real architecture of Overstory.
+That is the real architecture of Haru.

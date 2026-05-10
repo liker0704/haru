@@ -1,6 +1,6 @@
 # Recovery System
 
-This document is the contributor guide for Overstory's swarm recovery system.
+This document is the contributor guide for Haru's swarm recovery system.
 It covers the snapshot bundle format, the restore algorithm, the reconciliation
 report, CLI usage, and failure modes.
 
