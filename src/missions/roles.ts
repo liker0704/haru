@@ -16,7 +16,11 @@ import type {
 import { startPersistentAgent, stopPersistentAgent } from "../agents/persistent-root.ts";
 import { AgentError } from "../errors.ts";
 import type { Mission, MissionStore } from "../types.ts";
-import { buildMissionRoleBeacon, materializeMissionRolePrompt } from "./context.ts";
+import {
+	buildMissionRoleBeacon,
+	type MaterializedMissionRolePrompt,
+	materializeMissionRolePrompt,
+} from "./context.ts";
 import { drainAgentInbox } from "./messaging.ts";
 import { createMissionStore } from "./store.ts";
 
@@ -137,14 +141,60 @@ export async function startMissionAnalyst(
 }
 
 /**
+ * Mission analyst role variant. Determines which capability/.md is loaded.
+ *
+ * - `intake`: pre-tier-set sketch + answer clarifier questions
+ *   (`mission-analyst-intake.md`). Used by `intake-phase`.
+ * - `planned`: planned-tier full role (`mission-analyst-planned.md`).
+ * - `full`: full-tier role with architect + TDD (`mission-analyst.md`).
+ */
+export type AnalystRole = "intake" | "planned" | "full";
+
+/**
+ * Map an analyst role to its registered capability string.
+ *
+ * The role is determined by either an explicit caller argument (e.g. intake-phase
+ * passes `"intake"`) or by `mission.tier`. When tier is null and no explicit role,
+ * default to `"intake"` so pre-tier dispatches resolve correctly.
+ */
+function analystCapabilityFor(role: AnalystRole): string {
+	switch (role) {
+		case "intake":
+			return "mission-analyst-intake";
+		case "planned":
+			return "mission-analyst-planned";
+		case "full":
+			return "mission-analyst";
+	}
+}
+
+/**
+ * Resolve an analyst role from an optional explicit override and the mission's
+ * current tier. `intake` is the default when tier is null.
+ */
+function resolveAnalystRole(mission: Mission, override?: AnalystRole): AnalystRole {
+	if (override) return override;
+	if (mission.tier === "planned") return "planned";
+	if (mission.tier === "full") return "full";
+	return "intake";
+}
+
+/**
  * Ensure the mission analyst is running. If no analyst session exists or
- * it's dead, spawn one with tier-appropriate capability and slug-scoped name.
+ * it's dead, spawn one with role-appropriate capability and slug-scoped name.
+ *
+ * Pass an explicit `role` to override the tier-derived default — used by
+ * `intake-phase` to spawn the intake variant before tier is set, and by
+ * `mission-tier set` to prompt-swap into planned/full after tier is known.
  */
 export async function ensureMissionAnalyst(
 	mission: Mission,
 	overstoryDir: string,
 	projectRoot: string,
+	role?: AnalystRole,
 ): Promise<void> {
+	const resolvedRole = resolveAnalystRole(mission, role);
+
 	if (mission.analystSessionId) {
 		// Analyst already bound — check if alive
 		const { openSessionStore } = await import("../sessions/compat.ts");
@@ -160,10 +210,9 @@ export async function ensureMissionAnalyst(
 		}
 	}
 
-	// Spawn analyst with tier-appropriate capability
+	// Spawn analyst with role-appropriate capability
 	const analystName = mission.slug ? `mission-analyst-${mission.slug}` : "mission-analyst";
-	const analystCapability =
-		mission.tier === "planned" ? "mission-analyst-planned" : "mission-analyst";
+	const analystCapability = analystCapabilityFor(resolvedRole);
 	const coordAgentName = mission.slug ? `coordinator-${mission.slug}` : "coordinator";
 
 	const analystPrompt = await materializeMissionRolePrompt({
@@ -191,6 +240,39 @@ export async function ensureMissionAnalyst(
 			missionId: mission.id,
 			contextPath: analystPrompt.contextPath,
 		}),
+	});
+}
+
+/**
+ * Swap the live analyst session's role prompt to a new variant without respawning.
+ *
+ * Called by `ha mission tier set` — once tier transitions from null to
+ * direct/planned/full, the analyst's role file changes from `mission-analyst-intake`
+ * to the tier-appropriate variant. Research findings and conversation context
+ * are retained because we paste the new prompt into the same tmux session via
+ * `nudgeAgent` (existing pattern used for coordinator prompt-swap).
+ *
+ * Returns the path to the materialized prompt file. Caller is responsible for
+ * the actual nudge delivery (typically via `nudgeAgent(..., promptPath)`).
+ */
+export async function materializeAnalystRoleSwap(
+	mission: Mission,
+	overstoryDir: string,
+	role: AnalystRole,
+): Promise<MaterializedMissionRolePrompt> {
+	const analystName = mission.slug ? `mission-analyst-${mission.slug}` : "mission-analyst";
+	const capability = analystCapabilityFor(role);
+	const coordAgentName = mission.slug ? `coordinator-${mission.slug}` : "coordinator";
+
+	return materializeMissionRolePrompt({
+		overstoryDir,
+		agentName: analystName,
+		capability,
+		roleLabel: "Mission Analyst",
+		mission,
+		siblingNames: {
+			"Coordinator agent": coordAgentName,
+		},
 	});
 }
 

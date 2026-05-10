@@ -140,11 +140,48 @@ async function tierSetCommand(tierArg: string, opts: { json?: boolean }): Promis
 
 		// 5. After transaction — spawn roles and send prompt
 
-		// 6. Lazy-spawn analyst if needed
+		// 6. Spawn or prompt-swap analyst with tier-appropriate role
+		//
+		// Direct tier doesn't need an analyst (no understand/plan phase). For
+		// planned/full, either:
+		// - Analyst already alive (e.g. spawned by intake-phase) → prompt-swap
+		//   from `mission-analyst-intake` to the tier variant; conversation
+		//   context (research findings) is retained.
+		// - No analyst alive → spawn fresh with tier-appropriate role.
 		if (newTier === "planned" || newTier === "full") {
 			const freshMissionForAnalyst = missionStore.getById(mission.id);
 			if (freshMissionForAnalyst) {
-				await ensureMissionAnalyst(freshMissionForAnalyst, overstoryDir, cwd);
+				const analystRole: import("../missions/roles.ts").AnalystRole =
+					newTier === "planned" ? "planned" : "full";
+
+				// ensureMissionAnalyst is idempotent — alive sessions are reused.
+				await ensureMissionAnalyst(freshMissionForAnalyst, overstoryDir, cwd, analystRole);
+
+				// If analyst was already alive (intake variant), swap its prompt
+				// to the new role via tmux paste.
+				if (freshMissionForAnalyst.analystSessionId) {
+					try {
+						const { materializeAnalystRoleSwap } = await import("../missions/roles.ts");
+						const analystPrompt = await materializeAnalystRoleSwap(
+							freshMissionForAnalyst,
+							overstoryDir,
+							analystRole,
+						);
+						const { nudgeAgent } = await import("./nudge.ts");
+						const analystName = freshMissionForAnalyst.slug
+							? `mission-analyst-${freshMissionForAnalyst.slug}`
+							: "mission-analyst";
+						await nudgeAgent(
+							config.project.root,
+							analystName,
+							`[SYSTEM] Tier set to ${newTier}. Switching analyst role to ${analystRole}. New instructions follow.`,
+							true,
+							analystPrompt.promptPath,
+						);
+					} catch {
+						// Analyst may not be live yet — prompt file is on disk for next wake.
+					}
+				}
 			}
 		}
 
