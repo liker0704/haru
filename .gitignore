@@ -31,6 +31,7 @@ Thumbs.db
 # Environment
 .env
 .claude/.agent-env*
+.claude/scheduled_tasks.lock
 
 # Test artifacts
 coverage/
