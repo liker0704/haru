@@ -21,6 +21,10 @@ const MISSION_PENDING_SENDER_PREFIXES = [
 	"coordinator-mission-planned",
 	"coordinator-mission",
 	"coordinator",
+	// Stage A intake-phase agents — clarifier asks operator intent questions
+	// during intake; freezing the mission surfaces those Q's via standard
+	// `ha mission answer` flow.
+	"product-clarifier",
 ];
 
 export async function syncMissionPendingInputFromMail(

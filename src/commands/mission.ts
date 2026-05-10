@@ -32,6 +32,7 @@ import {
 import { resolveMissionByIdOrSlug } from "../missions/runtime-context.ts";
 import { createMissionStore } from "../missions/store.ts";
 import { missionHandoff, missionResume } from "../missions/workstream-control.ts";
+import { createMissionSpecCommand } from "./mission-spec.ts";
 import { createMissionTierCommand } from "./mission-tier.ts";
 
 export { missionRefreshBriefsCommand } from "../missions/brief-refresh.ts";
@@ -477,6 +478,7 @@ export function createMissionCommand(): Command {
 		});
 
 	cmd.addCommand(createMissionTierCommand());
+	cmd.addCommand(createMissionSpecCommand());
 
 	return cmd;
 }

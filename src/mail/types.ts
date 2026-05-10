@@ -37,7 +37,9 @@ export type MailProtocolType =
 	| "clarifier_question"
 	| "clarifier_answer"
 	| "research_complete"
-	| "spec_ready";
+	| "spec_ready"
+	| "spec_approved"
+	| "spec_rejected";
 
 /** All valid mail message types. */
 export type MailMessageType = MailSemanticType | MailProtocolType;
@@ -78,6 +80,8 @@ export const MAIL_MESSAGE_TYPES: readonly MailMessageType[] = [
 	"clarifier_answer",
 	"research_complete",
 	"spec_ready",
+	"spec_approved",
+	"spec_rejected",
 ] as const;
 
 /** Delivery state for mail reliability v2 (claim/ack semantics). */
@@ -463,6 +467,21 @@ export interface SpecReadyPayload {
 	analystQuestionCount: number;
 }
 
+/**
+ * Operator's verdict on the materialized product-spec.md. Drives the
+ * `human-spec-review` gate in supervised mode — see `ha mission spec
+ * approve|reject` and `evaluateGate("human-spec-review", ...)`.
+ */
+export interface SpecApprovedPayload {
+	missionId: string;
+}
+
+export interface SpecRejectedPayload {
+	missionId: string;
+	/** Free-text rejection reason routed to clarifier on retry. */
+	reason: string;
+}
+
 /** Maps protocol message types to their payload interfaces. */
 export interface MailPayloadMap {
 	worker_done: WorkerDonePayload;
@@ -495,4 +514,6 @@ export interface MailPayloadMap {
 	clarifier_answer: ClarifierAnswerPayload;
 	research_complete: ResearchCompletePayload;
 	spec_ready: SpecReadyPayload;
+	spec_approved: SpecApprovedPayload;
+	spec_rejected: SpecRejectedPayload;
 }

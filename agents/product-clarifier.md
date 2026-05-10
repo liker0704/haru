@@ -180,7 +180,16 @@ ha mail send --to <coordinator-or-mission-system> --type spec_ready \
 
 ## spec-rejection-loop
 
-If the operator rejects the spec at the `human-spec-review` gate (intake-phase subgraph node), you'll be re-spawned with the previous spec + reject reason in your dispatch context. Address the rejection feedback specifically; max 3 attempts before escalation.
+The operator approves or rejects the spec via `ha mission spec approve` /
+`ha mission spec reject --reason "..."` — those commands emit
+`spec_approved` / `spec_rejected` mail addressed to
+`operator-decision-${slug}`. The intake-phase gate evaluator picks them
+up and fires the matching engine trigger.
+
+On rejection you'll be re-spawned with the previous spec + reject reason in
+your dispatch context. Address the rejection feedback specifically; max 3
+attempts before escalation (intake-phase emits `mission_finding` and surfaces
+manual-action options to the operator).
 
 ## persistence-and-context-recovery
 

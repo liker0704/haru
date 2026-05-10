@@ -187,7 +187,7 @@ async function spawnEphemeralAgent(opts: {
 		[
 			"ha",
 			"sling",
-			opts.capability, // task ID positional — sling falls back to capability slug
+			opts.capability, // task ID positional — used as the agent's task slug
 			"--capability",
 			opts.capability,
 			"--name",
@@ -195,7 +195,6 @@ async function spawnEphemeralAgent(opts: {
 			"--depth",
 			"0",
 			"--skip-task-check",
-			"--no-attach",
 			"--json",
 		],
 		{
@@ -290,7 +289,24 @@ function buildHandlers(deps: PhaseCellDeps): HandlerRegistry {
 			await ctx.saveCheckpoint({ ...checkpoint, rejectionCount: count });
 
 			if (count >= MAX_SPEC_REJECTIONS) {
-				// Escalate back to human-spec-review for manual edit/cancel decision.
+				// Escalation — clarifier exhausted retry budget. Emit
+				// `mission_finding` so the operator sees a clear signal that the
+				// auto-flow stopped trying. Control returns to human-spec-review:
+				// operator can `ha mission spec approve` to proceed despite issues,
+				// `ha mission update --objective <new>` and re-spin, or
+				// `ha mission stop` to abandon.
+				try {
+					await ctx.sendMail(
+						"operator",
+						`Spec clarification exhausted (${MAX_SPEC_REJECTIONS} attempts)`,
+						"The product-clarifier hit the max retry budget. Review the latest " +
+							"product-spec.md and choose: `ha mission spec approve` (accept as-is), " +
+							"`ha mission update --objective <text>` (reset), or `ha mission stop`.",
+						"mission_finding",
+					);
+				} catch {
+					// Best-effort — never block the trigger on mail failure.
+				}
 				return { trigger: "escalate" };
 			}
 			// Loop back to clarifier for another attempt.

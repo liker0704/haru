@@ -49,7 +49,8 @@ describe("createMissionCommand", () => {
 		expect(names).toContain("update");
 		expect(names).toContain("extract-learnings");
 		expect(names).toContain("tier");
-		expect(names).toHaveLength(20);
+		expect(names).toContain("spec");
+		expect(names).toHaveLength(21);
 	});
 
 	test("answer subcommand supports --body and --file", () => {

@@ -580,6 +580,41 @@ export function evaluateAwaitSpecReady(
 }
 
 /**
+ * Supervised-mode human gate for product-spec review. Resolved by the operator
+ * via `ha mission spec approve|reject`, which emits a `spec_approved` or
+ * `spec_rejected` mail addressed to `operator-decision-${slug}`. Auto-skip for
+ * non-supervised autonomies happens at the handler layer (see intake-phase.ts);
+ * this evaluator only runs for supervised missions.
+ *
+ * Returns `met:true` with trigger `approved` or `rejected` once the operator
+ * verdict mail is observed; otherwise stays open (no nudge target — there is
+ * no agent to wake; the operator is the gate).
+ */
+export function evaluateHumanSpecReview(
+	mission: Mission,
+	mailStore: MailStore | null,
+	gateEnteredAt?: string,
+): GateEvalResult {
+	if (!mailStore) return { met: false };
+	const decisionRecipient = `operator-decision-${mission.slug}`;
+	const verdicts = mailStore.getAll({ to: decisionRecipient });
+	const verdict = verdicts.find(
+		(m) =>
+			(m.type === "spec_approved" || m.type === "spec_rejected") &&
+			(!gateEnteredAt || m.createdAt >= gateEnteredAt),
+	);
+	if (verdict) {
+		return {
+			met: true,
+			trigger: verdict.type === "spec_approved" ? "approved" : "rejected",
+		};
+	}
+	// No nudge target — operator is the gate. Watchdog will surface stuck state
+	// via gate-timeout escalation (default 1h on the human gate).
+	return { met: false };
+}
+
+/**
  * Wait for tier to be set by tier-classifier (mission.tier transitions from
  * null to direct/planned/full).
  */
@@ -661,9 +696,10 @@ export async function evaluateGate(
 		case "await-tier-set":
 			return evaluateAwaitTierSet(mission);
 		case "human-spec-review":
-			// Human gate — resolved by `ha mission answer` (or auto-skip when
-			// mission.autonomy != 'supervised', handled at engine layer).
-			return { met: false };
+			// Supervised mode: resolved by `ha mission spec approve|reject` which
+			// emits `spec_approved` / `spec_rejected` mail. Auto-spec/auto-all
+			// modes short-circuit via the handler before this evaluator runs.
+			return evaluateHumanSpecReview(mission, stores.mailStore, gateEnteredAt);
 		default:
 			return { met: false, unknown: true };
 	}
