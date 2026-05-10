@@ -16,6 +16,7 @@ export const PERSISTENT_CAPABILITIES: ReadonlySet<string> = new Set([
 	"coordinator-mission-direct",
 	"coordinator-mission-planned",
 	"mission-analyst",
+	"mission-analyst-intake",
 	"execution-director",
 	"monitor",
 	"plan-review-lead",

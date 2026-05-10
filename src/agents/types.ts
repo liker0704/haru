@@ -34,6 +34,7 @@ export const SUPPORTED_CAPABILITIES = [
 	"lead-mission",
 	"mission-analyst",
 	"mission-analyst-planned",
+	"mission-analyst-intake",
 	"execution-director",
 	"plan-review-lead",
 	"plan-devil-advocate",
@@ -43,6 +44,8 @@ export const SUPPORTED_CAPABILITIES = [
 	"plan-simulator",
 	"research-lead",
 	"researcher",
+	"product-clarifier",
+	"tier-classifier",
 ] as const;
 
 /** Union type derived from the capabilities constant. */

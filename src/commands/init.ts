@@ -332,6 +332,31 @@ export function buildAgentManifest(): AgentManifest {
 			canSpawn: false,
 			constraints: ["read-only", "no-worktree"],
 		},
+		// === Stage A intake-phase agents ===
+		"mission-analyst-intake": {
+			file: "mission-analyst-intake.md",
+			model: "opus",
+			tools: ["Read", "Glob", "Grep", "Bash"],
+			capabilities: ["research", "analyze", "synthesize", "mission", "intake"],
+			canSpawn: true,
+			constraints: ["read-only", "no-worktree"],
+		},
+		"product-clarifier": {
+			file: "product-clarifier.md",
+			model: "haiku",
+			tools: ["Read", "Glob", "Grep", "Bash"],
+			capabilities: ["clarify", "spec-author", "intake"],
+			canSpawn: false,
+			constraints: ["read-only", "no-worktree"],
+		},
+		"tier-classifier": {
+			file: "tier-classifier.md",
+			model: "haiku",
+			tools: ["Read", "Glob", "Grep", "Bash"],
+			capabilities: ["classify", "tier-classify", "intake"],
+			canSpawn: false,
+			constraints: ["read-only", "no-worktree"],
+		},
 	};
 
 	// Build capability index: map each capability to agent names that declare it
