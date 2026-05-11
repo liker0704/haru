@@ -349,6 +349,15 @@ export function buildAgentManifest(): AgentManifest {
 			canSpawn: false,
 			constraints: ["read-only", "no-worktree"],
 		},
+		// === Stage C debug-phase agent ===
+		debugger: {
+			file: "debugger.md",
+			model: "sonnet",
+			tools: ["Read", "Write", "Edit", "Glob", "Grep", "Bash"],
+			capabilities: ["debug", "fix", "diagnose"],
+			canSpawn: false,
+			constraints: [],
+		},
 	};
 
 	// Build capability index: map each capability to agent names that declare it

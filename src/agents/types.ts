@@ -45,6 +45,7 @@ export const SUPPORTED_CAPABILITIES = [
 	"researcher",
 	"product-clarifier",
 	"tier-classifier",
+	"debugger",
 ] as const;
 
 /** Union type derived from the capabilities constant. */
