@@ -793,18 +793,40 @@ function readDebugAttempts(missionStore: MissionStore, missionId: string): numbe
 	return data?.debugAttempts ?? 0;
 }
 
-/** Stage C: wait for mission-analyst's `debug_brief_ready` mail to the debugger inbox. */
+/**
+ * Stage C: wait for mission-analyst's `debug_brief_ready` mail.
+ *
+ * Fix #5 from full-PR review: debugger spawned per attempt with name
+ * `debugger-<slug>-attempt-<N>`. Gate must read the correct per-attempt inbox.
+ * Attempt counter lives in checkpoint at `done-phase:dispatch-debugger`.
+ *
+ * Fix #6 from full-PR review: filter by `dispatchedAt` (checkpoint timestamp)
+ * instead of `gateEnteredAt`. The debugger and analyst run concurrently after
+ * dispatch — by the time `request-analyst-brief` gate enters, mail may already
+ * exist. Using `gateEnteredAt` would race-condition out valid early mails.
+ */
 export function evaluateAwaitDebugBriefReady(
 	mission: Mission,
 	mailStore: MailStore | null,
-	gateEnteredAt?: string,
+	missionStore: MissionStore | null,
+	_gateEnteredAt?: string,
 ): GateEvalResult {
 	if (!mailStore) return { met: false };
-	// Brief is addressed to debugger-<slug>; check inbox for type=debug_brief_ready
-	const debuggerInbox = `debugger-${mission.slug}`;
+	const attemptN = missionStore ? readDebugAttempts(missionStore, mission.id) : 0;
+	const dispatchedAt = missionStore
+		? (() => {
+				const cp = missionStore.checkpoints.getCheckpoint(
+					mission.id,
+					"done-phase:dispatch-debugger",
+				);
+				const data = cp?.data as { dispatchedAt?: string } | null;
+				return data?.dispatchedAt;
+			})()
+		: undefined;
+	const debuggerInbox = `debugger-${mission.slug}-attempt-${attemptN}`;
 	const msgs = mailStore.getAll({ to: debuggerInbox });
 	const ready = msgs.find(
-		(m) => m.type === "debug_brief_ready" && (!gateEnteredAt || m.createdAt >= gateEnteredAt),
+		(m) => m.type === "debug_brief_ready" && (!dispatchedAt || m.createdAt >= dispatchedAt),
 	);
 	if (ready) return { met: true, trigger: "brief_ready" };
 	return {
@@ -817,19 +839,32 @@ export function evaluateAwaitDebugBriefReady(
 /**
  * Stage C: wait for debugger's verdict — either `debug_fix_committed` (→ merge step)
  * or `debug_failed` (→ check-attempts handler for retry/exhausted decision).
+ *
+ * Same dispatchedAt-based filtering as evaluateAwaitDebugBriefReady (fix #6).
  */
 export function evaluateAwaitDebugFix(
 	mission: Mission,
 	mailStore: MailStore | null,
-	gateEnteredAt?: string,
+	missionStore: MissionStore | null,
+	_gateEnteredAt?: string,
 ): GateEvalResult {
 	if (!mailStore) return { met: false };
+	const dispatchedAt = missionStore
+		? (() => {
+				const cp = missionStore.checkpoints.getCheckpoint(
+					mission.id,
+					"done-phase:dispatch-debugger",
+				);
+				const data = cp?.data as { dispatchedAt?: string } | null;
+				return data?.dispatchedAt;
+			})()
+		: undefined;
 	const coordinatorName = `coordinator-${mission.slug}`;
 	const msgs = mailStore.getAll({ to: coordinatorName });
 	const verdict = msgs.find(
 		(m) =>
 			(m.type === "debug_fix_committed" || m.type === "debug_failed") &&
-			(!gateEnteredAt || m.createdAt >= gateEnteredAt),
+			(!dispatchedAt || m.createdAt >= dispatchedAt),
 	);
 	if (verdict) {
 		return {
@@ -927,9 +962,19 @@ export async function evaluateGate(
 				gateEnteredAt,
 			);
 		case "request-analyst-brief":
-			return evaluateAwaitDebugBriefReady(mission, stores.mailStore, gateEnteredAt);
+			return evaluateAwaitDebugBriefReady(
+				mission,
+				stores.mailStore,
+				stores.missionStore ?? null,
+				gateEnteredAt,
+			);
 		case "await-debug-fix":
-			return evaluateAwaitDebugFix(mission, stores.mailStore, gateEnteredAt);
+			return evaluateAwaitDebugFix(
+				mission,
+				stores.mailStore,
+				stores.missionStore ?? null,
+				gateEnteredAt,
+			);
 		default:
 			return { met: false, unknown: true };
 	}

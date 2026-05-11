@@ -126,6 +126,13 @@ function buildSubgraph(_config: PhaseCellConfig): MissionGraph {
 				trigger: "debugger_dispatched",
 			},
 			{
+				// Fix #4 from full-PR review: infrastructure failure (no projectRoot,
+				// no featureBranch, worktree-add failed) short-circuits to escalation.
+				from: `${CELL_TYPE}:dispatch-debugger`,
+				to: `${CELL_TYPE}:escalate`,
+				trigger: "dispatch_failed",
+			},
+			{
 				from: `${CELL_TYPE}:request-analyst-brief`,
 				to: `${CELL_TYPE}:await-debug-fix`,
 				trigger: "brief_ready",
@@ -184,12 +191,13 @@ function buildHandlers(deps: PhaseCellDeps): HandlerRegistry {
 	return {
 		"dispatch-debugger": async (ctx) => {
 			const mission = ctx.getMission();
-			if (!mission) return { trigger: "debugger_dispatched" };
+			if (!mission) return { trigger: "dispatch_failed" };
 			const projectRoot = deps.projectRoot;
 			const overstoryDir = deps.overstoryDir;
 			if (!projectRoot || !overstoryDir) {
-				// Required deps missing — can't spawn worktree or sling. Treat as fail.
-				return { trigger: "debugger_dispatched" };
+				// Required deps missing — can't spawn worktree or sling. Escalate
+				// immediately rather than burn attempts on infrastructure failure.
+				return { trigger: "dispatch_failed" };
 			}
 
 			// Increment attempt counter (stored on this node's checkpoint)
@@ -203,7 +211,7 @@ function buildHandlers(deps: PhaseCellDeps): HandlerRegistry {
 			const featureBranch = mission.featureBranch ?? null;
 			if (!featureBranch) {
 				// Should not reach here — holdout_skip should have fired upstream.
-				return { trigger: "debugger_dispatched" };
+				return { trigger: "dispatch_failed" };
 			}
 
 			// N7 fix: re-resolve feature-branch HEAD fresh each attempt so prior
@@ -240,14 +248,17 @@ function buildHandlers(deps: PhaseCellDeps): HandlerRegistry {
 			if (addExit !== 0) {
 				const stderr = await new Response(addProc.stderr).text();
 				process.stderr.write(`[dispatch-debugger] worktree add failed: ${stderr.slice(0, 200)}\n`);
-				// Persist failure state and let check-debug-attempts loop / escalate.
+				// Fix #4 from full-PR review: short-circuit to escalation. Plan
+				// §S8 risk-7: "worktree creation fails → escalate immediately, not
+				// retry". Wasting 3 attempts on infrastructure failures the
+				// debugger has no power to fix burns tokens for nothing.
 				deps.missionStore.checkpoints.saveCheckpoint(mission.id, `${CELL_TYPE}:dispatch-debugger`, {
 					debugAttempts,
 					worktreeAddFailed: true,
 					stderr: stderr.slice(0, 500),
 					dispatchedAt: new Date().toISOString(),
 				});
-				return { trigger: "debugger_dispatched" };
+				return { trigger: "dispatch_failed" };
 			}
 
 			// Spawn debugger via sling. Add debug attempts dir + brief path to

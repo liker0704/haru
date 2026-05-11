@@ -178,19 +178,27 @@ async function runRetry(missionArg: string | undefined, opts: { json?: boolean }
 	// dispatch-debugger's `git worktree add` will collide on path reuse.
 	await cleanupDebugWorktrees(projectRoot, overstoryDir, mission.slug);
 
-	// Reset attempt counter (next dispatch reads 0 + 1 = 1).
+	// Reset attempt counter + clear paused state + move node back to holdout.
+	// Fix #3 from full-PR review: atomic — otherwise the watchdog tick could
+	// observe an inconsistent intermediate state (e.g. unfrozen + still on
+	// debug-paused terminal) and trigger spurious auto-completion via the
+	// terminal-status branch in mission-tick.ts.
 	const missionStore = createMissionStore(join(overstoryDir, "sessions.db"));
 	try {
-		missionStore.checkpoints.saveCheckpoint(mission.id, "done-phase:dispatch-debugger", {
-			debugAttempts: 0,
-			resetByOperator: true,
-			resetAt: new Date().toISOString(),
+		missionStore.transaction(() => {
+			missionStore.checkpoints.saveCheckpoint(mission.id, "done-phase:dispatch-debugger", {
+				debugAttempts: 0,
+				resetByOperator: true,
+				resetAt: new Date().toISOString(),
+			});
+			// Move current node back BEFORE unfreezing so engine sees consistent state.
+			missionStore.updateCurrentNode(mission.id, "done-phase:holdout");
+			missionStore.updatePauseReason(mission.id, null);
+			missionStore.unfreeze(mission.id);
+			// Clear stale gate state so the rerun starts cleanly (fresh entered_at,
+			// no leftover resolved_at filter clobbering result-file detection).
+			missionStore.resetGateState(mission.id, "done-phase:holdout");
 		});
-		// Unfreeze — engine re-evaluates done-phase:holdout on next tick.
-		missionStore.unfreeze(mission.id);
-		missionStore.updatePauseReason(mission.id, null);
-		// Move current node back to the holdout gate so engine retries.
-		missionStore.updateCurrentNode(mission.id, "done-phase:holdout");
 	} finally {
 		missionStore.close();
 	}

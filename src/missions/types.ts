@@ -207,10 +207,11 @@ export interface Mission {
 	 * `.overstory/session-branch.txt` (if exists) or `config.project.canonicalBranch`
 	 * — mirrors merge command resolution (`src/commands/merge.ts:153-169`).
 	 *
-	 * Legacy missions get null; Stage C evaluator emits "holdout_skip" trigger
+	 * Legacy missions (pre-Stage-C) and test fixtures may omit this. Stage C
+	 * evaluator treats both null and missing-from-row as "holdout_skip" trigger
 	 * preserving pre-Stage-C behavior (graceful degradation, no SQL backfill needed).
 	 */
-	featureBranch: string | null;
+	featureBranch?: string | null;
 }
 
 export type InsertMission = Pick<Mission, "id" | "slug" | "objective"> & {
