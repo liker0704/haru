@@ -1,0 +1,19 @@
+# Stage C debug-loop assertions. Bound to scenario.yaml.
+#
+# NOTE: This is a SKELETON. Full debug-loop wiring (done-phase subgraph,
+# handlers, debugger spawn) lands in Wave 3 (S8-S10). Until then, these
+# assertions are aspirational targets — they declare the success contract
+# but won't all pass on an unwired runtime.
+#
+# Existing assertion kinds (see src/eval/assertions.ts): min_workers_spawned,
+# tasks_completed, no_zombies, max_stall_rate. Stage C needs new kinds
+# (debug_attempt_count, mission_auto_completed, etc.) added in Wave 3.
+
+assertions:
+  - kind: no_zombies
+    label: "No zombie agents after debug-loop completes"
+    expected: true
+
+  - kind: max_stall_rate
+    label: "Debug loop does not stall the watchdog"
+    expected: 0.0

@@ -503,6 +503,13 @@ export interface DebugBriefRequestPayload {
 	attemptN: number;
 	integrationBranch: string;
 	integrationSha: string;
+	/**
+	 * Agent name to address the resulting `debug_brief_ready` mail to.
+	 * Engine stamps this when dispatching debugger (typically
+	 * `debugger-<slug>-attempt-<N>`) so analyst doesn't have to guess
+	 * the per-attempt naming convention.
+	 */
+	debuggerName: string;
 	/** Subset of HoldoutCheck — id/level/name/status/message only (no details). */
 	failedGates: Array<{
 		id: string;

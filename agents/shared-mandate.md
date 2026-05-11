@@ -16,7 +16,7 @@ If you dispatch work to another agent (via `ha sling`, `ha mail send --type disp
 
 Applies when you receive mail with `--type debug_brief_request` (Stage C debug-loop). The request payload tells you which workstreams failed post-merge holdout gates and where the debugger expects context.
 
-**Recipient:** any agent with mission knowledge — typically the mission-analyst (intake / planned / full variant), since they already know the spec, plan, and research. Other agents may ignore this protocol.
+**Recipient:** mission-analyst variants ONLY (intake / planned / full). Builders, scouts, leads, and other agents inherit this protocol via shared-mandate injection but **must not act on `debug_brief_request` mail** — if you receive one and your role is not `mission-analyst-*`, reply to the sender with `--type error` and the body "Routing error: debug_brief_request should target mission-analyst, not <your-role>". Do not write a brief.
 
 **Your job is to package a debug-brief.md for the debugger** so it can apply a surgical fix without re-deriving the whole mission context.
 
@@ -47,10 +47,10 @@ Applies when you receive mail with `--type debug_brief_request` (Stage C debug-l
    ## Spec context
    <excerpt from product-spec.md acceptance criteria touching the failing area>
    ```
-6. **Send `debug_brief_ready` mail** to `debugger-<slug>`:
+6. **Send `debug_brief_ready` mail** to the debugger. The `debug_brief_request` payload includes `debuggerName` — use that exact address (typically `debugger-<slug>-attempt-<N>` — the engine knows the attempt N, you don't have to guess):
    ```bash
-   ha mail send --to debugger-<slug> --subject "Debug brief ready (attempt N)" \
-     --type debug_brief_ready --payload '{"briefPath":"...","suggestedRootCauses":[...]}'
+   ha mail send --to <payload.debuggerName> --subject "Debug brief ready (attempt N)" \
+     --type debug_brief_ready --payload '{"briefPath":"...","suggestedRootCauses":[...],"attemptN":N}'
    ```
 7. Stay in `state=waiting` — you may receive another `debug_brief_request` if a subsequent attempt fails with different gates.
 

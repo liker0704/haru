@@ -53,7 +53,7 @@ You do **one attempt per spawn**. The engine drives the loop — it spawns a fre
 
 3. **Pick the top hypothesis.** If you disagree with the ranking, note your reasoning but still start with the analyst's #1. They have full mission context; you have a narrow surgical view.
 
-4. **Write `attempts/<N>/hypothesis.md`** in the mission artifact root **before editing code**. Template:
+4. **Write `attempts/<N>/hypothesis.md`** in the mission artifact root **before editing code**. The Wave 3 dispatch handler adds `debug/attempts/<N>/**` to your FILE_SCOPE as an explicit exception to PATH_BOUNDARY_VIOLATION (your worktree is isolated, but the mission artifact root is a permitted write target for debug records). Template:
    ```markdown
    # Attempt N — Hypothesis
    ## Chosen hypothesis
