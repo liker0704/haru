@@ -1,0 +1,99 @@
+description: "Stage C debug-loop: planted broken test triggers debugger; mission auto-completes after fix"
+timeout_ms: 1800000
+
+# Stage C debug-loop eval. Validates the post-merge integration gate:
+# - All workstreams merge into mission feature branch
+# - done-phase:holdout async evaluator spawns holdout-runner subprocess
+# - L1 quality gates fail on planted bug
+# - dispatch-debugger handler creates worktree + spawns debugger
+# - mission-analyst packages debug-brief.md (via shared-mandate protocol)
+# - debugger applies minimal fix, sends debug_fix_committed
+# - merge-debug-fix ff-merges debug branch into feature branch
+# - re-run holdout → pass
+# - mission auto-completes (Wave 1 S5 bug fix)
+#
+# NOTE: full e2e execution requires Wave 3 done-phase subgraph wired.
+# This file is a behavioral contract until then.
+
+fixtures:
+  # Happy path: trivially fixable bug
+  fixable_assertion:
+    description: |
+      A workstream's source file contains `return 4 + 5` but the test asserts
+      `expect(result).toBe(9)`. We plant a regression: change source to
+      `return 4 + 4`. Debugger should localize, hypothesize "wrong operand",
+      restore the correct value, re-run gates → green.
+    plant:
+      file: "src/example/compute.ts"
+      replace:
+        from: "return 4 + 5"
+        to: "return 4 + 4"
+    expected_attempts_max: 2
+    expected_outcome: "auto_completed"
+    expected_artifacts:
+      - "debug/debug-brief.md"
+      - "debug/attempts/1/hypothesis.md"
+      - "debug/attempts/1/test-report.json"
+      # No consultation-request-pack.md on happy path
+
+  # Multi-attempt: debugger needs to try twice
+  needs_retry:
+    description: |
+      First hypothesis is wrong (e.g., suspected wrong file). On attempt 1,
+      debugger edits an unrelated import path. Gates still fail. On attempt 2,
+      debugger re-reads brief, picks 2nd-ranked hypothesis, fixes the right
+      file. Mission completes with 2 attempts logged.
+    plant:
+      file: "src/example/compute.ts"
+      replace:
+        from: "function add(a: number, b: number): number"
+        to: "function add(a: number, b: string): number"  # type mismatch
+    misleading_brief: true  # Force analyst to suggest wrong file first
+    expected_attempts_max: 3
+    expected_outcome: "auto_completed"
+
+  # Escalation path: un-fixable assertion
+  contradictory_test:
+    description: |
+      Test asserts `expect(true).toBe(false)` — impossible to satisfy without
+      editing the test (forbidden by no-test-edit policy). All 3 attempts
+      fail with debug_failed. Engine writes consultation-request-pack.md and
+      pauses mission with pendingInputKind="debug-escalation".
+    plant:
+      file: "src/example/contradictory.test.ts"
+      content: |
+        import { test, expect } from "bun:test";
+        test("impossible", () => {
+          expect(true).toBe(false);
+        });
+    expected_attempts_max: 3
+    expected_outcome: "paused_escalation"
+    expected_artifacts:
+      - "debug/consultation-request-pack.md"
+      - "debug/attempts/1/hypothesis.md"
+      - "debug/attempts/2/hypothesis.md"
+      - "debug/attempts/3/hypothesis.md"
+    expected_mission_state:
+      state: "frozen"
+      pendingInputKind: "debug-escalation"
+
+  # Legacy graceful degradation
+  legacy_null_feature_branch:
+    description: |
+      Pre-Stage-C mission has null featureBranch (no migration backfill).
+      evaluateHoldoutGate emits holdout_skip trigger. Mission auto-completes
+      via cleanup → complete edge without invoking debugger.
+    setup:
+      mission_feature_branch: null
+    expected_outcome: "auto_completed"
+    expected_no_subprocess_spawned: true
+
+  # Crash detection
+  subprocess_crash:
+    description: |
+      holdout-runner subprocess crashes silently (simulated SIGKILL after
+      spawn). Evaluator detects via isProcessRunning(pid) returning false
+      with result file absent. Emits holdout_fail; engine dispatches debugger.
+    simulate_subprocess_crash: true
+    expected_attempts_min: 1
+    expected_outcome: "auto_completed_or_escalated"
