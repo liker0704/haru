@@ -60,8 +60,12 @@ function checkSections(content: string, required: string[]): string[] {
 /**
  * Run quality gates from project config instead of hardcoded bun commands.
  * Falls back to DEFAULT_QUALITY_GATES if config has no gates defined.
+ *
+ * Exported for Stage C debug-loop: invoked by `holdout-runner.ts` subprocess
+ * to run gates on the mission feature branch worktree without full holdout
+ * orchestration (no L2/L3 structural checks, no kura side-effects).
  */
-async function checkQualityGates(
+export async function checkQualityGates(
 	projectRoot: string,
 	qualityGates: ReadonlyArray<{ name: string; command: string; description?: string }>,
 	run: (

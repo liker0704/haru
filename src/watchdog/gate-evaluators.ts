@@ -677,6 +677,158 @@ export function evaluateAwaitTierSet(mission: Mission): GateEvalResult {
 	};
 }
 
+/**
+ * Stage C: post-merge holdout gate (was: dead-code `done-phase:holdout` per concept review).
+ *
+ * Spawns a detached subprocess running `holdout-runner.ts` against the mission
+ * feature branch worktree, polling `<artifactRoot>/debug/holdout-result-<attemptN>.json`
+ * for the JSON result. Daemon never blocks >100ms; subprocess survives parent
+ * restart via `detached: true` + `unref()` (pattern from `src/commands/watch.ts:163-173`).
+ *
+ * Result triggers:
+ *   - `holdout_pass`: all gates green → cleanup → mission auto-completes
+ *   - `holdout_fail`: one or more gates red → dispatch-debugger (debug-loop entry)
+ *   - `holdout_skip`: legacy mission with null featureBranch (graceful degradation)
+ */
+export async function evaluateHoldoutGate(
+	mission: Mission,
+	missionStore: MissionStore | null,
+	artifactRoot: string,
+	_gateEnteredAt?: string,
+): Promise<GateEvalResult> {
+	// Legacy in-flight mission (pre-Stage-C) — no integration target known.
+	// Skip cleanly so the mission auto-completes via pre-existing path.
+	if (!mission.featureBranch) {
+		return { met: true, trigger: "holdout_skip" };
+	}
+	if (!missionStore) return { met: false };
+
+	const attemptN = readDebugAttempts(missionStore, mission.id);
+	const resultPath = `${artifactRoot}/debug/holdout-result-${attemptN}.json`;
+	const resultFile = Bun.file(resultPath);
+
+	if (await resultFile.exists()) {
+		const parsed = (await resultFile.json()) as {
+			checks: Array<{ status: string; level: number; name: string }>;
+		};
+		const allPassed = parsed.checks.every((c) => c.status === "pass" || c.status === "skip");
+		missionStore.checkpoints.saveCheckpoint(mission.id, "done-phase:holdout", {
+			attemptN,
+			checks: parsed.checks,
+			completedAt: new Date().toISOString(),
+		});
+		return {
+			met: true,
+			trigger: allPassed ? "holdout_pass" : "holdout_fail",
+		};
+	}
+
+	// No result file yet — check subprocess state via checkpoint
+	const cp = missionStore.checkpoints.getCheckpoint(mission.id, "done-phase:holdout");
+	const cpData = cp?.data as { pid?: number; attemptN?: number; startedAt?: string } | null;
+
+	if (cpData?.pid && cpData.attemptN === attemptN) {
+		// Subprocess in flight; trust it
+		return {
+			met: false,
+			nudgeMessage: `Quality gates running (pid ${cpData.pid}, attempt ${attemptN})`,
+		};
+	}
+
+	// Need to spawn fresh subprocess.
+	const runnerPath = new URL("../missions/holdout-runner.ts", import.meta.url).pathname;
+	// Strip wal trailing slashes / quotes that Bun.spawn doesn't accept gracefully:
+	// Ensure debug dir exists for result file output.
+	const debugDir = `${artifactRoot}/debug`;
+	await Bun.write(`${debugDir}/.keep`, "");
+
+	const subproc = Bun.spawn(
+		[
+			"bun",
+			"run",
+			runnerPath,
+			mission.id,
+			String(attemptN),
+			mission.featureBranch, // feature branch ref; runner cwd-s to worktree
+			resultPath,
+		],
+		{
+			detached: true,
+			stdio: ["ignore", "ignore", "ignore"],
+		},
+	);
+	subproc.unref();
+
+	missionStore.checkpoints.saveCheckpoint(mission.id, "done-phase:holdout", {
+		pid: subproc.pid,
+		attemptN,
+		startedAt: new Date().toISOString(),
+	});
+
+	return {
+		met: false,
+		nudgeMessage: `Quality gates dispatched (pid ${subproc.pid}, attempt ${attemptN})`,
+	};
+}
+
+/** Read current debug attempt counter from checkpoint stored by dispatch-debugger handler. */
+function readDebugAttempts(missionStore: MissionStore, missionId: string): number {
+	const cp = missionStore.checkpoints.getCheckpoint(missionId, "done-phase:dispatch-debugger");
+	const data = cp?.data as { debugAttempts?: number } | null;
+	return data?.debugAttempts ?? 0;
+}
+
+/** Stage C: wait for mission-analyst's `debug_brief_ready` mail to the debugger inbox. */
+export function evaluateAwaitDebugBriefReady(
+	mission: Mission,
+	mailStore: MailStore | null,
+	gateEnteredAt?: string,
+): GateEvalResult {
+	if (!mailStore) return { met: false };
+	// Brief is addressed to debugger-<slug>; check inbox for type=debug_brief_ready
+	const debuggerInbox = `debugger-${mission.slug}`;
+	const msgs = mailStore.getAll({ to: debuggerInbox });
+	const ready = msgs.find(
+		(m) => m.type === "debug_brief_ready" && (!gateEnteredAt || m.createdAt >= gateEnteredAt),
+	);
+	if (ready) return { met: true, trigger: "brief_ready" };
+	return {
+		met: false,
+		nudgeTarget: `mission-analyst-${mission.slug}`,
+		nudgeMessage: "Package failure context into debug-brief.md; send debug_brief_ready mail.",
+	};
+}
+
+/**
+ * Stage C: wait for debugger's verdict — either `debug_fix_committed` (→ merge step)
+ * or `debug_failed` (→ check-attempts handler for retry/exhausted decision).
+ */
+export function evaluateAwaitDebugFix(
+	mission: Mission,
+	mailStore: MailStore | null,
+	gateEnteredAt?: string,
+): GateEvalResult {
+	if (!mailStore) return { met: false };
+	const coordinatorName = `coordinator-${mission.slug}`;
+	const msgs = mailStore.getAll({ to: coordinatorName });
+	const verdict = msgs.find(
+		(m) =>
+			(m.type === "debug_fix_committed" || m.type === "debug_failed") &&
+			(!gateEnteredAt || m.createdAt >= gateEnteredAt),
+	);
+	if (verdict) {
+		return {
+			met: true,
+			trigger: verdict.type === "debug_fix_committed" ? "fix_committed" : "fix_failed",
+		};
+	}
+	return {
+		met: false,
+		nudgeTarget: `debugger-${mission.slug}`,
+		nudgeMessage: "Apply minimal fix per debug-brief; commit and send debug_fix_committed.",
+	};
+}
+
 /** Dispatch gate evaluator based on the current node ID. */
 export async function evaluateGate(
 	nodeId: string,
@@ -747,6 +899,13 @@ export async function evaluateGate(
 			// emits `spec_approved` / `spec_rejected` mail. Auto-spec/auto-all
 			// modes short-circuit via the handler before this evaluator runs.
 			return evaluateHumanSpecReview(mission, stores.mailStore, gateEnteredAt);
+		// Stage C debug-loop gates
+		case "holdout":
+			return evaluateHoldoutGate(mission, stores.missionStore ?? null, artifactRoot, gateEnteredAt);
+		case "request-analyst-brief":
+			return evaluateAwaitDebugBriefReady(mission, stores.mailStore, gateEnteredAt);
+		case "await-debug-fix":
+			return evaluateAwaitDebugFix(mission, stores.mailStore, gateEnteredAt);
 		default:
 			return { met: false, unknown: true };
 	}
