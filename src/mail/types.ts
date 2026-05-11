@@ -39,7 +39,12 @@ export type MailProtocolType =
 	| "research_complete"
 	| "spec_ready"
 	| "spec_approved"
-	| "spec_rejected";
+	| "spec_rejected"
+	| "debug_brief_request"
+	| "debug_brief_ready"
+	| "debug_fix_committed"
+	| "debug_failed"
+	| "debug_escalation";
 
 /** All valid mail message types. */
 export type MailMessageType = MailSemanticType | MailProtocolType;
@@ -82,6 +87,11 @@ export const MAIL_MESSAGE_TYPES: readonly MailMessageType[] = [
 	"spec_ready",
 	"spec_approved",
 	"spec_rejected",
+	"debug_brief_request",
+	"debug_brief_ready",
+	"debug_fix_committed",
+	"debug_failed",
+	"debug_escalation",
 ] as const;
 
 /** Delivery state for mail reliability v2 (claim/ack semantics). */
@@ -482,6 +492,62 @@ export interface SpecRejectedPayload {
 	reason: string;
 }
 
+/**
+ * Stage C debug-loop protocol payloads. See `docs/architecture/decomposition-issue-tree.md`
+ * §OV-PHASE4 and plan `/home/liker2/.claude/plans/2-stage-c-debug-loop.md`.
+ */
+
+/** Engine → mission-analyst: pack failure context into debug-brief.md. */
+export interface DebugBriefRequestPayload {
+	missionId: string;
+	attemptN: number;
+	integrationBranch: string;
+	integrationSha: string;
+	/** Subset of HoldoutCheck — id/level/name/status/message only (no details). */
+	failedGates: Array<{
+		id: string;
+		level: number;
+		name: string;
+		status: string;
+		message: string;
+	}>;
+}
+
+/** mission-analyst → debugger: brief ready, here are hypotheses. */
+export interface DebugBriefReadyPayload {
+	missionId: string;
+	attemptN: number;
+	briefPath: string;
+	suggestedRootCauses: string[];
+	suspectedWorkstream?: string;
+}
+
+/** Debugger → engine: fix committed to debug worktree branch. */
+export interface DebugFixCommittedPayload {
+	missionId: string;
+	attemptN: number;
+	worktreeBranch: string;
+	commitSha: string;
+	/** Path to attempt's test-report.json (local re-run results). */
+	reportPath: string;
+}
+
+/** Debugger → engine: attempt failed; no fix this iteration. */
+export interface DebugFailedPayload {
+	missionId: string;
+	attemptN: number;
+	reason: string;
+	/** New hypothesis the debugger would try next (informational). */
+	hypothesis: string;
+}
+
+/** Engine → operator: max attempts exhausted, manual intervention needed. */
+export interface DebugEscalationPayload {
+	missionId: string;
+	totalAttempts: number;
+	packPath: string;
+}
+
 /** Maps protocol message types to their payload interfaces. */
 export interface MailPayloadMap {
 	worker_done: WorkerDonePayload;
@@ -516,4 +582,9 @@ export interface MailPayloadMap {
 	spec_ready: SpecReadyPayload;
 	spec_approved: SpecApprovedPayload;
 	spec_rejected: SpecRejectedPayload;
+	debug_brief_request: DebugBriefRequestPayload;
+	debug_brief_ready: DebugBriefReadyPayload;
+	debug_fix_committed: DebugFixCommittedPayload;
+	debug_failed: DebugFailedPayload;
+	debug_escalation: DebugEscalationPayload;
 }
