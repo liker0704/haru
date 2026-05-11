@@ -5,11 +5,13 @@
  * branch worktree without blocking the watchdog daemon's tick loop.
  *
  * Invocation (from `src/watchdog/gate-evaluators.ts`):
- *   bun run src/missions/holdout-runner.ts <missionId> <attemptN> <featureBranchWorktree> <resultJsonPath>
+ *   bun run src/missions/holdout-runner.ts <missionId> <attemptN> <projectRoot> <resultJsonPath>
  *
  * The runner:
  *  1. Resolves project quality gates from config (or DEFAULT_QUALITY_GATES fallback)
- *  2. Invokes the exported `checkQualityGates` against `featureBranchWorktree` as cwd
+ *  2. Invokes the exported `checkQualityGates` against `projectRoot` as cwd —
+ *     the canonical repo where merger has merged workstream branches into the
+ *     mission feature branch (currently checked out)
  *  3. Writes `HoldoutCheck[]` JSON to `resultJsonPath` for the evaluator to parse
  *
  * Runs detached (`Bun.spawn({detached: true, stdio: ["ignore","ignore","ignore"]}).unref()`)
@@ -33,18 +35,18 @@ async function defaultRunCommand(
 }
 
 async function main(): Promise<void> {
-	const [, , missionId, attemptN, featureBranchWorktree, resultJsonPath] = process.argv;
-	if (!missionId || !attemptN || !featureBranchWorktree || !resultJsonPath) {
+	const [, , missionId, attemptN, projectRoot, resultJsonPath] = process.argv;
+	if (!missionId || !attemptN || !projectRoot || !resultJsonPath) {
 		process.stderr.write(
 			"holdout-runner: missing required args " +
-				"(missionId, attemptN, featureBranchWorktree, resultJsonPath)\n",
+				"(missionId, attemptN, projectRoot, resultJsonPath)\n",
 		);
 		process.exit(2);
 	}
 
-	const config = await loadConfig(featureBranchWorktree);
+	const config = await loadConfig(projectRoot);
 	const gates = config.project.qualityGates ?? DEFAULT_QUALITY_GATES;
-	const checks = await checkQualityGates(featureBranchWorktree, gates, defaultRunCommand);
+	const checks = await checkQualityGates(projectRoot, gates, defaultRunCommand);
 
 	await Bun.write(
 		resultJsonPath,
@@ -52,7 +54,7 @@ async function main(): Promise<void> {
 			{
 				missionId,
 				attemptN: Number(attemptN),
-				featureBranchWorktree,
+				projectRoot,
 				producedAt: new Date().toISOString(),
 				checks,
 			},

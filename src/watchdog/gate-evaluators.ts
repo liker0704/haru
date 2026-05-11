@@ -8,6 +8,7 @@
 
 import type { MailStore } from "../mail/store.ts";
 import type { MissionStore } from "../missions/types.ts";
+import { isProcessRunning } from "../process/util.ts";
 import type { SessionStore } from "../sessions/store.ts";
 import type { Mission } from "../types.ts";
 
@@ -694,6 +695,7 @@ export async function evaluateHoldoutGate(
 	mission: Mission,
 	missionStore: MissionStore | null,
 	artifactRoot: string,
+	projectRoot: string | undefined,
 	_gateEnteredAt?: string,
 ): Promise<GateEvalResult> {
 	// Legacy in-flight mission (pre-Stage-C) — no integration target known.
@@ -702,6 +704,12 @@ export async function evaluateHoldoutGate(
 		return { met: true, trigger: "holdout_skip" };
 	}
 	if (!missionStore) return { met: false };
+	if (!projectRoot) {
+		// Defensive: caller didn't thread projectRoot through. Treat as skip rather
+		// than spawn a subprocess with wrong cwd. Future evaluateGate signature
+		// will make projectRoot required.
+		return { met: true, trigger: "holdout_skip" };
+	}
 
 	const attemptN = readDebugAttempts(missionStore, mission.id);
 	const resultPath = `${artifactRoot}/debug/holdout-result-${attemptN}.json`;
@@ -728,30 +736,36 @@ export async function evaluateHoldoutGate(
 	const cpData = cp?.data as { pid?: number; attemptN?: number; startedAt?: string } | null;
 
 	if (cpData?.pid && cpData.attemptN === attemptN) {
-		// Subprocess in flight; trust it
-		return {
-			met: false,
-			nudgeMessage: `Quality gates running (pid ${cpData.pid}, attempt ${attemptN})`,
-		};
+		// Subprocess pid recorded — verify it's still alive (B3 fix from review).
+		// If dead AND no result file → crash detection (treat as holdout_fail);
+		// engine will dispatch debugger on next tick.
+		if (isProcessRunning(cpData.pid)) {
+			return {
+				met: false,
+				nudgeMessage: `Quality gates running (pid ${cpData.pid}, attempt ${attemptN})`,
+			};
+		}
+		missionStore.checkpoints.saveCheckpoint(mission.id, "done-phase:holdout", {
+			attemptN,
+			crashedPid: cpData.pid,
+			completedAt: new Date().toISOString(),
+		});
+		return { met: true, trigger: "holdout_fail" };
 	}
 
 	// Need to spawn fresh subprocess.
+	// Plan note: Bun.spawn with detached + unref + stdio=ignore lets subprocess
+	// survive parent daemon restart per src/commands/watch.ts:163-173 pattern.
 	const runnerPath = new URL("../missions/holdout-runner.ts", import.meta.url).pathname;
-	// Strip wal trailing slashes / quotes that Bun.spawn doesn't accept gracefully:
 	// Ensure debug dir exists for result file output.
 	const debugDir = `${artifactRoot}/debug`;
 	await Bun.write(`${debugDir}/.keep`, "");
 
+	// B1 fix from review: pass projectRoot as the cwd for quality gates. The
+	// featureBranch is informational (recorded for diagnostics) — actual cwd
+	// is the canonical repo root where merger merges ws branches.
 	const subproc = Bun.spawn(
-		[
-			"bun",
-			"run",
-			runnerPath,
-			mission.id,
-			String(attemptN),
-			mission.featureBranch, // feature branch ref; runner cwd-s to worktree
-			resultPath,
-		],
+		["bun", "run", runnerPath, mission.id, String(attemptN), projectRoot, resultPath],
 		{
 			detached: true,
 			stdio: ["ignore", "ignore", "ignore"],
@@ -762,6 +776,7 @@ export async function evaluateHoldoutGate(
 	missionStore.checkpoints.saveCheckpoint(mission.id, "done-phase:holdout", {
 		pid: subproc.pid,
 		attemptN,
+		featureBranch: mission.featureBranch,
 		startedAt: new Date().toISOString(),
 	});
 
@@ -840,6 +855,9 @@ export async function evaluateGate(
 	},
 	artifactRoot: string,
 	gateEnteredAt?: string,
+	/** Stage C: project root passed through for holdout subprocess cwd. Optional
+	 * for backward compat with evaluators that don't need it. */
+	projectRoot?: string,
 ): Promise<GateEvalResult> {
 	// Node IDs follow cellType:nodeName convention
 	const parts = nodeId.split(":");
@@ -901,7 +919,13 @@ export async function evaluateGate(
 			return evaluateHumanSpecReview(mission, stores.mailStore, gateEnteredAt);
 		// Stage C debug-loop gates
 		case "holdout":
-			return evaluateHoldoutGate(mission, stores.missionStore ?? null, artifactRoot, gateEnteredAt);
+			return evaluateHoldoutGate(
+				mission,
+				stores.missionStore ?? null,
+				artifactRoot,
+				projectRoot,
+				gateEnteredAt,
+			);
 		case "request-analyst-brief":
 			return evaluateAwaitDebugBriefReady(mission, stores.mailStore, gateEnteredAt);
 		case "await-debug-fix":

@@ -394,6 +394,7 @@ async function processMission(mission: Mission, opts: MissionTickOpts): Promise<
 			},
 			artifactRoot,
 			gateFilterTime,
+			opts.projectRoot,
 		);
 		if (earlyEval.met && earlyEval.trigger) {
 			missionStore.resolveGate(mission.id, currentNodeId, earlyEval.trigger);
