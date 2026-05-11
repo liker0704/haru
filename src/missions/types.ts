@@ -154,12 +154,18 @@ export const MISSION_PHASES: readonly MissionPhase[] = [
 	"done",
 ] as const;
 
-export type PendingInputKind = "question" | "approval" | "decision" | "clarification";
+export type PendingInputKind =
+	| "question"
+	| "approval"
+	| "decision"
+	| "clarification"
+	| "debug-escalation";
 export const PENDING_INPUT_KINDS: readonly PendingInputKind[] = [
 	"question",
 	"approval",
 	"decision",
 	"clarification",
+	"debug-escalation",
 ] as const;
 
 export interface Mission {
@@ -195,6 +201,16 @@ export interface Mission {
 	hasEmittedWsProducerWrite: boolean;
 	/** Autonomy level — controls human-in-the-loop gates. Default `supervised`. */
 	autonomy: MissionAutonomy;
+	/**
+	 * Integration target branch where all workstream merges land. Stage C debug-loop
+	 * runs quality gates against this branch. Resolved at lifecycle-start from
+	 * `.overstory/session-branch.txt` (if exists) or `config.project.canonicalBranch`
+	 * — mirrors merge command resolution (`src/commands/merge.ts:153-169`).
+	 *
+	 * Legacy missions get null; Stage C evaluator emits "holdout_skip" trigger
+	 * preserving pre-Stage-C behavior (graceful degradation, no SQL backfill needed).
+	 */
+	featureBranch: string | null;
 }
 
 export type InsertMission = Pick<Mission, "id" | "slug" | "objective"> & {
@@ -203,6 +219,7 @@ export type InsertMission = Pick<Mission, "id" | "slug" | "objective"> & {
 	startedAt?: string | null;
 	tier?: MissionTier | null;
 	autonomy?: MissionAutonomy;
+	featureBranch?: string | null;
 };
 
 export interface MissionSummary {

@@ -734,4 +734,35 @@ async function processMission(mission: Mission, opts: MissionTickOpts): Promise<
 			}),
 		});
 	}
+
+	// Stage C bug fix: engine auto-completes missions on terminal node reach.
+	// Pre-Stage-C, engine reached `done-phase:complete` but mission stayed
+	// state="active" until operator manually ran `ha mission complete` — `completeMission()`
+	// was only called from `lifecycle-terminate.ts:291`. Now engine path finalizes itself.
+	//
+	// Guard: only fire when state is active (don't re-complete already-completed missions);
+	// terminal status implies phase already advanced to "done" via engine transitions.
+	if (result.status === "terminal") {
+		const freshMission = missionStore.getById(mission.id);
+		if (freshMission && freshMission.state === "active" && freshMission.phase === "done") {
+			missionStore.completeMission(mission.id);
+			if (opts.eventStore) {
+				opts.eventStore.insert({
+					runId: mission.runId,
+					agentName: "engine",
+					sessionId: null,
+					eventType: "engine_mission_auto_completed",
+					toolName: null,
+					toolArgs: null,
+					toolDurationMs: null,
+					level: "info",
+					data: JSON.stringify({
+						kind: "mission_auto_completed",
+						missionId: mission.id,
+						terminalNode: result.toNodeId,
+					}),
+				});
+			}
+		}
+	}
 }

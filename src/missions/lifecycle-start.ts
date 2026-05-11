@@ -35,6 +35,31 @@ import { createMissionStore } from "./store.ts";
 
 // === ha mission start ===
 
+/**
+ * Stage C: resolve mission feature branch — the integration target where
+ * workstream merges land. Mirrors `src/commands/merge.ts:153-169` resolution
+ * order: `.overstory/session-branch.txt` content (operator's working branch)
+ * if present, otherwise project's canonical branch from config.
+ *
+ * Returns null if neither is resolvable (extremely unlikely; the engine's
+ * Stage C holdout evaluator gracefully degrades on null via `holdout_skip`).
+ */
+async function resolveFeatureBranch(
+	overstoryDir: string,
+	config: Awaited<ReturnType<typeof loadConfig>>,
+): Promise<string | null> {
+	try {
+		const sessionBranchFile = Bun.file(join(overstoryDir, "session-branch.txt"));
+		if (await sessionBranchFile.exists()) {
+			const content = (await sessionBranchFile.text()).trim();
+			if (content) return content;
+		}
+	} catch {
+		// fall through to canonical
+	}
+	return config.project.canonicalBranch ?? null;
+}
+
 interface StartOpts {
 	slug?: string;
 	objective?: string;
@@ -136,6 +161,11 @@ export async function missionStart(
 			runStore.close();
 		}
 
+		// Stage C: resolve mission feature branch — where ws merges land, and
+		// where Stage C debug-loop runs L1 quality gates. Source mirrors
+		// `src/commands/merge.ts:153-169`: session-branch.txt ?? canonicalBranch.
+		const featureBranch = await resolveFeatureBranch(overstoryDir, config);
+
 		const insertMission: InsertMission = {
 			id: missionId,
 			slug,
@@ -145,6 +175,7 @@ export async function missionStart(
 			startedAt: new Date().toISOString(),
 			tier: opts.specFile && opts.tier ? opts.tier : null,
 			autonomy: opts.autonomy ?? "supervised",
+			featureBranch,
 		};
 		const createdMission = missionStore.create(insertMission);
 		missionCreated = true;
