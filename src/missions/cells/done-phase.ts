@@ -185,6 +185,12 @@ function buildHandlers(deps: PhaseCellDeps): HandlerRegistry {
 		"dispatch-debugger": async (ctx) => {
 			const mission = ctx.getMission();
 			if (!mission) return { trigger: "debugger_dispatched" };
+			const projectRoot = deps.projectRoot;
+			const overstoryDir = deps.overstoryDir;
+			if (!projectRoot || !overstoryDir) {
+				// Required deps missing — can't spawn worktree or sling. Treat as fail.
+				return { trigger: "debugger_dispatched" };
+			}
 
 			// Increment attempt counter (stored on this node's checkpoint)
 			const cp = deps.missionStore.checkpoints.getCheckpoint(
@@ -200,23 +206,94 @@ function buildHandlers(deps: PhaseCellDeps): HandlerRegistry {
 				return { trigger: "debugger_dispatched" };
 			}
 
+			// N7 fix: re-resolve feature-branch HEAD fresh each attempt so prior
+			// merge-debug-fix commits are captured. `git rev-parse` is cheap.
+			let integrationSha = "";
+			try {
+				const proc = Bun.spawn(["git", "rev-parse", `refs/heads/${featureBranch}`], {
+					cwd: projectRoot,
+					stdout: "pipe",
+					stderr: "pipe",
+				});
+				const stdout = await new Response(proc.stdout).text();
+				if ((await proc.exited) === 0) integrationSha = stdout.trim();
+			} catch {
+				// Best-effort; empty sha means analyst will derive from local state.
+			}
+
 			const debuggerName = `debugger-${mission.slug}-attempt-${debugAttempts}`;
 			const debugBranch = `haru/${mission.slug}/debug-attempt-${debugAttempts}`;
+			const worktreePath = join(
+				overstoryDir,
+				"worktrees",
+				"debug",
+				`${mission.slug}-attempt-${debugAttempts}`,
+			);
 
-			// Persist attempt N + dispatched debugger name; gate evaluators read this.
+			// Create debug worktree from current feature-branch HEAD. New branch
+			// off the feature ref; debugger commits land there.
+			const addProc = Bun.spawn(
+				["git", "worktree", "add", "-b", debugBranch, worktreePath, featureBranch],
+				{ cwd: projectRoot, stdout: "pipe", stderr: "pipe" },
+			);
+			const addExit = await addProc.exited;
+			if (addExit !== 0) {
+				const stderr = await new Response(addProc.stderr).text();
+				process.stderr.write(`[dispatch-debugger] worktree add failed: ${stderr.slice(0, 200)}\n`);
+				// Persist failure state and let check-debug-attempts loop / escalate.
+				deps.missionStore.checkpoints.saveCheckpoint(mission.id, `${CELL_TYPE}:dispatch-debugger`, {
+					debugAttempts,
+					worktreeAddFailed: true,
+					stderr: stderr.slice(0, 500),
+					dispatchedAt: new Date().toISOString(),
+				});
+				return { trigger: "debugger_dispatched" };
+			}
+
+			// Spawn debugger via sling. Add debug attempts dir + brief path to
+			// FILE_SCOPE so debugger can write hypothesis.md outside worktree
+			// (the artifact root is the mission's debug/ — explicit exception
+			// to PATH_BOUNDARY_VIOLATION).
+			const artifactRoot = mission.artifactRoot ?? "";
+			const debugAttemptsDir = join(artifactRoot, "debug", "attempts");
+			const debugBriefPath = join(artifactRoot, "debug", "debug-brief.md");
+			const slingProc = Bun.spawn(
+				[
+					"ha",
+					"sling",
+					`debug-${mission.slug}-${debugAttempts}`,
+					"--capability",
+					"debugger",
+					"--name",
+					debuggerName,
+					"--branch",
+					debugBranch,
+					"--files",
+					`${debugAttemptsDir}/**`,
+					"--files",
+					debugBriefPath,
+				],
+				{
+					cwd: projectRoot,
+					stdout: "pipe",
+					stderr: "pipe",
+					detached: true,
+				},
+			);
+			slingProc.unref();
+
+			// Persist attempt N + dispatched debugger + worktree path.
 			deps.missionStore.checkpoints.saveCheckpoint(mission.id, `${CELL_TYPE}:dispatch-debugger`, {
 				debugAttempts,
 				debuggerName,
 				debugBranch,
 				featureBranch,
+				integrationSha,
+				worktreePath,
 				dispatchedAt: new Date().toISOString(),
 			});
 
 			// Construct debug_brief_request payload for mission-analyst.
-			// Recent holdout result lives at debug/holdout-result-<N-1>.json
-			// (the failing attempt that triggered this dispatch).
-			const artifactRoot = mission.artifactRoot ?? "";
-			const integrationSha = ""; // Filled in by analyst via git rev-parse
 			const payload: DebugBriefRequestPayload = {
 				missionId: mission.id,
 				attemptN: debugAttempts,
@@ -252,8 +329,12 @@ function buildHandlers(deps: PhaseCellDeps): HandlerRegistry {
 			if (!data?.debugBranch || !data.featureBranch || !deps.projectRoot) {
 				return { trigger: "merge_conflict" };
 			}
-			// FF-merge debug branch into feature branch in canonical repo.
-			const proc = Bun.spawn(["git", "merge", "--ff-only", data.debugBranch], {
+			// B2 fix from review: ff-update the feature branch ref WITHOUT checking
+			// it out in canonical (canonical may be on a different branch — operator
+			// may be working there). `git push . <src>:<dst>` does a local ref
+			// fast-forward; only succeeds if dst is ancestor of src (true since
+			// debug branch was forked from feature-branch HEAD).
+			const proc = Bun.spawn(["git", "push", ".", `${data.debugBranch}:${data.featureBranch}`], {
 				cwd: deps.projectRoot,
 				stdout: "pipe",
 				stderr: "pipe",
@@ -280,7 +361,7 @@ function buildHandlers(deps: PhaseCellDeps): HandlerRegistry {
 			const artifactRoot = mission.artifactRoot ?? "";
 			const packPath = join(artifactRoot, "debug", "consultation-request-pack.md");
 
-			// Write a basic Consultation Pack stub (S10 will produce full content).
+			// Build Consultation Pack from attempts/<N>/hypothesis.md records.
 			const cp = deps.missionStore.checkpoints.getCheckpoint(
 				mission.id,
 				`${CELL_TYPE}:dispatch-debugger`,
@@ -296,31 +377,47 @@ function buildHandlers(deps: PhaseCellDeps): HandlerRegistry {
 				`\`ha mission debug retry|accept|abort\` to resolve.\n`;
 			await Bun.write(packPath, pack);
 
-			// Send `question` mail to operator and freeze mission with returned threadId.
-			// Mail dependency interface here is minimal; we use mailSend without
-			// direct threadId access — escalate writes the pack, sends notification,
-			// and writes a pendingInput marker via the dedicated `freeze` API.
-			// Send notification mail (not threaded — Stage C uses dedicated CLI flow).
 			const escalationPayload: DebugEscalationPayload = {
 				missionId: mission.id,
 				totalAttempts,
 				packPath,
 			};
-			await deps.mailSend(
-				"operator",
-				`Debug escalation: ${mission.slug}`,
-				`Mission ${mission.slug} needs human intervention after ${totalAttempts} debug attempts. ` +
-					`Pack: ${packPath}\n\n` +
-					`Run \`ha mission debug status ${mission.id}\` to inspect, then ` +
-					`retry/accept/abort.\n\n` +
-					`Payload: ${JSON.stringify(escalationPayload)}`,
-				"debug_escalation",
-			);
 
-			// Freeze mission with pendingInputKind=debug-escalation. Engine sees
-			// terminal node + frozen state, stops ticking until operator acts.
-			// freeze(id, kind, threadId) verified at types.ts:462.
-			deps.missionStore.freeze(mission.id, "debug-escalation", null);
+			// B3 fix from review (N8): send `question` mail FIRST, capture
+			// returned messageId, use it as threadId in freeze(). Otherwise the
+			// frozen mission has no thread anchor for operator response.
+			let threadId: string | null = null;
+			const mailStore = deps.mailStore;
+			if (mailStore) {
+				const { createMailClient } = await import("../../mail/client.ts");
+				const mailClient = createMailClient(mailStore);
+				threadId = mailClient.send({
+					from: `coordinator-${mission.slug}`,
+					to: "operator",
+					subject: `Debug escalation: ${mission.slug}`,
+					body:
+						`Mission ${mission.slug} needs human intervention after ${totalAttempts} debug attempts. ` +
+						`Pack: ${packPath}\n\n` +
+						`Run \`ha mission debug status ${mission.id}\` to inspect, then ` +
+						`retry/accept/abort.`,
+					type: "question",
+					missionId: mission.id,
+					payload: JSON.stringify(escalationPayload),
+				});
+				// Also emit the debug_escalation notification mail for observability /
+				// non-blocking notifications (Slack/etc. integrations Stage E).
+				await deps.mailSend(
+					"operator",
+					`[notification] Debug escalation: ${mission.slug}`,
+					`Pack: ${packPath}`,
+					"debug_escalation",
+				);
+			}
+
+			// Freeze with the question's messageId as threadId so future thread-
+			// based unfreeze (post-Stage-C operator flow extensions) can resolve
+			// the relationship cleanly.
+			deps.missionStore.freeze(mission.id, "debug-escalation", threadId);
 			deps.missionStore.updatePauseReason(
 				mission.id,
 				`Stage C debug loop exhausted after ${totalAttempts} attempts`,
