@@ -162,6 +162,161 @@ describe("analyzeCompatibility", () => {
 		expect(result.staticOnly).toBe(true);
 		expect(result.summary).toBeTruthy();
 	});
+
+	it("R1. cross-file move with identical signature → compatible, single modified/info entry", async () => {
+		const symA = makeSym({
+			name: "Foo",
+			kind: "interface",
+			signature: "{ x: number }",
+			filePath: "src/a.ts",
+		});
+		const symB = makeSym({
+			name: "Foo",
+			kind: "interface",
+			signature: "{ x: number }",
+			filePath: "src/b.ts",
+		});
+		const a = makeSurface("main", [symA]);
+		const b = makeSurface("feature", [symB]);
+		const result = await analyzeCompatibility(a, b);
+		expect(result.compatible).toBe(true);
+		expect(result.changes).toHaveLength(1);
+		expect(result.changes[0]?.kind).toBe("modified");
+		expect(result.changes[0]?.severity).toBe("info");
+		expect(result.changes[0]?.previousFilePath).toBe("src/a.ts");
+		expect(result.changes[0]?.symbol.filePath).toBe("src/b.ts");
+		expect(result.changes[0]?.previousSignature).toBeUndefined();
+	});
+
+	it("R2. cross-file move with different signature → no fold, incompatible", async () => {
+		const symA = makeSym({
+			name: "Foo",
+			kind: "interface",
+			signature: "{ x: number }",
+			filePath: "src/a.ts",
+		});
+		const symB = makeSym({
+			name: "Foo",
+			kind: "interface",
+			signature: "{ x: string }",
+			filePath: "src/b.ts",
+		});
+		const a = makeSurface("main", [symA]);
+		const b = makeSurface("feature", [symB]);
+		const result = await analyzeCompatibility(a, b);
+		expect(result.compatible).toBe(false);
+		const removedEntry = result.changes.find((c) => c.kind === "removed");
+		const addedEntry = result.changes.find((c) => c.kind === "added");
+		expect(removedEntry).toBeDefined();
+		expect(addedEntry).toBeDefined();
+		expect(removedEntry?.symbol.filePath).toBe("src/a.ts");
+		expect(addedEntry?.symbol.filePath).toBe("src/b.ts");
+	});
+
+	it("R3. same name, different kind → no fold", async () => {
+		const symA = makeSym({
+			name: "Foo",
+			kind: "interface",
+			signature: "{ x: number }",
+			filePath: "src/a.ts",
+		});
+		const symB = makeSym({
+			name: "Foo",
+			kind: "const",
+			signature: "{ x: number }",
+			filePath: "src/b.ts",
+		});
+		const a = makeSurface("main", [symA]);
+		const b = makeSurface("feature", [symB]);
+		const result = await analyzeCompatibility(a, b);
+		const removedEntry = result.changes.find((c) => c.kind === "removed");
+		const addedEntry = result.changes.find((c) => c.kind === "added");
+		expect(removedEntry).toBeDefined();
+		expect(addedEntry).toBeDefined();
+		expect(result.changes.find((c) => c.kind === "modified")).toBeUndefined();
+	});
+
+	it("R4. same name multiple removed — fold only signature-matching pair, remainder stays breaking", async () => {
+		const symAa = makeSym({
+			name: "Foo",
+			kind: "interface",
+			signature: "{ x: number }",
+			filePath: "src/a.ts",
+		});
+		const symAc = makeSym({
+			name: "Foo",
+			kind: "interface",
+			signature: "{ y: string }",
+			filePath: "src/c.ts",
+		});
+		const symBb = makeSym({
+			name: "Foo",
+			kind: "interface",
+			signature: "{ x: number }",
+			filePath: "src/b.ts",
+		});
+		const a = makeSurface("main", [symAa, symAc]);
+		const b = makeSurface("feature", [symBb]);
+		const result = await analyzeCompatibility(a, b);
+		const modified = result.changes.find((c) => c.kind === "modified");
+		expect(modified).toBeDefined();
+		expect(modified?.severity).toBe("info");
+		expect(modified?.previousFilePath).toBe("src/a.ts");
+		const remaining = result.changes.find((c) => c.kind === "removed");
+		expect(remaining).toBeDefined();
+		expect(remaining?.symbol.filePath).toBe("src/c.ts");
+		expect(remaining?.severity).toBe("breaking");
+		expect(result.compatible).toBe(false);
+	});
+
+	it("R5. cross-file move of const in types.ts with identical signature → fold produces info, not breaking", async () => {
+		const symA = makeSym({
+			name: "FooConfig",
+			kind: "const",
+			signature: "{ enabled: boolean }",
+			filePath: "src/a/types.ts",
+		});
+		const symB = makeSym({
+			name: "FooConfig",
+			kind: "const",
+			signature: "{ enabled: boolean }",
+			filePath: "src/b/types.ts",
+		});
+		const a = makeSurface("main", [symA]);
+		const b = makeSurface("feature", [symB]);
+		const result = await analyzeCompatibility(a, b);
+		expect(result.changes).toHaveLength(1);
+		expect(result.changes[0]?.kind).toBe("modified");
+		expect(result.changes[0]?.severity).toBe("info");
+		expect(result.changes[0]?.previousFilePath).toBe("src/a/types.ts");
+		expect(result.compatible).toBe(true);
+	});
+
+	it("R6 (ordering-proof). fold runs after schema-conflict elevation — folded move not re-escalated", async () => {
+		// Both surfaces have the same const in their respective types.ts files (different paths, identical signature).
+		// Schema-conflict elevation only fires on kind==="modified" entries from same-file detection — not on
+		// fold-produced entries — so the result must be info, not breaking.
+		const symA = makeSym({
+			name: "FooConfig",
+			kind: "const",
+			signature: '["a","b"]',
+			filePath: "src/a/types.ts",
+		});
+		const symB = makeSym({
+			name: "FooConfig",
+			kind: "const",
+			signature: '["a","b"]',
+			filePath: "src/b/types.ts",
+		});
+		const a = makeSurface("main", [symA]);
+		const b = makeSurface("feature", [symB]);
+		const result = await analyzeCompatibility(a, b);
+		expect(result.changes).toHaveLength(1);
+		const entry = result.changes[0];
+		expect(entry?.kind).toBe("modified");
+		expect(entry?.severity).toBe("info");
+		expect(result.compatible).toBe(true);
+	});
 });
 
 describe("formatCompatReport", () => {
