@@ -38,6 +38,19 @@ export interface MissionArtifactPaths {
 	 * reads it as the contract between product layer and technical planning.
 	 */
 	productSpecMd: string;
+	/**
+	 * Stage C debug-loop artifacts: produced when post-merge holdout gates fail.
+	 *
+	 * - `debugDir` — parent dir for all debug-phase outputs (`<root>/debug/`)
+	 * - `debugBriefMd` — mission-analyst's failure context for debugger
+	 * - `consultationPackMd` — synthesized escalation pack when 3 attempts exhausted
+	 * - `debugAttemptsDir` — per-attempt records (`attempts/<N>/test-report.json`,
+	 *   `hypothesis.md`, `diff.patch`); see plan §S8.
+	 */
+	debugDir: string;
+	debugBriefMd: string;
+	consultationPackMd: string;
+	debugAttemptsDir: string;
 }
 
 export interface MaterializedMissionRolePrompt {
@@ -116,6 +129,10 @@ export function getMissionArtifactPaths(
 		refactorSpecsDir: join(planDir, "refactor-specs"),
 		resultsDir: join(root, "results"),
 		productSpecMd: join(root, "product-spec.md"),
+		debugDir: join(root, "debug"),
+		debugBriefMd: join(root, "debug", "debug-brief.md"),
+		consultationPackMd: join(root, "debug", "consultation-request-pack.md"),
+		debugAttemptsDir: join(root, "debug", "attempts"),
 	};
 }
 

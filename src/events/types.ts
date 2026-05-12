@@ -24,7 +24,8 @@ export type EventType =
 	| "engine_ws_status_updated"
 	| "engine_mission_suspended"
 	| "engine_gate_timeout_routed"
-	| "engine_nudge_ceiling_reached";
+	| "engine_nudge_ceiling_reached"
+	| "engine_mission_auto_completed";
 
 /** Severity levels for events. */
 export type EventLevel = "debug" | "info" | "warn" | "error";

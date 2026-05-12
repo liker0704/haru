@@ -223,6 +223,7 @@ function createMockMissionStore(): MissionStore {
 		incrementNudgeCount: noop,
 		markCeilingEmitted: noop,
 		resolveGate: noop,
+		resetGateState: noop,
 		updateWorkstreamStatus: noop,
 		transaction: <T>(fn: () => T): T => fn(),
 		updateTier: noop,

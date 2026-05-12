@@ -411,6 +411,7 @@ export function allowedChildCapabilities(
 			"execution-director",
 			"product-clarifier",
 			"tier-classifier",
+			"debugger",
 		];
 	}
 

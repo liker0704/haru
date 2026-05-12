@@ -34,6 +34,7 @@ const AGENT_DEF_FILES = [
 	"coordinator-mission-planned.md",
 	"coordinator-mission.md",
 	"coordinator.md",
+	"debugger.md",
 	"execution-director.md",
 	"lead-mission.md",
 	"lead.md",

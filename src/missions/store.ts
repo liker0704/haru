@@ -64,6 +64,7 @@ interface MissionRow {
 	tier: string | null;
 	has_emitted_ws_producer_write: number;
 	autonomy: string;
+	feature_branch: string | null;
 }
 
 const CREATE_TABLE = `
@@ -79,7 +80,7 @@ CREATE TABLE IF NOT EXISTS missions (
   first_freeze_at TEXT,
   frozen_at TEXT,
   pending_user_input INTEGER NOT NULL DEFAULT 0,
-  pending_input_kind TEXT CHECK(pending_input_kind IS NULL OR pending_input_kind IN ('question','approval','decision','clarification')),
+  pending_input_kind TEXT CHECK(pending_input_kind IS NULL OR pending_input_kind IN ('question','approval','decision','clarification','debug-escalation')),
   pending_input_thread_id TEXT,
   reopen_count INTEGER NOT NULL DEFAULT 0,
   artifact_root TEXT,
@@ -99,7 +100,8 @@ CREATE TABLE IF NOT EXISTS missions (
   tier TEXT CHECK(tier IS NULL OR tier IN ('direct','planned','full')),
   has_emitted_ws_producer_write INTEGER NOT NULL DEFAULT 0,
   autonomy TEXT NOT NULL DEFAULT 'supervised'
-    CHECK(autonomy IN ('supervised','auto-spec','auto-all'))
+    CHECK(autonomy IN ('supervised','auto-spec','auto-all')),
+  feature_branch TEXT
 )`;
 
 const CREATE_INDEXES = `
@@ -136,6 +138,7 @@ const REQUIRED_MISSION_COLUMNS = [
 	"learnings_extracted",
 	"has_emitted_ws_producer_write",
 	"autonomy",
+	"feature_branch",
 ] as const;
 
 function getMissionColumns(db: Database): Set<string> {
@@ -649,6 +652,75 @@ const MISSION_MIGRATIONS: Migration[] = [
 			return row ? row.sql.includes("'intake'") : false;
 		},
 	},
+	{
+		version: 11,
+		description:
+			"Stage C: extend pending_input_kind CHECK to allow 'debug-escalation' + " +
+			"add feature_branch column for integration-branch tracking",
+		up: (db) => {
+			// Step 1: ADD COLUMN feature_branch (cheap, no rebuild)
+			if (!hasColumn(db, "missions", "feature_branch")) {
+				db.exec("ALTER TABLE missions ADD COLUMN feature_branch TEXT");
+			}
+
+			// Step 2: rebuild table to extend pending_input_kind CHECK
+			// Guard: skip if 'debug-escalation' already in CHECK clause
+			const schemaRow = db
+				.prepare<{ sql: string }, []>(
+					"SELECT sql FROM sqlite_master WHERE type='table' AND name='missions'",
+				)
+				.get();
+			if (!schemaRow || schemaRow.sql.includes("'debug-escalation'")) {
+				return;
+			}
+			rebuildTable({
+				db,
+				table: "missions",
+				createSql: CREATE_TABLE.replace("CREATE TABLE IF NOT EXISTS", "CREATE TABLE"),
+				columns: [
+					"id",
+					"slug",
+					"objective",
+					"run_id",
+					"state",
+					"phase",
+					"first_freeze_at",
+					"frozen_at",
+					"pending_user_input",
+					"pending_input_kind",
+					"pending_input_thread_id",
+					"reopen_count",
+					"artifact_root",
+					"paused_workstream_ids",
+					"analyst_session_id",
+					"execution_director_session_id",
+					"coordinator_session_id",
+					"architect_session_id",
+					"paused_lead_names",
+					"pause_reason",
+					"current_node",
+					"started_at",
+					"completed_at",
+					"created_at",
+					"updated_at",
+					"learnings_extracted",
+					"tier",
+					"has_emitted_ws_producer_write",
+					"autonomy",
+					"feature_branch",
+				],
+			});
+		},
+		detect: (db) => {
+			if (!hasColumn(db, "missions", "feature_branch")) return false;
+			const row = db
+				.prepare<{ sql: string }, []>(
+					"SELECT sql FROM sqlite_master WHERE type='table' AND name='missions'",
+				)
+				.get();
+			return row ? row.sql.includes("'debug-escalation'") : false;
+		},
+	},
 ];
 
 /** Convert a database row (snake_case) to a Mission object (camelCase). */
@@ -682,6 +754,7 @@ function rowToMission(row: MissionRow): Mission {
 		tier: (row.tier as MissionTier | null) ?? null,
 		hasEmittedWsProducerWrite: (row.has_emitted_ws_producer_write ?? 0) === 1,
 		autonomy: (row.autonomy as MissionAutonomy | null) ?? "supervised",
+		featureBranch: row.feature_branch ?? null,
 	};
 }
 
@@ -719,12 +792,13 @@ export function createMissionStore(dbPath: string): MissionStore {
 			$updated_at: string;
 			$tier: string | null;
 			$autonomy: string;
+			$feature_branch: string | null;
 		}
 	>(`
 		INSERT INTO missions
-			(id, slug, objective, run_id, artifact_root, started_at, created_at, updated_at, tier, autonomy)
+			(id, slug, objective, run_id, artifact_root, started_at, created_at, updated_at, tier, autonomy, feature_branch)
 		VALUES
-			($id, $slug, $objective, $run_id, $artifact_root, $started_at, $created_at, $updated_at, $tier, $autonomy)
+			($id, $slug, $objective, $run_id, $artifact_root, $started_at, $created_at, $updated_at, $tier, $autonomy, $feature_branch)
 	`);
 
 	const getByIdStmt = db.prepare<MissionRow, { $id: string }>(`
@@ -925,6 +999,7 @@ export function createMissionStore(dbPath: string): MissionStore {
 				$updated_at: now,
 				$tier: mission.tier ?? null,
 				$autonomy: mission.autonomy ?? "supervised",
+				$feature_branch: mission.featureBranch ?? null,
 			});
 			const row = getByIdStmt.get({ $id: mission.id });
 			if (!row) {
