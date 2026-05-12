@@ -9,8 +9,8 @@ import { join } from "node:path";
 import chalk from "chalk";
 import { Command } from "commander";
 import { detectHaruDir, loadConfig } from "../config.ts";
-import { materializeMissionRolePrompt } from "../missions/context.ts";
-import { ensureMissionAnalyst } from "../missions/roles.ts";
+import { buildMissionRoleBeacon, materializeMissionRolePrompt } from "../missions/context.ts";
+import { ensureMissionAnalyst, startMissionCoordinator } from "../missions/roles.ts";
 import { createMissionStore } from "../missions/store.ts";
 import { MISSION_TIERS } from "../missions/types.ts";
 import { createSessionStore } from "../sessions/store.ts";
@@ -217,18 +217,61 @@ async function tierSetCommand(tierArg: string, opts: { json?: boolean }): Promis
 			siblingNames,
 		});
 
-		// 8. Paste full prompt into coordinator's conversation via nudge + file paste
+		// 8. Spawn coordinator if not alive, else nudge with new prompt.
+		// Stage A removed the up-front coordinator spawn from `ha mission start`
+		// (intake-phase only spawns analyst-intake/clarifier/tier-classifier).
+		// On tier-set the coordinator must exist to drive the post-intake phases,
+		// so check session liveness and spawn-if-missing before nudging.
+		const sessionStoreForCoord = createSessionStore(join(overstoryDir, "sessions.db"));
+		let coordinatorAlive = false;
 		try {
-			const { nudgeAgent } = await import("./nudge.ts");
-			await nudgeAgent(
-				config.project.root,
-				coordAgentName,
-				`[SYSTEM] Tier set to ${newTier}. New instructions follow.`,
-				true,
-				prompt.promptPath,
-			);
-		} catch {
-			// Coordinator may not be alive yet — prompt file is on disk for next wake
+			const existing = sessionStoreForCoord.getByName(coordAgentName);
+			coordinatorAlive =
+				existing !== null && existing.state !== "completed" && existing.state !== "zombie";
+		} finally {
+			sessionStoreForCoord.close();
+		}
+
+		if (!coordinatorAlive) {
+			try {
+				const coordResult = await startMissionCoordinator({
+					missionId: freshMission.id,
+					missionSlug: freshMission.slug,
+					agentName: coordAgentName,
+					capability: tierCapability,
+					projectRoot: config.project.root,
+					overstoryDir,
+					existingRunId: freshMission.runId ?? "",
+					appendSystemPromptFile: prompt.promptPath,
+					beacon: buildMissionRoleBeacon({
+						agentName: coordAgentName,
+						missionId: freshMission.id,
+						contextPath: prompt.contextPath,
+					}),
+				});
+				const missionStoreForBind = createMissionStore(join(overstoryDir, "sessions.db"));
+				try {
+					missionStoreForBind.bindCoordinatorSession(freshMission.id, coordResult.session.id);
+				} finally {
+					missionStoreForBind.close();
+				}
+			} catch (err) {
+				console.error(chalk.yellow(`! Coordinator spawn failed: ${String(err)}`));
+				console.error(chalk.dim("  Mission engine will retry on next watchdog tick."));
+			}
+		} else {
+			try {
+				const { nudgeAgent } = await import("./nudge.ts");
+				await nudgeAgent(
+					config.project.root,
+					coordAgentName,
+					`[SYSTEM] Tier set to ${newTier}. New instructions follow.`,
+					true,
+					prompt.promptPath,
+				);
+			} catch {
+				// Coordinator alive but unreachable — prompt file is on disk for next wake.
+			}
 		}
 
 		// 10. Output result
