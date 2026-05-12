@@ -1763,5 +1763,25 @@
 		"status": "active",
 		"createdAt": "2026-05-12T10:10:53.402Z",
 		"completedAt": null
+	},
+	{
+		"id": "group-e6ad0dd7",
+		"name": "manifest-freshness-retry",
+		"memberIssueIds": [
+			"haru-badc"
+		],
+		"status": "active",
+		"createdAt": "2026-05-12T20:41:28.111Z",
+		"completedAt": null
+	},
+	{
+		"id": "group-55f94af7",
+		"name": "manifest-fresh-v3-exec",
+		"memberIssueIds": [
+			"haru-0668"
+		],
+		"status": "active",
+		"createdAt": "2026-05-12T21:52:40.983Z",
+		"completedAt": null
 	}
 ]
