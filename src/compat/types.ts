@@ -36,6 +36,8 @@ export interface SurfaceChange {
 	symbol: ExportedSymbol;
 	/** Present when kind is modified. */
 	previousSignature?: string;
+	/** Present when symbol moved between files with identical signature (pure move). */
+	previousFilePath?: string;
 	severity: ChangeSeverity;
 }
 

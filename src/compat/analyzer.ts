@@ -149,8 +149,53 @@ export async function analyzeCompatibility(
 		}
 	}
 
-	const compatible = !changes.some((c) => c.severity === "breaking");
-	const sorted = sortChanges(changes);
+	// Post-process fold: collapse cross-file symbol moves (same name+kind+signature, different file).
+	// Runs after schema-conflict elevation so fold's new modified/info entries are not re-evaluated.
+	const removedByName = new Map<string, SurfaceChange[]>();
+	for (const c of changes) {
+		if (c.kind === "removed") {
+			const arr = removedByName.get(c.symbol.name) ?? [];
+			arr.push(c);
+			removedByName.set(c.symbol.name, arr);
+		}
+	}
+
+	const dropped = new Set<SurfaceChange>();
+	const folded: SurfaceChange[] = [];
+
+	for (const c of changes) {
+		if (c.kind !== "added") continue;
+		if (dropped.has(c)) continue;
+
+		const candidates = removedByName.get(c.symbol.name);
+		if (!candidates || candidates.length === 0) continue;
+
+		const matchIdx = candidates.findIndex(
+			(r) =>
+				!dropped.has(r) &&
+				r.symbol.kind === c.symbol.kind &&
+				r.symbol.signature === c.symbol.signature,
+		);
+		if (matchIdx === -1) continue;
+
+		const match = candidates[matchIdx];
+		if (match === undefined) continue; // unreachable: findIndex returned valid index
+		candidates.splice(matchIdx, 1);
+
+		folded.push({
+			kind: "modified",
+			symbol: c.symbol,
+			severity: "info",
+			previousFilePath: match.symbol.filePath,
+		});
+		dropped.add(match);
+		dropped.add(c);
+	}
+
+	const finalChanges = changes.filter((c) => !dropped.has(c)).concat(folded);
+
+	const compatible = !finalChanges.some((c) => c.severity === "breaking");
+	const sorted = sortChanges(finalChanges);
 
 	const warningCount = sorted.filter((c) => c.severity === "warning").length;
 	let staticOnly = true;
