@@ -24,6 +24,7 @@ import { loadWorkstreamsFile } from "../missions/workstreams.ts";
 import { createRunStore, createSessionStore } from "../sessions/store.ts";
 import { cleanupTempDir, createTempGitRepo } from "../test-helpers.ts";
 import type { AgentSession } from "../types.ts";
+import { buildAgentManifest } from "./init.ts";
 import {
 	type MissionCommandDeps,
 	missionAnswer,
@@ -192,6 +193,10 @@ beforeEach(async () => {
 	overstoryDir = join(tempDir, ".overstory");
 	await mkdir(overstoryDir, { recursive: true });
 	await writeConfig(tempDir);
+	await Bun.write(
+		join(overstoryDir, "agent-manifest.json"),
+		JSON.stringify(buildAgentManifest(), null, "\t"),
+	);
 
 	originalCwd = process.cwd();
 	process.chdir(tempDir);

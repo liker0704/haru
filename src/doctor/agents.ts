@@ -1,5 +1,6 @@
 import { readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
+import { buildAgentManifest } from "../commands/init.ts";
 import type { AgentManifest } from "../types.ts";
 import type { DoctorCheck, DoctorCheckFn } from "./types.ts";
 
@@ -277,6 +278,30 @@ export const checkAgents: DoctorCheckFn = async (_config, overstoryDir): Promise
 			indexErrors.length === 0 ? "Index is consistent" : `Found ${indexErrors.length} issue(s)`,
 		details: indexErrors.length > 0 ? indexErrors : undefined,
 		fixable: indexErrors.length > 0,
+	});
+
+	// Check 3b: Manifest freshness — name-level diff vs init.ts source of truth
+	const sourceKeys = new Set(Object.keys(buildAgentManifest().agents));
+	const manifestKeys = new Set(Object.keys(manifest.agents));
+	const missing = [...sourceKeys].filter((k) => !manifestKeys.has(k));
+	const extra = [...manifestKeys].filter((k) => !sourceKeys.has(k));
+	const drift: string[] = [];
+	if (missing.length > 0) drift.push(`Missing in manifest: ${missing.sort().join(", ")}`);
+	if (extra.length > 0) drift.push(`Extra in manifest: ${extra.sort().join(", ")}`);
+
+	checks.push({
+		name: "Manifest freshness",
+		category: "agents",
+		status: drift.length === 0 ? "pass" : "warn",
+		message:
+			drift.length === 0
+				? "Manifest matches init.ts source of truth (agent names)"
+				: `Manifest drift vs init.ts source of truth (${drift.length} difference(s)) — name-level only`,
+		details:
+			drift.length > 0
+				? [...drift, "Fix: run `ha update --manifest` (manual; --fix does not wire this check)"]
+				: undefined,
+		fixable: drift.length > 0,
 	});
 
 	// Check 4: Validate identity files

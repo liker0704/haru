@@ -6,6 +6,7 @@ import type { MissionCommandDeps } from "../missions/lifecycle.ts";
 import { missionStart, missionStop } from "../missions/lifecycle.ts";
 import { createMissionStore } from "../missions/store.ts";
 import { cleanupTempDir } from "../test-helpers.ts";
+import { buildAgentManifest } from "./init.ts";
 import { createMissionCommand, resolveCurrentMissionId } from "./mission.ts";
 
 let tempDir: string;
@@ -191,6 +192,10 @@ describe("missionStart concurrency guard", () => {
 		guardDir = await mkdtemp(join(tmpdir(), "mission-guard-test-"));
 		guardOverstoryDir = join(guardDir, ".overstory");
 		await mkdir(guardOverstoryDir, { recursive: true });
+		await Bun.write(
+			join(guardOverstoryDir, "agent-manifest.json"),
+			JSON.stringify(buildAgentManifest(), null, "\t"),
+		);
 		process.exitCode = 0;
 		originalStdout = process.stdout.write;
 		originalStderr = process.stderr.write;

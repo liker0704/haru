@@ -16,6 +16,7 @@ import { access, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { StartPersistentAgentResult } from "../agents/persistent-root.ts";
+import { buildAgentManifest } from "../commands/init.ts";
 import { missionResumeAll, missionStart } from "./lifecycle-start.ts";
 import type { MissionCommandDeps } from "./lifecycle-types.ts";
 import { createMissionStore } from "./store.ts";
@@ -29,6 +30,10 @@ beforeEach(async () => {
 	overstoryDir = join(tempDir, ".overstory");
 	projectRoot = tempDir;
 	await Bun.write(join(overstoryDir, ".keep"), "");
+	await Bun.write(
+		join(overstoryDir, "agent-manifest.json"),
+		JSON.stringify(buildAgentManifest(), null, "\t"),
+	);
 
 	// Minimal config.yaml so loadConfig() succeeds
 	await Bun.write(
@@ -206,5 +211,140 @@ describe("missionResumeAll", () => {
 
 		// Reset so subsequent tests are unaffected
 		process.exitCode = 0;
+	});
+});
+
+describe("validateRequiredCapabilities", () => {
+	let capDir: string;
+	let capOverstoryDir: string;
+	let capProjectRoot: string;
+	let originalStdout: typeof process.stdout.write;
+	let originalStderr: typeof process.stderr.write;
+
+	beforeEach(async () => {
+		capDir = await mkdtemp(join(tmpdir(), "ov-validate-caps-test-"));
+		capOverstoryDir = join(capDir, ".overstory");
+		capProjectRoot = capDir;
+		await Bun.write(join(capOverstoryDir, ".keep"), "");
+		await Bun.write(
+			join(capProjectRoot, ".overstory", "config.yaml"),
+			["version: 1", "watchdog:", "  tier0Enabled: false", "mission:", "  maxConcurrent: 1"].join(
+				"\n",
+			),
+		);
+		process.exitCode = 0;
+		originalStdout = process.stdout.write;
+		originalStderr = process.stderr.write;
+		process.stdout.write = (() => true) as typeof process.stdout.write;
+		process.stderr.write = (() => true) as typeof process.stderr.write;
+	});
+
+	afterEach(async () => {
+		process.exitCode = 0;
+		process.stdout.write = originalStdout;
+		process.stderr.write = originalStderr;
+		await rm(capDir, { recursive: true, force: true });
+	});
+
+	test("all-required-present: proceeds when full manifest is seeded", async () => {
+		await Bun.write(
+			join(capOverstoryDir, "agent-manifest.json"),
+			JSON.stringify(buildAgentManifest(), null, "\t"),
+		);
+
+		await missionStart(capOverstoryDir, capProjectRoot, {
+			slug: "all-present",
+			objective: "test",
+			json: true,
+		});
+
+		expect(process.exitCode).not.toBe(1);
+		const store = createMissionStore(join(capOverstoryDir, "sessions.db"));
+		try {
+			expect(store.list({ limit: 100 }).length).toBe(1);
+		} finally {
+			store.close();
+		}
+	});
+
+	test("single-missing: fails fast when tier-classifier is missing", async () => {
+		const fullManifest = buildAgentManifest();
+		// Strip tier-classifier from the manifest
+		const agents = { ...fullManifest.agents };
+		delete agents["tier-classifier"];
+		await Bun.write(
+			join(capOverstoryDir, "agent-manifest.json"),
+			JSON.stringify({ ...fullManifest, agents }, null, "\t"),
+		);
+
+		await missionStart(capOverstoryDir, capProjectRoot, {
+			slug: "single-miss",
+			objective: "test",
+			json: true,
+		});
+
+		expect(process.exitCode).toBe(1);
+		const store = createMissionStore(join(capOverstoryDir, "sessions.db"));
+		try {
+			expect(store.list({ limit: 100 }).length).toBe(0);
+		} finally {
+			store.close();
+		}
+	});
+
+	test("all-missing: fails fast when no Stage A agents exist", async () => {
+		await Bun.write(
+			join(capOverstoryDir, "agent-manifest.json"),
+			JSON.stringify({ version: "1.0", agents: {}, capabilityIndex: {} }, null, "\t"),
+		);
+
+		let captured = "";
+		const origWrite = process.stdout.write;
+		process.stdout.write = ((chunk: string | Uint8Array) => {
+			captured += typeof chunk === "string" ? chunk : new TextDecoder().decode(chunk);
+			return true;
+		}) as typeof process.stdout.write;
+		try {
+			await missionStart(capOverstoryDir, capProjectRoot, {
+				slug: "all-miss",
+				objective: "test",
+				json: true,
+			});
+		} finally {
+			process.stdout.write = origWrite;
+		}
+
+		expect(process.exitCode).toBe(1);
+		const parsed = JSON.parse(captured);
+		expect(parsed.command).toBe("mission start");
+		expect(parsed.error).toContain("mission-analyst-intake");
+		expect(parsed.error).toContain("product-clarifier");
+		expect(parsed.error).toContain("tier-classifier");
+		expect(parsed.error).toContain("debugger");
+	});
+
+	test("unreadable-manifest: fails fast with parse-error detail when manifest is malformed", async () => {
+		await Bun.write(join(capOverstoryDir, "agent-manifest.json"), "not json");
+
+		let captured = "";
+		const origWrite = process.stdout.write;
+		process.stdout.write = ((chunk: string | Uint8Array) => {
+			captured += typeof chunk === "string" ? chunk : new TextDecoder().decode(chunk);
+			return true;
+		}) as typeof process.stdout.write;
+		try {
+			await missionStart(capOverstoryDir, capProjectRoot, {
+				slug: "unreadable",
+				objective: "test",
+				json: true,
+			});
+		} finally {
+			process.stdout.write = origWrite;
+		}
+
+		expect(process.exitCode).toBe(1);
+		const parsed = JSON.parse(captured);
+		expect(parsed.command).toBe("mission start");
+		expect(parsed.error).toContain("Cannot read");
 	});
 });

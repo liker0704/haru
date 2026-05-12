@@ -35,6 +35,37 @@ import { createMissionStore } from "./store.ts";
 
 // === ha mission start ===
 
+type CapCheckResult =
+	| { ok: true }
+	| { ok: false; reason: "unreadable"; detail: string }
+	| { ok: false; reason: "missing"; missing: string[] };
+
+const REQUIRED_AGENTS = [
+	"mission-analyst-intake",
+	"product-clarifier",
+	"tier-classifier",
+	"debugger",
+] as const;
+
+async function validateRequiredCapabilities(overstoryDir: string): Promise<CapCheckResult> {
+	const manifestPath = join(overstoryDir, "agent-manifest.json");
+	let raw: string;
+	try {
+		raw = await Bun.file(manifestPath).text();
+	} catch (err) {
+		return { ok: false, reason: "unreadable", detail: (err as Error).message };
+	}
+	let parsed: { agents?: Record<string, unknown> };
+	try {
+		parsed = JSON.parse(raw);
+	} catch (err) {
+		return { ok: false, reason: "unreadable", detail: (err as Error).message };
+	}
+	const present = new Set(Object.keys(parsed.agents ?? {}));
+	const missing = REQUIRED_AGENTS.filter((c) => !present.has(c));
+	return missing.length === 0 ? { ok: true } : { ok: false, reason: "missing", missing };
+}
+
 /**
  * Stage C: resolve mission feature branch — the integration target where
  * workstream merges land. Mirrors `src/commands/merge.ts:153-169` resolution
@@ -92,6 +123,22 @@ export async function missionStart(
 		!opts.specFile
 	) {
 		const message = "Intent required: pass it as positional arg, --objective, or --spec <file>";
+		if (opts.json) {
+			jsonError("mission start", message);
+		} else {
+			printError("Mission start failed", message);
+		}
+		missionStore.close();
+		process.exitCode = 1;
+		return;
+	}
+
+	const capCheck = await validateRequiredCapabilities(overstoryDir);
+	if (!capCheck.ok) {
+		const message =
+			capCheck.reason === "unreadable"
+				? `Cannot read .overstory/agent-manifest.json (${capCheck.detail}). Run \`ha update --manifest\` to regenerate.`
+				: `Missing required capabilities: ${capCheck.missing.join(", ")}. Run \`ha update --manifest\` to refresh agent manifest.`;
 		if (opts.json) {
 			jsonError("mission start", message);
 		} else {
