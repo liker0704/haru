@@ -1739,5 +1739,17 @@
 		"status": "active",
 		"createdAt": "2026-05-09T21:12:40.929Z",
 		"completedAt": null
+	},
+	{
+		"id": "group-89a8e1ef",
+		"name": "bug-bash-v2-batch",
+		"memberIssueIds": [
+			"haru-3068",
+			"haru-2b74",
+			"haru-c9e2"
+		],
+		"status": "active",
+		"createdAt": "2026-05-12T08:15:41.384Z",
+		"completedAt": null
 	}
 ]
