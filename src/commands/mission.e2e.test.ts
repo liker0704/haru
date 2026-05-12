@@ -41,8 +41,8 @@ let tempDir: string;
 let overstoryDir: string;
 let originalCwd: string;
 let originalExitCode: typeof process.exitCode;
-let originalStdoutWrite: typeof process.stdout.write;
-let originalStderrWrite: typeof process.stderr.write;
+let _originalStdoutWrite: typeof process.stdout.write;
+let _originalStderrWrite: typeof process.stderr.write;
 
 function writeConfig(root: string): Promise<number> {
 	return Bun.write(
@@ -698,9 +698,9 @@ describe("mission command e2e", () => {
 			verifySessionStore.close();
 		}
 		expect(deps.stopped).toEqual([
-			"coordinator",
-			"mission-analyst",
-			"execution-director",
+			"coordinator-stop-descendants",
+			"mission-analyst-stop-descendants",
+			"execution-director-stop-descendants",
 			"docs-smoke-lead",
 		]);
 
