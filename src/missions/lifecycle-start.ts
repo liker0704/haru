@@ -428,6 +428,7 @@ async function restartMissionRoles(
 			missionId: mission.id,
 			missionSlug: mission.slug,
 			agentName: analystAgentName,
+			capability: analystCapability,
 			projectRoot,
 			overstoryDir,
 			existingRunId: runId,

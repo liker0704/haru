@@ -46,6 +46,11 @@ export interface StartMissionRoleOpts {
 	missionSlug?: string;
 	/** Override agent name for parallel mission support. */
 	agentName?: string;
+	/** Capability variant. Defaults to the role's legacy capability (e.g.
+	 *  "mission-analyst") when omitted. Used by intake-phase and tier-set to
+	 *  spawn role variants like "mission-analyst-intake" or
+	 *  "mission-analyst-planned". */
+	capability?: string;
 }
 
 /** Options for stopping a mission role. */
@@ -113,7 +118,7 @@ export async function startMissionAnalyst(
 
 	const result = await startAgent({
 		agentName: analystName,
-		capability: "mission-analyst",
+		capability: opts.capability ?? "mission-analyst",
 		projectRoot: opts.projectRoot,
 		overstoryDir: opts.overstoryDir,
 		tmuxSession,
@@ -231,6 +236,7 @@ export async function ensureMissionAnalyst(
 		missionId: mission.id,
 		missionSlug: mission.slug,
 		agentName: analystName,
+		capability: analystCapability,
 		projectRoot,
 		overstoryDir,
 		existingRunId: mission.runId ?? "",
@@ -376,7 +382,7 @@ export async function startMissionCoordinator(
 
 	const result = await startAgent({
 		agentName: coordName,
-		capability: "coordinator-mission",
+		capability: opts.capability ?? "coordinator-mission",
 		projectRoot: opts.projectRoot,
 		overstoryDir: opts.overstoryDir,
 		tmuxSession,
