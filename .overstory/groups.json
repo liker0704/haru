@@ -1751,5 +1751,17 @@
 		"status": "active",
 		"createdAt": "2026-05-12T08:15:41.384Z",
 		"completedAt": null
+	},
+	{
+		"id": "group-c64a8887",
+		"name": "stage-a-gaps-v2-batch",
+		"memberIssueIds": [
+			"haru-aa5f",
+			"haru-7b3e",
+			"haru-037b"
+		],
+		"status": "active",
+		"createdAt": "2026-05-12T10:10:53.402Z",
+		"completedAt": null
 	}
 ]
