@@ -362,6 +362,17 @@ async function handleBranch(
 }
 
 /**
+ * Extract workstream id from a mission-scoped branch name.
+ * Convention: haru/<slug>/<role>-<ws-id>/<task-id> where <role> in
+ * {builder, lead, reviewer, merger}. Returns null if the branch does not
+ * match the pattern.
+ */
+export function parseWorkstreamIdFromBranch(branchName: string): string | null {
+	const m = /^haru\/[^/]+\/(?:builder|lead|reviewer|merger)-([^/]+)\//.exec(branchName);
+	return m?.[1] ?? null;
+}
+
+/**
  * Open a sessions.db handle configured for concurrent writes. Caller owns
  * close(). Used by the ov-merge producer path — shared by recordWorkstreamMerge
  * so `ha merge --all` does not open/close a fresh handle per entry.
@@ -376,26 +387,42 @@ function openSessionsDbForWrite(overstoryDir: string): import("bun:sqlite").Data
 
 /**
  * Record that a workstream has merged so gate evaluators advance the execute
- * phase correctly. Silently warns when `workstreamId` is absent (see Round 2
- * plan §BUG-A) — missed producer wiring surfaces in stderr rather than
- * silently skipping the SSOT update.
+ * phase correctly. When `workstreamId` is absent, attempts to recover it from
+ * the branch name before warning. Missed producer wiring surfaces in stderr.
  *
  * Callers running in a loop (e.g. `ha merge --all`) SHOULD pass a pre-opened
  * `db` handle to avoid repeated open/close cycles.
  */
-async function recordWorkstreamMerge(
+export async function recordWorkstreamMerge(
 	entry: MergeEntry,
 	overstoryDir: string,
 	db?: import("bun:sqlite").Database,
 ): Promise<void> {
 	if (!entry.missionId) return;
-	if (!entry.workstreamId) {
-		process.stderr.write(
-			`[merge] warning: workstreamId absent for branch ${entry.branchName} — ` +
-				`workstream_status NOT updated. Fix: ha sling must record workstreamId at dispatch.\n`,
-		);
-		return;
+
+	let workstreamId: string;
+	let updatedBy: string = "engine";
+	const rawWsId = entry.workstreamId ?? null;
+	if (!rawWsId) {
+		const parsed = parseWorkstreamIdFromBranch(entry.branchName);
+		if (parsed) {
+			workstreamId = parsed;
+			updatedBy = "engine-branch-parse";
+			process.stderr.write(
+				`[merge] note: workstreamId absent from merge entry for branch ${entry.branchName}; ` +
+					`recovered from branch name. Root cause: spec-meta.json missing workstreamId.\n`,
+			);
+		} else {
+			process.stderr.write(
+				`[merge] warning: workstreamId absent for branch ${entry.branchName} -- ` +
+					`workstream_status NOT updated. Fix: ha sling must record workstreamId at dispatch.\n`,
+			);
+			return;
+		}
+	} else {
+		workstreamId = rawWsId;
 	}
+
 	// Single DB handle + single transaction: both writes land atomically, preventing
 	// half-applied state (e.g., sticky flag flipped but status row missing → future
 	// fallback misfires).
@@ -404,14 +431,20 @@ async function recordWorkstreamMerge(
 		const ownDb = db ?? openSessionsDbForWrite(overstoryDir);
 		try {
 			const tx = ownDb.transaction((m: string, ws: string) => {
-				updateWorkstreamStatus(ownDb, m, ws, "merged", "engine");
+				updateWorkstreamStatus(
+					ownDb,
+					m,
+					ws,
+					"merged",
+					updatedBy as "engine" | "agent" | "operator",
+				);
 				ownDb
 					.prepare(
 						"UPDATE missions SET has_emitted_ws_producer_write = 1, updated_at = ? WHERE id = ?",
 					)
 					.run(new Date().toISOString(), m);
 			});
-			tx(entry.missionId, entry.workstreamId);
+			tx(entry.missionId, workstreamId);
 		} finally {
 			// Only close if we opened it ourselves; caller-owned handles stay open.
 			if (!db) ownDb.close();

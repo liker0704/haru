@@ -1,8 +1,10 @@
+import { Database } from "bun:sqlite";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { ValidationError } from "../errors.ts";
 import { createMergeQueue } from "../merge/queue.ts";
+import type { MergeEntry } from "../merge/types.ts";
 import {
 	cleanupTempDir,
 	commitFile,
@@ -10,7 +12,7 @@ import {
 	getDefaultBranch,
 	runGitInDir,
 } from "../test-helpers.ts";
-import { mergeCommand } from "./merge.ts";
+import { mergeCommand, parseWorkstreamIdFromBranch, recordWorkstreamMerge } from "./merge.ts";
 
 describe("mergeCommand", () => {
 	let repoDir: string;
@@ -628,5 +630,177 @@ merge:
 			const sharedFile = await Bun.file(join(repoDir, "src/shared.ts")).text();
 			expect(sharedFile).toBe("feature branch content");
 		});
+	});
+});
+
+// === Unit tests: parseWorkstreamIdFromBranch ===
+
+describe("parseWorkstreamIdFromBranch", () => {
+	test("extracts workstream id for builder prefix", () => {
+		expect(parseWorkstreamIdFromBranch("haru/slug/builder-ws-42/task-7")).toBe("ws-42");
+	});
+
+	test("extracts workstream id for lead prefix", () => {
+		expect(parseWorkstreamIdFromBranch("haru/slug/lead-ws-99/task-abc")).toBe("ws-99");
+	});
+
+	test("extracts workstream id for reviewer prefix", () => {
+		expect(parseWorkstreamIdFromBranch("haru/slug/reviewer-ws-1/task-def")).toBe("ws-1");
+	});
+
+	test("extracts workstream id for merger prefix", () => {
+		expect(parseWorkstreamIdFromBranch("haru/slug/merger-ws-5/task-ghi")).toBe("ws-5");
+	});
+
+	test("returns null for unknown role prefix", () => {
+		expect(parseWorkstreamIdFromBranch("haru/some-slug/feature-without-builder/task-7")).toBeNull();
+	});
+
+	test("returns null for non-haru branch", () => {
+		expect(parseWorkstreamIdFromBranch("main")).toBeNull();
+	});
+
+	test("returns null for empty string", () => {
+		expect(parseWorkstreamIdFromBranch("")).toBeNull();
+	});
+});
+
+// === Unit tests: recordWorkstreamMerge ===
+
+describe("recordWorkstreamMerge", () => {
+	function createTestDb(): Database {
+		const db = new Database(":memory:");
+		db.exec(`
+			CREATE TABLE missions (
+				id TEXT PRIMARY KEY,
+				has_emitted_ws_producer_write INTEGER NOT NULL DEFAULT 0,
+				updated_at TEXT NOT NULL
+			);
+			CREATE TABLE workstream_status (
+				mission_id TEXT NOT NULL,
+				workstream_id TEXT NOT NULL,
+				status TEXT NOT NULL,
+				updated_at TEXT NOT NULL,
+				updated_by TEXT NOT NULL,
+				PRIMARY KEY (mission_id, workstream_id)
+			);
+		`);
+		return db;
+	}
+
+	function insertMission(db: Database, id: string): void {
+		db.prepare("INSERT INTO missions (id, updated_at) VALUES (?, ?)").run(
+			id,
+			new Date().toISOString(),
+		);
+	}
+
+	function makeMergeEntry(overrides: Partial<MergeEntry> = {}): MergeEntry {
+		return {
+			branchName: "haru/slug/builder-ws-1/task-abc",
+			taskId: "task-abc",
+			missionId: "mission-1",
+			workstreamId: "ws-1",
+			agentName: "builder",
+			filesModified: [],
+			enqueuedAt: new Date().toISOString(),
+			status: "pending",
+			resolvedTier: null,
+			compatReportPath: null,
+			...overrides,
+		};
+	}
+
+	test("happy path: workstreamId set -> status=merged, updated_by=engine, flag flipped", async () => {
+		const db = createTestDb();
+		insertMission(db, "mission-1");
+
+		await recordWorkstreamMerge(makeMergeEntry(), "/unused", db);
+
+		const wsRow = db
+			.prepare(
+				"SELECT status, updated_by FROM workstream_status WHERE mission_id = ? AND workstream_id = ?",
+			)
+			.get("mission-1", "ws-1") as { status: string; updated_by: string } | null;
+		expect(wsRow?.status).toBe("merged");
+		expect(wsRow?.updated_by).toBe("engine");
+
+		const mRow = db
+			.prepare("SELECT has_emitted_ws_producer_write FROM missions WHERE id = ?")
+			.get("mission-1") as { has_emitted_ws_producer_write: number } | null;
+		expect(mRow?.has_emitted_ws_producer_write).toBe(1);
+		db.close();
+	});
+
+	test("fallback path: workstreamId=null, branch parsed -> status=merged, updated_by=engine-branch-parse", async () => {
+		const db = createTestDb();
+		insertMission(db, "mission-2");
+
+		await recordWorkstreamMerge(
+			makeMergeEntry({
+				missionId: "mission-2",
+				workstreamId: null,
+				branchName: "haru/some-slug/builder-ws-42/task-7",
+			}),
+			"/unused",
+			db,
+		);
+
+		const wsRow = db
+			.prepare(
+				"SELECT status, updated_by FROM workstream_status WHERE mission_id = ? AND workstream_id = ?",
+			)
+			.get("mission-2", "ws-42") as { status: string; updated_by: string } | null;
+		expect(wsRow?.status).toBe("merged");
+		expect(wsRow?.updated_by).toBe("engine-branch-parse");
+
+		const mRow = db
+			.prepare("SELECT has_emitted_ws_producer_write FROM missions WHERE id = ?")
+			.get("mission-2") as { has_emitted_ws_producer_write: number } | null;
+		expect(mRow?.has_emitted_ws_producer_write).toBe(1);
+		db.close();
+	});
+
+	test("no-recovery path: workstreamId=null, unrecognised branch -> no write, stderr has warning", async () => {
+		const db = createTestDb();
+		insertMission(db, "mission-3");
+
+		let stderrOutput = "";
+		const originalWrite = process.stderr.write.bind(process.stderr);
+		process.stderr.write = (chunk: unknown): boolean => {
+			stderrOutput += String(chunk);
+			return true;
+		};
+
+		try {
+			await recordWorkstreamMerge(
+				makeMergeEntry({
+					missionId: "mission-3",
+					workstreamId: null,
+					branchName: "haru/some-slug/feature-without-builder/task-7",
+				}),
+				"/unused",
+				db,
+			);
+		} finally {
+			process.stderr.write = originalWrite;
+		}
+
+		const rows = db
+			.prepare("SELECT * FROM workstream_status WHERE mission_id = ?")
+			.all("mission-3");
+		expect(rows).toHaveLength(0);
+		expect(stderrOutput).toContain("workstream_status NOT updated");
+		db.close();
+	});
+
+	test("no-mission path: missionId=null -> early return, no writes", async () => {
+		const db = createTestDb();
+
+		await recordWorkstreamMerge(makeMergeEntry({ missionId: null }), "/unused", db);
+
+		const rows = db.prepare("SELECT * FROM workstream_status").all();
+		expect(rows).toHaveLength(0);
+		db.close();
 	});
 });
