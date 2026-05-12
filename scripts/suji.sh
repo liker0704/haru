@@ -30,6 +30,20 @@ apply() {
 	fi
 }
 
+safe_push() {
+	local remote="$1" branch="$2"
+	local url
+	url=$(git remote get-url "$remote")
+	if [ "${SANDBOX:-0}" = "1" ]; then
+		case "$url" in
+			file://*) ;; # ok
+			/*)       ;; # local path is acceptable
+			*) echo "[ABORT] SANDBOX=1 but origin is non-local: $url" >&2; exit 1 ;;
+		esac
+	fi
+	apply "git push -u $remote $branch"
+}
+
 # ---------------------------------------------------------------------------
 # Guard: must not run from inside an agent session
 # ---------------------------------------------------------------------------
@@ -48,6 +62,25 @@ fi
 
 cd "$SISTER_REPO"
 echo "  cwd: $(pwd)"
+
+if [ "${SANDBOX:-0}" = "1" ]; then
+	ORIGINAL_ORIGIN=$(git remote get-url origin 2>/dev/null || echo "")
+	SANDBOX_BARE="${SISTER_REPO}/.sandbox-origin.git"
+	if [ ! -d "$SANDBOX_BARE" ]; then
+		git init --bare "$SANDBOX_BARE" >/dev/null
+	fi
+	git remote set-url origin "file://$SANDBOX_BARE"
+	echo "  [sandbox] origin rewritten: $ORIGINAL_ORIGIN → file://$SANDBOX_BARE"
+
+	# Restore on any exit path: success, error, signal.
+	restore_origin() {
+		if [ -n "${ORIGINAL_ORIGIN:-}" ]; then
+			git remote set-url origin "$ORIGINAL_ORIGIN" 2>/dev/null || true
+			echo "  [sandbox] origin restored to: $ORIGINAL_ORIGIN"
+		fi
+	}
+	trap restore_origin EXIT INT TERM ERR
+fi
 
 # ---------------------------------------------------------------------------
 # Step 1: D17 hardened remote check (seeds-specific — non-negotiable)
@@ -457,7 +490,7 @@ step "Remote publish: git push -u origin rebrand-to-suji (SKIP_PUSH=${SKIP_PUSH:
 if [ "${SKIP_PUSH:-0}" = "1" ]; then
 	echo "  [SKIP_PUSH=1] skipping remote publish — run manually: git push -u origin rebrand-to-suji"
 else
-	apply "git push -u origin rebrand-to-suji"
+	safe_push origin rebrand-to-suji
 fi
 
 # ---------------------------------------------------------------------------

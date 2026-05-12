@@ -26,6 +26,20 @@ apply() {
 	fi
 }
 
+safe_push() {
+	local remote="$1" branch="$2"
+	local url
+	url=$(git remote get-url "$remote")
+	if [ "${SANDBOX:-0}" = "1" ]; then
+		case "$url" in
+			file://*) ;; # ok
+			/*)       ;; # local path is acceptable
+			*) echo "[ABORT] SANDBOX=1 but origin is non-local: $url" >&2; exit 1 ;;
+		esac
+	fi
+	apply "git push -u $remote $branch"
+}
+
 err() { echo "[ABORT] $*" >&2; exit 1; }
 
 trap 'echo "[ABORT] failed at line $LINENO: $BASH_COMMAND" >&2; git -C "$SISTER_REPO" status --short 2>/dev/null || true' ERR
@@ -41,6 +55,25 @@ fi
 [ -d "$SISTER_REPO/.git" ] || err "not a git repo: $SISTER_REPO"
 echo "  repo: $SISTER_REPO"
 cd "$SISTER_REPO"
+
+if [ "${SANDBOX:-0}" = "1" ]; then
+	ORIGINAL_ORIGIN=$(git remote get-url origin 2>/dev/null || echo "")
+	SANDBOX_BARE="${SISTER_REPO}/.sandbox-origin.git"
+	if [ ! -d "$SANDBOX_BARE" ]; then
+		git init --bare "$SANDBOX_BARE" >/dev/null
+	fi
+	git remote set-url origin "file://$SANDBOX_BARE"
+	echo "  [sandbox] origin rewritten: $ORIGINAL_ORIGIN → file://$SANDBOX_BARE"
+
+	# Restore on any exit path: success, error, signal.
+	restore_origin() {
+		if [ -n "${ORIGINAL_ORIGIN:-}" ]; then
+			git remote set-url origin "$ORIGINAL_ORIGIN" 2>/dev/null || true
+			echo "  [sandbox] origin restored to: $ORIGINAL_ORIGIN"
+		fi
+	}
+	trap restore_origin EXIT INT TERM ERR
+fi
 
 # ---------------------------------------------------------------------------
 # STEP 2: Verify remotes
@@ -262,7 +295,7 @@ step "Finalize: bun install + commit + push + post-mod quality-gate COMPARE"
 apply "bun install"
 apply "git add -A"
 apply "git commit -m 'refactor(rebrand): canopy → tane per mission rebrand-hana-v2'"
-apply "git push -u origin rebrand-to-tane"
+safe_push origin rebrand-to-tane
 
 # Post-mod COMPARE (MED M2)
 set +e
