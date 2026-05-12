@@ -6,7 +6,7 @@
  */
 
 import { existsSync } from "node:fs";
-import { rm } from "node:fs/promises";
+import { rm, unlink } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { stopCommand } from "../commands/stop.ts";
@@ -30,7 +30,12 @@ import type { MissionCommandDeps } from "./lifecycle-types.ts";
 import { drainAgentInbox } from "./messaging.ts";
 import { generateMissionReview } from "./review.ts";
 import { stopMissionRole, stopMissionRunDescendants } from "./roles.ts";
-import { removeActiveMission } from "./runtime-context.ts";
+import {
+	currentRunPointerPath,
+	listActiveMissions,
+	missionRunPointerPath,
+	removeActiveMission,
+} from "./runtime-context.ts";
 import { createMissionStore } from "./store.ts";
 
 /**
@@ -360,6 +365,19 @@ async function terminalizeMission(opts: {
 		}
 
 		await removeActiveMission(overstoryDir, mission.id);
+
+		try {
+			await unlink(missionRunPointerPath(overstoryDir, mission.id));
+		} catch {
+			// Pointer may already be absent — best effort
+		}
+		if ((await listActiveMissions(overstoryDir)).length === 0) {
+			try {
+				await unlink(currentRunPointerPath(overstoryDir));
+			} catch {
+				// Already absent — best effort
+			}
+		}
 
 		let bundlePath: string | null = null;
 		const refreshedMission = missionStore.getById(mission.id) ?? mission;

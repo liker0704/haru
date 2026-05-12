@@ -1762,6 +1762,8 @@ describe("slingCommand circuit breaker gate", () => {
 		repoDir = realpathSync(await createTempGitRepo());
 		originalCwd = process.cwd();
 		process.chdir(repoDir);
+		delete process.env.HARU_AGENT_NAME;
+		delete process.env.HARU_WORKTREE_PATH;
 	});
 
 	afterEach(async () => {
