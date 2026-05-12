@@ -25,6 +25,7 @@
  */
 
 import { join } from "node:path";
+import { createManifestLoader } from "../../agents/manifest.ts";
 import type { DebugBriefRequestPayload, DebugEscalationPayload } from "../../mail/types.ts";
 import type { MissionGraph } from "../../types.ts";
 import type { HandlerRegistry } from "../types.ts";
@@ -133,6 +134,11 @@ function buildSubgraph(_config: PhaseCellConfig): MissionGraph {
 				trigger: "dispatch_failed",
 			},
 			{
+				from: `${CELL_TYPE}:dispatch-debugger`,
+				to: `${CELL_TYPE}:escalate`,
+				trigger: "capability_missing",
+			},
+			{
 				from: `${CELL_TYPE}:request-analyst-brief`,
 				to: `${CELL_TYPE}:await-debug-fix`,
 				trigger: "brief_ready",
@@ -200,6 +206,28 @@ function buildHandlers(deps: PhaseCellDeps): HandlerRegistry {
 				return { trigger: "dispatch_failed" };
 			}
 
+			// Preflight: verify debugger capability is registered before any side effect.
+			const manifestPath = join(overstoryDir, "agent-manifest.json");
+			const agentBaseDir = join(overstoryDir, "agent-defs");
+			const manifestLoader = createManifestLoader(manifestPath, agentBaseDir);
+			let debuggerAgent: { file: string } | undefined;
+			try {
+				const manifest = await manifestLoader.load();
+				debuggerAgent = manifest.agents.debugger;
+			} catch {
+				// Manifest unloadable (missing file, malformed JSON, or broken .md ref).
+				// Treat as effectively-missing capability — same coordinator surfacing path.
+			}
+			if (!debuggerAgent) {
+				deps.missionStore.checkpoints.saveCheckpoint(mission.id, `${CELL_TYPE}:dispatch-debugger`, {
+					capabilityMissing: true,
+					dispatchFailureReason:
+						"debugger capability not registered in agent-manifest.json — run `ha update --manifest`",
+					dispatchedAt: new Date().toISOString(),
+				});
+				return { trigger: "capability_missing" };
+			}
+
 			// Increment attempt counter (stored on this node's checkpoint)
 			const cp = deps.missionStore.checkpoints.getCheckpoint(
 				mission.id,
@@ -240,14 +268,24 @@ function buildHandlers(deps: PhaseCellDeps): HandlerRegistry {
 
 			// Create debug worktree from current feature-branch HEAD. New branch
 			// off the feature ref; debugger commits land there.
-			const addProc = Bun.spawn(
-				["git", "worktree", "add", "-b", debugBranch, worktreePath, featureBranch],
-				{ cwd: projectRoot, stdout: "pipe", stderr: "pipe" },
-			);
-			const addExit = await addProc.exited;
+			let addExit: number;
+			let addStderr = "";
+			try {
+				const addProc = Bun.spawn(
+					["git", "worktree", "add", "-b", debugBranch, worktreePath, featureBranch],
+					{ cwd: projectRoot, stdout: "pipe", stderr: "pipe" },
+				);
+				addExit = await addProc.exited;
+				if (addExit !== 0) addStderr = await new Response(addProc.stderr).text();
+			} catch (err) {
+				// Bun.spawn throws when cwd is missing or git is not found.
+				addExit = 1;
+				addStderr = err instanceof Error ? err.message : String(err);
+			}
 			if (addExit !== 0) {
-				const stderr = await new Response(addProc.stderr).text();
-				process.stderr.write(`[dispatch-debugger] worktree add failed: ${stderr.slice(0, 200)}\n`);
+				process.stderr.write(
+					`[dispatch-debugger] worktree add failed: ${addStderr.slice(0, 200)}\n`,
+				);
 				// Fix #4 from full-PR review: short-circuit to escalation. Plan
 				// §S8 risk-7: "worktree creation fails → escalate immediately, not
 				// retry". Wasting 3 attempts on infrastructure failures the
@@ -255,7 +293,7 @@ function buildHandlers(deps: PhaseCellDeps): HandlerRegistry {
 				deps.missionStore.checkpoints.saveCheckpoint(mission.id, `${CELL_TYPE}:dispatch-debugger`, {
 					debugAttempts,
 					worktreeAddFailed: true,
-					stderr: stderr.slice(0, 500),
+					stderr: addStderr.slice(0, 500),
 					dispatchedAt: new Date().toISOString(),
 				});
 				return { trigger: "dispatch_failed" };
@@ -377,13 +415,16 @@ function buildHandlers(deps: PhaseCellDeps): HandlerRegistry {
 				mission.id,
 				`${CELL_TYPE}:dispatch-debugger`,
 			);
-			const data = cp?.data as { debugAttempts?: number } | null;
+			const data = cp?.data as { debugAttempts?: number; dispatchFailureReason?: string } | null;
 			const totalAttempts = data?.debugAttempts ?? MAX_DEBUG_ATTEMPTS;
+			const dispatchFailureReason = data?.dispatchFailureReason ?? null;
 
 			const pack =
 				`# Consultation Request Pack\n\n` +
-				`Mission ${mission.slug} exhausted ${totalAttempts} debug attempts. ` +
-				`Inspect attempts/<N>/hypothesis.md for what was tried. ` +
+				(dispatchFailureReason
+					? `Mission ${mission.slug} could not dispatch debugger. Reason: ${dispatchFailureReason}\n\n`
+					: `Mission ${mission.slug} exhausted ${totalAttempts} debug attempts. ` +
+						`Inspect attempts/<N>/hypothesis.md for what was tried. `) +
 				`Run \`ha mission debug status ${mission.id}\` to review, then ` +
 				`\`ha mission debug retry|accept|abort\` to resolve.\n`;
 			await Bun.write(packPath, pack);
