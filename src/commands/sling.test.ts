@@ -1844,19 +1844,35 @@ describe("slingCommand circuit breaker gate", () => {
 	test("allows dispatch when circuit breaker is closed", async () => {
 		await writeBreakerConfig(repoDir, true);
 
-		// No breaker record = defaults to closed state; command should fail later (tmux), not at breaker
-		await expect(slingCommand("task-cb-002", { capability: "builder" })).rejects.not.toThrow(
-			"Circuit breaker is open for capability",
-		);
+		// No breaker record = defaults to closed; assertion is that the breaker-open
+		// error specifically is NOT raised. The command may resolve or fail later
+		// (e.g. tmux); only the breaker error is forbidden here.
+		let caught: unknown = null;
+		try {
+			await slingCommand("task-cb-002", { capability: "builder" });
+		} catch (e) {
+			caught = e;
+		}
+		if (caught !== null) {
+			expect(String(caught)).not.toContain("Circuit breaker is open");
+		}
 	});
 
 	test("skips breaker check when config.resilience is absent", async () => {
 		await writeBreakerConfig(repoDir, false);
 
-		// No resilience config = no breaker check; command should fail later (tmux), not at breaker
-		await expect(slingCommand("task-cb-003", { capability: "builder" })).rejects.not.toThrow(
-			"Circuit breaker is open for capability",
-		);
+		// No resilience config = no breaker check; assertion is that the breaker-open
+		// error specifically is NOT raised. The command may resolve or fail later
+		// (e.g. tmux); only the breaker error is forbidden here.
+		let caught: unknown = null;
+		try {
+			await slingCommand("task-cb-003", { capability: "builder" });
+		} catch (e) {
+			caught = e;
+		}
+		if (caught !== null) {
+			expect(String(caught)).not.toContain("Circuit breaker is open");
+		}
 	});
 
 	test("sends error mail to coordinator when breaker is tripped with no parent", async () => {
