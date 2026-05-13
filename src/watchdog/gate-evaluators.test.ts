@@ -19,6 +19,7 @@ import {
 	evaluateHumanSpecReview,
 	evaluateUnderstandReady,
 	evaluateWsCompletion,
+	filterMailSinceGate,
 } from "./gate-evaluators.ts";
 
 type TestMessage = {
@@ -687,5 +688,52 @@ describe("evaluateHumanSpecReview", () => {
 		]);
 		const result = evaluateHumanSpecReview(mission, mailStore, "2026-01-01T00:00:00Z");
 		expect(result.met).toBe(false);
+	});
+});
+
+describe("filterMailSinceGate", () => {
+	const msgs = [
+		{ createdAt: "2026-01-01T00:00:00.000Z", body: "old" },
+		{ createdAt: "2026-04-01T00:00:00.000Z", body: "gate" },
+		{ createdAt: "2026-05-01T00:00:00.000Z", body: "new" },
+	];
+
+	it("returns same array reference when gateFilterTime is undefined", () => {
+		expect(filterMailSinceGate(msgs, undefined)).toBe(msgs);
+	});
+
+	it("drops messages with createdAt before gateFilterTime", () => {
+		const result = filterMailSinceGate(msgs, "2026-04-01T00:00:00.000Z");
+		expect(result.map((m) => m.body)).toEqual(["gate", "new"]);
+	});
+
+	it("inclusive boundary: keeps message whose createdAt equals gateFilterTime", () => {
+		const single = [{ createdAt: "2026-04-01T00:00:00.000Z" }];
+		expect(filterMailSinceGate(single, "2026-04-01T00:00:00.000Z")).toHaveLength(1);
+	});
+
+	it("dispatchedAt evaluators still use raw inlined comparison — not filterMailSinceGate", async () => {
+		const src = await Bun.file(new URL("./gate-evaluators.ts", import.meta.url)).text();
+		const dispatchedAtMatches = (src.match(/m\.createdAt >= dispatchedAt/g) ?? []).length;
+		const gateEnteredAtMatches = (src.match(/m\.createdAt >= gateEnteredAt/g) ?? []).length;
+		expect(dispatchedAtMatches).toBe(2);
+		expect(gateEnteredAtMatches).toBe(0);
+	});
+
+	it("end-to-end via evaluateAwaitResearch: inclusive at T, exclusive at T+1ms", () => {
+		const T = "2026-04-01T12:00:00.000Z";
+		const Tplus1 = new Date(new Date(T).getTime() + 1).toISOString();
+		const mission = makeMission({ analystSessionId: "sess-1", slug: "test" });
+		const mailStore = createTestMailStore([
+			{
+				from: "mission-analyst-test",
+				to: "coordinator-test",
+				type: "result",
+				subject: "Research done",
+				createdAt: T,
+			},
+		]);
+		expect(evaluateAwaitResearch(mission, mailStore, T).met).toBe(true);
+		expect(evaluateAwaitResearch(mission, mailStore, Tplus1).met).toBe(false);
 	});
 });
