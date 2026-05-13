@@ -1793,5 +1793,17 @@
 		"status": "active",
 		"createdAt": "2026-05-13T06:58:45.079Z",
 		"completedAt": null
+	},
+	{
+		"id": "group-65b920fc",
+		"name": "engine-bugfix-batch-1",
+		"memberIssueIds": [
+			"haru-1e91",
+			"haru-90fb",
+			"haru-c28e"
+		],
+		"status": "active",
+		"createdAt": "2026-05-13T08:47:28.948Z",
+		"completedAt": null
 	}
 ]
