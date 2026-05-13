@@ -190,6 +190,13 @@ export interface OverstoryConfig {
 		shellInitDelayMs?: number;
 	};
 	mission?: {
+		/** Per-node gate timing overrides. */
+		gates?: {
+			/** Grace period overrides by node name (ms). */
+			gracePeriods?: Record<string, number>;
+			/** Max total wait overrides by node name (ms). */
+			maxTotalWaitMs?: Record<string, number>;
+		};
 		planReview?: {
 			/** @deprecated Plan review is now always enabled. This field is ignored. */
 			enabled?: boolean;

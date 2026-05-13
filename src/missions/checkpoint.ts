@@ -6,7 +6,7 @@
  */
 
 import type { Database } from "bun:sqlite";
-import type { CheckpointStore } from "../types.ts";
+import type { CheckpointStatusRow, CheckpointStore } from "../types.ts";
 
 // DDL is managed via store.ts migrations; this module only prepares statements.
 
@@ -110,6 +110,46 @@ export function createCheckpointStore(db: Database): CheckpointStore {
 
 	const deleteCheckpointsStmt = db.prepare<void, { $mission_id: string }>(
 		`DELETE FROM mission_node_checkpoints WHERE mission_id = $mission_id`,
+	);
+
+	/** Row shape for mission_node_checkpoint_status. */
+	interface CheckpointStatusDbRow {
+		status: "pending" | "confirmed";
+		pending_handler: string | null;
+		pending_recorded_at: string | null;
+	}
+
+	const getCheckpointStatusStmt = db.prepare<
+		CheckpointStatusDbRow,
+		{ $mission_id: string; $node_id: string }
+	>(
+		`SELECT status, pending_handler, pending_recorded_at
+		 FROM mission_node_checkpoint_status
+		 WHERE mission_id = $mission_id AND node_id = $node_id`,
+	);
+
+	const upsertPendingStmt = db.prepare<
+		void,
+		{
+			$mission_id: string;
+			$node_id: string;
+			$pending_handler: string;
+			$pending_recorded_at: string;
+			$updated_at: string;
+		}
+	>(
+		`INSERT OR REPLACE INTO mission_node_checkpoint_status
+		   (mission_id, node_id, status, pending_handler, pending_recorded_at, updated_at)
+		 VALUES ($mission_id, $node_id, 'pending', $pending_handler, $pending_recorded_at, $updated_at)`,
+	);
+
+	const upsertConfirmedStmt = db.prepare<
+		void,
+		{ $mission_id: string; $node_id: string; $updated_at: string }
+	>(
+		`INSERT OR REPLACE INTO mission_node_checkpoint_status
+		   (mission_id, node_id, status, pending_handler, pending_recorded_at, updated_at)
+		 VALUES ($mission_id, $node_id, 'confirmed', NULL, NULL, $updated_at)`,
 	);
 
 	/** Atomic checkpoint + transition in a single transaction. */
@@ -273,6 +313,35 @@ export function createCheckpointStore(db: Database): CheckpointStore {
 
 		deleteCheckpoints(missionId: string): void {
 			deleteCheckpointsStmt.run({ $mission_id: missionId });
+		},
+
+		getCheckpointStatus(key: string, nodeId: string): CheckpointStatusRow | null {
+			const row = getCheckpointStatusStmt.get({ $mission_id: key, $node_id: nodeId });
+			if (!row) return null;
+			return {
+				status: row.status,
+				pendingHandler: row.pending_handler,
+				pendingRecordedAt: row.pending_recorded_at,
+			};
+		},
+
+		markCheckpointPending(key: string, nodeId: string, handlerName: string): void {
+			const now = new Date().toISOString();
+			upsertPendingStmt.run({
+				$mission_id: key,
+				$node_id: nodeId,
+				$pending_handler: handlerName,
+				$pending_recorded_at: now,
+				$updated_at: now,
+			});
+		},
+
+		markCheckpointConfirmed(key: string, nodeId: string): void {
+			upsertConfirmedStmt.run({
+				$mission_id: key,
+				$node_id: nodeId,
+				$updated_at: new Date().toISOString(),
+			});
 		},
 	};
 }

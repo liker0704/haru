@@ -83,6 +83,8 @@ const EVENT_LABELS: Record<EventType, EventLabel> = {
 	engine_gate_timeout_routed: { compact: "TMOUT", full: "ENG TMOUT ", color: color.yellow },
 	engine_nudge_ceiling_reached: { compact: "CEIL!", full: "ENG CEILNG", color: color.red },
 	engine_mission_auto_completed: { compact: "DONE ", full: "ENG AUTOCMP", color: color.green },
+	engine_pending_unsafe_replay: { compact: "2PC! ", full: "ENG 2PC ERR", color: color.yellow },
+	engine_agent_resumed_on_mail: { compact: "RSUME", full: "ENG RESUME ", color: color.cyan },
 };
 
 /** Returns the EventLabel for a given event type. */

@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import type { CheckpointStore, MissionStore } from "../../types.ts";
+import type { CheckpointStatusRow, CheckpointStore, MissionStore } from "../../types.ts";
 import { validateGraph } from "../graph.ts";
 import type { HandlerContext } from "../types.ts";
 import type { ArchitectureCriticVerdictPayload } from "./architecture-review.ts";
@@ -122,6 +122,14 @@ function createMockCheckpointStore(): CheckpointStore & { transitions: StoredTra
 		deleteCheckpoints(_missionId: string): void {
 			checkpoints.clear();
 		},
+
+		getCheckpointStatus(_key: string, _nodeId: string): CheckpointStatusRow | null {
+			return null;
+		},
+
+		markCheckpointPending(_key: string, _nodeId: string, _handlerName: string): void {},
+
+		markCheckpointConfirmed(_key: string, _nodeId: string): void {},
 	};
 }
 

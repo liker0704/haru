@@ -80,6 +80,23 @@ export interface GraphEngine {
 	forceAdvance(trigger: string): Promise<StepResult>;
 }
 
+// === Replay-safe handler registry ===
+
+/**
+ * Handlers safe to re-invoke on crash-recovery replay.
+ * Criteria: idempotent observable effect — a second invocation produces the same outcome.
+ * Counter handlers (spec-rejected, dispatch-debugger) and mail-senders (escalate) are excluded.
+ */
+export const REPLAY_SAFE_HANDLERS: ReadonlySet<string> = new Set<string>([
+	"dispatch-clarifier",
+	"dispatch-tier-classifier",
+	"dispatch-analyst-intake",
+	"summary",
+	"check-debug-attempts",
+	"merge-debug-fix",
+	"cleanup",
+]);
+
 // === Factory ===
 
 export function createGraphEngine(opts: GraphEngineOpts): GraphEngine {
@@ -131,22 +148,31 @@ export function createGraphEngine(opts: GraphEngineOpts): GraphEngine {
 			return { status: "error", fromNodeId, toNodeId: fromNodeId, trigger, error: err };
 		}
 
-		opts.checkpointStore.saveStepResult(effectiveKey, fromNodeId, edge.to, trigger, null);
-		opts.missionStore?.updateCurrentNode(opts.missionId, edge.to);
-		state.currentNodeId = edge.to;
-
-		// Reset gate state on loop-back: if the destination is a gate node other than
-		// the origin, its stale resolved_at would filter out post-entry signals and
-		// cause the evaluator to return met:false indefinitely (BUG-E).
 		const destNode = nodeMap.get(edge.to);
-		if (
+		const destIsGate =
 			destNode &&
 			edge.to !== fromNodeId &&
-			(destNode.gate === "async" || destNode.gate === "human")
-		) {
-			opts.missionStore?.resetGateState(opts.missionId, edge.to);
+			(destNode.gate === "async" || destNode.gate === "human");
+
+		const commit = () => {
+			opts.checkpointStore.saveStepResult(effectiveKey, fromNodeId, edge.to, trigger, null);
+			opts.missionStore?.updateCurrentNode(opts.missionId, edge.to);
+			// Reset gate state on loop-back: if the destination is a gate node other than
+			// the origin, its stale resolved_at would filter out post-entry signals and
+			// cause the evaluator to return met:false indefinitely (BUG-E).
+			if (destIsGate) {
+				opts.missionStore?.resetGateState(opts.missionId, edge.to);
+			}
+			opts.checkpointStore.markCheckpointConfirmed(effectiveKey, fromNodeId);
+		};
+
+		if (opts.missionStore) {
+			opts.missionStore.transaction(commit);
+		} else {
+			commit();
 		}
 
+		state.currentNodeId = edge.to;
 		return { status: "advanced", fromNodeId, toNodeId: edge.to, trigger };
 	};
 
@@ -200,11 +226,24 @@ export function createGraphEngine(opts: GraphEngineOpts): GraphEngine {
 		// Handler invocation
 		let trigger: string | null = null;
 		if (node.handler) {
+			// Pending-replay gate: if a prior invocation was interrupted before confirmed,
+			// re-invoking a non-safe handler could double-increment counters or send duplicate mail.
+			const pendingStatus = opts.checkpointStore.getCheckpointStatus(effectiveKey, nodeId);
+			if (pendingStatus?.status === "pending") {
+				const pendingHandler = pendingStatus.pendingHandler;
+				if (!pendingHandler || !REPLAY_SAFE_HANDLERS.has(pendingHandler)) {
+					return performAdvance(nodeId, "dispatch_failed");
+				}
+				// Replay-safe: fall through; pending marker will be overwritten by confirm in performAdvance.
+			}
+
 			const handler = opts.handlers[node.handler];
 			if (!handler) {
 				const err = `Handler '${node.handler}' not registered`;
 				return { status: "error", fromNodeId: nodeId, toNodeId: nodeId, trigger: null, error: err };
 			}
+
+			opts.checkpointStore.markCheckpointPending(effectiveKey, nodeId, node.handler);
 
 			const ctx: HandlerContext = {
 				missionId: opts.missionId,

@@ -5,9 +5,9 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import type { CheckpointStore, MissionGraph, MissionStore } from "../types.ts";
+import type { CheckpointStatusRow, CheckpointStore, MissionGraph, MissionStore } from "../types.ts";
 import type { GraphEngineOpts } from "./engine.ts";
-import { createGraphEngine } from "./engine.ts";
+import { createGraphEngine, REPLAY_SAFE_HANDLERS } from "./engine.ts";
 import type { HandlerRegistry } from "./types.ts";
 
 // === In-memory mock stores ===
@@ -119,6 +119,44 @@ function createMockCheckpointStore(): CheckpointStore & { transitions: StoredTra
 
 		deleteCheckpoints(_missionId: string): void {
 			checkpoints.clear();
+		},
+
+		getCheckpointStatus(_key: string, _nodeId: string): CheckpointStatusRow | null {
+			return null;
+		},
+
+		markCheckpointPending(_key: string, _nodeId: string, _handlerName: string): void {},
+
+		markCheckpointConfirmed(_key: string, _nodeId: string): void {},
+	};
+}
+
+function createMockCheckpointStoreWithStatus(): ReturnType<typeof createMockCheckpointStore> & {
+	pendingStatuses: Map<string, CheckpointStatusRow>;
+} {
+	const base = createMockCheckpointStore();
+	const pendingStatuses = new Map<string, CheckpointStatusRow>();
+	const key = (k: string, nodeId: string) => `${k}:${nodeId}`;
+
+	return {
+		...base,
+		pendingStatuses,
+		getCheckpointStatus(k: string, nodeId: string) {
+			return pendingStatuses.get(key(k, nodeId)) ?? null;
+		},
+		markCheckpointPending(k: string, nodeId: string, handlerName: string) {
+			pendingStatuses.set(key(k, nodeId), {
+				status: "pending",
+				pendingHandler: handlerName,
+				pendingRecordedAt: new Date().toISOString(),
+			});
+		},
+		markCheckpointConfirmed(k: string, nodeId: string) {
+			pendingStatuses.set(key(k, nodeId), {
+				status: "confirmed",
+				pendingHandler: null,
+				pendingRecordedAt: null,
+			});
 		},
 	};
 }
@@ -234,6 +272,7 @@ function createMockMissionStore(): MissionStore & { currentNode: string | null }
 		incrementNudgeCount: noop,
 		markCeilingEmitted: noop,
 		resolveGate: noop,
+		resetGateState: noop,
 		updateWorkstreamStatus: noop,
 		transaction: <T>(fn: () => T): T => fn(),
 		updateTier: noop,
@@ -946,6 +985,233 @@ describe("subgraph execution", () => {
 
 		expect(result.status).toBe("gate");
 		expect(result.fromNodeId).toBe("parent");
+	});
+});
+
+// === 2PC + replay ===
+
+const handlerGraph = (handlerName: string): MissionGraph => ({
+	version: 1,
+	nodes: [
+		{
+			kind: "lifecycle",
+			id: "work",
+			phase: "understand",
+			state: "active",
+			handler: handlerName,
+		},
+		{
+			kind: "lifecycle",
+			id: "done",
+			phase: "done",
+			state: "completed",
+			terminal: true,
+		},
+		{
+			kind: "lifecycle",
+			id: "failed",
+			phase: "done",
+			state: "completed",
+			terminal: true,
+		},
+	],
+	edges: [
+		{ from: "work", to: "done", trigger: "next" },
+		{ from: "work", to: "failed", trigger: "dispatch_failed" },
+	],
+});
+
+describe("2PC + replay", () => {
+	test("markCheckpointPending is called before handler invocation", async () => {
+		const checkpointStore = createMockCheckpointStoreWithStatus();
+		let pendingAtInvocation: CheckpointStatusRow | null = null;
+
+		const handlers: HandlerRegistry = {
+			myHandler: async () => {
+				pendingAtInvocation = checkpointStore.getCheckpointStatus("mission-1", "work");
+				return { trigger: "next" };
+			},
+		};
+
+		const engine = createGraphEngine(
+			makeOpts(handlerGraph("myHandler"), handlers, { checkpointStore }),
+		);
+		await engine.step();
+
+		expect((pendingAtInvocation as CheckpointStatusRow | null)?.status).toBe("pending");
+		expect((pendingAtInvocation as CheckpointStatusRow | null)?.pendingHandler).toBe("myHandler");
+	});
+
+	test("markCheckpointConfirmed is called inside performAdvance after handler completes", async () => {
+		const checkpointStore = createMockCheckpointStoreWithStatus();
+
+		const handlers: HandlerRegistry = {
+			myHandler: async () => ({ trigger: "next" }),
+		};
+
+		const engine = createGraphEngine(
+			makeOpts(handlerGraph("myHandler"), handlers, { checkpointStore }),
+		);
+		await engine.step();
+
+		const status = checkpointStore.getCheckpointStatus("mission-1", "work");
+		expect(status?.status).toBe("confirmed");
+	});
+
+	test("handler crash leaves pending status (pending stays on throw)", async () => {
+		const checkpointStore = createMockCheckpointStoreWithStatus();
+
+		const handlers: HandlerRegistry = {
+			myHandler: async () => {
+				throw new Error("crash");
+			},
+		};
+
+		const engine = createGraphEngine(
+			makeOpts(handlerGraph("myHandler"), handlers, { checkpointStore }),
+		);
+		await engine.step();
+
+		const status = checkpointStore.getCheckpointStatus("mission-1", "work");
+		expect(status?.status).toBe("pending");
+	});
+
+	test("replay-safe handler with pending status falls through to re-invocation", async () => {
+		const checkpointStore = createMockCheckpointStoreWithStatus();
+		// Pre-seed a pending status for a replay-safe handler
+		checkpointStore.markCheckpointPending("mission-1", "work", "summary");
+
+		let invoked = false;
+		const handlers: HandlerRegistry = {
+			summary: async () => {
+				invoked = true;
+				return { trigger: "next" };
+			},
+		};
+
+		const graph = handlerGraph("summary");
+		const engine = createGraphEngine(makeOpts(graph, handlers, { checkpointStore }));
+		const result = await engine.step();
+
+		expect(invoked).toBe(true);
+		expect(result.status).toBe("advanced");
+	});
+
+	test("non-replay-safe handler with pending status routes to dispatch_failed", async () => {
+		const checkpointStore = createMockCheckpointStoreWithStatus();
+		// Pre-seed a pending status for a non-safe handler
+		checkpointStore.markCheckpointPending("mission-1", "work", "spec-rejected");
+
+		let invoked = false;
+		const handlers: HandlerRegistry = {
+			"spec-rejected": async () => {
+				invoked = true;
+				return { trigger: "next" };
+			},
+		};
+
+		const graph = handlerGraph("spec-rejected");
+		const engine = createGraphEngine(makeOpts(graph, handlers, { checkpointStore }));
+		const result = await engine.step();
+
+		expect(invoked).toBe(false);
+		expect(result.status).toBe("advanced");
+		expect(result.toNodeId).toBe("failed");
+		expect(result.trigger).toBe("dispatch_failed");
+	});
+
+	test("ctx.saveCheckpoint during pending does not affect checkpoint status table", async () => {
+		const checkpointStore = createMockCheckpointStoreWithStatus();
+
+		const handlers: HandlerRegistry = {
+			myHandler: async (ctx) => {
+				// Simulate handler-inner data mutation
+				await ctx.saveCheckpoint({ count: 99 });
+				return { trigger: "next" };
+			},
+		};
+
+		const engine = createGraphEngine(
+			makeOpts(handlerGraph("myHandler"), handlers, { checkpointStore }),
+		);
+
+		// Pre-seed pending status
+		checkpointStore.markCheckpointPending("mission-1", "work", "myHandler");
+
+		// Now drive handler — the saveCheckpoint inside handler must not clear pending
+		const saveOriginal = checkpointStore.saveCheckpoint.bind(checkpointStore);
+		let pendingAfterSave: CheckpointStatusRow | null = null;
+		checkpointStore.saveCheckpoint = (key, nodeId, data) => {
+			saveOriginal(key, nodeId, data);
+			pendingAfterSave = checkpointStore.getCheckpointStatus("mission-1", "work");
+		};
+
+		await engine.step();
+
+		// After saveCheckpoint call inside handler, status was still pending (not overwritten)
+		expect((pendingAfterSave as CheckpointStatusRow | null)?.status).toBe("pending");
+	});
+
+	test("performAdvance transaction wraps all writes atomically when missionStore provided", async () => {
+		const checkpointStore = createMockCheckpointStoreWithStatus();
+		const missionStore = createMockMissionStore();
+		const transactionCalls: string[] = [];
+
+		const origTransaction = missionStore.transaction.bind(missionStore);
+		missionStore.transaction = <T>(fn: () => T): T => {
+			transactionCalls.push("tx");
+			return origTransaction(fn);
+		};
+
+		const handlers: HandlerRegistry = {
+			myHandler: async () => ({ trigger: "next" }),
+		};
+
+		const graph = handlerGraph("myHandler");
+		const engine = createGraphEngine(makeOpts(graph, handlers, { checkpointStore, missionStore }));
+		await engine.step();
+
+		expect(transactionCalls.length).toBeGreaterThanOrEqual(1);
+		expect(missionStore.currentNode).toBe("done");
+	});
+
+	test("performAdvance without missionStore falls back to direct calls (test-only path)", async () => {
+		const checkpointStore = createMockCheckpointStoreWithStatus();
+
+		const handlers: HandlerRegistry = {
+			myHandler: async () => ({ trigger: "next" }),
+		};
+
+		const engine = createGraphEngine(
+			makeOpts(handlerGraph("myHandler"), handlers, { checkpointStore }),
+		);
+		const result = await engine.step();
+
+		// No missionStore — must still advance and confirm
+		expect(result.status).toBe("advanced");
+		const status = checkpointStore.getCheckpointStatus("mission-1", "work");
+		expect(status?.status).toBe("confirmed");
+	});
+
+	test("REPLAY_SAFE_HANDLERS contains exactly the specified 7 members", () => {
+		const expected = new Set([
+			"dispatch-clarifier",
+			"dispatch-tier-classifier",
+			"dispatch-analyst-intake",
+			"summary",
+			"check-debug-attempts",
+			"merge-debug-fix",
+			"cleanup",
+		]);
+
+		expect(REPLAY_SAFE_HANDLERS.size).toBe(7);
+		for (const name of expected) {
+			expect(REPLAY_SAFE_HANDLERS.has(name)).toBe(true);
+		}
+		// Non-safe handlers must NOT be in the set
+		expect(REPLAY_SAFE_HANDLERS.has("spec-rejected")).toBe(false);
+		expect(REPLAY_SAFE_HANDLERS.has("dispatch-debugger")).toBe(false);
+		expect(REPLAY_SAFE_HANDLERS.has("escalate")).toBe(false);
 	});
 });
 

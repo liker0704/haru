@@ -14,8 +14,9 @@ import { validateTransition } from "../agents/state-machine.ts";
 import { resumeAgent } from "../commands/resume.ts";
 import { loadConfig } from "../config.ts";
 import type { OverstoryConfig } from "../config-types.ts";
-import type { EventStore, EventType } from "../events/types.ts";
+import type { EventStore } from "../events/types.ts";
 import type { MailStore } from "../mail/store.ts";
+import { REPLAY_SAFE_HANDLERS } from "../missions/engine.ts";
 import {
 	buildLifecycleGraph,
 	buildLifecycleHandlers,
@@ -83,6 +84,38 @@ const MAX_TOTAL_WAIT_OVERRIDES: Record<string, number> = {
 const resumeAttempts = new Map<string, number>();
 const resumeFailureEmitted = new Set<string>();
 const MAX_RESUME_ATTEMPTS = 5;
+
+/**
+ * Wrap all advance writes for a gate resolution in a single SQLite transaction.
+ * Subgraph sites pass a non-null subgraphCheckpointKey; top-level falls back to missionId.
+ */
+function commitAdvance(
+	missionStore: MissionStore,
+	missionId: string,
+	fromNodeId: string,
+	toNodeId: string,
+	trigger: string,
+	subgraphCheckpointKey: string | null,
+): void {
+	missionStore.transaction(() => {
+		missionStore.resolveGate(missionId, fromNodeId, trigger);
+		if (subgraphCheckpointKey !== null) {
+			missionStore.checkpoints.saveStepResult(
+				subgraphCheckpointKey,
+				fromNodeId,
+				toNodeId,
+				trigger,
+				null,
+			);
+		}
+		missionStore.resetGateState(missionId, toNodeId);
+		missionStore.updateCurrentNode(missionId, toNodeId);
+		missionStore.checkpoints.markCheckpointConfirmed(
+			subgraphCheckpointKey ?? missionId,
+			fromNodeId,
+		);
+	});
+}
 
 /** Reset module-local resume counters. Test-only escape hatch. */
 export function __resetResumeCountersForTesting(): void {
@@ -208,7 +241,7 @@ async function checkAndResumeWaitingAgents(mission: Mission, opts: MissionTickOp
 				runId: mission.runId,
 				agentName: "engine",
 				sessionId: session.id,
-				eventType: "engine_agent_resumed_on_mail" as unknown as EventType,
+				eventType: "engine_agent_resumed_on_mail",
 				toolName: null,
 				toolArgs: null,
 				toolDurationMs: null,
@@ -439,6 +472,38 @@ async function processMission(mission: Mission, opts: MissionTickOpts): Promise<
 		if (!freshMission?.currentNode && currentNodeId === engine.currentNodeId()) {
 			return;
 		}
+
+		// Emit diagnostic event when a non-replay-safe handler left a pending marker.
+		// Routing to dispatch_failed happens in engine.step(); this event is for observability.
+		const checkpointKey = currentNodeId.includes("-phase:")
+			? `${currentNodeId.split("-phase:")[0] ?? ""}:active:${mission.id}`
+			: mission.id;
+		const pendingStatusRow = missionStore.checkpoints.getCheckpointStatus(
+			checkpointKey,
+			currentNodeId,
+		);
+		if (
+			pendingStatusRow?.status === "pending" &&
+			pendingStatusRow.pendingHandler &&
+			!REPLAY_SAFE_HANDLERS.has(pendingStatusRow.pendingHandler)
+		) {
+			opts.eventStore?.insert({
+				runId: mission.runId,
+				agentName: "engine",
+				sessionId: null,
+				eventType: "engine_pending_unsafe_replay",
+				toolName: null,
+				toolArgs: null,
+				toolDurationMs: null,
+				level: "warn",
+				data: JSON.stringify({
+					missionId: mission.id,
+					nodeId: currentNodeId,
+					handlerName: pendingStatusRow.pendingHandler,
+				}),
+			});
+		}
+
 		const nodeName = currentNodeId.split(":")[1] ?? "";
 
 		// Look up the current graph node to read per-node timeout overrides
@@ -482,24 +547,21 @@ async function processMission(mission: Mission, opts: MissionTickOpts): Promise<
 			opts.projectRoot,
 		);
 		if (earlyEval.met && earlyEval.trigger) {
-			missionStore.resolveGate(mission.id, currentNodeId, earlyEval.trigger);
 			const advanceEdge = findSubgraphEdge(tickGraph, currentNodeId, earlyEval.trigger);
 			if (advanceEdge) {
 				const phaseName = currentNodeId.split("-phase:")[0] ?? "";
 				const parentNodeId = `${phaseName}:active`;
 				const subgraphCheckpointKey = `${parentNodeId}:${mission.id}`;
-				missionStore.checkpoints.saveStepResult(
-					subgraphCheckpointKey,
+				commitAdvance(
+					missionStore,
+					mission.id,
 					currentNodeId,
 					advanceEdge.to,
 					earlyEval.trigger,
-					null,
+					subgraphCheckpointKey,
 				);
-				// Reset destination gate state on loop-back to prevent stale
-				// resolved_at from filtering out events (haru-5fd9).
-				missionStore.resetGateState(mission.id, advanceEdge.to);
-				missionStore.updateCurrentNode(mission.id, advanceEdge.to);
 			} else {
+				missionStore.resolveGate(mission.id, currentNodeId, earlyEval.trigger);
 				await engine.advanceNode(earlyEval.trigger);
 			}
 			if (opts.eventStore) {
@@ -528,24 +590,23 @@ async function processMission(mission: Mission, opts: MissionTickOpts): Promise<
 			// If the node declares onTimeout, route via timeout edge instead of suspending
 			const onTimeout = currentGraphNode?.onTimeout;
 			if (onTimeout) {
-				missionStore.resolveGate(mission.id, currentNodeId, "timeout");
-
 				// Advance the subgraph to the timeout-edge target using pre-built graph.
 				const timeoutEdge = findSubgraphEdge(tickGraph, currentNodeId, "timeout");
 				if (timeoutEdge) {
 					const phaseName = currentNodeId.split("-phase:")[0] ?? "";
 					const parentNodeId = `${phaseName}:active`;
 					const subgraphCheckpointKey = `${parentNodeId}:${mission.id}`;
-					missionStore.checkpoints.saveStepResult(
-						subgraphCheckpointKey,
+					commitAdvance(
+						missionStore,
+						mission.id,
 						currentNodeId,
 						timeoutEdge.to,
 						"timeout",
-						null,
+						subgraphCheckpointKey,
 					);
-					missionStore.updateCurrentNode(mission.id, timeoutEdge.to);
 				} else {
 					// Top-level or review cell gate — use engine.advanceNode
+					missionStore.resolveGate(mission.id, currentNodeId, "timeout");
 					await engine.advanceNode("timeout");
 				}
 
@@ -650,8 +711,6 @@ async function processMission(mission: Mission, opts: MissionTickOpts): Promise<
 
 		if (evalResult.met && evalResult.trigger) {
 			// Gate resolved — advance
-			missionStore.resolveGate(mission.id, currentNodeId, evalResult.trigger);
-
 			// For subgraph gates, find the target node using pre-built graph
 			const advanceEdge = findSubgraphEdge(tickGraph, currentNodeId, evalResult.trigger);
 			if (advanceEdge) {
@@ -659,19 +718,17 @@ async function processMission(mission: Mission, opts: MissionTickOpts): Promise<
 				const phaseName = currentNodeId.split("-phase:")[0] ?? "";
 				const parentNodeId = `${phaseName}:active`;
 				const subgraphCheckpointKey = `${parentNodeId}:${mission.id}`;
-
-				missionStore.checkpoints.saveStepResult(
-					subgraphCheckpointKey,
+				commitAdvance(
+					missionStore,
+					mission.id,
 					currentNodeId,
 					advanceEdge.to,
 					evalResult.trigger,
-					null,
+					subgraphCheckpointKey,
 				);
-				// Reset destination gate state on loop-back (haru-5fd9).
-				missionStore.resetGateState(mission.id, advanceEdge.to);
-				missionStore.updateCurrentNode(mission.id, advanceEdge.to);
 			} else {
 				// Top-level gate — use engine.advanceNode
+				missionStore.resolveGate(mission.id, currentNodeId, evalResult.trigger);
 				await engine.advanceNode(evalResult.trigger);
 			}
 
