@@ -267,4 +267,10 @@ export interface OverstoryConfig {
 		/** Auto-resume timeout to prevent spawn-pause deadlock. */
 		maxPauseDurationMs: number;
 	};
+	/**
+	 * PR-phase configuration placeholder. The full shape (per architecture §5.15)
+	 * is added by the w9 GREEN-phase builder. Typed as `Record<string, unknown>`
+	 * so tests can reference `config.pr` without a separate cast.
+	 */
+	pr?: Record<string, unknown>;
 }
