@@ -1805,5 +1805,15 @@
 		"status": "active",
 		"createdAt": "2026-05-13T08:47:28.948Z",
 		"completedAt": null
+	},
+	{
+		"id": "group-82d69066",
+		"name": "fix-failing-tests-batch",
+		"memberIssueIds": [
+			"haru-d359"
+		],
+		"status": "active",
+		"createdAt": "2026-05-13T11:07:58.510Z",
+		"completedAt": null
 	}
 ]
