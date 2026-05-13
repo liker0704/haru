@@ -42,8 +42,7 @@ function buildSubgraph(_config: PhaseCellConfig): MissionGraph {
 				kind: "cell",
 				id: `${CELL_TYPE}:summary`,
 				cellType: CELL_TYPE,
-				gate: "async",
-				gateTimeout: 600,
+				handler: "summary",
 			},
 			// Stage C: holdout is now a real gate (was dead-code; KEEP node id)
 			{
@@ -200,6 +199,37 @@ function buildSubgraph(_config: PhaseCellConfig): MissionGraph {
 
 function buildHandlers(deps: PhaseCellDeps): HandlerRegistry {
 	return {
+		summary: async (ctx) => {
+			const mission = ctx.getMission();
+			if (!mission) return { trigger: "summary_ready" };
+			const artifactRoot =
+				mission.artifactRoot ??
+				(deps.overstoryDir ? join(deps.overstoryDir, "missions", mission.id) : "");
+			if (!artifactRoot) return { trigger: "summary_ready" };
+
+			const summaryPath = join(artifactRoot, "results", "summary.md");
+			const lines = [
+				`# Mission Summary — ${mission.slug ?? mission.id}`,
+				"",
+				`- Mission ID: ${mission.id}`,
+				`- Objective: ${mission.objective ?? "(unset)"}`,
+				`- Phase: done`,
+				`- State: ${mission.state}`,
+				`- Tier: ${mission.tier ?? "unknown"}`,
+				`- Generated: ${new Date().toISOString()}`,
+				"",
+				"## Workstreams",
+				"",
+				"_See `plan/workstreams.json` for the full workstream list._",
+				"",
+				"## Notes",
+				"",
+				"_Engine-generated baseline. Operators may replace with a richer post-mission summary._",
+			];
+			await Bun.write(summaryPath, `${lines.join("\n")}\n`);
+			return { trigger: "summary_ready" };
+		},
+
 		"dispatch-debugger": async (ctx) => {
 			const mission = ctx.getMission();
 			if (!mission) return { trigger: "dispatch_failed" };

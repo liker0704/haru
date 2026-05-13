@@ -92,6 +92,59 @@ import { createRunStore } from "../sessions/store.ts";
  */
 const _defaultTailerRegistry: Map<string, TailerHandle> = new Map();
 
+// === Source-freshness warning (#273) ===
+
+let startupCaptured = false;
+let startupSha = "";
+let lastWarnedSha: string | null = null;
+
+async function defaultCaptureGitHead(cwd: string): Promise<string> {
+	try {
+		const proc = Bun.spawn(["git", "rev-parse", "HEAD"], {
+			cwd,
+			stdout: "pipe",
+			stderr: "pipe",
+		});
+		const stdout = await new Response(proc.stdout).text();
+		return (await proc.exited) === 0 ? stdout.trim() : "";
+	} catch {
+		return "";
+	}
+}
+
+async function checkSourceFreshness(opts: {
+	projectRoot: string;
+	eventStore: EventStore | null;
+	logger: { warn: (msg: string, meta?: unknown) => void };
+	captureGitHead: (cwd: string) => Promise<string>;
+}): Promise<void> {
+	if (!startupSha) return;
+	const currentSha = await opts.captureGitHead(opts.projectRoot);
+	if (!currentSha || currentSha === startupSha) return;
+	if (currentSha === lastWarnedSha) return;
+	lastWarnedSha = currentSha;
+
+	const message = "Daemon module cache may be stale — restart `ha watch` to pick up source changes";
+	const runbook = "ha watch stop && ha watch start";
+	opts.logger.warn(
+		`daemon-source-drift: startup=${startupSha.slice(0, 8)} current=${currentSha.slice(0, 8)} — ${runbook}`,
+	);
+	recordEvent(opts.eventStore, {
+		runId: null,
+		agentName: "watchdog",
+		eventType: "custom",
+		level: "warn",
+		data: { type: "daemon_source_drift", startupSha, currentSha, message, runbook },
+	});
+}
+
+/** Test helper: reset module-level source-freshness state. */
+export function _resetSourceFreshnessForTests(): void {
+	startupCaptured = false;
+	startupSha = "";
+	lastWarnedSha = null;
+}
+
 /**
  * Record an agent failure to mulch for future reference.
  * Fire-and-forget: never throws, logs errors internally if mulch fails.
@@ -644,6 +697,10 @@ export interface DaemonOptions {
 	_capturePaneContent?: (name: string, lines?: number) => Promise<string | null>;
 	/** Dependency injection for testing. Overrides MailStore creation for decision gate detection. */
 	_mailStore?: MailStore | null;
+	/** Dependency injection for testing. Uses defaultCaptureGitHead when omitted. */
+	_captureGitHead?: (cwd: string) => Promise<string>;
+	/** Dependency injection for testing. Uses a stderr-writing default when omitted. */
+	_logger?: { warn: (msg: string, meta?: unknown) => void };
 	/** DI for resilience store. If not provided, created from resilience.db when config.resilience exists. */
 	_resilienceStore?: ResilienceStore | null;
 	/** DI for headroom store. If not provided, created from headroom.db when config.headroom exists. */
@@ -808,6 +865,28 @@ export async function runDaemonTick(options: DaemonOptions): Promise<void> {
 	} catch {
 		// Reading run ID failure is non-fatal
 	}
+
+	const captureHead = options._captureGitHead ?? defaultCaptureGitHead;
+	const logger = options._logger ?? {
+		warn: (msg: string) => {
+			try {
+				process.stderr.write(`[watchdog] ${msg}\n`);
+			} catch {
+				// Guard: logging must not throw
+			}
+		},
+	};
+
+	if (!startupCaptured) {
+		startupSha = await captureHead(root);
+		startupCaptured = true;
+	}
+	await checkSourceFreshness({
+		projectRoot: root,
+		eventStore,
+		logger,
+		captureGitHead: captureHead,
+	});
 
 	// Open ResilienceStore if resilience config is present
 	let resilienceStore: ResilienceStore | null = null;

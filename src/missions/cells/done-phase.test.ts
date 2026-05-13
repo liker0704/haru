@@ -4,7 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { cleanupTempDir } from "../../test-helpers.ts";
 import type { Mission } from "../../types.ts";
+import { createGraphEngine } from "../engine.ts";
 import { validateGraph } from "../graph.ts";
+import { createMockCheckpointStore } from "../test-mocks.ts";
 import type { HandlerContext } from "../types.ts";
 import { donePhaseCell } from "./done-phase.ts";
 import type { PhaseCellConfig, PhaseCellDeps } from "./types.ts";
@@ -29,10 +31,11 @@ describe("donePhaseCell.buildSubgraph", () => {
 		}
 	});
 
-	test("summary has gate: async", () => {
+	test("summary node is a handler not a gate", () => {
 		const node = graph.nodes.find((n) => n.id === "done-phase:summary");
 		expect(node).toBeDefined();
-		expect(node?.gate).toBe("async");
+		expect(node?.handler).toBe("summary");
+		expect(node?.gate).toBeUndefined();
 	});
 
 	// === Stage C subgraph extension ===
@@ -589,5 +592,155 @@ describe("donePhaseCell escalate placeholder-checkpoint", () => {
 		);
 		expect(edge).toBeDefined();
 		expect(edge?.to).toBe("done-phase:debug-paused");
+	});
+});
+
+describe("donePhaseCell summary handler", () => {
+	let tempDir: string;
+	let artifactRoot: string;
+
+	beforeEach(async () => {
+		tempDir = await mkdtemp(join(tmpdir(), "haru-done-summary-"));
+		artifactRoot = join(tempDir, "artifacts");
+		await mkdir(join(artifactRoot, "results"), { recursive: true });
+	});
+
+	afterEach(async () => {
+		await cleanupTempDir(tempDir);
+	});
+
+	function makeFakeMission(overrides: Partial<Mission> = {}): Mission {
+		return {
+			id: "m1",
+			slug: "test",
+			objective: "test obj",
+			runId: null,
+			state: "active",
+			phase: "done",
+			firstFreezeAt: null,
+			pendingUserInput: false,
+			pendingInputKind: null,
+			pendingInputThreadId: null,
+			reopenCount: 0,
+			artifactRoot,
+			pausedWorkstreamIds: [],
+			analystSessionId: null,
+			executionDirectorSessionId: null,
+			coordinatorSessionId: null,
+			architectSessionId: null,
+			pausedLeadNames: [],
+			pauseReason: null,
+			currentNode: null,
+			startedAt: null,
+			completedAt: null,
+			createdAt: new Date().toISOString(),
+			updatedAt: new Date().toISOString(),
+			learningsExtracted: false,
+			tier: "planned",
+			hasEmittedWsProducerWrite: false,
+			autonomy: "supervised",
+			featureBranch: null,
+			frozenAt: null,
+			...overrides,
+		} as unknown as Mission;
+	}
+
+	function makeDeps(): PhaseCellDeps {
+		const mission = makeFakeMission();
+		return {
+			mailSend: async () => {},
+			checkpointStore: {} as PhaseCellDeps["checkpointStore"],
+			missionStore: {
+				getById: (_id: string) => mission,
+				checkpoints: {
+					saveCheckpoint: () => {},
+					getCheckpoint: () => null,
+				},
+			} as unknown as PhaseCellDeps["missionStore"],
+		};
+	}
+
+	test("summary node is a handler not a gate (graph-level)", () => {
+		const graph = donePhaseCell.buildSubgraph({
+			missionId: "m1",
+			artifactRoot,
+			projectRoot: "/tmp/p",
+		});
+		const node = graph.nodes.find((n) => n.id === "done-phase:summary");
+		expect(node).toBeDefined();
+		expect(node?.handler).toBe("summary");
+		expect(node?.gate).toBeUndefined();
+	});
+
+	test("done-phase mission advances past summary node (engine-level)", async () => {
+		// bug_demo (structural): under HEAD~1 the same setup leaves currentNode pinned
+		// at done-phase:summary (status="gate") because the node was a gate, not a handler.
+		const graph = donePhaseCell.buildSubgraph({
+			missionId: "m1",
+			artifactRoot,
+			projectRoot: "/tmp/p",
+		});
+		const mission = makeFakeMission();
+		const fakeMissionStore = {
+			getById: (_id: string) => mission,
+			checkpoints: { saveCheckpoint: () => {}, getCheckpoint: () => null },
+			updateCurrentNode: () => {},
+			resetGateState: () => {},
+		} as unknown as import("../../types.ts").MissionStore;
+		const deps: PhaseCellDeps = {
+			mailSend: async () => {},
+			checkpointStore: {} as PhaseCellDeps["checkpointStore"],
+			missionStore: fakeMissionStore,
+		};
+		const handlers = donePhaseCell.buildHandlers(deps);
+		const checkpointStore = createMockCheckpointStore();
+
+		const engine = createGraphEngine({
+			graph,
+			handlers,
+			checkpointStore,
+			missionId: "m1",
+			startNodeId: "done-phase:summary",
+			missionStore: fakeMissionStore,
+		});
+
+		const result = await engine.step();
+
+		expect(result.status).toBe("advanced");
+		expect(result.toNodeId).toBe("done-phase:holdout");
+		expect(result.trigger).toBe("summary_ready");
+		expect(await Bun.file(join(artifactRoot, "results", "summary.md")).exists()).toBe(true);
+
+		const content = await Bun.file(join(artifactRoot, "results", "summary.md")).text();
+		expect(content).toContain("m1");
+		expect(content).toContain("# Mission Summary");
+	});
+
+	test("summary handler is idempotent", async () => {
+		const deps = makeDeps();
+		const handlers = donePhaseCell.buildHandlers(deps);
+		const summaryHandler = handlers.summary;
+		if (!summaryHandler) throw new Error("summary handler not registered");
+
+		const ctx = {
+			missionId: "m1",
+			nodeId: "done-phase:summary",
+			checkpoint: null,
+			saveCheckpoint: async () => {},
+			sendMail: async () => {},
+			getMission: () => makeFakeMission(),
+		} as HandlerContext;
+
+		const r1 = await summaryHandler(ctx);
+		expect(r1.trigger).toBe("summary_ready");
+		const content1 = await Bun.file(join(artifactRoot, "results", "summary.md")).text();
+
+		const r2 = await summaryHandler(ctx);
+		expect(r2.trigger).toBe("summary_ready");
+		const content2 = await Bun.file(join(artifactRoot, "results", "summary.md")).text();
+
+		// Strip the non-deterministic Generated: line before comparing
+		const strip = (s: string) => s.replace(/^- Generated:.*$/m, "");
+		expect(strip(content1)).toBe(strip(content2));
 	});
 });

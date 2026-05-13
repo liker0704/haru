@@ -24,7 +24,7 @@ import { createMailStore } from "../mail/store.ts";
 import { createSessionStore } from "../sessions/store.ts";
 import { cleanupTempDir } from "../test-helpers.ts";
 import type { AgentSession, HealthCheck, OverstoryConfig, StoredEvent } from "../types.ts";
-import { buildCompletionMessage, runDaemonTick } from "./daemon.ts";
+import { _resetSourceFreshnessForTests, buildCompletionMessage, runDaemonTick } from "./daemon.ts";
 
 // === Test constants ===
 
@@ -3389,6 +3389,148 @@ describe("health policy integration", () => {
 				_eventStore: eventStore,
 			});
 			expect(existsSync(sentinelPath)).toBe(false);
+		} finally {
+			eventStore.close();
+		}
+	});
+});
+
+describe("daemon source freshness", () => {
+	let tempRoot: string;
+
+	beforeEach(async () => {
+		tempRoot = await createTempRoot();
+		_resetSourceFreshnessForTests();
+	});
+
+	afterEach(async () => {
+		_resetSourceFreshnessForTests();
+		await cleanupTempDir(tempRoot);
+	});
+
+	function makeDriftTick(opts: {
+		captureQueue: string[];
+		warnRecorder: string[];
+		eventStore: ReturnType<typeof createEventStore>;
+	}) {
+		let callIndex = 0;
+		const captureGitHead = async (_cwd: string): Promise<string> => {
+			const sha = opts.captureQueue[callIndex++] ?? "";
+			return sha;
+		};
+		return () =>
+			runDaemonTick({
+				root: tempRoot,
+				...THRESHOLDS,
+				_tmux: { isSessionAlive: async () => false, killSession: async () => {} },
+				_recordFailure: async () => {},
+				_nudge: async () => ({ delivered: true }),
+				_getConnection: () => undefined,
+				_capturePaneContent: async () => null,
+				_eventStore: opts.eventStore,
+				_captureGitHead: captureGitHead,
+				_logger: {
+					warn: (msg: string) => {
+						opts.warnRecorder.push(msg);
+					},
+				},
+			});
+	}
+
+	function getDriftEvents(eventStore: ReturnType<typeof createEventStore>): StoredEvent[] {
+		return eventStore.getByAgent("watchdog").filter((e) => {
+			try {
+				return (JSON.parse(e.data ?? "{}") as { type?: string }).type === "daemon_source_drift";
+			} catch {
+				return false;
+			}
+		});
+	}
+
+	test("daemon emits one-shot warning on HEAD drift", async () => {
+		// bug_demo (structural): under HEAD~1 (no checkSourceFreshness call),
+		// zero daemon_source_drift events fire even when HEAD changes.
+		//
+		// Queue layout (tick 1 makes 2 captureHead calls: startup + freshness check;
+		// subsequent ticks make 1 call each):
+		//   index 0 → "sha-aaaa"  tick 1 startup
+		//   index 1 → "sha-bbbb"  tick 1 freshness → WARN (drift detected)
+		//   index 2 → "sha-bbbb"  tick 2 freshness → no warn (same as lastWarnedSha)
+		//   index 3 → "sha-cccc"  tick 3 freshness → WARN (new drift target)
+		const captureQueue = ["sha-aaaa", "sha-bbbb", "sha-bbbb", "sha-cccc"];
+		const warnRecorder: string[] = [];
+		const eventStore = createEventStore(":memory:");
+
+		try {
+			const tick = makeDriftTick({ captureQueue, warnRecorder, eventStore });
+
+			// Tick 1: startup captures sha-aaaa, re-check returns sha-bbbb → drift → warn
+			await tick();
+			// Tick 2: sha-bbbb same as lastWarned → no new warn
+			await tick();
+			// Tick 3: sha-cccc new drift target → warn again
+			await tick();
+
+			expect(warnRecorder).toHaveLength(2);
+
+			const driftEvents = getDriftEvents(eventStore);
+			expect(driftEvents).toHaveLength(2);
+
+			const event = driftEvents[0];
+			expect(event?.level).toBe("warn");
+			expect(event?.agentName).toBe("watchdog");
+		} finally {
+			eventStore.close();
+		}
+	});
+
+	test("daemon does NOT warn on stable HEAD", async () => {
+		// Startup (index 0) + 5 freshness checks (indices 1-5) = 6 calls for 5 ticks
+		const captureQueue = [
+			"sha-stable",
+			"sha-stable",
+			"sha-stable",
+			"sha-stable",
+			"sha-stable",
+			"sha-stable",
+		];
+		const warnRecorder: string[] = [];
+		const eventStore = createEventStore(":memory:");
+
+		try {
+			const tick = makeDriftTick({ captureQueue, warnRecorder, eventStore });
+
+			for (let i = 0; i < 5; i++) {
+				await tick();
+			}
+
+			expect(warnRecorder).toHaveLength(0);
+			expect(getDriftEvents(eventStore)).toHaveLength(0);
+		} finally {
+			eventStore.close();
+		}
+	});
+
+	test("warning payload includes runbook step", async () => {
+		// Tick 1: startup (index 0) + freshness check (index 1) → warn
+		const captureQueue = ["sha-aaaa", "sha-bbbb"];
+		const warnRecorder: string[] = [];
+		const eventStore = createEventStore(":memory:");
+
+		try {
+			const tick = makeDriftTick({ captureQueue, warnRecorder, eventStore });
+			await tick();
+
+			const driftEvents = getDriftEvents(eventStore);
+			expect(driftEvents).toHaveLength(1);
+
+			const event = driftEvents[0];
+			const data = JSON.parse(event?.data ?? "{}") as {
+				message?: string;
+				runbook?: string;
+			};
+			expect(data.message).toBeDefined();
+			expect(data.runbook).toBe("ha watch stop && ha watch start");
 		} finally {
 			eventStore.close();
 		}
