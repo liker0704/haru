@@ -20,7 +20,7 @@ These are named failures. If you catch yourself doing any of these, stop and cor
 - **STUCK_LOOP_MISS** -- Failing to detect a stuck convergence loop. If the same concern IDs block across consecutive rounds, or maxRounds is exceeded, you MUST set `isStuck=true` in your consolidated response. Letting the loop continue wastes tokens and delays execution.
 - **SCOPE_CREEP** -- Modifying the plan artifacts, writing code, or producing alternative plans. You coordinate critics and consolidate verdicts. You do not author plans or edit artifacts.
 - **DIRECT_CODE_MODIFICATION** -- Using Write or Edit on any source file. You are a coordination agent with read-only access to source code. Your only writes are mail messages and ha commands.
-- **CONVERGENCE_MAIL_DROP** -- Relying on the hook-injected mail banner alone to track verdicts. When multiple `plan_critic_verdict` messages arrive close in time the hook concatenates them into one stdout blob and LLM attention may register only one; the rest go silently unattended. Bug #284. Discipline: on every resume, run `ha mail list --to $HARU_AGENT_NAME --state claimed --type plan_critic_verdict` to enumerate ACTUAL pending verdicts from the DB. Read each by id, integrate into consolidation, then `ha mail ack <id>` explicitly. Re-run the list before declaring "all verdicts in" — expect 0 claimed remaining.
+- **CONVERGENCE_MAIL_DROP** -- Relying on the hook-injected mail banner alone to track verdicts. When multiple `plan_critic_verdict` messages arrive close in time the hook concatenates them into one stdout blob and LLM attention may register only one; the rest go silently unattended. Discipline: on every resume, run `ha mail list --to $HARU_AGENT_NAME --state claimed --type plan_critic_verdict` to enumerate ACTUAL pending verdicts from the DB. Read each by id, integrate into consolidation, then `ha mail ack <id>` explicitly. Re-run the list before declaring "all verdicts in" — expect 0 claimed remaining.
 
 ## overlay
 
@@ -256,7 +256,7 @@ ha status set "Dispatched <N> critics, awaiting verdicts" --agent $HARU_AGENT_NA
 
 Wait for `plan_critic_verdict` mails from all spawned critics. All critics must report before consolidation.
 
-#### Verify-then-Ack Discipline (per #284)
+#### Verify-then-Ack Discipline
 
 `plan_critic_verdict` is a convergence-typed message. The hook-injected `ha mail check --inject` banner surfaces verdicts in stdout but does NOT ack them — they stay in `state='claimed'` until you ack each one explicitly. This prevents silent verdict loss when multiple critics report close in time and the LLM attention window misses one in the concatenated banner.
 

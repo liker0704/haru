@@ -26,7 +26,7 @@ These are named failures. If you catch yourself doing any of these, stop and cor
 - **SILENT_ESCALATION_DROP** -- Receiving an escalation mail and not acting on it. Every escalation must be routed according to its severity, or frozen for human input if critical.
 - **AUTONOMOUS_OVERREACH** -- Proceeding autonomously when the situation warrants freezing for operator input. Freeze triggers: scope expansion beyond original objective, security-sensitive changes, objective mismatch, budget/cost concern, irrecoverable merge failure.
 - **ARCHITECT_BYPASS** -- Allowing execution to proceed without the architect completing the Design phase. The architect ALWAYS runs in Full tier; TDD-awareness only adapts artifact requirements (architecture.md always, plus test-plan.yaml when TDD is active). The architect must send the architecture-ready signal (a `result` mail with subject "Architecture ready: <mission>") before the mission can proceed to execution.
-- **CONVERGENCE_MAIL_DROP** -- Relying on the hook-injected mail banner alone to track `merge_ready`, `worker_done`, or `result` mails from the ED, analyst, or architect. When multiple workstreams complete close in time the hook concatenates messages into one stdout blob and LLM attention may register only one; the rest go silently unattended. Bug #284. Discipline: on every resume, run `ha mail list --to $HARU_AGENT_NAME --state claimed --type <type>` for each convergence type to enumerate ACTUAL pending mail from the DB. Act on each, then `ha mail ack <id>` explicitly. Re-list before declaring "all done" — expect 0 claimed remaining.
+- **CONVERGENCE_MAIL_DROP** -- Relying on the hook-injected mail banner alone to track `merge_ready`, `worker_done`, or `result` mails from the ED, analyst, or architect. When multiple workstreams complete close in time the hook concatenates messages into one stdout blob and LLM attention may register only one; the rest go silently unattended. Discipline: on every resume, run `ha mail list --to $HARU_AGENT_NAME --state claimed --type <type>` for each convergence type to enumerate ACTUAL pending mail from the DB. Act on each, then `ha mail ack <id>` explicitly. Re-list before declaring "all done" — expect 0 claimed remaining.
 
 ## overlay
 
@@ -270,7 +270,7 @@ Goal: Monitor execution, merge completed work, handle issues.
 
 1. **Monitor** via `ha mail check` and `ha status`. Do NOT poll in a loop -- wait for tmux nudge.
 
-   **Verify-then-Ack discipline (per #284):** `merge_ready`, `worker_done`, and `result` are convergence-typed mail. The hook-injected banner surfaces them but does NOT ack — they stay `state='claimed'` until you ack explicitly. When parallel workstreams complete close in time, the LLM attention window can miss one in the concatenated banner. On every resume, enumerate from the DB before acting:
+   **Verify-then-Ack discipline:** `merge_ready`, `worker_done`, and `result` are convergence-typed mail. The hook-injected banner surfaces them but does NOT ack — they stay `state='claimed'` until you ack explicitly. When parallel workstreams complete close in time, the LLM attention window can miss one in the concatenated banner. On every resume, enumerate from the DB before acting:
 
    ```bash
    ha mail list --to $HARU_AGENT_NAME --state claimed --type merge_ready
@@ -289,7 +289,7 @@ Goal: Monitor execution, merge completed work, handle issues.
      --body "Branch <branch> merged successfully. Task <task-id> closed." \
      --type merged --agent $HARU_AGENT_NAME
 
-   # Per #284: ack the merge_ready explicitly after acting on it
+   # ack the merge_ready explicitly after acting on it
    ha mail ack <merge-ready-id> --agent $HARU_AGENT_NAME
    ```
 #### Post-Merge Architecture Review (Full Tier — Always)
