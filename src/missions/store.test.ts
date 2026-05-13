@@ -972,3 +972,354 @@ describe("tier operations", () => {
 		expect(fetched?.tier).toBeNull();
 	});
 });
+
+// === migration v13: PR lifecycle persistence ===
+
+/**
+ * Local shape declarations for the PR-state / PR-comment accessors that the
+ * builder will add to MissionStore in W1. The cast keeps the test file
+ * compiling against the un-widened MissionStore interface during RED phase.
+ */
+type MissionPrStateRow = {
+	missionId: string;
+	prNumber: number;
+	prUrl: string;
+	branch: string;
+	createdAt: string;
+	lastCiStatus: string | null;
+	lastReviewDecision: string | null;
+	approvedHeadSha: string | null;
+	mergedAt: string | null;
+};
+type MissionPrCommentRow = {
+	missionId: string;
+	prNumber: number;
+	commentId: string;
+	author: string;
+	body: string;
+	action: string | null;
+	status: string;
+	fixCycles: number;
+	detectedAt: string;
+	resolvedAt: string | null;
+};
+type PrExt = {
+	getPrState(missionId: string): MissionPrStateRow | null;
+	upsertPrState(row: MissionPrStateRow): void;
+	updatePrCiStatus(missionId: string, status: string): void;
+	updatePrReviewDecision(missionId: string, decision: string): void;
+	setApprovedHeadSha(missionId: string, sha: string): void;
+	markPrMerged(missionId: string, mergedAt: string): void;
+	listPrComments(missionId: string): MissionPrCommentRow[];
+	countTriageSpawnsSince(missionId: string, since: string): number;
+	countTriagePerAuthorSince(missionId: string, author: string, since: string): number;
+	recordPrComment(row: MissionPrCommentRow): void;
+	updatePrCommentAction(commentId: string, action: string, status: string): void;
+	markPrCommentResolved(commentId: string): void;
+};
+const ext = (s: MissionStore): MissionStore & PrExt => s as MissionStore & PrExt;
+
+describe("migration v13: parent_mission_id + learnings_extracted_at", () => {
+	test("T-w1-1: both columns exist on missions with TEXT/nullable, positioned after feature_branch", () => {
+		const probe = new Database(dbPath);
+		const cols = probe.prepare("PRAGMA table_info(missions)").all() as Array<{
+			cid: number;
+			name: string;
+			type: string;
+			notnull: number;
+			dflt_value: string | null;
+			pk: number;
+		}>;
+		probe.close();
+
+		const parentCol = cols.find((c) => c.name === "parent_mission_id");
+		const learningsAtCol = cols.find((c) => c.name === "learnings_extracted_at");
+		expect(parentCol).toBeDefined();
+		expect(learningsAtCol).toBeDefined();
+		expect(parentCol?.type).toBe("TEXT");
+		expect(parentCol?.notnull).toBe(0);
+		expect(learningsAtCol?.type).toBe("TEXT");
+		expect(learningsAtCol?.notnull).toBe(0);
+
+		const featureBranchCol = cols.find((c) => c.name === "feature_branch");
+		expect(featureBranchCol).toBeDefined();
+		const featureBranchCid = featureBranchCol?.cid ?? -1;
+		expect(parentCol?.cid).toBeGreaterThan(featureBranchCid);
+		expect(learningsAtCol?.cid).toBeGreaterThan(featureBranchCid);
+	});
+
+	test("T-w1-2: re-opening the store is idempotent (no duplicate columns)", () => {
+		store.close();
+		expect(() => {
+			store = createMissionStore(dbPath);
+		}).not.toThrow();
+
+		const probe = new Database(dbPath);
+		const cols = probe.prepare("PRAGMA table_info(missions)").all() as Array<{ name: string }>;
+		probe.close();
+
+		const parentMatches = cols.filter((c) => c.name === "parent_mission_id");
+		const learningsAtMatches = cols.filter((c) => c.name === "learnings_extracted_at");
+		expect(parentMatches).toHaveLength(1);
+		expect(learningsAtMatches).toHaveLength(1);
+	});
+});
+
+describe("migration v13: mission_pr_state table", () => {
+	test("T-w1-3: mission_pr_state has 9 columns in declared order, mission_id is PRIMARY KEY", () => {
+		const probe = new Database(dbPath);
+		const cols = probe.prepare("PRAGMA table_info(mission_pr_state)").all() as Array<{
+			name: string;
+			pk: number;
+		}>;
+		probe.close();
+
+		expect(cols.map((c) => c.name)).toEqual([
+			"mission_id",
+			"pr_number",
+			"pr_url",
+			"branch",
+			"created_at",
+			"last_ci_status",
+			"last_review_decision",
+			"approved_head_sha",
+			"merged_at",
+		]);
+
+		const pkRow = cols.find((c) => c.name === "mission_id");
+		expect(pkRow?.pk).toBe(1);
+	});
+});
+
+describe("migration v13: mission_pr_comments table", () => {
+	test("T-w1-4: mission_pr_comments has 10 columns in declared order, comment_id is PRIMARY KEY", () => {
+		const probe = new Database(dbPath);
+		const cols = probe.prepare("PRAGMA table_info(mission_pr_comments)").all() as Array<{
+			name: string;
+			pk: number;
+		}>;
+		probe.close();
+
+		expect(cols.map((c) => c.name)).toEqual([
+			"mission_id",
+			"pr_number",
+			"comment_id",
+			"author",
+			"body",
+			"action",
+			"status",
+			"fix_cycles",
+			"detected_at",
+			"resolved_at",
+		]);
+
+		const pkRow = cols.find((c) => c.name === "comment_id");
+		expect(pkRow?.pk).toBe(1);
+	});
+
+	test("T-w1-5: body CHECK constraint rejects > 65536 chars, accepts == 65536", () => {
+		const raw = new Database(dbPath);
+		try {
+			const tooLong = "x".repeat(65537);
+			expect(() =>
+				raw.exec(
+					`INSERT INTO mission_pr_comments
+					 (mission_id, pr_number, comment_id, author, body, status, fix_cycles, detected_at)
+					 VALUES ('mission-001', 1, 'c-too-long', 'octocat',
+					         '${tooLong}', 'open', 0, '2026-05-13T00:00:00Z')`,
+				),
+			).toThrow();
+
+			const justRight = "x".repeat(65536);
+			expect(() =>
+				raw.exec(
+					`INSERT INTO mission_pr_comments
+					 (mission_id, pr_number, comment_id, author, body, status, fix_cycles, detected_at)
+					 VALUES ('mission-001', 1, 'c-just-right', 'octocat',
+					         '${justRight}', 'open', 0, '2026-05-13T00:00:00Z')`,
+				),
+			).not.toThrow();
+		} finally {
+			raw.close();
+		}
+	});
+});
+
+describe("MissionStore PR state accessors", () => {
+	function baseState(overrides: Partial<MissionPrStateRow> = {}): MissionPrStateRow {
+		return {
+			missionId: "mission-001",
+			prNumber: 42,
+			prUrl: "https://github.com/example/repo/pull/42",
+			branch: "feature/stage-e",
+			createdAt: "2026-05-13T00:00:00Z",
+			lastCiStatus: "pending",
+			lastReviewDecision: "pending",
+			approvedHeadSha: "deadbeef",
+			mergedAt: null,
+			...overrides,
+		};
+	}
+
+	test("T-w1-6: upsertPrState + getPrState roundtrip all 9 fields", () => {
+		store.create(makeMission());
+		const row = baseState();
+		ext(store).upsertPrState(row);
+
+		const got = ext(store).getPrState("mission-001");
+		expect(got).toEqual(row);
+	});
+
+	test("upsertPrState overwrites on PRIMARY KEY conflict (same missionId)", () => {
+		store.create(makeMission());
+		ext(store).upsertPrState(baseState({ prNumber: 42 }));
+		ext(store).upsertPrState(baseState({ prNumber: 99, prUrl: "https://example/pull/99" }));
+
+		const got = ext(store).getPrState("mission-001");
+		expect(got?.prNumber).toBe(99);
+		expect(got?.prUrl).toBe("https://example/pull/99");
+	});
+
+	test("getPrState returns null for unknown mission", () => {
+		expect(ext(store).getPrState("does-not-exist")).toBeNull();
+	});
+
+	test("updatePrCiStatus mutates only last_ci_status; other fields preserved", () => {
+		store.create(makeMission());
+		ext(store).upsertPrState(baseState({ lastCiStatus: "pending" }));
+		ext(store).updatePrCiStatus("mission-001", "success");
+
+		const got = ext(store).getPrState("mission-001");
+		expect(got?.lastCiStatus).toBe("success");
+		expect(got?.lastReviewDecision).toBe("pending");
+		expect(got?.prNumber).toBe(42);
+		expect(got?.branch).toBe("feature/stage-e");
+		expect(got?.approvedHeadSha).toBe("deadbeef");
+	});
+
+	test("updatePrReviewDecision mutates only last_review_decision; other fields preserved", () => {
+		store.create(makeMission());
+		ext(store).upsertPrState(baseState({ lastReviewDecision: "pending" }));
+		ext(store).updatePrReviewDecision("mission-001", "approved");
+
+		const got = ext(store).getPrState("mission-001");
+		expect(got?.lastReviewDecision).toBe("approved");
+		expect(got?.lastCiStatus).toBe("pending");
+		expect(got?.prUrl).toBe("https://github.com/example/repo/pull/42");
+	});
+
+	test("T-w1-7: setApprovedHeadSha sets approved_head_sha; null before, value after", () => {
+		store.create(makeMission());
+		ext(store).upsertPrState(baseState({ approvedHeadSha: null }));
+		const before = ext(store).getPrState("mission-001");
+		expect(before?.approvedHeadSha).toBeNull();
+
+		ext(store).setApprovedHeadSha("mission-001", "abc123");
+		const after = ext(store).getPrState("mission-001");
+		expect(after?.approvedHeadSha).toBe("abc123");
+	});
+
+	test("markPrMerged sets mergedAt; other fields preserved", () => {
+		store.create(makeMission());
+		ext(store).upsertPrState(baseState({ mergedAt: null }));
+		ext(store).markPrMerged("mission-001", "2026-05-14T00:00:00Z");
+
+		const got = ext(store).getPrState("mission-001");
+		expect(got?.mergedAt).toBe("2026-05-14T00:00:00Z");
+		expect(got?.prNumber).toBe(42);
+		expect(got?.branch).toBe("feature/stage-e");
+		expect(got?.lastCiStatus).toBe("pending");
+	});
+});
+
+describe("MissionStore PR comment accessors", () => {
+	function baseComment(overrides: Partial<MissionPrCommentRow> = {}): MissionPrCommentRow {
+		return {
+			missionId: "mission-001",
+			prNumber: 42,
+			commentId: "c1",
+			author: "octocat",
+			body: "please fix",
+			action: null,
+			status: "open",
+			fixCycles: 0,
+			detectedAt: "2026-05-13T01:00:00Z",
+			resolvedAt: null,
+			...overrides,
+		};
+	}
+
+	test("T-w1-8: recordPrComment is INSERT OR IGNORE by comment_id (first write wins)", () => {
+		store.create(makeMission());
+		ext(store).recordPrComment(baseComment({ commentId: "c1", body: "first" }));
+		ext(store).recordPrComment(baseComment({ commentId: "c1", body: "second" }));
+
+		const rows = ext(store).listPrComments("mission-001");
+		expect(rows).toHaveLength(1);
+		expect(rows[0]?.body).toBe("first");
+	});
+
+	test("listPrComments returns all rows for the mission", () => {
+		store.create(makeMission());
+		ext(store).recordPrComment(baseComment({ commentId: "c1" }));
+		ext(store).recordPrComment(baseComment({ commentId: "c2" }));
+		ext(store).recordPrComment(baseComment({ commentId: "c3" }));
+
+		const rows = ext(store).listPrComments("mission-001");
+		expect(rows).toHaveLength(3);
+		expect(rows.find((r) => r.commentId === "c1")).toBeDefined();
+		expect(rows.find((r) => r.commentId === "c2")).toBeDefined();
+		expect(rows.find((r) => r.commentId === "c3")).toBeDefined();
+	});
+
+	test("updatePrCommentAction sets action and status on the targeted comment", () => {
+		store.create(makeMission());
+		ext(store).recordPrComment(baseComment({ commentId: "c1" }));
+		ext(store).updatePrCommentAction("c1", "trivial_fix", "in_progress");
+
+		const rows = ext(store).listPrComments("mission-001");
+		const c1 = rows.find((r) => r.commentId === "c1");
+		expect(c1?.action).toBe("trivial_fix");
+		expect(c1?.status).toBe("in_progress");
+	});
+
+	test("markPrCommentResolved sets resolvedAt non-null", () => {
+		store.create(makeMission());
+		ext(store).recordPrComment(baseComment({ commentId: "c1" }));
+		ext(store).markPrCommentResolved("c1");
+
+		const rows = ext(store).listPrComments("mission-001");
+		const c1 = rows.find((r) => r.commentId === "c1");
+		expect(c1?.resolvedAt).not.toBeNull();
+	});
+
+	test("T-w1-9: countTriageSpawnsSince counts triage rows since timestamp", () => {
+		store.create(makeMission());
+		ext(store).recordPrComment(baseComment({ commentId: "c1" }));
+		ext(store).recordPrComment(baseComment({ commentId: "c2" }));
+		ext(store).updatePrCommentAction("c1", "trivial_fix", "in_progress");
+
+		const sinceEpoch = ext(store).countTriageSpawnsSince("mission-001", "1970-01-01T00:00:00Z");
+		expect(sinceEpoch).toBeGreaterThanOrEqual(1);
+
+		const sinceFuture = ext(store).countTriageSpawnsSince("mission-001", "2999-01-01T00:00:00Z");
+		expect(sinceFuture).toBe(0);
+	});
+
+	test("T-w1-10: countTriagePerAuthorSince counts triage rows per author", () => {
+		store.create(makeMission());
+		ext(store).recordPrComment(baseComment({ commentId: "c1", author: "A" }));
+		ext(store).recordPrComment(baseComment({ commentId: "c2", author: "A" }));
+		ext(store).recordPrComment(baseComment({ commentId: "c3", author: "B" }));
+		ext(store).updatePrCommentAction("c1", "trivial_fix", "in_progress");
+		ext(store).updatePrCommentAction("c2", "trivial_fix", "in_progress");
+		ext(store).updatePrCommentAction("c3", "trivial_fix", "in_progress");
+
+		expect(ext(store).countTriagePerAuthorSince("mission-001", "A", "1970-01-01T00:00:00Z")).toBe(
+			2,
+		);
+		expect(ext(store).countTriagePerAuthorSince("mission-001", "B", "1970-01-01T00:00:00Z")).toBe(
+			1,
+		);
+	});
+});

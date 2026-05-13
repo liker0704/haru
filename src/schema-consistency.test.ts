@@ -339,7 +339,9 @@ describe("SQL schema consistency", () => {
 				"has_emitted_ws_producer_write",
 				"id",
 				"learnings_extracted",
+				"learnings_extracted_at",
 				"objective",
+				"parent_mission_id",
 				"pause_reason",
 				"paused_lead_names",
 				"paused_workstream_ids",
@@ -357,6 +359,86 @@ describe("SQL schema consistency", () => {
 			].sort();
 
 			expect(actual).toEqual(expected);
+		});
+
+		test("mission_pr_state table columns match schema", () => {
+			const dbPath = join(tmpDir, "sessions.db");
+			const store = createMissionStore(dbPath);
+
+			const db = new Database(dbPath, { readonly: true });
+			const actual = getTableColumns(db, "mission_pr_state");
+			db.close();
+			store.close();
+
+			const expected = [
+				"approved_head_sha",
+				"branch",
+				"created_at",
+				"last_ci_status",
+				"last_review_decision",
+				"merged_at",
+				"mission_id",
+				"pr_number",
+				"pr_url",
+			].sort();
+
+			expect(actual).toEqual(expected);
+		});
+
+		test("mission_pr_comments table columns match schema", () => {
+			const dbPath = join(tmpDir, "sessions.db");
+			const store = createMissionStore(dbPath);
+
+			const db = new Database(dbPath, { readonly: true });
+			const actual = getTableColumns(db, "mission_pr_comments");
+			db.close();
+			store.close();
+
+			const expected = [
+				"action",
+				"author",
+				"body",
+				"comment_id",
+				"detected_at",
+				"fix_cycles",
+				"mission_id",
+				"pr_number",
+				"resolved_at",
+				"status",
+			].sort();
+
+			expect(actual).toEqual(expected);
+		});
+
+		test("mission_pr_comments enforces body length CHECK constraint", () => {
+			const dbPath = join(tmpDir, "sessions.db");
+			const store = createMissionStore(dbPath);
+
+			const raw = new Database(dbPath);
+			try {
+				const tooLong = "x".repeat(65537);
+				expect(() =>
+					raw.exec(
+						`INSERT INTO mission_pr_comments
+						 (mission_id, pr_number, comment_id, author, body, status, fix_cycles, detected_at)
+						 VALUES ('m-1', 1, 'c-too-long', 'octocat',
+						         '${tooLong}', 'open', 0, '2026-05-13T00:00:00Z')`,
+					),
+				).toThrow();
+
+				const justRight = "x".repeat(65536);
+				expect(() =>
+					raw.exec(
+						`INSERT INTO mission_pr_comments
+						 (mission_id, pr_number, comment_id, author, body, status, fix_cycles, detected_at)
+						 VALUES ('m-1', 1, 'c-just-right', 'octocat',
+						         '${justRight}', 'open', 0, '2026-05-13T00:00:00Z')`,
+					),
+				).not.toThrow();
+			} finally {
+				raw.close();
+				store.close();
+			}
 		});
 
 		test("mission_node_checkpoint_status table columns match 2PC status side table schema", () => {

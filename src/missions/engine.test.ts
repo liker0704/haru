@@ -278,6 +278,21 @@ function createMockMissionStore(): MissionStore & { currentNode: string | null }
 		updateTier: noop,
 		clearGateStates: noop,
 		clearCheckpoints: noop,
+
+		// === PR phase state (Stage E) — stub implementations ===
+		getPrState: () => null,
+		upsertPrState: noop,
+		updatePrCiStatus: noop,
+		updatePrReviewDecision: noop,
+		setApprovedHeadSha: noop,
+		markPrMerged: noop,
+		listPrComments: () => [],
+		countTriageSpawnsSince: () => 0,
+		countTriagePerAuthorSince: () => 0,
+		recordPrComment: noop,
+		updatePrCommentAction: noop,
+		markPrCommentResolved: noop,
+
 		close: noop,
 	};
 }

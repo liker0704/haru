@@ -239,6 +239,38 @@ export interface MissionSummary {
 	updatedAt: string;
 }
 
+// === PR Lifecycle Types (Stage E) ===
+
+/** PR lifecycle state row, one per mission (mission_pr_state table). */
+export interface MissionPrStateRow {
+	missionId: string;
+	prNumber: number;
+	prUrl: string;
+	branch: string;
+	createdAt: string;
+	lastCiStatus: string | null;
+	lastReviewDecision: string | null;
+	/** SHA captured at await-approval resolution; merge re-fetches and refuses if mismatch (sec-authz-03 + da-07). */
+	approvedHeadSha: string | null;
+	mergedAt: string | null;
+}
+
+/** Observed PR comment row (mission_pr_comments table). */
+export interface MissionPrCommentRow {
+	missionId: string;
+	prNumber: number;
+	commentId: string;
+	author: string;
+	body: string;
+	/** Triage decision: trivial_fix | needs_context | refactor_request | reply_only | approval_event | human_triage_request. Null until first triage. */
+	action: string | null;
+	/** Lifecycle: pending | in_progress | responded | escalated. */
+	status: string;
+	fixCycles: number;
+	detectedAt: string;
+	resolvedAt: string | null;
+}
+
 // === Checkpoint Persistence ===
 
 /** Status row from the 2PC side table mission_node_checkpoint_status. */
@@ -544,6 +576,23 @@ export interface MissionStore {
 	clearGateStates(missionId: string): void;
 	/** Clear all checkpoint records for a mission (used during tier escalation). */
 	clearCheckpoints(missionId: string): void;
+
+	// === PR phase state (Stage E) ===
+	getPrState(missionId: string): MissionPrStateRow | null;
+	upsertPrState(row: MissionPrStateRow): void;
+	updatePrCiStatus(missionId: string, status: string): void;
+	updatePrReviewDecision(missionId: string, decision: string): void;
+	/** SHA-pinned merge contract (sec-authz-03): persisted at await-approval; merge handler re-fetches and refuses if mismatch. */
+	setApprovedHeadSha(missionId: string, sha: string): void;
+	markPrMerged(missionId: string, mergedAt: string): void;
+	listPrComments(missionId: string): MissionPrCommentRow[];
+	/** Comments transitioned to in_progress after `since`. Used for sec-rate-05 spawn cap. */
+	countTriageSpawnsSince(missionId: string, since: string): number;
+	countTriagePerAuthorSince(missionId: string, author: string, since: string): number;
+	/** Insert-or-ignore by comment_id. */
+	recordPrComment(row: MissionPrCommentRow): void;
+	updatePrCommentAction(commentId: string, action: string, status: string): void;
+	markPrCommentResolved(commentId: string): void;
 
 	close(): void;
 }

@@ -209,6 +209,8 @@ export type {
 	MissionGraphEdge,
 	MissionGraphNode,
 	MissionPhase,
+	MissionPrCommentRow,
+	MissionPrStateRow,
 	MissionState,
 	MissionStore,
 	MissionSummary,

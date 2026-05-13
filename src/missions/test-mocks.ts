@@ -245,6 +245,21 @@ export function createMockMissionStore(): MissionStore & { currentNode: string |
 		clearGateStates: noop,
 		clearCheckpoints: noop,
 		transaction: <T>(fn: () => T): T => fn(),
+
+		// === PR phase state (Stage E) — stub implementations ===
+		getPrState: () => null,
+		upsertPrState: noop,
+		updatePrCiStatus: noop,
+		updatePrReviewDecision: noop,
+		setApprovedHeadSha: noop,
+		markPrMerged: noop,
+		listPrComments: () => [],
+		countTriageSpawnsSince: () => 0,
+		countTriagePerAuthorSince: () => 0,
+		recordPrComment: noop,
+		updatePrCommentAction: noop,
+		markPrCommentResolved: noop,
+
 		close: noop,
 	};
 }
