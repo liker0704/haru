@@ -1,0 +1,40 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`renderMrpMarkdown T-w2-4: golden snapshot for happy-path MRP — ≤120 lines, has required headers 1`] = `
+"# Merge Readiness Pack — stage-e-v2
+
+## TL;DR
+- **Intent:** Stage E v2 — merge readiness pack and renderer
+- **Tier:** full | **Autonomy:** supervised
+- **Duration:** 2026-05-01T00:00:00.000Z → 2026-05-01T01:30:00.000Z (5400s)
+
+## Diff
+- Files: 4 changed, +320 / -40
+
+| Workstream | Files | +Lines | -Lines |
+|---|---|---|---|
+| w2-mrp-renderer | 4 | 320 | 40 |
+
+## Acceptance
+- ✅ schema is frozen at v1
+- ✅ renderer is pure
+
+## Quality gates
+- bun_test: ✅
+- biome: ✅
+- tsc: ✅
+
+## Workstreams
+| ID | Objective | Task |
+|---|---|---|
+| w2-mrp-renderer | Build MRP schema v1 + markdown renderer | haru-d3b9 |
+
+## Linked issues
+- #283
+
+## Agent trail
+| Commit | Agent | Capability |
+|---|---|---|
+| abc1234 | builder-mrp-w2 | builder |
+"
+`;
