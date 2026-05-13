@@ -175,6 +175,19 @@ export function validateUnknownFields(raw: Record<string, unknown>): void {
 		assertKnownKeys(raw.context, KNOWN_FIELDS.context, "context");
 	}
 
+	if (isObj(raw.pr)) {
+		assertKnownKeys(raw.pr, KNOWN_FIELDS.prConfig, "pr");
+		if (isObj(raw.pr.triage)) {
+			assertKnownKeys(raw.pr.triage, KNOWN_FIELDS.prTriageConfig, "pr.triage");
+		}
+		if (isObj(raw.pr.ghBudget)) {
+			assertKnownKeys(raw.pr.ghBudget, KNOWN_FIELDS.prGhBudgetConfig, "pr.ghBudget");
+		}
+		if (isObj(raw.pr.classifyCiRed)) {
+			assertKnownKeys(raw.pr.classifyCiRed, KNOWN_FIELDS.prClassifyCiRedConfig, "pr.classifyCiRed");
+		}
+	}
+
 	if (isObj(raw.healthPolicy)) {
 		assertKnownKeys(raw.healthPolicy, KNOWN_FIELDS.healthPolicy, "healthPolicy");
 		if (Array.isArray(raw.healthPolicy.rules)) {

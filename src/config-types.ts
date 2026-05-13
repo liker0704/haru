@@ -267,4 +267,33 @@ export interface OverstoryConfig {
 		/** Auto-resume timeout to prevent spawn-pause deadlock. */
 		maxPauseDurationMs: number;
 	};
+	pr?: {
+		enabled?: boolean;
+		directTierIncludesPr?: boolean;
+		operatorGithubLogin?: string;
+		commentTriageAuthors?: string[];
+		ciTimeoutMs?: number;
+		commentsTimeoutMs?: number;
+		approvalTimeoutMs?: number;
+		mergeStrategy?: "squash" | "rebase" | "merge";
+		showCost?: boolean;
+		autoCloseSuperseded?: boolean;
+		maxTriageSpawnsPerMission?: number;
+		maxTriagePerAuthorPerHour?: number;
+		maxCoordinatorResumesPerPr?: number;
+		requireOperatorPermission?: boolean;
+		triage?: {
+			minConfidence?: number;
+		};
+		ghBudget?: {
+			rpm?: number;
+			burst?: number;
+			callTimeoutMs?: number;
+			maxConcurrent?: number;
+		};
+		classifyCiRed?: {
+			flakeThresholdMs?: number;
+			maxFlakeRetries?: number;
+		};
+	};
 }
