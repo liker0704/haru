@@ -129,6 +129,7 @@ export function createGhBudget(
 		if (pauseUntilMs !== null && now() < pauseUntilMs) {
 			return new Promise<void>((resolve) => {
 				waiters.push({ resolve });
+				if (waiters.length === 1) scheduleRefill();
 			});
 		}
 
@@ -226,7 +227,9 @@ export function createGhBudget(
 		const durationMs = now() - startMs;
 
 		if (timedOut) {
-			// Dispatch any waiting concurrency waiters already done above
+			// Refund the token so repeated timeouts don't drain burst capacity
+			lastTokens = Math.min(config.burst, computeTokens() + 1);
+			lastRefillAt = now();
 			return {
 				stdout: "",
 				stderr: "gh call timeout",
