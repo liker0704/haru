@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { realpathSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { mkdir, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -11,8 +11,10 @@ import { createMissionStore } from "../missions/store.ts";
 import { createResilienceStore } from "../resilience/store.ts";
 import { ClaudeRuntime } from "../runtimes/claude.ts";
 import { getRuntime } from "../runtimes/registry.ts";
+import { openSessionStore } from "../sessions/compat.ts";
 import { cleanupTempDir, createTempGitRepo } from "../test-helpers.ts";
 import type { AgentManifest, OverstoryConfig } from "../types.ts";
+import { killProcessTree } from "../worktree/tmux.ts";
 import {
 	type AutoDispatchOptions,
 	allowedChildCapabilities,
@@ -35,6 +37,37 @@ import {
 	slingCommand,
 	validateHierarchy,
 } from "./sling.ts";
+
+/**
+ * Kill any real agent processes spawned by slingCommand during a test, before the
+ * temp dir is removed. slingCommand persists pane PIDs to sessions.db; we walk
+ * them and kill the entire process tree (the bun/claude child ignores SIGHUP
+ * from `tmux kill-session` and otherwise gets re-parented to init with a
+ * deleted cwd, accumulating leaks across test runs).
+ *
+ * Safe to call when no agents were spawned — sessions.db may not exist yet.
+ */
+async function killSpawnedAgents(repoDir: string): Promise<void> {
+	const overstoryDir = join(repoDir, ".haru");
+	const dbPath = join(overstoryDir, "sessions.db");
+	if (!existsSync(dbPath)) return;
+	let store: ReturnType<typeof openSessionStore>["store"];
+	try {
+		({ store } = openSessionStore(overstoryDir));
+	} catch {
+		return;
+	}
+	try {
+		const pids = store
+			.getAll()
+			.map((s) => s.pid)
+			.filter((p): p is number => p !== null);
+		// Kill in parallel; killProcessTree handles already-dead pids quietly.
+		await Promise.all(pids.map((pid) => killProcessTree(pid, 200)));
+	} finally {
+		store.close();
+	}
+}
 
 /**
  * Tests for the stagger delay enforcement in the sling command (step 4b).
@@ -693,6 +726,7 @@ describe("slingCommand mission spec enforcement", () => {
 
 	afterEach(async () => {
 		process.chdir(originalCwd);
+		await killSpawnedAgents(repoDir);
 		await cleanupTempDir(repoDir);
 	});
 
@@ -1768,6 +1802,16 @@ describe("slingCommand circuit breaker gate", () => {
 
 	afterEach(async () => {
 		process.chdir(originalCwd);
+		await killSpawnedAgents(repoDir);
+		// Belt-and-braces: kill tmux sessions whose pane PID never made it to sessions.db
+		// (e.g., slingCommand threw after tmux create but before store.upsert).
+		await Bun.spawn({
+			cmd: [
+				"sh",
+				"-c",
+				"tmux list-sessions -F '#S' 2>/dev/null | grep '^haru-sling-breaker-test-' | xargs -I {} tmux kill-session -t {} 2>/dev/null; true",
+			],
+		}).exited;
 		await cleanupTempDir(repoDir);
 	});
 
