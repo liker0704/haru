@@ -1,11 +1,18 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, describe, expect, it } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { MailStore } from "../mail/store.ts";
-import type { MailMessage } from "../mail/types.ts";
-import { makeMission } from "../missions/test-mocks.ts";
+import type { MailMessage, MailMessageType } from "../mail/types.ts";
+import { type GhBudget, type GhInvocationResult, setGhBudget } from "../missions/gh-budget.ts";
+import { createMockMissionStore, makeMission } from "../missions/test-mocks.ts";
 import type { SessionStore } from "../sessions/store.ts";
+import type { MissionPrCommentRow } from "../types.ts";
+// Namespace import for evaluators not yet implemented (RED phase). Named imports
+// would crash module load; namespace access resolves to `undefined` at runtime
+// so calling these functions throws "is not a function" inside the test (RED),
+// while existing tests remain runnable.
+import * as gateEvaluators from "./gate-evaluators.ts";
 import {
 	computeAdaptiveResearchTimeout,
 	evaluateArchitectDesign,
@@ -16,11 +23,65 @@ import {
 	evaluateAwaitTierSet,
 	evaluateDispatchPlanning,
 	evaluateGate,
+	evaluateHoldoutGate,
 	evaluateHumanSpecReview,
 	evaluateUnderstandReady,
 	evaluateWsCompletion,
 	filterMailSinceGate,
+	type GateEvalResult,
 } from "./gate-evaluators.ts";
+
+const evaluatorsAny = gateEvaluators as Record<string, unknown>;
+const evaluateAwaitCI = evaluatorsAny.evaluateAwaitCI as (
+	mission: ReturnType<typeof makeMission>,
+	missionStore: ReturnType<typeof createMockMissionStore> | null,
+	projectRoot?: string,
+	gateEnteredAt?: string,
+	deps?: {
+		runGh?: GhBudget["runGh"];
+		now?: () => number;
+	},
+) => Promise<GateEvalResult>;
+const evaluateAwaitComments = evaluatorsAny.evaluateAwaitComments as (
+	mission: ReturnType<typeof makeMission>,
+	missionStore: ReturnType<typeof createMockMissionStore> | null,
+	projectRoot?: string,
+	gateEnteredAt?: string,
+	deps?: { runGh?: GhBudget["runGh"]; now?: () => number },
+) => Promise<GateEvalResult & { payload?: unknown }>;
+const evaluateAwaitApproval = evaluatorsAny.evaluateAwaitApproval as (
+	mission: ReturnType<typeof makeMission>,
+	missionStore: ReturnType<typeof createMockMissionStore> | null,
+	mailStore: MailStore | null,
+	projectRoot?: string,
+	gateEnteredAt?: string,
+	deps?: {
+		runGh?: GhBudget["runGh"];
+		now?: () => number;
+		config?: {
+			pr?: {
+				operatorGithubLogin?: string;
+				approvalTimeoutMs?: number;
+				commentsTimeoutMs?: number;
+				ciTimeoutMs?: number;
+				requireOperatorPermission?: boolean;
+			};
+		};
+		addMail?: (msg: {
+			to: string;
+			from: string;
+			type: string;
+			subject: string;
+			body: string;
+		}) => void;
+	},
+) => Promise<GateEvalResult>;
+const evaluateAwaitDebugComplete = evaluatorsAny.evaluateAwaitDebugComplete as (
+	mission: ReturnType<typeof makeMission>,
+	mailStore: MailStore | null,
+	gateEnteredAt?: string,
+	deps?: { now?: () => number; debugTimeoutMs?: number },
+) => GateEvalResult;
 
 type TestMessage = {
 	from: string;
@@ -735,5 +796,737 @@ describe("filterMailSinceGate", () => {
 		]);
 		expect(evaluateAwaitResearch(mission, mailStore, T).met).toBe(true);
 		expect(evaluateAwaitResearch(mission, mailStore, Tplus1).met).toBe(false);
+	});
+});
+
+// =============================================================================
+// w5: PR-phase + holdout-snapshot gate evaluators (T-w5-1..T-w5-27)
+// Architecture refs: §4.2, §5.5, §5.6, §5.8, §5.9, §5.10, §5.11
+// =============================================================================
+
+type GhResponder = (args: readonly string[]) => GhInvocationResult;
+
+function makeGhResult(stdout: string, stderr = "", exitCode = 0): GhInvocationResult {
+	return { stdout, stderr, exitCode, durationMs: 0 };
+}
+
+function fakeBudget(responder: GhResponder): GhBudget & { calls: Array<readonly string[]> } {
+	const calls: Array<readonly string[]> = [];
+	const budget = {
+		runGh: async (args: readonly string[]) => {
+			calls.push(args);
+			return responder(args);
+		},
+		snapshot: () => ({ tokensAvailable: 100, queuedCount: 0, lastRateLimitResetAt: null }),
+		calls,
+	};
+	return budget as unknown as GhBudget & { calls: Array<readonly string[]> };
+}
+
+function trackingMissionStore(
+	prNumber = 42,
+	preexistingComments: MissionPrCommentRow[] = [],
+): {
+	store: ReturnType<typeof createMockMissionStore>;
+	calls: {
+		updatePrCiStatus: string[];
+		setApprovedHeadSha: Array<[string, string]>;
+		recordPrComment: MissionPrCommentRow[];
+	};
+} {
+	const calls = {
+		updatePrCiStatus: [] as string[],
+		setApprovedHeadSha: [] as Array<[string, string]>,
+		recordPrComment: [] as MissionPrCommentRow[],
+	};
+	const store = createMockMissionStore();
+	store.getPrState = (id: string) => ({
+		missionId: id,
+		prNumber,
+		prUrl: `https://github.com/o/r/pull/${prNumber}`,
+		branch: "feat/x",
+		createdAt: "2026-01-01T00:00:00Z",
+		lastCiStatus: null,
+		lastReviewDecision: null,
+		approvedHeadSha: null,
+		mergedAt: null,
+	});
+	store.updatePrCiStatus = (_id: string, status: string) => {
+		calls.updatePrCiStatus.push(status);
+	};
+	store.setApprovedHeadSha = (id: string, sha: string) => {
+		calls.setApprovedHeadSha.push([id, sha]);
+	};
+	store.recordPrComment = (row: MissionPrCommentRow) => {
+		calls.recordPrComment.push(row);
+	};
+	store.listPrComments = () => preexistingComments;
+	return { store, calls };
+}
+
+function createSimpleMailStore(messages: MailMessage[]): MailStore {
+	const store = {
+		getAll(filters?: { to?: string; from?: string }): MailMessage[] {
+			const to = filters?.to;
+			const from = filters?.from;
+			return messages.filter((m) => (!to || m.to === to) && (!from || m.from === from));
+		},
+	};
+	return store as unknown as MailStore;
+}
+
+function buildMailMessage(
+	overrides: Partial<MailMessage> & { type: MailMessageType },
+): MailMessage {
+	return {
+		id: overrides.id ?? "msg-1",
+		from: overrides.from ?? "sender",
+		to: overrides.to ?? "recipient",
+		subject: overrides.subject ?? "",
+		body: overrides.body ?? "",
+		type: overrides.type,
+		priority: overrides.priority ?? "normal",
+		threadId: overrides.threadId ?? null,
+		payload: overrides.payload ?? null,
+		read: overrides.read ?? false,
+		createdAt: overrides.createdAt ?? new Date().toISOString(),
+		state: overrides.state ?? "acked",
+		claimedAt: overrides.claimedAt ?? null,
+		attempt: overrides.attempt ?? 0,
+		nextRetryAt: overrides.nextRetryAt ?? null,
+		failReason: overrides.failReason ?? null,
+		missionId: overrides.missionId ?? null,
+	};
+}
+
+describe("evaluateAwaitCI [T-w5-1..T-w5-6]", () => {
+	afterEach(() => setGhBudget(null));
+
+	it("T-w5-1: all checks SUCCESS → met:true, trigger=ci_passed [arch §5.5]", async () => {
+		const { store } = trackingMissionStore(42);
+		const checksJson = JSON.stringify([
+			{
+				name: "build",
+				status: "COMPLETED",
+				conclusion: "SUCCESS",
+				detailsUrl: "https://x",
+				startedAt: "2026-01-01T00:00:00Z",
+				completedAt: "2026-01-01T00:05:00Z",
+			},
+			{
+				name: "lint",
+				status: "COMPLETED",
+				conclusion: "SUCCESS",
+				detailsUrl: "https://y",
+				startedAt: "2026-01-01T00:00:00Z",
+				completedAt: "2026-01-01T00:04:00Z",
+			},
+		]);
+		const budget = fakeBudget(() => makeGhResult(checksJson));
+		const mission = makeMission({ id: "m1", slug: "test" });
+		const result = await evaluateAwaitCI(mission, store, undefined, undefined, {
+			runGh: budget.runGh,
+		});
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("ci_passed");
+	});
+
+	it("T-w5-2: one FAILURE check → met:true, trigger=ci_failed; updatePrCiStatus called [arch §5.5]", async () => {
+		const { store, calls } = trackingMissionStore(42);
+		const checksJson = JSON.stringify([
+			{ name: "build", status: "COMPLETED", conclusion: "SUCCESS" },
+			{ name: "lint", status: "COMPLETED", conclusion: "FAILURE" },
+		]);
+		const budget = fakeBudget(() => makeGhResult(checksJson));
+		const mission = makeMission({ id: "m1", slug: "test" });
+		const result = await evaluateAwaitCI(mission, store, undefined, undefined, {
+			runGh: budget.runGh,
+		});
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("ci_failed");
+		expect(calls.updatePrCiStatus).toContain("FAILURE");
+	});
+
+	it("T-w5-3: all IN_PROGRESS → met:false [arch §5.5]", async () => {
+		const { store } = trackingMissionStore(42);
+		const checksJson = JSON.stringify([
+			{ name: "build", status: "IN_PROGRESS", conclusion: null },
+			{ name: "lint", status: "IN_PROGRESS", conclusion: null },
+		]);
+		const budget = fakeBudget(() => makeGhResult(checksJson));
+		const mission = makeMission({ id: "m1", slug: "test" });
+		const result = await evaluateAwaitCI(mission, store, undefined, undefined, {
+			runGh: budget.runGh,
+		});
+		expect(result.met).toBe(false);
+	});
+
+	it("T-w5-4: elapsed > ciTimeoutMs (4h default) → met:true, trigger=ci_timeout [arch §5.5]", async () => {
+		const { store } = trackingMissionStore(42);
+		const nowMs = Date.parse("2026-02-01T05:00:00Z");
+		const gateEnteredAt = "2026-02-01T00:00:00Z"; // 5h before now (> 4h cap)
+		const checksJson = JSON.stringify([{ name: "build", status: "IN_PROGRESS", conclusion: null }]);
+		const budget = fakeBudget(() => makeGhResult(checksJson));
+		const mission = makeMission({ id: "m1", slug: "test" });
+		const result = await evaluateAwaitCI(mission, store, undefined, gateEnteredAt, {
+			runGh: budget.runGh,
+			now: () => nowMs,
+		});
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("ci_timeout");
+	});
+
+	it("T-w5-5: stderr 'Bad credentials' → met:true, trigger=gh_auth_missing [arch §5.10]", async () => {
+		const { store } = trackingMissionStore(42);
+		const budget = fakeBudget(() => makeGhResult("", "HTTP 401: Bad credentials\n", 1));
+		const mission = makeMission({ id: "m1", slug: "test" });
+		const result = await evaluateAwaitCI(mission, store, undefined, undefined, {
+			runGh: budget.runGh,
+		});
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("gh_auth_missing");
+	});
+
+	it("T-w5-6: stderr rate-limit headers → met:true, trigger=pr_rate_limited [arch §5.10]", async () => {
+		const { store } = trackingMissionStore(42);
+		const budget = fakeBudget(() =>
+			makeGhResult("", "Retry-After: 60\nX-RateLimit-Remaining: 0\n", 1),
+		);
+		const mission = makeMission({ id: "m1", slug: "test" });
+		const result = await evaluateAwaitCI(mission, store, undefined, undefined, {
+			runGh: budget.runGh,
+		});
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("pr_rate_limited");
+	});
+});
+
+describe("evaluateAwaitComments [T-w5-7..T-w5-9]", () => {
+	afterEach(() => setGhBudget(null));
+
+	it("T-w5-7: new comment not in listPrComments → met:true, trigger=new_comment; recordPrComment called [arch §5.6]", async () => {
+		const { store, calls } = trackingMissionStore(42, []);
+		const prViewJson = JSON.stringify({
+			comments: [{ id: "c1", author: { login: "reviewerA" }, body: "looks good?" }],
+			reviews: [],
+		});
+		const budget = fakeBudget(() => makeGhResult(prViewJson));
+		const mission = makeMission({ id: "m1", slug: "test" });
+		const result = await evaluateAwaitComments(mission, store, undefined, undefined, {
+			runGh: budget.runGh,
+		});
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("new_comment");
+		expect(calls.recordPrComment.length).toBe(1);
+		expect(calls.recordPrComment[0]?.status).toBe("pending");
+		const payload = result.payload as { commentId?: string; author?: string; body?: string };
+		expect(payload?.commentId).toBe("c1");
+		expect(payload?.author).toBe("reviewerA");
+		expect(payload?.body).toBe("looks good?");
+	});
+
+	it("T-w5-8: comment already in listPrComments → met:false; recordPrComment NOT called [arch §5.6]", async () => {
+		const preexisting: MissionPrCommentRow = {
+			missionId: "m1",
+			prNumber: 42,
+			commentId: "c1",
+			author: "reviewerA",
+			body: "looks good?",
+			action: null,
+			status: "pending",
+			fixCycles: 0,
+			detectedAt: "2026-01-01T00:00:00Z",
+			resolvedAt: null,
+		};
+		const { store, calls } = trackingMissionStore(42, [preexisting]);
+		const prViewJson = JSON.stringify({
+			comments: [{ id: "c1", author: { login: "reviewerA" }, body: "looks good?" }],
+			reviews: [],
+		});
+		const budget = fakeBudget(() => makeGhResult(prViewJson));
+		const mission = makeMission({ id: "m1", slug: "test" });
+		const result = await evaluateAwaitComments(mission, store, undefined, undefined, {
+			runGh: budget.runGh,
+		});
+		expect(result.met).toBe(false);
+		expect(calls.recordPrComment.length).toBe(0);
+	});
+
+	it("T-w5-9: elapsed > commentsTimeoutMs (7d default) → met:true, trigger=comments_stale [arch §5.6]", async () => {
+		const { store } = trackingMissionStore(42);
+		const nowMs = Date.parse("2026-02-08T00:00:00Z");
+		const gateEnteredAt = "2026-02-01T00:00:00Z"; // 7d before now
+		const budget = fakeBudget(() => makeGhResult(JSON.stringify({ comments: [], reviews: [] })));
+		const mission = makeMission({ id: "m1", slug: "test" });
+		const result = await evaluateAwaitComments(mission, store, undefined, gateEnteredAt, {
+			runGh: budget.runGh,
+			now: () => nowMs,
+		});
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("comments_stale");
+	});
+});
+
+describe("evaluateAwaitApproval [T-w5-10..T-w5-18]", () => {
+	afterEach(() => setGhBudget(null));
+
+	it("T-w5-10: one APPROVED review → captures headRefOid, met:true, trigger=approved [arch §5.8]", async () => {
+		const { store, calls } = trackingMissionStore(42);
+		const prViewJson = JSON.stringify({
+			reviewDecision: "APPROVED",
+			headRefOid: "abc123def",
+			reviews: [
+				{ state: "APPROVED", author: { login: "reviewerA" }, submittedAt: "2026-02-01T00:00:00Z" },
+			],
+			comments: [],
+		});
+		const budget = fakeBudget(() => makeGhResult(prViewJson));
+		const mission = makeMission({ id: "m1", slug: "test" });
+		const mailStore = createSimpleMailStore([]);
+		const result = await evaluateAwaitApproval(mission, store, mailStore, undefined, undefined, {
+			runGh: budget.runGh,
+		});
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("approved");
+		expect(calls.setApprovedHeadSha).toEqual([["m1", "abc123def"]]);
+	});
+
+	it("T-w5-11: RESTRICTIVE-WINS — single reviewer CHANGES_REQUESTED + LGTM comment (non-operator) → trigger=changes_requested [arch §5.8]", async () => {
+		const { store } = trackingMissionStore(42);
+		const prViewJson = JSON.stringify({
+			reviewDecision: "CHANGES_REQUESTED",
+			headRefOid: "sha1",
+			reviews: [
+				{
+					state: "CHANGES_REQUESTED",
+					author: { login: "reviewerA" },
+					submittedAt: "2026-02-01T00:00:00Z",
+				},
+			],
+			comments: [{ id: "c1", author: { login: "reviewerA" }, body: "LGTM" }],
+		});
+		const budget = fakeBudget(() => makeGhResult(prViewJson));
+		const mission = makeMission({ id: "m1", slug: "test" });
+		const result = await evaluateAwaitApproval(mission, store, null, undefined, undefined, {
+			runGh: budget.runGh,
+			config: { pr: { operatorGithubLogin: "opuser" } },
+		});
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("changes_requested");
+	});
+
+	it("T-w5-12: RESTRICTIVE-WINS multi-reviewer — A:CHANGES_REQUESTED + B:APPROVED → trigger=changes_requested [arch §5.8]", async () => {
+		const { store } = trackingMissionStore(42);
+		const prViewJson = JSON.stringify({
+			reviewDecision: null,
+			headRefOid: "sha1",
+			reviews: [
+				{
+					state: "CHANGES_REQUESTED",
+					author: { login: "reviewerA" },
+					submittedAt: "2026-02-01T00:00:00Z",
+				},
+				{
+					state: "APPROVED",
+					author: { login: "reviewerB" },
+					submittedAt: "2026-02-01T00:05:00Z",
+				},
+			],
+			comments: [],
+		});
+		const budget = fakeBudget(() => makeGhResult(prViewJson));
+		const mission = makeMission({ id: "m1", slug: "test" });
+		const result = await evaluateAwaitApproval(mission, store, null, undefined, undefined, {
+			runGh: budget.runGh,
+		});
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("changes_requested");
+	});
+
+	it("T-w5-13: same-reviewer flip — A:CHANGES_REQUESTED@t1 then A:APPROVED@t2 → trigger=approved [arch §5.8]", async () => {
+		const { store } = trackingMissionStore(42);
+		const prViewJson = JSON.stringify({
+			reviewDecision: "APPROVED",
+			headRefOid: "sha1",
+			reviews: [
+				{
+					state: "CHANGES_REQUESTED",
+					author: { login: "reviewerA" },
+					submittedAt: "2026-02-01T00:00:00Z",
+				},
+				{
+					state: "APPROVED",
+					author: { login: "reviewerA" },
+					submittedAt: "2026-02-01T01:00:00Z",
+				},
+			],
+			comments: [],
+		});
+		const budget = fakeBudget(() => makeGhResult(prViewJson));
+		const mission = makeMission({ id: "m1", slug: "test" });
+		const result = await evaluateAwaitApproval(mission, store, null, undefined, undefined, {
+			runGh: budget.runGh,
+		});
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("approved");
+	});
+
+	it("T-w5-14: OPERATOR OVERRIDE — CHANGES_REQUESTED + operator LGTM (admin perm) → trigger=approved [arch §5.8, §5.9]", async () => {
+		const { store } = trackingMissionStore(42);
+		const prViewJson = JSON.stringify({
+			reviewDecision: "CHANGES_REQUESTED",
+			headRefOid: "sha1",
+			reviews: [
+				{
+					state: "CHANGES_REQUESTED",
+					author: { login: "reviewerA" },
+					submittedAt: "2026-02-01T00:00:00Z",
+				},
+			],
+			comments: [{ id: "c1", author: { login: "opuser" }, body: "LGTM" }],
+		});
+		const responder: GhResponder = (args) => {
+			if (args[0] === "api" && args.some((a) => a.includes("collaborators"))) {
+				return makeGhResult(JSON.stringify({ permission: "admin" }));
+			}
+			return makeGhResult(prViewJson);
+		};
+		const budget = fakeBudget(responder);
+		const mission = makeMission({ id: "m1", slug: "test" });
+		const result = await evaluateAwaitApproval(mission, store, null, undefined, undefined, {
+			runGh: budget.runGh,
+			config: { pr: { operatorGithubLogin: "opuser" } },
+		});
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("approved");
+	});
+
+	it("T-w5-15: COMMENT-APPROVAL — null reviewDecision + operator 'lgtm.' + admin → trigger=approved [arch §5.8]", async () => {
+		const { store } = trackingMissionStore(42);
+		const prViewJson = JSON.stringify({
+			reviewDecision: null,
+			headRefOid: "sha1",
+			reviews: [],
+			comments: [{ id: "c1", author: { login: "opuser" }, body: "lgtm." }],
+		});
+		const responder: GhResponder = (args) => {
+			if (args[0] === "api" && args.some((a) => a.includes("collaborators"))) {
+				return makeGhResult(JSON.stringify({ permission: "admin" }));
+			}
+			return makeGhResult(prViewJson);
+		};
+		const budget = fakeBudget(responder);
+		const mission = makeMission({ id: "m1", slug: "test" });
+		const result = await evaluateAwaitApproval(mission, store, null, undefined, undefined, {
+			runGh: budget.runGh,
+			config: { pr: { operatorGithubLogin: "opuser" } },
+		});
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("approved");
+	});
+
+	it("T-w5-16: COMMENT-APPROVAL regex strict — operator 'LGTM with caveats' → met:false [arch §5.8]", async () => {
+		const { store } = trackingMissionStore(42);
+		const prViewJson = JSON.stringify({
+			reviewDecision: null,
+			headRefOid: "sha1",
+			reviews: [],
+			comments: [{ id: "c1", author: { login: "opuser" }, body: "LGTM with caveats" }],
+		});
+		const responder: GhResponder = (args) => {
+			if (args[0] === "api" && args.some((a) => a.includes("collaborators"))) {
+				return makeGhResult(JSON.stringify({ permission: "admin" }));
+			}
+			return makeGhResult(prViewJson);
+		};
+		const budget = fakeBudget(responder);
+		const mission = makeMission({ id: "m1", slug: "test" });
+		const result = await evaluateAwaitApproval(mission, store, null, undefined, undefined, {
+			runGh: budget.runGh,
+			config: { pr: { operatorGithubLogin: "opuser" } },
+		});
+		expect(result.met).toBe(false);
+	});
+
+	it("T-w5-17: COMMENT-APPROVAL — 'LGTM' from non-operator → met:false [arch §5.8]", async () => {
+		const { store } = trackingMissionStore(42);
+		const prViewJson = JSON.stringify({
+			reviewDecision: null,
+			headRefOid: "sha1",
+			reviews: [],
+			comments: [{ id: "c1", author: { login: "randomdev" }, body: "LGTM" }],
+		});
+		const budget = fakeBudget(() => makeGhResult(prViewJson));
+		const mission = makeMission({ id: "m1", slug: "test" });
+		const result = await evaluateAwaitApproval(mission, store, null, undefined, undefined, {
+			runGh: budget.runGh,
+			config: { pr: { operatorGithubLogin: "opuser" } },
+		});
+		expect(result.met).toBe(false);
+	});
+
+	it("T-w5-18: elapsed > approvalTimeoutMs (48h) → emits reminder via addMail, returns trigger=approval_pending_long [arch §5.8]", async () => {
+		const { store } = trackingMissionStore(42);
+		const nowMs = Date.parse("2026-02-03T01:00:00Z");
+		const gateEnteredAt = "2026-02-01T00:00:00Z"; // 49h before now (> 48h)
+		const prViewJson = JSON.stringify({
+			reviewDecision: null,
+			headRefOid: "sha1",
+			reviews: [],
+			comments: [],
+		});
+		const budget = fakeBudget(() => makeGhResult(prViewJson));
+		const sentMails: Array<{
+			to: string;
+			from: string;
+			type: string;
+			subject: string;
+			body: string;
+		}> = [];
+		const mission = makeMission({ id: "m1", slug: "test" });
+		const result = await evaluateAwaitApproval(mission, store, null, undefined, gateEnteredAt, {
+			runGh: budget.runGh,
+			now: () => nowMs,
+			addMail: (msg) => sentMails.push(msg),
+		});
+		expect(sentMails.length).toBe(1);
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("approval_pending_long");
+	});
+});
+
+describe("evaluateAwaitDebugComplete [T-w5-19..T-w5-20]", () => {
+	it("T-w5-19: fix_committed mail after gateEnteredAt → met:true, trigger=fix_committed [arch §5.11]", () => {
+		const gateEnteredAt = "2026-02-01T00:00:00Z";
+		const after = new Date(Date.parse(gateEnteredAt) + 1000).toISOString();
+		const mailStore = createSimpleMailStore([
+			buildMailMessage({
+				id: "msg-fix",
+				from: "debugger-test",
+				to: "coordinator-test",
+				type: "fix_committed" as MailMessageType,
+				subject: "Fix committed",
+				createdAt: after,
+			}),
+		]);
+		const mission = makeMission({ id: "m1", slug: "test" });
+		const result = evaluateAwaitDebugComplete(mission, mailStore, gateEnteredAt);
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("fix_committed");
+	});
+
+	it("T-w5-20: empty mailStore + elapsed > debugTimeoutMs (1h default) → met:true, trigger=debug_timeout [arch §5.11]", () => {
+		const gateEnteredAt = "2026-02-01T00:00:00Z";
+		const nowMs = Date.parse("2026-02-01T02:00:00Z"); // 2h > 1h timeout
+		const mailStore = createSimpleMailStore([]);
+		const mission = makeMission({ id: "m1", slug: "test" });
+		const result = evaluateAwaitDebugComplete(mission, mailStore, gateEnteredAt, {
+			now: () => nowMs,
+		});
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("debug_timeout");
+	});
+});
+
+describe("evaluateGate (PR-phase dispatch wiring) [T-w5-21]", () => {
+	afterEach(() => setGhBudget(null));
+
+	it("T-w5-21: routes pr-phase:await-{ci,comments,approval,debug-complete,debug-fix} by suffix [arch §4.2]", async () => {
+		// await-ci: routes to evaluateAwaitCI with `gh pr checks` call
+		const ciBudget = fakeBudget(() => makeGhResult(JSON.stringify([])));
+		setGhBudget(ciBudget);
+		const { store } = trackingMissionStore(42);
+		const mission = makeMission({ id: "m1", slug: "test" });
+		const mailStore = createSimpleMailStore([]);
+		const ciResult = await evaluateGate(
+			"pr-phase:await-ci",
+			mission,
+			{ mailStore, sessionStore: createTestSessionStore(), missionStore: store },
+			"/tmp",
+		);
+		expect(ciResult.unknown).toBeUndefined();
+		expect(ciBudget.calls.length).toBeGreaterThan(0);
+		const ciArgs = ciBudget.calls[0] ?? [];
+		expect(ciArgs[0]).toBe("pr");
+		expect(ciArgs[1]).toBe("checks");
+
+		// await-comments: routes to evaluateAwaitComments with `gh pr view --json comments,reviews`
+		const commentsBudget = fakeBudget(() =>
+			makeGhResult(JSON.stringify({ comments: [], reviews: [] })),
+		);
+		setGhBudget(commentsBudget);
+		const commentsResult = await evaluateGate(
+			"pr-phase:await-comments",
+			mission,
+			{ mailStore, sessionStore: createTestSessionStore(), missionStore: store },
+			"/tmp",
+		);
+		expect(commentsResult.unknown).toBeUndefined();
+		expect(commentsBudget.calls.length).toBeGreaterThan(0);
+		const commentsArgs = commentsBudget.calls[0] ?? [];
+		expect(commentsArgs[0]).toBe("pr");
+		expect(commentsArgs[1]).toBe("view");
+		expect(commentsArgs.includes("comments,reviews")).toBe(true);
+
+		// await-approval: routes to evaluateAwaitApproval with reviewDecision,reviews,headRefOid
+		const approvalBudget = fakeBudget(() =>
+			makeGhResult(
+				JSON.stringify({ reviewDecision: null, headRefOid: "sha", reviews: [], comments: [] }),
+			),
+		);
+		setGhBudget(approvalBudget);
+		const approvalResult = await evaluateGate(
+			"pr-phase:await-approval",
+			mission,
+			{ mailStore, sessionStore: createTestSessionStore(), missionStore: store },
+			"/tmp",
+		);
+		expect(approvalResult.unknown).toBeUndefined();
+		expect(approvalBudget.calls.length).toBeGreaterThan(0);
+		const approvalArgs = approvalBudget.calls[0] ?? [];
+		expect(approvalArgs[0]).toBe("pr");
+		expect(approvalArgs[1]).toBe("view");
+		expect(approvalArgs.includes("reviewDecision,reviews,headRefOid")).toBe(true);
+
+		// await-debug-complete: routes to evaluateAwaitDebugComplete (no gh)
+		const debugCompleteBudget = fakeBudget(() => makeGhResult(""));
+		setGhBudget(debugCompleteBudget);
+		const debugCompleteResult = await evaluateGate(
+			"pr-phase:await-debug-complete",
+			mission,
+			{ mailStore, sessionStore: createTestSessionStore(), missionStore: store },
+			"/tmp",
+		);
+		expect(debugCompleteResult.unknown).toBeUndefined();
+		expect(debugCompleteBudget.calls.length).toBe(0);
+
+		// await-debug-fix: existing DONE-phase evaluator; prefix is ignored — dispatch is by suffix.
+		const debugFixBudget = fakeBudget(() => makeGhResult(""));
+		setGhBudget(debugFixBudget);
+		const debugFixResult = await evaluateGate(
+			"pr-phase:await-debug-fix",
+			mission,
+			{ mailStore, sessionStore: createTestSessionStore(), missionStore: store },
+			"/tmp",
+		);
+		expect(debugFixResult.unknown).toBeUndefined();
+	});
+});
+
+describe("evaluateHoldoutGate (snapshot-diff rewrite) [T-w5-22..T-w5-26]", () => {
+	let artifactRoot: string;
+
+	const setup = async (): Promise<void> => {
+		artifactRoot = await mkdtemp(join(tmpdir(), "w5-holdout-"));
+		await mkdir(join(artifactRoot, "results"), { recursive: true });
+		await mkdir(join(artifactRoot, "debug"), { recursive: true });
+	};
+
+	afterEach(async () => {
+		if (artifactRoot) await rm(artifactRoot, { recursive: true, force: true });
+	});
+
+	it("T-w5-22: NO baseline.json AND NO sentinels → trigger=holdout_baseline_missing [arch §5.11]", async () => {
+		await setup();
+		const mission = makeMission({ id: "mission-test", slug: "test", featureBranch: "feat/x" });
+		const missionStore = createMockMissionStore();
+		const result = await evaluateHoldoutGate(mission, missionStore, artifactRoot, artifactRoot);
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("holdout_baseline_missing");
+	});
+
+	it("T-w5-23: baseline.json corrupt + .baseline-captured sentinel → trigger=holdout_baseline_corrupt [arch §5.11]", async () => {
+		await setup();
+		await writeFile(join(artifactRoot, "results", "baseline.json"), "{not json");
+		await writeFile(join(artifactRoot, "results", ".baseline-captured"), "");
+		const mission = makeMission({ id: "mission-test", slug: "test", featureBranch: "feat/x" });
+		const missionStore = createMockMissionStore();
+		const result = await evaluateHoldoutGate(mission, missionStore, artifactRoot, artifactRoot);
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("holdout_baseline_corrupt");
+	});
+
+	it("T-w5-24: baseline+current both tsc fail (no new failures) → trigger=holdout_pass [arch §5.11]", async () => {
+		await setup();
+		const baseline = [{ id: "tsc", level: 1, name: "tsc", status: "fail", message: "" }];
+		const current = {
+			checks: [{ id: "tsc", level: 1, name: "tsc", status: "fail", message: "" }],
+		};
+		await writeFile(join(artifactRoot, "results", "baseline.json"), JSON.stringify(baseline));
+		await writeFile(join(artifactRoot, "results", ".baseline-captured"), "");
+		await writeFile(join(artifactRoot, "debug", "holdout-result-0.json"), JSON.stringify(current));
+		const mission = makeMission({ id: "mission-test", slug: "test", featureBranch: "feat/x" });
+		const missionStore = createMockMissionStore();
+		const result = await evaluateHoldoutGate(mission, missionStore, artifactRoot, artifactRoot);
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("holdout_pass");
+	});
+
+	it("T-w5-25: baseline tsc pass → current tsc fail → trigger=holdout_fail with newFailures payload [arch §5.11]", async () => {
+		await setup();
+		const baseline = [{ id: "tsc", level: 1, name: "tsc", status: "pass", message: "" }];
+		const current = {
+			checks: [{ id: "tsc", level: 1, name: "tsc", status: "fail", message: "" }],
+		};
+		await writeFile(join(artifactRoot, "results", "baseline.json"), JSON.stringify(baseline));
+		await writeFile(join(artifactRoot, "results", ".baseline-captured"), "");
+		await writeFile(join(artifactRoot, "debug", "holdout-result-0.json"), JSON.stringify(current));
+		const mission = makeMission({ id: "mission-test", slug: "test", featureBranch: "feat/x" });
+		const missionStore = createMockMissionStore();
+		const result = await evaluateHoldoutGate(mission, missionStore, artifactRoot, artifactRoot);
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("holdout_fail");
+		const payload = (result as unknown as { payload?: unknown }).payload as
+			| { newFailures?: Array<{ id: string; status: string }> }
+			| undefined;
+		expect(payload?.newFailures?.length).toBe(1);
+		expect(payload?.newFailures?.[0]?.id).toBe("tsc");
+		expect(payload?.newFailures?.[0]?.status).toBe("fail");
+	});
+
+	it("T-w5-26: baseline tsc fail → current tsc pass → trigger=holdout_pass (resolved failures) [arch §5.11]", async () => {
+		await setup();
+		const baseline = [{ id: "tsc", level: 1, name: "tsc", status: "fail", message: "" }];
+		const current = {
+			checks: [{ id: "tsc", level: 1, name: "tsc", status: "pass", message: "" }],
+		};
+		await writeFile(join(artifactRoot, "results", "baseline.json"), JSON.stringify(baseline));
+		await writeFile(join(artifactRoot, "results", ".baseline-captured"), "");
+		await writeFile(join(artifactRoot, "debug", "holdout-result-0.json"), JSON.stringify(current));
+		const mission = makeMission({ id: "mission-test", slug: "test", featureBranch: "feat/x" });
+		const missionStore = createMockMissionStore();
+		const result = await evaluateHoldoutGate(mission, missionStore, artifactRoot, artifactRoot);
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("holdout_pass");
+		// Snapshot-diff rewrite MUST expose newFailures payload (empty here — tsc was already failing in baseline, now resolved).
+		const payload = (result as unknown as { payload?: unknown }).payload as
+			| { newFailures?: unknown[]; resolvedFailures?: unknown[] }
+			| undefined;
+		expect(payload).toBeDefined();
+		expect(payload?.newFailures).toEqual([]);
+	});
+});
+
+describe("gh-budget singleton routing [T-w5-27]", () => {
+	afterEach(() => setGhBudget(null));
+
+	it("T-w5-27: evaluateAwaitCI without _deps falls back to getGhBudget singleton [arch §5.5, §5.10]", async () => {
+		const checksJson = JSON.stringify([
+			{ name: "build", status: "COMPLETED", conclusion: "SUCCESS" },
+		]);
+		const budget = fakeBudget(() => makeGhResult(checksJson));
+		setGhBudget(budget);
+		const { store } = trackingMissionStore(42);
+		const mission = makeMission({ id: "m1", slug: "test" });
+		await evaluateAwaitCI(mission, store, undefined);
+		expect(budget.calls.length).toBe(1);
+		const args = budget.calls[0] ?? [];
+		expect(args).toEqual([
+			"pr",
+			"checks",
+			"42",
+			"--json",
+			"name,status,conclusion,detailsUrl,startedAt,completedAt",
+		]);
 	});
 });
