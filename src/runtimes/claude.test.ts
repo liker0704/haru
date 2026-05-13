@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtemp } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { OverstoryError } from "../errors.ts";
 import { cleanupTempDir } from "../test-helpers.ts";
 import type { ResolvedModel } from "../types.ts";
 import { ClaudeRuntime } from "./claude.ts";
@@ -966,5 +967,230 @@ describe("ClaudeRuntime detectRateLimit", () => {
 			const result = runtime.detectRateLimit("");
 			expect(result.limited).toBe(false);
 		});
+	});
+});
+
+// === RED-phase tests for w7: discoverSessionId + intendedResume contract ===
+// Production code has not yet been changed. New tests are expected to FAIL
+// until the builder implements `discoverSessionId` on ClaudeRuntime and adds
+// `intendedResume` enforcement in `buildSpawnCommand`.
+
+type DiscoverOpts = { timeoutMs: number; pollIntervalMs: number };
+type DiscoverFn = (
+	worktreePath: string,
+	spawnedAfter: number,
+	opts?: DiscoverOpts,
+) => Promise<string | null>;
+
+describe("ClaudeRuntime discoverSessionId", () => {
+	const runtime = new ClaudeRuntime();
+	let tempHome: string;
+	let originalHome: string | undefined;
+
+	const callDiscover = (
+		worktreePath: string,
+		spawnedAfter: number,
+		opts?: DiscoverOpts,
+	): Promise<string | null> =>
+		(runtime as unknown as { discoverSessionId: DiscoverFn }).discoverSessionId(
+			worktreePath,
+			spawnedAfter,
+			opts,
+		);
+
+	beforeEach(async () => {
+		tempHome = await mkdtemp(join(tmpdir(), "haru-claude-discover-"));
+		originalHome = process.env.HOME;
+		process.env.HOME = tempHome;
+	});
+
+	afterEach(async () => {
+		if (originalHome !== undefined) {
+			process.env.HOME = originalHome;
+		} else {
+			delete process.env.HOME;
+		}
+		await cleanupTempDir(tempHome);
+	});
+
+	test("T-1: returns null when project directory does not exist", async () => {
+		// Do not create $HOME/.claude/projects/<sanitized>/
+		const result = await callDiscover("/some/worktree", Date.now(), {
+			timeoutMs: 50,
+			pollIntervalMs: 10,
+		});
+		expect(result).toBeNull();
+	});
+
+	test("T-2: returns session UUID when matching jsonl file exists with mtime >= spawnedAfter", async () => {
+		const worktreePath = join(tempHome, "worktree");
+		const sanitized = worktreePath.replace(/\//g, "-");
+		const projectDir = join(tempHome, ".claude", "projects", sanitized);
+		await mkdir(projectDir, { recursive: true });
+
+		const sessionId = "9c9a6ad0-83db-49c2-927a-79ada95448ec";
+		const jsonlPath = join(projectDir, `${sessionId}.jsonl`);
+		await writeFile(jsonlPath, "{}\n");
+
+		// Bump mtime to a known recent value to guarantee mtime >= spawnedAfter.
+		const now = new Date();
+		await utimes(jsonlPath, now, now);
+
+		const result = await callDiscover(worktreePath, 0, {
+			timeoutMs: 100,
+			pollIntervalMs: 10,
+		});
+		expect(result).toBe(sessionId);
+	});
+
+	test("T-3: returns null when jsonl files exist but all have mtime < spawnedAfter", async () => {
+		const worktreePath = join(tempHome, "worktree");
+		const sanitized = worktreePath.replace(/\//g, "-");
+		const projectDir = join(tempHome, ".claude", "projects", sanitized);
+		await mkdir(projectDir, { recursive: true });
+
+		const jsonlPath = join(projectDir, "old-session-id.jsonl");
+		await writeFile(jsonlPath, "{}\n");
+
+		// Force the file's mtime to a moment in the past so spawnedAfter
+		// (set far in the future below) is strictly greater than mtime.
+		const past = new Date(Date.now() - 60_000);
+		await utimes(jsonlPath, past, past);
+
+		const spawnedAfter = Date.now() + 1_000_000;
+		const result = await callDiscover(worktreePath, spawnedAfter, {
+			timeoutMs: 50,
+			pollIntervalMs: 10,
+		});
+		expect(result).toBeNull();
+	});
+
+	test("T-4: sanitization: /home/user/p maps to -home-user-p", async () => {
+		const worktreePath = "/home/user/p";
+		const projectDir = join(tempHome, ".claude", "projects", "-home-user-p");
+		await mkdir(projectDir, { recursive: true });
+
+		const sessionId = "11111111-2222-3333-4444-555555555555";
+		const jsonlPath = join(projectDir, `${sessionId}.jsonl`);
+		await writeFile(jsonlPath, "{}\n");
+		const now = new Date();
+		await utimes(jsonlPath, now, now);
+
+		const result = await callDiscover(worktreePath, 0, {
+			timeoutMs: 50,
+			pollIntervalMs: 10,
+		});
+		expect(result).toBe(sessionId);
+	});
+
+	test("T-5: returns null after timeout when no jsonl file appears", async () => {
+		const worktreePath = join(tempHome, "worktree");
+		const sanitized = worktreePath.replace(/\//g, "-");
+		const projectDir = join(tempHome, ".claude", "projects", sanitized);
+		await mkdir(projectDir, { recursive: true });
+		// No .jsonl files in projectDir
+
+		const started = Date.now();
+		const result = await callDiscover(worktreePath, Date.now(), {
+			timeoutMs: 50,
+			pollIntervalMs: 10,
+		});
+		const elapsed = Date.now() - started;
+		expect(result).toBeNull();
+		expect(elapsed).toBeLessThan(1000);
+	});
+
+	test.skipIf(process.platform === "win32")(
+		"T-6: permission denied on projectDir returns null without throwing",
+		async () => {
+			const worktreePath = join(tempHome, "worktree");
+			const sanitized = worktreePath.replace(/\//g, "-");
+			const projectDir = join(tempHome, ".claude", "projects", sanitized);
+			await mkdir(projectDir, { recursive: true });
+
+			try {
+				await chmod(projectDir, 0o000);
+				const result = await callDiscover(worktreePath, 0, {
+					timeoutMs: 50,
+					pollIntervalMs: 10,
+				});
+				expect(result).toBeNull();
+			} finally {
+				// Always restore permissions so afterEach cleanup can rm -rf the temp dir.
+				await chmod(projectDir, 0o755).catch(() => undefined);
+			}
+		},
+	);
+});
+
+describe("ClaudeRuntime buildSpawnCommand contract (intendedResume)", () => {
+	const runtime = new ClaudeRuntime();
+
+	test("T-7: throws OverstoryError when intendedResume is true and resumeSessionId is null", () => {
+		const opts = {
+			model: "sonnet",
+			permissionMode: "bypass",
+			cwd: "/tmp",
+			env: {},
+			intendedResume: true,
+			resumeSessionId: null,
+		} as unknown as SpawnOpts;
+
+		let thrown: unknown;
+		try {
+			runtime.buildSpawnCommand(opts);
+		} catch (e) {
+			thrown = e;
+		}
+		expect(thrown).toBeInstanceOf(OverstoryError);
+		expect((thrown as OverstoryError).code).toBe("coordinator_session_unavailable");
+	});
+
+	test("T-8: throws OverstoryError when intendedResume is true and resumeSessionId is undefined", () => {
+		const opts = {
+			model: "sonnet",
+			permissionMode: "bypass",
+			cwd: "/tmp",
+			env: {},
+			intendedResume: true,
+			// resumeSessionId omitted
+		} as unknown as SpawnOpts;
+
+		let thrown: unknown;
+		try {
+			runtime.buildSpawnCommand(opts);
+		} catch (e) {
+			thrown = e;
+		}
+		expect(thrown).toBeInstanceOf(OverstoryError);
+		expect((thrown as OverstoryError).code).toBe("coordinator_session_unavailable");
+	});
+
+	test("T-9: appends --resume when intendedResume is true and resumeSessionId is provided", () => {
+		const opts = {
+			model: "sonnet",
+			permissionMode: "bypass",
+			cwd: "/tmp",
+			env: {},
+			intendedResume: true,
+			resumeSessionId: "abc-123",
+		} as unknown as SpawnOpts;
+
+		const cmd = runtime.buildSpawnCommand(opts);
+		expect(cmd).toContain("--resume abc-123");
+	});
+
+	test("T-10: backwards compat: intendedResume false with missing resumeSessionId does not throw and does not append --resume", () => {
+		const opts = {
+			model: "sonnet",
+			permissionMode: "bypass",
+			cwd: "/tmp",
+			env: {},
+			intendedResume: false,
+			// resumeSessionId omitted
+		} as unknown as SpawnOpts;
+
+		const cmd = runtime.buildSpawnCommand(opts);
+		expect(cmd).not.toContain("--resume");
 	});
 });
