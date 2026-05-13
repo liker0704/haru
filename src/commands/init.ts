@@ -358,6 +358,15 @@ export function buildAgentManifest(): AgentManifest {
 			canSpawn: false,
 			constraints: [],
 		},
+		// === Stage E pr-phase agent ===
+		"pr-comment-triage": {
+			file: "pr-comment-triage.md",
+			model: "haiku",
+			tools: ["Read"],
+			capabilities: ["pr-comment-triage"],
+			canSpawn: false,
+			constraints: ["read-only", "ephemeral", "single-pass", "no-write", "no-bash"],
+		},
 	};
 
 	// Build capability index: map each capability to agent names that declare it

@@ -53,6 +53,7 @@ const AGENT_DEF_FILES = [
 	"plan-security-critic.md",
 	"plan-simulator.md",
 	"product-clarifier.md",
+	"pr-comment-triage.md",
 	"research-lead.md",
 	"tier-classifier.md",
 	"researcher.md",
@@ -1049,5 +1050,29 @@ describe("initCommand: .gitattributes setup", () => {
 		const content = await Bun.file(join(tempDir, ".gitattributes")).text();
 		// Content should be unchanged
 		expect(content).toBe(existingContent);
+	});
+});
+
+describe("initCommand: pr-comment-triage manifest entry", () => {
+	test("manifest includes pr-comment-triage", () => {
+		const manifest = buildAgentManifest();
+		expect(manifest.agents["pr-comment-triage"]).toBeDefined();
+	});
+
+	test("tools is exactly ['Read'] (tool-surface regression guard)", () => {
+		const manifest = buildAgentManifest();
+		expect(manifest.agents["pr-comment-triage"]?.tools).toEqual(["Read"]);
+	});
+
+	test("canSpawn is false", () => {
+		const manifest = buildAgentManifest();
+		expect(manifest.agents["pr-comment-triage"]?.canSpawn).toBe(false);
+	});
+
+	test("constraints include no-write and no-bash", () => {
+		const manifest = buildAgentManifest();
+		const constraints = manifest.agents["pr-comment-triage"]?.constraints ?? [];
+		expect(constraints).toContain("no-write");
+		expect(constraints).toContain("no-bash");
 	});
 });

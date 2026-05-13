@@ -50,6 +50,7 @@ const AGENT_DEF_FILES = [
 	"plan-second-opinion.md",
 	"plan-security-critic.md",
 	"plan-simulator.md",
+	"pr-comment-triage.md",
 	"product-clarifier.md",
 	"research-lead.md",
 	"researcher.md",
