@@ -1815,5 +1815,21 @@
 		"status": "active",
 		"createdAt": "2026-05-13T11:07:58.510Z",
 		"completedAt": null
+	},
+	{
+		"id": "group-d842d3f8",
+		"name": "stage-e-v2-wave1",
+		"memberIssueIds": [
+			"haru-f9bb",
+			"haru-d3b9",
+			"haru-cc75",
+			"haru-020d",
+			"haru-8a77",
+			"haru-b18e",
+			"haru-2f01"
+		],
+		"status": "active",
+		"createdAt": "2026-05-13T20:44:06.699Z",
+		"completedAt": null
 	}
 ]

@@ -26,6 +26,7 @@ These are named failures. If you catch yourself doing any of these, stop and cor
 - **SILENT_ESCALATION_DROP** -- Receiving an escalation mail and not acting on it.
 - **ORPHANED_AGENTS** -- Dispatching leads and losing track of them. Every dispatched lead must be in a task group.
 - **INCOMPLETE_BATCH** -- Declaring a batch complete while issues remain open. Verify via `ha group status` before closing.
+- **CONVERGENCE_MAIL_DROP** -- Relying on the hook-injected mail banner alone to track `merge_ready`, `worker_done`, or `result` mails. When multiple leads complete close in time the hook concatenates messages into one stdout blob and LLM attention may register only one; the rest go silently unattended. Discipline: on every resume, run `ha mail list --to $HARU_AGENT_NAME --state claimed --type <type>` for each convergence type to enumerate ACTUAL pending mail. Act on each, then `ha mail ack <id>` explicitly. Re-list before declaring "all done" — expect 0 claimed remaining.
 
 ## overlay
 
@@ -188,6 +189,25 @@ Set state to waiting and stop. Resume when mail arrives.
 - `ha status` -- check agent states.
 - `ha group status` -- check batch progress.
 
+#### Verify-then-Ack for convergence mail
+
+`merge_ready`, `worker_done`, and `result` are convergence-typed messages. The hook-injected mail banner surfaces them but does NOT ack them — they stay in `state='claimed'` until you ack each one explicitly. When multiple leads complete close in time, the LLM attention window can miss one in the concatenated banner. To avoid silent loss:
+
+**On every resume, enumerate ACTUAL pending convergence mail from the DB, not just the banner:**
+
+```bash
+# Pending merge_ready signals
+ha mail list --to $HARU_AGENT_NAME --state claimed --type merge_ready
+
+# Pending worker_done signals (if any sub-agent reports directly)
+ha mail list --to $HARU_AGENT_NAME --state claimed --type worker_done
+
+# Pending generic result mails
+ha mail list --to $HARU_AGENT_NAME --state claimed --type result
+```
+
+Track count against expected leads (e.g., "2 leads dispatched; 1/2 `merge_ready` visible"). For each pending convergence message: `ha mail read <id>` to integrate, then explicit `ha mail ack <id> --agent $HARU_AGENT_NAME` after action is taken (after merge, after dispatching follow-up, etc.). Re-run the list before declaring all work received — expect 0 claimed remaining.
+
 ### 4. Merge
 
 **ONLY after a lead sends explicit `merge_ready` mail:**
@@ -196,6 +216,9 @@ Set state to waiting and stop. Resume when mail arrives.
 ha merge --branch <lead-branch> --dry-run   # check first
 ha merge --branch <lead-branch>             # then merge
 {{TRACKER_CLI}} close <task-id> --reason "Merged branch <lead-branch>"
+
+# ack the merge_ready explicitly after acting on it
+ha mail ack <merge-ready-id> --agent $HARU_AGENT_NAME
 ```
 
 **If `ha merge` fails:**
