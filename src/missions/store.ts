@@ -14,6 +14,8 @@ import type {
 	Mission,
 	MissionAutonomy,
 	MissionPhase,
+	MissionPrCommentRow,
+	MissionPrStateRow,
 	MissionState,
 	MissionStore,
 	MissionTier,
@@ -746,6 +748,61 @@ const MISSION_MIGRATIONS: Migration[] = [
 			return row !== null;
 		},
 	},
+	{
+		version: 13,
+		description:
+			"Stage E: add parent_mission_id + learnings_extracted_at to missions; create mission_pr_state and mission_pr_comments tables",
+		up: (db) => {
+			if (!hasColumn(db, "missions", "parent_mission_id")) {
+				db.exec("ALTER TABLE missions ADD COLUMN parent_mission_id TEXT REFERENCES missions(id)");
+			}
+			if (!hasColumn(db, "missions", "learnings_extracted_at")) {
+				db.exec("ALTER TABLE missions ADD COLUMN learnings_extracted_at TEXT");
+			}
+			db.exec(`
+				CREATE TABLE IF NOT EXISTS mission_pr_state (
+					mission_id TEXT PRIMARY KEY,
+					pr_number INTEGER NOT NULL,
+					pr_url TEXT NOT NULL,
+					branch TEXT NOT NULL,
+					created_at TEXT NOT NULL,
+					last_ci_status TEXT,
+					last_review_decision TEXT,
+					approved_head_sha TEXT,
+					merged_at TEXT
+				)
+			`);
+			db.exec(`
+				CREATE TABLE IF NOT EXISTS mission_pr_comments (
+					mission_id TEXT NOT NULL,
+					pr_number INTEGER NOT NULL,
+					comment_id TEXT PRIMARY KEY,
+					author TEXT NOT NULL,
+					body TEXT NOT NULL CHECK(length(body) <= 65536),
+					action TEXT,
+					status TEXT NOT NULL,
+					fix_cycles INTEGER DEFAULT 0,
+					detected_at TEXT NOT NULL,
+					resolved_at TEXT
+				)
+			`);
+		},
+		detect: (db) => {
+			if (!hasColumn(db, "missions", "parent_mission_id")) return false;
+			if (!hasColumn(db, "missions", "learnings_extracted_at")) return false;
+			const prState = db
+				.prepare<{ name: string }, []>(
+					"SELECT name FROM sqlite_master WHERE type='table' AND name='mission_pr_state'",
+				)
+				.get();
+			const prComments = db
+				.prepare<{ name: string }, []>(
+					"SELECT name FROM sqlite_master WHERE type='table' AND name='mission_pr_comments'",
+				)
+				.get();
+			return prState !== null && prComments !== null;
+		},
+	},
 ];
 
 /** Convert a database row (snake_case) to a Mission object (camelCase). */
@@ -780,6 +837,60 @@ function rowToMission(row: MissionRow): Mission {
 		hasEmittedWsProducerWrite: (row.has_emitted_ws_producer_write ?? 0) === 1,
 		autonomy: (row.autonomy as MissionAutonomy | null) ?? "supervised",
 		featureBranch: row.feature_branch ?? null,
+	};
+}
+
+interface MissionPrStateDbRow {
+	mission_id: string;
+	pr_number: number;
+	pr_url: string;
+	branch: string;
+	created_at: string;
+	last_ci_status: string | null;
+	last_review_decision: string | null;
+	approved_head_sha: string | null;
+	merged_at: string | null;
+}
+
+function rowToPrState(r: MissionPrStateDbRow): MissionPrStateRow {
+	return {
+		missionId: r.mission_id,
+		prNumber: r.pr_number,
+		prUrl: r.pr_url,
+		branch: r.branch,
+		createdAt: r.created_at,
+		lastCiStatus: r.last_ci_status,
+		lastReviewDecision: r.last_review_decision,
+		approvedHeadSha: r.approved_head_sha,
+		mergedAt: r.merged_at,
+	};
+}
+
+interface MissionPrCommentDbRow {
+	mission_id: string;
+	pr_number: number;
+	comment_id: string;
+	author: string;
+	body: string;
+	action: string | null;
+	status: string;
+	fix_cycles: number;
+	detected_at: string;
+	resolved_at: string | null;
+}
+
+function rowToPrComment(r: MissionPrCommentDbRow): MissionPrCommentRow {
+	return {
+		missionId: r.mission_id,
+		prNumber: r.pr_number,
+		commentId: r.comment_id,
+		author: r.author,
+		body: r.body,
+		action: r.action,
+		status: r.status,
+		fixCycles: r.fix_cycles,
+		detectedAt: r.detected_at,
+		resolvedAt: r.resolved_at,
 	};
 }
 
@@ -1434,6 +1545,178 @@ export function createMissionStore(dbPath: string): MissionStore {
 			const stmt = db.prepare("DELETE FROM mission_node_checkpoints WHERE mission_id = $missionId");
 			return (missionId: string): void => {
 				stmt.run({ $missionId: missionId });
+			};
+		})(),
+
+		// === PR phase state (Stage E) ===
+
+		getPrState: (() => {
+			const stmt = db.prepare<MissionPrStateDbRow, { $missionId: string }>(
+				"SELECT * FROM mission_pr_state WHERE mission_id = $missionId",
+			);
+			return (missionId: string): MissionPrStateRow | null => {
+				const row = stmt.get({ $missionId: missionId });
+				return row ? rowToPrState(row) : null;
+			};
+		})(),
+
+		upsertPrState: (() => {
+			const stmt = db.prepare<
+				void,
+				{
+					$mission_id: string;
+					$pr_number: number;
+					$pr_url: string;
+					$branch: string;
+					$created_at: string;
+					$last_ci_status: string | null;
+					$last_review_decision: string | null;
+					$approved_head_sha: string | null;
+					$merged_at: string | null;
+				}
+			>(
+				`INSERT OR REPLACE INTO mission_pr_state
+				 (mission_id, pr_number, pr_url, branch, created_at, last_ci_status,
+				  last_review_decision, approved_head_sha, merged_at)
+				 VALUES ($mission_id, $pr_number, $pr_url, $branch, $created_at, $last_ci_status,
+				  $last_review_decision, $approved_head_sha, $merged_at)`,
+			);
+			return (row: MissionPrStateRow): void => {
+				stmt.run({
+					$mission_id: row.missionId,
+					$pr_number: row.prNumber,
+					$pr_url: row.prUrl,
+					$branch: row.branch,
+					$created_at: row.createdAt,
+					$last_ci_status: row.lastCiStatus,
+					$last_review_decision: row.lastReviewDecision,
+					$approved_head_sha: row.approvedHeadSha,
+					$merged_at: row.mergedAt,
+				});
+			};
+		})(),
+
+		updatePrCiStatus: (() => {
+			const stmt = db.prepare<void, { $status: string; $missionId: string }>(
+				"UPDATE mission_pr_state SET last_ci_status = $status WHERE mission_id = $missionId",
+			);
+			return (missionId: string, status: string): void => {
+				stmt.run({ $status: status, $missionId: missionId });
+			};
+		})(),
+
+		updatePrReviewDecision: (() => {
+			const stmt = db.prepare<void, { $decision: string; $missionId: string }>(
+				"UPDATE mission_pr_state SET last_review_decision = $decision WHERE mission_id = $missionId",
+			);
+			return (missionId: string, decision: string): void => {
+				stmt.run({ $decision: decision, $missionId: missionId });
+			};
+		})(),
+
+		setApprovedHeadSha: (() => {
+			const stmt = db.prepare<void, { $sha: string; $missionId: string }>(
+				"UPDATE mission_pr_state SET approved_head_sha = $sha WHERE mission_id = $missionId",
+			);
+			return (missionId: string, sha: string): void => {
+				stmt.run({ $sha: sha, $missionId: missionId });
+			};
+		})(),
+
+		markPrMerged: (() => {
+			const stmt = db.prepare<void, { $mergedAt: string; $missionId: string }>(
+				"UPDATE mission_pr_state SET merged_at = $mergedAt WHERE mission_id = $missionId",
+			);
+			return (missionId: string, mergedAt: string): void => {
+				stmt.run({ $mergedAt: mergedAt, $missionId: missionId });
+			};
+		})(),
+
+		listPrComments: (() => {
+			const stmt = db.prepare<MissionPrCommentDbRow, { $missionId: string }>(
+				"SELECT * FROM mission_pr_comments WHERE mission_id = $missionId ORDER BY detected_at ASC",
+			);
+			return (missionId: string): MissionPrCommentRow[] => {
+				return stmt.all({ $missionId: missionId }).map(rowToPrComment);
+			};
+		})(),
+
+		countTriageSpawnsSince: (() => {
+			const stmt = db.prepare<{ count: number }, { $missionId: string; $since: string }>(
+				`SELECT COUNT(*) as count FROM mission_pr_comments
+				 WHERE mission_id = $missionId AND status = 'in_progress' AND detected_at > $since`,
+			);
+			return (missionId: string, since: string): number => {
+				const row = stmt.get({ $missionId: missionId, $since: since });
+				return row?.count ?? 0;
+			};
+		})(),
+
+		countTriagePerAuthorSince: (() => {
+			const stmt = db.prepare<
+				{ count: number },
+				{ $missionId: string; $author: string; $since: string }
+			>(
+				`SELECT COUNT(*) as count FROM mission_pr_comments
+				 WHERE mission_id = $missionId AND author = $author AND status = 'in_progress' AND detected_at > $since`,
+			);
+			return (missionId: string, author: string, since: string): number => {
+				const row = stmt.get({ $missionId: missionId, $author: author, $since: since });
+				return row?.count ?? 0;
+			};
+		})(),
+
+		recordPrComment: (() => {
+			const stmt = db.prepare<
+				void,
+				{
+					$mission_id: string;
+					$pr_number: number;
+					$comment_id: string;
+					$author: string;
+					$body: string;
+					$action: string | null;
+					$status: string;
+					$fix_cycles: number;
+					$detected_at: string;
+					$resolved_at: string | null;
+				}
+			>(
+				`INSERT OR IGNORE INTO mission_pr_comments
+				 (mission_id, pr_number, comment_id, author, body, action, status, fix_cycles, detected_at, resolved_at)
+				 VALUES ($mission_id, $pr_number, $comment_id, $author, $body, $action, $status, $fix_cycles, $detected_at, $resolved_at)`,
+			);
+			return (row: MissionPrCommentRow): void => {
+				stmt.run({
+					$mission_id: row.missionId,
+					$pr_number: row.prNumber,
+					$comment_id: row.commentId,
+					$author: row.author,
+					$body: row.body,
+					$action: row.action,
+					$status: row.status,
+					$fix_cycles: row.fixCycles,
+					$detected_at: row.detectedAt,
+					$resolved_at: row.resolvedAt,
+				});
+			};
+		})(),
+
+		updatePrCommentAction: (() => {
+			const stmt = db.prepare<void, { $action: string; $status: string; $commentId: string }>(
+				"UPDATE mission_pr_comments SET action = $action, status = $status WHERE comment_id = $commentId",
+			);
+			return (commentId: string, action: string, status: string): void => {
+				stmt.run({ $action: action, $status: status, $commentId: commentId });
+			};
+		})(),
+
+		markPrCommentResolved: (() => {
+			const stmt = db.prepare<void, { $resolvedAt: string; $commentId: string }>(
+				"UPDATE mission_pr_comments SET resolved_at = $resolvedAt, status = 'responded' WHERE comment_id = $commentId",
+			);
+			return (commentId: string): void => {
+				stmt.run({ $resolvedAt: new Date().toISOString(), $commentId: commentId });
 			};
 		})(),
 
