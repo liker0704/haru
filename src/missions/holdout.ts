@@ -45,6 +45,10 @@ function makeCheck(
 	return { id, level, name, status, message, details };
 }
 
+export function extractCheckKey(check: HoldoutCheck): string {
+	return check.id;
+}
+
 function checkSections(content: string, required: string[]): string[] {
 	const missing: string[] = [];
 	for (const section of required) {

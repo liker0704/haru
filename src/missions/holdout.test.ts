@@ -2,8 +2,9 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { HoldoutCheck } from "../types.ts";
 import type { HoldoutDeps } from "./holdout.ts";
-import { runMissionHoldout } from "./holdout.ts";
+import { extractCheckKey, runMissionHoldout } from "./holdout.ts";
 
 // === Test helpers ===
 
@@ -299,5 +300,36 @@ describe("runMissionHoldout", () => {
 			expect(typeof check.message).toBe("string");
 			expect(["pass", "fail", "warn", "skip"]).toContain(check.status);
 		}
+	});
+});
+
+describe("extractCheckKey", () => {
+	test("returns check.id", () => {
+		const check: HoldoutCheck = {
+			id: "l1-tests",
+			level: 1,
+			name: "Tests",
+			status: "pass",
+			message: "ok",
+		};
+		expect(extractCheckKey(check)).toBe("l1-tests");
+	});
+
+	test("returns id consistently across statuses (the helper is pure-shape)", () => {
+		const passCheck: HoldoutCheck = {
+			id: "l1-lint",
+			level: 1,
+			name: "Lint",
+			status: "pass",
+			message: "ok",
+		};
+		const failCheck: HoldoutCheck = {
+			id: "l1-lint",
+			level: 1,
+			name: "Lint",
+			status: "fail",
+			message: "errors",
+		};
+		expect(extractCheckKey(passCheck)).toBe(extractCheckKey(failCheck));
 	});
 });
