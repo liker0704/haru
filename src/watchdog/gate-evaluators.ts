@@ -20,6 +20,23 @@ export interface GateEvalResult {
 	unknown?: boolean;
 }
 
+/**
+ * Filter mail messages to those created at or after the gate sticky filter time.
+ * `gateFilterTime` is typically `mission_gate_state.resolved_at ?? entered_at`
+ * (the sticky-timestamp pattern the watchdog already uses).
+ *
+ * Do NOT use this for `dispatchedAt`-scoped evaluators (debug-loop):
+ * `evaluateAwaitDebugBriefReady` and `evaluateAwaitDebugFix` intentionally
+ * filter from dispatch time, not gate entry.
+ */
+export function filterMailSinceGate<M extends { createdAt: string }>(
+	messages: M[],
+	gateFilterTime: string | undefined,
+): M[] {
+	if (!gateFilterTime) return messages;
+	return messages.filter((m) => m.createdAt >= gateFilterTime);
+}
+
 /** Check if research phase has completed: analyst sent result mail to coordinator.
  * If all scouts dispatched by analyst have returned results but analyst hasn't
  * aggregated yet, escalate with a specific nudge telling analyst exactly what
@@ -40,13 +57,8 @@ export function evaluateAwaitResearch(
 
 	// Path 1: analyst explicitly sent aggregated result to coordinator.
 	const coordinatorName = `coordinator-${mission.slug}`;
-	const coordInbox = mailStore.getAll({ to: coordinatorName });
-	const hasResult = coordInbox.some(
-		(m) =>
-			m.type === "result" &&
-			m.from.includes("analyst") &&
-			(!gateEnteredAt || m.createdAt >= gateEnteredAt),
-	);
+	const coordInbox = filterMailSinceGate(mailStore.getAll({ to: coordinatorName }), gateEnteredAt);
+	const hasResult = coordInbox.some((m) => m.type === "result" && m.from.includes("analyst"));
 	if (hasResult) {
 		return { met: true, trigger: "research_complete" };
 	}
@@ -58,11 +70,8 @@ export function evaluateAwaitResearch(
 	// Scope to scout-prefixed recipients; analyst may also dispatch non-scout
 	// agents (e.g. plan-review-lead) which must not poison this detection.
 	const analystOutbox = mailStore.getAll({ from: analystName });
-	const scoutDispatches = analystOutbox.filter(
-		(m) =>
-			m.type === "dispatch" &&
-			m.to.startsWith("scout-") &&
-			(!gateEnteredAt || m.createdAt >= gateEnteredAt),
+	const scoutDispatches = filterMailSinceGate(analystOutbox, gateEnteredAt).filter(
+		(m) => m.type === "dispatch" && m.to.startsWith("scout-"),
 	);
 	if (scoutDispatches.length > 0) {
 		const analystInbox = mailStore.getAll({ to: analystName });
@@ -106,14 +115,11 @@ export function evaluateUnderstandReady(
 	}
 	if (mailStore) {
 		const coordName = mission.slug ? `coordinator-${mission.slug}` : "coordinator";
-		const msgs = mailStore.getAll({ to: coordName });
+		const msgs = filterMailSinceGate(mailStore.getAll({ to: coordName }), gateEnteredAt);
 
 		// Auto-resolve if "Plan complete" mail arrived (analyst finished planning)
 		const planComplete = msgs.find(
-			(m) =>
-				m.type === "result" &&
-				m.subject?.toLowerCase().includes("plan complete") &&
-				(!gateEnteredAt || m.createdAt >= gateEnteredAt),
+			(m) => m.type === "result" && m.subject?.toLowerCase().includes("plan complete"),
 		);
 		if (planComplete) {
 			return { met: true, trigger: "ready" };
@@ -122,12 +128,9 @@ export function evaluateUnderstandReady(
 		// If analyst has been dispatched for planning, understand phase is complete — advance.
 		// The coordinator dispatching planning IS the signal that research has been evaluated.
 		const analystName = mission.slug ? `mission-analyst-${mission.slug}` : "mission-analyst";
-		const allMsgs = mailStore.getAll({ to: analystName });
+		const allMsgs = filterMailSinceGate(mailStore.getAll({ to: analystName }), gateEnteredAt);
 		const planningDispatched = allMsgs.find(
-			(m) =>
-				m.type === "dispatch" &&
-				m.subject?.toLowerCase().includes("planning phase") &&
-				(!gateEnteredAt || m.createdAt >= gateEnteredAt),
+			(m) => m.type === "dispatch" && m.subject?.toLowerCase().includes("planning phase"),
 		);
 		if (planningDispatched) {
 			return { met: true, trigger: "ready" };
@@ -231,12 +234,9 @@ export async function evaluateArchitectDesign(
 
 	// Check for architect_ready mail
 	const coordinatorName = `coordinator-${mission.slug}`;
-	const msgs = mailStore.getAll({ to: coordinatorName });
+	const msgs = filterMailSinceGate(mailStore.getAll({ to: coordinatorName }), gateEnteredAt);
 	const hasArchitectReady = msgs.some(
-		(m) =>
-			m.type === "status" &&
-			m.subject.includes("architect_ready") &&
-			(!gateEnteredAt || m.createdAt >= gateEnteredAt),
+		(m) => m.type === "status" && m.subject.includes("architect_ready"),
 	);
 	if (hasArchitectReady) {
 		return { met: true, trigger: "architect_ready" };
@@ -281,10 +281,8 @@ export async function evaluateWsCompletion(
 	// Legacy path (opt-out via env var) — advance on first `merged` mail to ED.
 	// Default is the new SSOT path below.
 	if (process.env.HARU_LEGACY_WS_COMPLETION === "true") {
-		const msgs = mailStore.getAll({ to: edName });
-		const mergedMail = msgs.find(
-			(m) => m.type === "merged" && (!gateEnteredAt || m.createdAt >= gateEnteredAt),
-		);
+		const msgs = filterMailSinceGate(mailStore.getAll({ to: edName }), gateEnteredAt);
+		const mergedMail = msgs.find((m) => m.type === "merged");
 		if (mergedMail) {
 			return { met: true, trigger: "ws_merged", nudgeMessage: mergedMail.body };
 		}
@@ -326,10 +324,8 @@ export async function evaluateWsCompletion(
 	//    missed them. After the first producer write per mission, this
 	//    fallback is permanently disabled.
 	if (!mission.hasEmittedWsProducerWrite) {
-		const msgs = mailStore.getAll({ to: edName });
-		const mergedMail = msgs.find(
-			(m) => m.type === "merged" && (!gateEnteredAt || m.createdAt >= gateEnteredAt),
-		);
+		const msgs = filterMailSinceGate(mailStore.getAll({ to: edName }), gateEnteredAt);
+		const mergedMail = msgs.find((m) => m.type === "merged");
 		if (mergedMail) {
 			return {
 				met: true,
@@ -351,14 +347,12 @@ export function evaluateArchFinal(
 	if (!mailStore) return { met: false };
 
 	const coordinatorName = `coordinator-${mission.slug}`;
-	const msgs = mailStore.getAll({ to: coordinatorName });
+	const msgs = filterMailSinceGate(mailStore.getAll({ to: coordinatorName }), gateEnteredAt);
 	const architectName = `architect-${mission.slug}`;
 	const hasFinal = msgs.some(
 		(m) =>
 			m.from.includes(architectName) &&
-			(m.subject.includes("architecture_final") ||
-				m.subject.includes("Architecture Finalization")) &&
-			(!gateEnteredAt || m.createdAt >= gateEnteredAt),
+			(m.subject.includes("architecture_final") || m.subject.includes("Architecture Finalization")),
 	);
 
 	if (hasFinal) {
@@ -384,10 +378,8 @@ export function evaluateDispatchPlanning(
 	const analystName = `mission-analyst-${mission.slug}`;
 
 	// Path 1: coordinator explicitly dispatched planning to analyst after gate entry.
-	const analystInbox = mailStore.getAll({ to: analystName });
-	const hasDispatch = analystInbox.some(
-		(m) => m.type === "dispatch" && (!gateEnteredAt || m.createdAt >= gateEnteredAt),
-	);
+	const analystInbox = filterMailSinceGate(mailStore.getAll({ to: analystName }), gateEnteredAt);
+	const hasDispatch = analystInbox.some((m) => m.type === "dispatch");
 	if (hasDispatch) {
 		return { met: true, trigger: "planning_started" };
 	}
@@ -424,12 +416,9 @@ export function evaluateArchReviewDispatch(
 	if (!mailStore) return { met: false };
 
 	const architectName = `architect-${mission.slug}`;
-	const msgs = mailStore.getAll({ to: architectName });
+	const msgs = filterMailSinceGate(mailStore.getAll({ to: architectName }), gateEnteredAt);
 	const hasDispatch = msgs.some(
-		(m) =>
-			m.type === "dispatch" &&
-			m.subject.toLowerCase().includes("architecture review") &&
-			(!gateEnteredAt || m.createdAt >= gateEnteredAt),
+		(m) => m.type === "dispatch" && m.subject.toLowerCase().includes("architecture review"),
 	);
 	if (hasDispatch) {
 		return { met: true, trigger: "review_dispatched" };
@@ -450,12 +439,8 @@ export function evaluateRefactorCompletion(
 	if (!mailStore) return { met: false };
 
 	const edName = `execution-director-${mission.slug}`;
-	const msgs = mailStore.getAll({ to: edName });
-	const hasDone = msgs.some(
-		(m) =>
-			(m.type === "worker_done" || m.type === "merged") &&
-			(!gateEnteredAt || m.createdAt >= gateEnteredAt),
-	);
+	const msgs = filterMailSinceGate(mailStore.getAll({ to: edName }), gateEnteredAt);
+	const hasDone = msgs.some((m) => m.type === "worker_done" || m.type === "merged");
 	if (hasDone) {
 		return { met: true, trigger: "refactor_done" };
 	}
@@ -496,14 +481,13 @@ export function evaluateArchReviewComplete(
 	if (!mailStore) return { met: false };
 
 	const coordinatorName = `coordinator-${mission.slug}`;
-	const msgs = mailStore.getAll({ to: coordinatorName });
+	const msgs = filterMailSinceGate(mailStore.getAll({ to: coordinatorName }), gateEnteredAt);
 
 	// Check for architecture review completion signals
 	const hasApproved = msgs.some(
 		(m) =>
 			m.subject.toLowerCase().includes("architecture review") &&
-			(m.type === "result" || m.subject.toLowerCase().includes("approved")) &&
-			(!gateEnteredAt || m.createdAt >= gateEnteredAt),
+			(m.type === "result" || m.subject.toLowerCase().includes("approved")),
 	);
 	if (hasApproved) {
 		return { met: true, trigger: "approved" };
@@ -542,8 +526,8 @@ export function evaluateAwaitResearchComplete(
 	// Look for research_complete signal in any inbox tied to this mission
 	// (analyst may address it to a coordinator or the mission system).
 	const fromAnalyst = mailStore.getAll({ from: analystName });
-	const ready = fromAnalyst.find(
-		(m) => m.type === "research_complete" && (!gateEnteredAt || m.createdAt >= gateEnteredAt),
+	const ready = filterMailSinceGate(fromAnalyst, gateEnteredAt).find(
+		(m) => m.type === "research_complete",
 	);
 	if (ready) {
 		return { met: true, trigger: "research_ready" };
@@ -604,8 +588,8 @@ export function evaluateAwaitSpecReady(
 
 	const clarifierName = `product-clarifier-${mission.slug}`;
 	const fromClarifier = mailStore.getAll({ from: clarifierName });
-	const ready = fromClarifier.find(
-		(m) => m.type === "spec_ready" && (!gateEnteredAt || m.createdAt >= gateEnteredAt),
+	const ready = filterMailSinceGate(fromClarifier, gateEnteredAt).find(
+		(m) => m.type === "spec_ready",
 	);
 	if (ready) {
 		return { met: true, trigger: "spec_ready" };
@@ -645,12 +629,8 @@ export function evaluateHumanSpecReview(
 
 	if (!mailStore) return { met: false };
 	const decisionRecipient = `operator-decision-${mission.slug}`;
-	const verdicts = mailStore.getAll({ to: decisionRecipient });
-	const verdict = verdicts.find(
-		(m) =>
-			(m.type === "spec_approved" || m.type === "spec_rejected") &&
-			(!gateEnteredAt || m.createdAt >= gateEnteredAt),
-	);
+	const verdicts = filterMailSinceGate(mailStore.getAll({ to: decisionRecipient }), gateEnteredAt);
+	const verdict = verdicts.find((m) => m.type === "spec_approved" || m.type === "spec_rejected");
 	if (verdict) {
 		return {
 			met: true,
@@ -989,10 +969,8 @@ function evaluateAwaitLeadsDone(
 	if (!mailStore) return { met: false };
 	// Coordinator name is slug-scoped or bare
 	const coordName = mission.slug ? `coordinator-${mission.slug}` : "coordinator";
-	const msgs = mailStore.getAll({ to: coordName });
-	const mergeReady = msgs.find(
-		(m) => m.type === "merge_ready" && (!gateEnteredAt || m.createdAt >= gateEnteredAt),
-	);
+	const msgs = filterMailSinceGate(mailStore.getAll({ to: coordName }), gateEnteredAt);
+	const mergeReady = msgs.find((m) => m.type === "merge_ready");
 	if (mergeReady) {
 		return {
 			met: true,
@@ -1015,20 +993,18 @@ function evaluatePlanReviewComplete(
 	if (!mailStore) return { met: false };
 	const analystName = mission.slug ? `mission-analyst-${mission.slug}` : "mission-analyst";
 	const msgs = mailStore.getAll({ to: analystName });
-	const approved = msgs.find(
+	const approved = filterMailSinceGate(msgs, gateEnteredAt).find(
 		(m) =>
 			m.type === "plan_review_consolidated" &&
-			(m.subject?.toLowerCase().includes("approve") ?? false) &&
-			(!gateEnteredAt || m.createdAt >= gateEnteredAt),
+			(m.subject?.toLowerCase().includes("approve") ?? false),
 	);
 	if (approved) {
 		return { met: true, trigger: "approved" };
 	}
-	const stuck = msgs.find(
+	const stuck = filterMailSinceGate(msgs, gateEnteredAt).find(
 		(m) =>
 			m.type === "plan_review_consolidated" &&
-			(m.subject?.toLowerCase().includes("stuck") ?? false) &&
-			(!gateEnteredAt || m.createdAt >= gateEnteredAt),
+			(m.subject?.toLowerCase().includes("stuck") ?? false),
 	);
 	if (stuck) {
 		return { met: true, trigger: "stuck" };
@@ -1052,10 +1028,11 @@ function evaluateCollectVerdicts(
 	gateEnteredAt?: string,
 ): GateEvalResult {
 	if (!mailStore) return { met: false };
-	const reviewLeadMsgs = mailStore.getAll({ to: "plan-review-lead" });
-	const hasVerdicts = reviewLeadMsgs.some(
-		(m) => m.type === "plan_critic_verdict" && (!gateEnteredAt || m.createdAt >= gateEnteredAt),
+	const reviewLeadMsgs = filterMailSinceGate(
+		mailStore.getAll({ to: "plan-review-lead" }),
+		gateEnteredAt,
 	);
+	const hasVerdicts = reviewLeadMsgs.some((m) => m.type === "plan_critic_verdict");
 	if (hasVerdicts) {
 		return { met: true, trigger: "verdicts_collected" };
 	}
