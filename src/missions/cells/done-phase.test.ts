@@ -686,6 +686,7 @@ describe("donePhaseCell summary handler", () => {
 			checkpoints: { saveCheckpoint: () => {}, getCheckpoint: () => null },
 			updateCurrentNode: () => {},
 			resetGateState: () => {},
+			transaction: <T>(fn: () => T): T => fn(),
 		} as unknown as import("../../types.ts").MissionStore;
 		const deps: PhaseCellDeps = {
 			mailSend: async () => {},
