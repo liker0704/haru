@@ -18,6 +18,7 @@ function makeCtx(opts: {
 	checkpoint?: unknown;
 	nodeId?: string;
 	onSaveCheckpoint?: (data: unknown) => void;
+	sendMail?: (to: string, subject: string, body: string, type: string) => Promise<void>;
 }): HandlerContext {
 	return {
 		nodeId: opts.nodeId ?? "intake-phase:ensure-context-generate",
@@ -26,6 +27,7 @@ function makeCtx(opts: {
 		saveCheckpoint: async (data: unknown) => {
 			opts.onSaveCheckpoint?.(data);
 		},
+		sendMail: opts.sendMail ?? (async () => {}),
 	} as HandlerContext;
 }
 
@@ -113,6 +115,64 @@ describe("intake-phase subgraph", () => {
 		);
 		expect(retryEdge?.to).toBe("intake-phase:dispatch-clarifier");
 	});
+
+	test("buildSubgraph has intake-phase:escalate node", () => {
+		const graph = intakePhaseCell.buildSubgraph({
+			missionId: "m1",
+			artifactRoot: "/tmp/m1",
+			projectRoot: "/tmp",
+		});
+		const nodeIds = graph.nodes.map((n) => n.id);
+		expect(nodeIds).toContain("intake-phase:escalate");
+	});
+
+	test("buildSubgraph has dispatch_failed edges (3 dispatch handlers → escalate)", () => {
+		const graph = intakePhaseCell.buildSubgraph({
+			missionId: "m1",
+			artifactRoot: "/tmp/m1",
+			projectRoot: "/tmp",
+		});
+		const failEdges = graph.edges.filter((e) => e.trigger === "dispatch_failed");
+		const failFromNodes = failEdges.map((e) => e.from);
+		expect(failFromNodes).toContain("intake-phase:dispatch-clarifier");
+		expect(failFromNodes).toContain("intake-phase:dispatch-tier-classifier");
+		expect(failFromNodes).toContain("intake-phase:dispatch-analyst-intake");
+		for (const edge of failEdges) {
+			if (
+				edge.from === "intake-phase:dispatch-clarifier" ||
+				edge.from === "intake-phase:dispatch-tier-classifier" ||
+				edge.from === "intake-phase:dispatch-analyst-intake"
+			) {
+				expect(edge.to).toBe("intake-phase:escalate");
+			}
+		}
+	});
+
+	test("buildSubgraph has spec-rejected dispatch_failed edge", () => {
+		const graph = intakePhaseCell.buildSubgraph({
+			missionId: "m1",
+			artifactRoot: "/tmp/m1",
+			projectRoot: "/tmp",
+		});
+		const edge = graph.edges.find(
+			(e) => e.from === "intake-phase:spec-rejected" && e.trigger === "dispatch_failed",
+		);
+		expect(edge).toBeDefined();
+		expect(edge?.to).toBe("intake-phase:escalate");
+	});
+
+	test("buildSubgraph has escalate → complete edge", () => {
+		const graph = intakePhaseCell.buildSubgraph({
+			missionId: "m1",
+			artifactRoot: "/tmp/m1",
+			projectRoot: "/tmp",
+		});
+		const edge = graph.edges.find(
+			(e) => e.from === "intake-phase:escalate" && e.trigger === "escalated",
+		);
+		expect(edge).toBeDefined();
+		expect(edge?.to).toBe("intake-phase:complete");
+	});
 });
 
 describe("intake-phase human-spec-review handler", () => {
@@ -180,5 +240,149 @@ describe("intake-phase ensure-context-generate handler", () => {
 		// biome-ignore lint/style/noNonNullAssertion: registry known
 		const result = await handlers["ensure-context-generate"]!(makeCtx({}));
 		expect(result.trigger).toBe("context_ready");
+	});
+});
+
+describe("intake-phase dispatch-clarifier handler", () => {
+	const fakeMission = {
+		id: "m1",
+		slug: "test-slug",
+	} as unknown as ReturnType<typeof makeMission>;
+
+	test("failure routes to dispatch_failed and persists dispatchFailureReason", async () => {
+		const saved: unknown[] = [];
+		const deps = makeDeps({
+			spawn: ((_cmd: unknown, _opts: unknown) => {
+				throw new Error("ENOENT: ha not found");
+			}) as unknown as typeof Bun.spawn,
+		});
+		const handlers = intakePhaseCell.buildHandlers(deps);
+		// biome-ignore lint/style/noNonNullAssertion: registry known
+		const result = await handlers["dispatch-clarifier"]!(
+			makeCtx({
+				mission: fakeMission,
+				onSaveCheckpoint: (data) => saved.push(data),
+			}),
+		);
+		// bug_demo: under HEAD~1, returns clarifier_dispatched regardless of spawn failure
+		expect(result.trigger).toBe("dispatch_failed");
+		expect(saved).toHaveLength(1);
+		const cp = saved[0] as { dispatchFailureReason?: string };
+		expect(typeof cp.dispatchFailureReason).toBe("string");
+		expect((cp.dispatchFailureReason ?? "").length).toBeGreaterThan(0);
+	});
+
+	test("success routes to clarifier_dispatched", async () => {
+		const deps = makeDeps({
+			spawn: ((_cmd: unknown, _opts: unknown) => ({
+				unref: () => {},
+				exited: Promise.resolve(0),
+			})) as unknown as typeof Bun.spawn,
+		});
+		const handlers = intakePhaseCell.buildHandlers(deps);
+		// biome-ignore lint/style/noNonNullAssertion: registry known
+		const result = await handlers["dispatch-clarifier"]!(makeCtx({ mission: fakeMission }));
+		expect(result.trigger).toBe("clarifier_dispatched");
+	});
+});
+
+describe("intake-phase dispatch-tier-classifier handler", () => {
+	const fakeMission = {
+		id: "m1",
+		slug: "test-slug",
+	} as unknown as ReturnType<typeof makeMission>;
+
+	test("failure routes to dispatch_failed", async () => {
+		const saved: unknown[] = [];
+		const deps = makeDeps({
+			spawn: ((_cmd: unknown, _opts: unknown) => {
+				throw new Error("spawn error");
+			}) as unknown as typeof Bun.spawn,
+		});
+		const handlers = intakePhaseCell.buildHandlers(deps);
+		// biome-ignore lint/style/noNonNullAssertion: registry known
+		const result = await handlers["dispatch-tier-classifier"]!(
+			makeCtx({
+				mission: fakeMission,
+				onSaveCheckpoint: (data) => saved.push(data),
+			}),
+		);
+		// bug_demo: under HEAD~1, returns classifier_dispatched regardless of spawn failure
+		expect(result.trigger).toBe("dispatch_failed");
+		expect(saved).toHaveLength(1);
+		const cp = saved[0] as { dispatchFailureReason?: string };
+		expect(typeof cp.dispatchFailureReason).toBe("string");
+	});
+});
+
+describe("intake-phase dispatch-analyst-intake handler", () => {
+	const fakeMission = {
+		id: "m1",
+		slug: "test-slug",
+	} as unknown as ReturnType<typeof makeMission>;
+
+	test("failure routes to dispatch_failed and persists reason", async () => {
+		const saved: unknown[] = [];
+		const deps = makeDeps({
+			overstoryDir: "/tmp/ov",
+			projectRoot: "/tmp/project",
+			ensureMissionAnalyst: async () => {
+				throw new Error("analyst spawn failed");
+			},
+		});
+		const handlers = intakePhaseCell.buildHandlers(deps);
+		// biome-ignore lint/style/noNonNullAssertion: registry known
+		const result = await handlers["dispatch-analyst-intake"]!(
+			makeCtx({
+				mission: fakeMission,
+				onSaveCheckpoint: (data) => saved.push(data),
+			}),
+		);
+		expect(result.trigger).toBe("dispatch_failed");
+		expect(saved).toHaveLength(1);
+		const cp = saved[0] as { dispatchFailureReason?: string };
+		expect(typeof cp.dispatchFailureReason).toBe("string");
+		expect((cp.dispatchFailureReason ?? "").length).toBeGreaterThan(0);
+	});
+
+	test("success routes to analyst_dispatched", async () => {
+		const deps = makeDeps({
+			overstoryDir: "/tmp/ov",
+			projectRoot: "/tmp/project",
+			ensureMissionAnalyst: async () => {},
+		});
+		const handlers = intakePhaseCell.buildHandlers(deps);
+		// biome-ignore lint/style/noNonNullAssertion: registry known
+		const result = await handlers["dispatch-analyst-intake"]!(makeCtx({ mission: fakeMission }));
+		expect(result.trigger).toBe("analyst_dispatched");
+	});
+});
+
+describe("intake-phase escalate handler", () => {
+	const fakeMission = {
+		id: "m1",
+		slug: "test-slug",
+	} as unknown as ReturnType<typeof makeMission>;
+
+	test("sends mission_finding mail and returns escalated", async () => {
+		const mails: Array<{ to: string; subject: string; body: string; type: string }> = [];
+		const handlers = intakePhaseCell.buildHandlers(makeDeps());
+		// biome-ignore lint/style/noNonNullAssertion: registry known
+		const result = await handlers.escalate!(
+			makeCtx({
+				mission: fakeMission,
+				checkpoint: { dispatchFailureReason: "spawn blew up" },
+				sendMail: async (to, subject, body, type) => {
+					mails.push({ to, subject, body, type });
+				},
+			}),
+		);
+		expect(result.trigger).toBe("escalated");
+		expect(mails).toHaveLength(1);
+		// biome-ignore lint/style/noNonNullAssertion: length checked above
+		const mail = mails[0]!;
+		expect(mail.to).toBe("operator");
+		expect(mail.type).toBe("mission_finding");
+		expect(mail.body).toContain("spawn blew up");
 	});
 });

@@ -259,3 +259,335 @@ describe("donePhaseCell dispatch-debugger preflight", () => {
 		expect(data.dispatchFailureReason).toContain("debugger capability not registered");
 	});
 });
+
+describe("donePhaseCell dispatch-debugger worktree probe", () => {
+	let tempDir: string;
+	let agentBaseDir: string;
+	let origSpawn: typeof Bun.spawn;
+
+	beforeEach(async () => {
+		tempDir = await mkdtemp(join(tmpdir(), "haru-done-wt-probe-"));
+		agentBaseDir = join(tempDir, "agent-defs");
+		await mkdir(agentBaseDir, { recursive: true });
+		origSpawn = Bun.spawn;
+
+		// Write debugger manifest so preflight passes.
+		await Bun.write(
+			join(tempDir, "agent-manifest.json"),
+			JSON.stringify({
+				version: "1.0",
+				agents: {
+					debugger: {
+						file: "debugger.md",
+						model: "sonnet",
+						tools: ["Read", "Edit"],
+						capabilities: ["debugger"],
+						canSpawn: false,
+						constraints: [],
+					},
+				},
+			}),
+		);
+		await Bun.write(join(agentBaseDir, "debugger.md"), "# debugger\n");
+	});
+
+	afterEach(async () => {
+		// biome-ignore lint/suspicious/noExplicitAny: restoring Bun.spawn after test
+		(Bun as any).spawn = origSpawn;
+		await cleanupTempDir(tempDir);
+	});
+
+	test("existing worktree → skip git worktree add", async () => {
+		const spawnArgs: string[][] = [];
+		// Compute expected worktreePath (slug=test-mission, attempt=1)
+		const expectedWorktreePath = join(tempDir, "worktrees", "debug", "test-mission-attempt-1");
+
+		// biome-ignore lint/suspicious/noExplicitAny: Bun.spawn overloads require any cast for test stubs
+		(Bun as any).spawn = (cmd: string[], opts?: unknown): ReturnType<typeof Bun.spawn> => {
+			spawnArgs.push([...cmd]);
+			const encoder = new TextEncoder();
+
+			if (cmd[0] === "git" && cmd[1] === "worktree" && cmd[2] === "list") {
+				// Return output with the expected worktreePath so probe detects it.
+				const output = `worktree ${expectedWorktreePath}\nHEAD abc123\nbranch refs/heads/feature/x\n`;
+				return {
+					stdout: new ReadableStream({
+						start(controller) {
+							controller.enqueue(encoder.encode(output));
+							controller.close();
+						},
+					}),
+					stderr: new ReadableStream({
+						start(c) {
+							c.close();
+						},
+					}),
+					exited: Promise.resolve(0),
+					unref: () => {},
+				} as unknown as ReturnType<typeof Bun.spawn>;
+			}
+
+			if (cmd[0] === "git" && cmd[1] === "rev-parse") {
+				return {
+					stdout: new ReadableStream({
+						start(controller) {
+							controller.enqueue(encoder.encode("abc123sha\n"));
+							controller.close();
+						},
+					}),
+					stderr: new ReadableStream({
+						start(c) {
+							c.close();
+						},
+					}),
+					exited: Promise.resolve(0),
+					unref: () => {},
+				} as unknown as ReturnType<typeof Bun.spawn>;
+			}
+
+			if (cmd[0] === "ha" && cmd[1] === "sling") {
+				return {
+					stdout: new ReadableStream({
+						start(c) {
+							c.close();
+						},
+					}),
+					stderr: new ReadableStream({
+						start(c) {
+							c.close();
+						},
+					}),
+					exited: new Promise<number>(() => {}),
+					unref: () => {},
+				} as unknown as ReturnType<typeof Bun.spawn>;
+			}
+
+			// Any other spawn (unexpected)
+			return origSpawn(cmd as [string, ...string[]], opts as Parameters<typeof Bun.spawn>[1]);
+		};
+
+		const checkpointData: Record<string, unknown> = {};
+		const deps: PhaseCellDeps = {
+			mailSend: async () => {},
+			checkpointStore: {} as PhaseCellDeps["checkpointStore"],
+			missionStore: {
+				checkpoints: {
+					saveCheckpoint: (_missionId: string, nodeId: string, data: unknown) => {
+						checkpointData[nodeId] = data;
+					},
+					getCheckpoint: () => null,
+				},
+			} as unknown as PhaseCellDeps["missionStore"],
+			overstoryDir: tempDir,
+			projectRoot: "/tmp/worktree-probe-test",
+		};
+
+		const ctx: HandlerContext = {
+			missionId: "m1",
+			nodeId: "done-phase:dispatch-debugger",
+			checkpoint: null,
+			saveCheckpoint: async () => {},
+			sendMail: async () => {},
+			getMission: () =>
+				({
+					id: "m1",
+					slug: "test-mission",
+					featureBranch: "feature/x",
+					artifactRoot: "/tmp/artifacts",
+				}) as unknown as Mission,
+		} as HandlerContext;
+
+		const handlers = donePhaseCell.buildHandlers(deps);
+		// biome-ignore lint/style/noNonNullAssertion: registry known
+		const result = await handlers["dispatch-debugger"]!(ctx);
+
+		// Probe found existing worktree — skips add, proceeds to sling spawn.
+		// bug_demo: under HEAD~1, probe absent → worktree add always called → fails → dispatch_failed.
+		expect(result.trigger).not.toBe("dispatch_failed");
+
+		// Verify git worktree add was NOT called.
+		const addCalls = spawnArgs.filter(
+			(args) => args[0] === "git" && args[1] === "worktree" && args[2] === "add",
+		);
+		expect(addCalls).toHaveLength(0);
+	});
+});
+
+describe("donePhaseCell escalate placeholder-checkpoint", () => {
+	let tempDir: string;
+
+	beforeEach(async () => {
+		tempDir = await mkdtemp(join(tmpdir(), "haru-done-escalate-"));
+		await mkdir(join(tempDir, "debug"), { recursive: true });
+	});
+
+	afterEach(async () => {
+		await cleanupTempDir(tempDir);
+	});
+
+	function makeCheckpointStore(initialData?: Record<string, unknown>) {
+		const store: Record<string, unknown> = { ...initialData };
+		const saved: Array<{ missionId: string; nodeId: string; data: unknown }> = [];
+		return {
+			saved,
+			checkpoints: {
+				saveCheckpoint: (missionId: string, nodeId: string, data: unknown) => {
+					store[nodeId] = data;
+					saved.push({ missionId, nodeId, data });
+				},
+				getCheckpoint: (_missionId: string, nodeId: string) => {
+					const data = store[nodeId];
+					return data !== undefined ? { data } : null;
+				},
+			},
+		};
+	}
+
+	function makeMailStore(returnId = "msg-fake") {
+		let sendCount = 0;
+		return {
+			sendCount: { get: () => sendCount },
+			store: {
+				insert: (msg: unknown): { id: string } & Record<string, unknown> => {
+					sendCount++;
+					// Spread msg first, then override id so we return the fake id (not the empty string from input).
+					return { ...(msg as object), id: returnId };
+				},
+			},
+		};
+	}
+
+	function makeEscalateCtx(
+		opts: {
+			sendMail?: (to: string, subject: string, body: string, type: string) => Promise<void>;
+		} = {},
+	): HandlerContext {
+		return {
+			missionId: "m1",
+			nodeId: "done-phase:escalate",
+			checkpoint: null,
+			saveCheckpoint: async () => {},
+			sendMail: opts.sendMail ?? (async () => {}),
+			getMission: () =>
+				({
+					id: "m1",
+					slug: "test-mission",
+					featureBranch: "feature/x",
+					artifactRoot: tempDir,
+				}) as unknown as Mission,
+		} as HandlerContext;
+	}
+
+	test("fresh path: saves escalationPending, sends mail, saves escalationThreadId", async () => {
+		const { checkpoints, saved } = makeCheckpointStore();
+		const { store: mailStore, sendCount } = makeMailStore("msg-fake");
+
+		const deps: PhaseCellDeps = {
+			mailSend: async () => {},
+			checkpointStore: {} as PhaseCellDeps["checkpointStore"],
+			missionStore: {
+				checkpoints,
+				freeze: () => {},
+				updatePauseReason: () => {},
+			} as unknown as PhaseCellDeps["missionStore"],
+			mailStore: mailStore as unknown as PhaseCellDeps["mailStore"],
+		};
+
+		const handlers = donePhaseCell.buildHandlers(deps);
+		// biome-ignore lint/style/noNonNullAssertion: registry known
+		const result = await handlers.escalate!(makeEscalateCtx());
+
+		expect(result.trigger).toBe("escalated");
+		expect(sendCount.get()).toBe(1);
+
+		const escalateSaved = saved.filter((s) => s.nodeId === "done-phase:escalate");
+		expect(escalateSaved).toHaveLength(2);
+		const first = escalateSaved[0]?.data as { escalationPending?: boolean };
+		const second = escalateSaved[1]?.data as {
+			escalationPending?: boolean;
+			escalationThreadId?: string;
+		};
+		expect(first?.escalationPending).toBe(true);
+		expect(second?.escalationPending).toBe(false);
+		expect(second?.escalationThreadId).toBe("msg-fake");
+	});
+
+	test("replay with prior threadId: no mail sent, freeze uses prior threadId", async () => {
+		const { checkpoints } = makeCheckpointStore({
+			"done-phase:escalate": { escalationThreadId: "msg-prev" },
+		});
+		const { store: mailStore, sendCount } = makeMailStore();
+
+		const freezeCalls: { threadId: string | null }[] = [];
+		const deps: PhaseCellDeps = {
+			mailSend: async () => {},
+			checkpointStore: {} as PhaseCellDeps["checkpointStore"],
+			missionStore: {
+				checkpoints,
+				freeze: (_id: unknown, _kind: unknown, threadId: string | null) => {
+					freezeCalls.push({ threadId });
+				},
+				updatePauseReason: () => {},
+			} as unknown as PhaseCellDeps["missionStore"],
+			mailStore: mailStore as unknown as PhaseCellDeps["mailStore"],
+		};
+
+		const handlers = donePhaseCell.buildHandlers(deps);
+		// biome-ignore lint/style/noNonNullAssertion: registry known
+		const result = await handlers.escalate!(makeEscalateCtx());
+
+		expect(result.trigger).toBe("escalated");
+		// mailClient.send must NOT be called on replay
+		expect(sendCount.get()).toBe(0);
+		expect(freezeCalls).toHaveLength(1);
+		// biome-ignore lint/style/noNonNullAssertion: length checked above
+		expect(freezeCalls[0]!.threadId).toBe("msg-prev");
+	});
+
+	test("crash-recovery (escalationPending=true, no threadId): returns pending_replay_aborted", async () => {
+		const { checkpoints } = makeCheckpointStore({
+			"done-phase:escalate": { escalationPending: true },
+		});
+		const { store: mailStore, sendCount } = makeMailStore();
+		const sentMails: Array<{ to: string; subject: string; type: string }> = [];
+
+		const deps: PhaseCellDeps = {
+			mailSend: async () => {},
+			checkpointStore: {} as PhaseCellDeps["checkpointStore"],
+			missionStore: {
+				checkpoints,
+				freeze: () => {},
+				updatePauseReason: () => {},
+			} as unknown as PhaseCellDeps["missionStore"],
+			mailStore: mailStore as unknown as PhaseCellDeps["mailStore"],
+		};
+
+		const handlers = donePhaseCell.buildHandlers(deps);
+		// biome-ignore lint/style/noNonNullAssertion: registry known
+		const result = await handlers.escalate!(
+			makeEscalateCtx({
+				sendMail: async (to, subject, _body, type) => {
+					sentMails.push({ to, subject, type });
+				},
+			}),
+		);
+
+		expect(result.trigger).toBe("pending_replay_aborted");
+		// Main escalation mail must NOT be sent
+		expect(sendCount.get()).toBe(0);
+		// Interrupt notification mail must be sent to operator
+		expect(sentMails).toHaveLength(1);
+		expect(sentMails[0]?.to).toBe("operator");
+		expect(sentMails[0]?.subject).toContain("Escalation interrupted");
+		expect(sentMails[0]?.type).toBe("mission_finding");
+	});
+
+	test("done-phase escalate has pending_replay_aborted edge to debug-paused", () => {
+		const graph = donePhaseCell.buildSubgraph(config);
+		const edge = graph.edges.find(
+			(e) => e.from === "done-phase:escalate" && e.trigger === "pending_replay_aborted",
+		);
+		expect(edge).toBeDefined();
+		expect(edge?.to).toBe("done-phase:debug-paused");
+	});
+});
