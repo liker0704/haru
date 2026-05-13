@@ -188,6 +188,11 @@ function buildSubgraph(_config: PhaseCellConfig): MissionGraph {
 				to: `${CELL_TYPE}:debug-paused`,
 				trigger: "escalated",
 			},
+			{
+				from: `${CELL_TYPE}:escalate`,
+				to: `${CELL_TYPE}:debug-paused`,
+				trigger: "pending_replay_aborted",
+			},
 			{ from: `${CELL_TYPE}:cleanup`, to: `${CELL_TYPE}:complete`, trigger: "cleanup_done" },
 		],
 	};
@@ -268,35 +273,59 @@ function buildHandlers(deps: PhaseCellDeps): HandlerRegistry {
 
 			// Create debug worktree from current feature-branch HEAD. New branch
 			// off the feature ref; debugger commits land there.
-			let addExit: number;
-			let addStderr = "";
+
+			// Probe for prior worktree to make handler replay-safe.
+			let worktreeAlreadyExists = false;
 			try {
-				const addProc = Bun.spawn(
-					["git", "worktree", "add", "-b", debugBranch, worktreePath, featureBranch],
-					{ cwd: projectRoot, stdout: "pipe", stderr: "pipe" },
-				);
-				addExit = await addProc.exited;
-				if (addExit !== 0) addStderr = await new Response(addProc.stderr).text();
-			} catch (err) {
-				// Bun.spawn throws when cwd is missing or git is not found.
-				addExit = 1;
-				addStderr = err instanceof Error ? err.message : String(err);
-			}
-			if (addExit !== 0) {
-				process.stderr.write(
-					`[dispatch-debugger] worktree add failed: ${addStderr.slice(0, 200)}\n`,
-				);
-				// Fix #4 from full-PR review: short-circuit to escalation. Plan
-				// §S8 risk-7: "worktree creation fails → escalate immediately, not
-				// retry". Wasting 3 attempts on infrastructure failures the
-				// debugger has no power to fix burns tokens for nothing.
-				deps.missionStore.checkpoints.saveCheckpoint(mission.id, `${CELL_TYPE}:dispatch-debugger`, {
-					debugAttempts,
-					worktreeAddFailed: true,
-					stderr: addStderr.slice(0, 500),
-					dispatchedAt: new Date().toISOString(),
+				const listProc = Bun.spawn(["git", "worktree", "list", "--porcelain"], {
+					cwd: projectRoot,
+					stdout: "pipe",
+					stderr: "pipe",
 				});
-				return { trigger: "dispatch_failed" };
+				const out = await new Response(listProc.stdout).text();
+				await listProc.exited;
+				worktreeAlreadyExists = out
+					.split("\n")
+					.some((line) => line.startsWith("worktree ") && line.endsWith(worktreePath));
+			} catch {
+				// Probe failure is non-fatal; fall through to add and let it fail explicitly.
+			}
+
+			if (!worktreeAlreadyExists) {
+				let addExit: number;
+				let addStderr = "";
+				try {
+					const addProc = Bun.spawn(
+						["git", "worktree", "add", "-b", debugBranch, worktreePath, featureBranch],
+						{ cwd: projectRoot, stdout: "pipe", stderr: "pipe" },
+					);
+					addExit = await addProc.exited;
+					if (addExit !== 0) addStderr = await new Response(addProc.stderr).text();
+				} catch (err) {
+					// Bun.spawn throws when cwd is missing or git is not found.
+					addExit = 1;
+					addStderr = err instanceof Error ? err.message : String(err);
+				}
+				if (addExit !== 0) {
+					process.stderr.write(
+						`[dispatch-debugger] worktree add failed: ${addStderr.slice(0, 200)}\n`,
+					);
+					// Fix #4 from full-PR review: short-circuit to escalation. Plan
+					// §S8 risk-7: "worktree creation fails → escalate immediately, not
+					// retry". Wasting 3 attempts on infrastructure failures the
+					// debugger has no power to fix burns tokens for nothing.
+					deps.missionStore.checkpoints.saveCheckpoint(
+						mission.id,
+						`${CELL_TYPE}:dispatch-debugger`,
+						{
+							debugAttempts,
+							worktreeAddFailed: true,
+							stderr: addStderr.slice(0, 500),
+							dispatchedAt: new Date().toISOString(),
+						},
+					);
+					return { trigger: "dispatch_failed" };
+				}
 			}
 
 			// Spawn debugger via sling. Add debug attempts dir + brief path to
@@ -411,53 +440,94 @@ function buildHandlers(deps: PhaseCellDeps): HandlerRegistry {
 			const packPath = join(artifactRoot, "debug", "consultation-request-pack.md");
 
 			// Build Consultation Pack from attempts/<N>/hypothesis.md records.
-			const cp = deps.missionStore.checkpoints.getCheckpoint(
+			const debugCp = deps.missionStore.checkpoints.getCheckpoint(
 				mission.id,
 				`${CELL_TYPE}:dispatch-debugger`,
 			);
-			const data = cp?.data as { debugAttempts?: number; dispatchFailureReason?: string } | null;
-			const totalAttempts = data?.debugAttempts ?? MAX_DEBUG_ATTEMPTS;
-			const dispatchFailureReason = data?.dispatchFailureReason ?? null;
-
-			const pack =
-				`# Consultation Request Pack\n\n` +
-				(dispatchFailureReason
-					? `Mission ${mission.slug} could not dispatch debugger. Reason: ${dispatchFailureReason}\n\n`
-					: `Mission ${mission.slug} exhausted ${totalAttempts} debug attempts. ` +
-						`Inspect attempts/<N>/hypothesis.md for what was tried. `) +
-				`Run \`ha mission debug status ${mission.id}\` to review, then ` +
-				`\`ha mission debug retry|accept|abort\` to resolve.\n`;
-			await Bun.write(packPath, pack);
-
-			const escalationPayload: DebugEscalationPayload = {
-				missionId: mission.id,
-				totalAttempts,
-				packPath,
-			};
+			const debugData = debugCp?.data as {
+				debugAttempts?: number;
+				dispatchFailureReason?: string;
+			} | null;
+			const totalAttempts = debugData?.debugAttempts ?? MAX_DEBUG_ATTEMPTS;
+			const dispatchFailureReason = debugData?.dispatchFailureReason ?? null;
 
 			// B3 fix from review (N8): send `question` mail FIRST, capture
 			// returned messageId, use it as threadId in freeze(). Otherwise the
 			// frozen mission has no thread anchor for operator response.
+			//
+			// Round-3 da-risk-12: placeholder-checkpoint pattern guards against the
+			// crash window between send and persist — prevents duplicate operator mail
+			// on replay.
 			let threadId: string | null = null;
-			const mailStore = deps.mailStore;
-			if (mailStore) {
-				const { createMailClient } = await import("../../mail/client.ts");
-				const mailClient = createMailClient(mailStore);
-				threadId = mailClient.send({
-					from: `coordinator-${mission.slug}`,
-					to: "operator",
-					subject: `Debug escalation: ${mission.slug}`,
-					body:
-						`Mission ${mission.slug} needs human intervention after ${totalAttempts} debug attempts. ` +
-						`Pack: ${packPath}\n\n` +
-						`Run \`ha mission debug status ${mission.id}\` to inspect, then ` +
-						`retry/accept/abort.`,
-					type: "question",
+			const escalateCp = deps.missionStore.checkpoints.getCheckpoint(
+				mission.id,
+				`${CELL_TYPE}:escalate`,
+			);
+			const prior = escalateCp?.data as {
+				escalationPending?: boolean;
+				escalationThreadId?: string;
+			} | null;
+
+			if (prior?.escalationThreadId) {
+				// Already sent (with successful threadId persistence). Reuse.
+				threadId = prior.escalationThreadId;
+			} else if (prior?.escalationPending) {
+				// Crash between send and persist. Cannot tell if the mail landed.
+				// Route to pending_replay_aborted rather than risk double-send.
+				await ctx.sendMail(
+					"operator",
+					`Escalation interrupted: ${mission.slug ?? mission.id}`,
+					`An escalation mail send was interrupted mid-flight (escalationPending=true, no threadId). The first mail may or may not have landed. Inspect operator inbox before deciding.`,
+					"mission_finding",
+				);
+				return { trigger: "pending_replay_aborted" };
+			} else {
+				// Fresh path: build pack, write, placeholder checkpoint, send, persist threadId.
+				const pack =
+					`# Consultation Request Pack\n\n` +
+					(dispatchFailureReason
+						? `Mission ${mission.slug} could not dispatch debugger. Reason: ${dispatchFailureReason}\n\n`
+						: `Mission ${mission.slug} exhausted ${totalAttempts} debug attempts. ` +
+							`Inspect attempts/<N>/hypothesis.md for what was tried. `) +
+					`Run \`ha mission debug status ${mission.id}\` to review, then ` +
+					`\`ha mission debug retry|accept|abort\` to resolve.\n`;
+				await Bun.write(packPath, pack);
+
+				const escalationPayload: DebugEscalationPayload = {
 					missionId: mission.id,
-					payload: JSON.stringify(escalationPayload),
-				});
-				// Also emit the debug_escalation notification mail for observability /
-				// non-blocking notifications (Slack/etc. integrations Stage E).
+					totalAttempts,
+					packPath,
+				};
+
+				const mailStore = deps.mailStore;
+				if (mailStore) {
+					deps.missionStore.checkpoints.saveCheckpoint(mission.id, `${CELL_TYPE}:escalate`, {
+						...(prior ?? {}),
+						escalationPending: true,
+					});
+					const { createMailClient } = await import("../../mail/client.ts");
+					const mailClient = createMailClient(mailStore);
+					threadId = mailClient.send({
+						from: `coordinator-${mission.slug}`,
+						to: "operator",
+						subject: `Debug escalation: ${mission.slug}`,
+						body:
+							`Mission ${mission.slug} needs human intervention after ${totalAttempts} debug attempts. ` +
+							`Pack: ${packPath}\n\n` +
+							`Run \`ha mission debug status ${mission.id}\` to inspect, then ` +
+							`retry/accept/abort.`,
+						type: "question",
+						missionId: mission.id,
+						payload: JSON.stringify(escalationPayload),
+					});
+					deps.missionStore.checkpoints.saveCheckpoint(mission.id, `${CELL_TYPE}:escalate`, {
+						...(prior ?? {}),
+						escalationPending: false,
+						escalationThreadId: threadId,
+					});
+				}
+
+				// Notification mail for observability (non-blocking; Stage E integrations).
 				await deps.mailSend(
 					"operator",
 					`[notification] Debug escalation: ${mission.slug}`,

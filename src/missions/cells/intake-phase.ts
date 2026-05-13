@@ -8,23 +8,26 @@
  *
  * Subgraph nodes:
  *   ensure-context-generate (handler) → context_ready
- *   dispatch-analyst-intake (handler) → analyst_dispatched
+ *   dispatch-analyst-intake (handler) → analyst_dispatched | dispatch_failed
  *   await-research-complete (async, 1500s) → research_ready
- *   dispatch-clarifier (handler) → clarifier_dispatched
+ *   dispatch-clarifier (handler) → clarifier_dispatched | dispatch_failed
  *   await-spec-ready (async, 3600s) → spec_ready
  *   human-spec-review (human, AUTO-SKIP if mission.autonomy != supervised) → approved | rejected
- *   spec-rejected (handler — capture reason, retry counter) → retry | escalate
- *   dispatch-tier-classifier (handler) → classifier_dispatched
+ *   spec-rejected (handler — capture reason, retry counter) → retry | escalate | dispatch_failed
+ *   dispatch-tier-classifier (handler) → classifier_dispatched | dispatch_failed
  *   await-tier-set (async, 300s) → tier_set
+ *   escalate (handler) → escalated
  *   complete (terminal)
  *
- * Dispatch handlers shell out via `Bun.spawn(["ha", "sling", ...])` for
- * ephemeral agents (clarifier, tier-classifier) and call `ensureMissionAnalyst`
- * for the persistent analyst.
+ * Dispatch handlers shell out via `spawnEphemeralAgent` for ephemeral agents
+ * (clarifier, tier-classifier) and call `ensureMissionAnalyst` for the
+ * persistent analyst. Synchronous spawn failure routes to dispatch_failed →
+ * escalate rather than silently returning the success trigger.
  */
 
 import type { MissionGraph } from "../../types.ts";
 import type { HandlerRegistry } from "../types.ts";
+import { spawnEphemeralAgent } from "./spawn-helpers.ts";
 import type { PhaseCellConfig, PhaseCellDefinition, PhaseCellDeps } from "./types.ts";
 
 const CELL_TYPE = "intake-phase";
@@ -96,6 +99,12 @@ function buildSubgraph(_config: PhaseCellConfig): MissionGraph {
 			},
 			{
 				kind: "cell",
+				id: `${CELL_TYPE}:escalate`,
+				cellType: CELL_TYPE,
+				handler: "escalate",
+			},
+			{
+				kind: "cell",
 				id: `${CELL_TYPE}:complete`,
 				cellType: CELL_TYPE,
 				terminal: true,
@@ -160,6 +169,33 @@ function buildSubgraph(_config: PhaseCellConfig): MissionGraph {
 				to: `${CELL_TYPE}:complete`,
 				trigger: "tier_set",
 			},
+			// dispatch_failed edges: all three dispatch handlers + spec-rejected
+			// (pending-replay non-safe path) route to escalate for operator notification.
+			{
+				from: `${CELL_TYPE}:dispatch-clarifier`,
+				to: `${CELL_TYPE}:escalate`,
+				trigger: "dispatch_failed",
+			},
+			{
+				from: `${CELL_TYPE}:dispatch-tier-classifier`,
+				to: `${CELL_TYPE}:escalate`,
+				trigger: "dispatch_failed",
+			},
+			{
+				from: `${CELL_TYPE}:dispatch-analyst-intake`,
+				to: `${CELL_TYPE}:escalate`,
+				trigger: "dispatch_failed",
+			},
+			{
+				from: `${CELL_TYPE}:spec-rejected`,
+				to: `${CELL_TYPE}:escalate`,
+				trigger: "dispatch_failed",
+			},
+			{
+				from: `${CELL_TYPE}:escalate`,
+				to: `${CELL_TYPE}:complete`,
+				trigger: "escalated",
+			},
 		],
 	};
 }
@@ -169,52 +205,9 @@ interface IntakeCheckpoint {
 	rejectionReason?: string;
 }
 
-/**
- * Spawn an ephemeral leaf-node agent (clarifier or tier-classifier) by shelling
- * out to `ha sling`. Headless, no worktree (these agents are read-only).
- *
- * The intake-phase handler treats spawn failure as non-fatal — the gate
- * evaluator's nudge will surface stuck state. We don't await session
- * completion here; the agent runs asynchronously and signals via mail.
- */
-async function spawnEphemeralAgent(opts: {
-	capability: string;
-	agentName: string;
-	projectRoot?: string;
-}): Promise<void> {
-	const cwd = opts.projectRoot ?? process.cwd();
-	const proc = Bun.spawn(
-		[
-			"ha",
-			"sling",
-			opts.capability, // task ID positional — used as the agent's task slug
-			"--capability",
-			opts.capability,
-			"--name",
-			opts.agentName,
-			"--depth",
-			"0",
-			"--skip-task-check",
-			"--json",
-		],
-		{
-			cwd,
-			stderr: "pipe",
-			stdout: "pipe",
-		},
-	);
-	// Don't await — agent runs in background; mail signals completion.
-	// Just verify spawn didn't fail synchronously.
-	await new Promise((resolve) => setTimeout(resolve, 50));
-	if (proc.exitCode !== null && proc.exitCode !== 0) {
-		const stderr = await new Response(proc.stderr).text();
-		throw new Error(`ha sling failed (exit ${proc.exitCode}): ${stderr}`);
-	}
-}
-
 function buildHandlers(deps: PhaseCellDeps): HandlerRegistry {
 	return {
-		"ensure-context-generate": async (ctx) => {
+		"ensure-context-generate": async (_ctx) => {
 			// Plan #231 (locked-in): compare cached project-context against the
 			// current state of the repo and regenerate on mismatch. The existing
 			// context system uses a structural hash (dir layout + package.json +
@@ -252,35 +245,40 @@ function buildHandlers(deps: PhaseCellDeps): HandlerRegistry {
 			if (!mission || !deps.overstoryDir || !deps.projectRoot) {
 				return { trigger: "analyst_dispatched" };
 			}
-			// Lazy import to avoid circular deps (roles → context → engine-wiring)
-			const { ensureMissionAnalyst } = await import("../roles.ts");
+			const ensureMissionAnalyst =
+				deps.ensureMissionAnalyst ?? (await import("../roles.ts")).ensureMissionAnalyst;
 			try {
 				await ensureMissionAnalyst(mission, deps.overstoryDir, deps.projectRoot, "intake");
 			} catch (err) {
-				// Don't block the graph — gate evaluator (`evaluateAwaitResearchComplete`)
-				// will surface stuck state via its nudge.
-				process.stderr.write(`[intake-phase] dispatch-analyst-intake failed: ${String(err)}\n`);
+				await ctx.saveCheckpoint({
+					dispatchFailureReason: err instanceof Error ? err.message : String(err),
+					failedAt: new Date().toISOString(),
+				});
+				return { trigger: "dispatch_failed" };
 			}
 			return { trigger: "analyst_dispatched" };
 		},
 
 		"dispatch-clarifier": async (ctx) => {
 			const mission = ctx.getMission();
-			if (!mission) return { trigger: "clarifier_dispatched" };
+			if (!mission) return { trigger: "dispatch_failed" };
 
-			// Spawn ephemeral clarifier via `ha sling`. Same Bun.spawn pattern used
-			// by existing handlers (e.g. plan-phase ensure-architect uses
-			// startArchitectRole; we use sling because clarifier is ephemeral).
 			const slug = mission.slug;
 			const clarifierName = slug ? `product-clarifier-${slug}` : "product-clarifier";
-			try {
-				await spawnEphemeralAgent({
+			const result = spawnEphemeralAgent(
+				{
 					capability: "product-clarifier",
 					agentName: clarifierName,
 					projectRoot: deps.projectRoot,
+				},
+				{ spawn: deps.spawn },
+			);
+			if (!result.spawned) {
+				await ctx.saveCheckpoint({
+					dispatchFailureReason: result.reason ?? "synchronous spawn failure",
+					failedAt: new Date().toISOString(),
 				});
-			} catch (err) {
-				process.stderr.write(`[intake-phase] dispatch-clarifier failed: ${String(err)}\n`);
+				return { trigger: "dispatch_failed" };
 			}
 			return { trigger: "clarifier_dispatched" };
 		},
@@ -334,20 +332,40 @@ function buildHandlers(deps: PhaseCellDeps): HandlerRegistry {
 
 		"dispatch-tier-classifier": async (ctx) => {
 			const mission = ctx.getMission();
-			if (!mission) return { trigger: "classifier_dispatched" };
+			if (!mission) return { trigger: "dispatch_failed" };
 
 			const slug = mission.slug;
 			const classifierName = slug ? `tier-classifier-${slug}` : "tier-classifier";
-			try {
-				await spawnEphemeralAgent({
+			const result = spawnEphemeralAgent(
+				{
 					capability: "tier-classifier",
 					agentName: classifierName,
 					projectRoot: deps.projectRoot,
+				},
+				{ spawn: deps.spawn },
+			);
+			if (!result.spawned) {
+				await ctx.saveCheckpoint({
+					dispatchFailureReason: result.reason ?? "synchronous spawn failure",
+					failedAt: new Date().toISOString(),
 				});
-			} catch (err) {
-				process.stderr.write(`[intake-phase] dispatch-tier-classifier failed: ${String(err)}\n`);
+				return { trigger: "dispatch_failed" };
 			}
 			return { trigger: "classifier_dispatched" };
+		},
+
+		escalate: async (ctx) => {
+			const mission = ctx.getMission();
+			if (!mission) return { trigger: "escalated" };
+			const checkpoint = ctx.checkpoint as { dispatchFailureReason?: string } | null;
+			await ctx.sendMail(
+				"operator",
+				`Intake dispatch failed: ${mission.slug ?? mission.id}`,
+				`Intake-phase dispatch failed. Reason: ${checkpoint?.dispatchFailureReason ?? "(unknown)"}. ` +
+					`Mission cannot proceed without operator intervention.`,
+				"mission_finding",
+			);
+			return { trigger: "escalated" };
 		},
 	};
 }

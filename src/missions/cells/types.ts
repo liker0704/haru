@@ -56,6 +56,15 @@ export interface PhaseCellDeps {
 	/** Absolute path to the project root — needed by handlers that spawn
 	 *  role agents (e.g. plan-phase ensure-architect). */
 	projectRoot?: string;
+	/** DI for Bun.spawn — used by spawn-helpers and intake-phase dispatch handlers. */
+	spawn?: typeof Bun.spawn;
+	/** DI for ensureMissionAnalyst — used by intake-phase dispatch-analyst-intake handler. */
+	ensureMissionAnalyst?: (
+		mission: import("../../types.ts").Mission,
+		overstoryDir: string,
+		projectRoot: string,
+		role?: import("../roles.ts").AnalystRole,
+	) => Promise<void>;
 }
 
 export interface PhaseCellDefinition {
