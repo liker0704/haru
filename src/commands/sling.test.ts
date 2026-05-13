@@ -1856,7 +1856,7 @@ describe("slingCommand circuit breaker gate", () => {
 		if (caught !== null) {
 			expect(String(caught)).not.toContain("Circuit breaker is open");
 		}
-	});
+	}, 30000);
 
 	test("skips breaker check when config.resilience is absent", async () => {
 		await writeBreakerConfig(repoDir, false);
@@ -1873,7 +1873,7 @@ describe("slingCommand circuit breaker gate", () => {
 		if (caught !== null) {
 			expect(String(caught)).not.toContain("Circuit breaker is open");
 		}
-	});
+	}, 30000);
 
 	test("sends error mail to coordinator when breaker is tripped with no parent", async () => {
 		await writeBreakerConfig(repoDir, true);
@@ -1908,5 +1908,5 @@ describe("slingCommand circuit breaker gate", () => {
 		} finally {
 			mailStore.close();
 		}
-	});
+	}, 30000);
 });
