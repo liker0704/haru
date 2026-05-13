@@ -15,13 +15,19 @@ import { mkdir, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { OverstoryConfig } from "../config-types.ts";
+import { createEventStore } from "../events/store.ts";
+import { createMailStore } from "../mail/store.ts";
 import type { GraphEngine, StepResult } from "../missions/engine.ts";
 import { createMissionStore } from "../missions/store.ts";
 import type { SessionStore } from "../sessions/store.ts";
 import { createSessionStore } from "../sessions/store.ts";
 import { cleanupTempDir } from "../test-helpers.ts";
-import type { MissionStore } from "../types.ts";
-import { type MissionTickOpts, runMissionTick } from "./mission-tick.ts";
+import type { AgentSession, MissionStore } from "../types.ts";
+import {
+	__resetResumeCountersForTesting,
+	type MissionTickOpts,
+	runMissionTick,
+} from "./mission-tick.ts";
 
 // === Helpers ===
 
@@ -94,6 +100,7 @@ function makeOpts(
 	missionStore: MissionStore,
 	sessionStore: SessionStore,
 	engineFactory?: MissionTickOpts["_startEngine"],
+	extras?: Partial<MissionTickOpts>,
 ): MissionTickOpts {
 	return {
 		overstoryDir,
@@ -105,6 +112,39 @@ function makeOpts(
 		eventStore: null,
 		intervalMs: 30_000,
 		_startEngine: engineFactory,
+		...extras,
+	};
+}
+
+/** Build a complete AgentSession for test use. */
+function makeSession(
+	overrides: Partial<AgentSession> & {
+		id: string;
+		agentName: string;
+		worktreePath: string;
+	},
+): AgentSession {
+	return {
+		capability: "coordinator",
+		runtime: "claude",
+		branchName: "main",
+		taskId: "task-1",
+		tmuxSession: `tmux-${overrides.agentName}`,
+		state: "waiting",
+		pid: null,
+		parentAgent: null,
+		depth: 0,
+		runId: null,
+		startedAt: new Date().toISOString(),
+		lastActivity: new Date().toISOString(),
+		escalationLevel: 0,
+		stalledSince: null,
+		rateLimitedSince: null,
+		runtimeSessionId: null,
+		transcriptPath: null,
+		originalRuntime: null,
+		statusLine: null,
+		...overrides,
 	};
 }
 
@@ -119,6 +159,7 @@ beforeEach(async () => {
 	({ overstoryDir, dbPath } = await createTempOvDir());
 	missionStore = createMissionStore(dbPath);
 	sessionStore = createSessionStore(dbPath);
+	__resetResumeCountersForTesting();
 });
 
 afterEach(async () => {
@@ -247,6 +288,404 @@ describe("runMissionTick", () => {
 		// Lock must be released after tick — next acquire succeeds.
 		const canAcquire = missionStore.acquireTickLock("m-active", 30_000);
 		expect(canAcquire).toBe(true);
+	});
+
+	describe("checkAndResumeWaitingAgents", () => {
+		/** Engine factory that short-circuits immediately (status=gate). */
+		function makeGateEngine(): MissionTickOpts["_startEngine"] {
+			return () =>
+				makeEngineReturning({
+					status: "gate",
+					fromNodeId: "understand:await-plan",
+					toNodeId: "understand:await-plan",
+					trigger: null,
+				});
+		}
+
+		test("auto-resumes waiting agent with dead tmux and unread mail", async () => {
+			const worktreePath = join(overstoryDir, "wt-coord");
+			await mkdir(worktreePath, { recursive: true });
+
+			const mailStore = createMailStore(join(overstoryDir, "mail.db"));
+			const eventStore = createEventStore(join(overstoryDir, "sessions.db"));
+
+			missionStore.create({ id: "m-resume", slug: "resume-mission", objective: "test" });
+			missionStore.updateCurrentNode("m-resume", "understand:await-plan");
+
+			const session = makeSession({
+				id: "sess-coord",
+				agentName: "coordinator-resume",
+				worktreePath,
+				tmuxSession: "tmux-coord",
+			});
+			sessionStore.upsert(session);
+			missionStore.bindSessions("m-resume", { coordinatorSessionId: "sess-coord" });
+
+			mailStore.insert({
+				id: "mail-1",
+				from: "worker-agent",
+				to: "coordinator-resume",
+				subject: "worker_done",
+				body: "done",
+				type: "worker_done",
+				priority: "normal",
+				threadId: null,
+			});
+
+			const resumeCalls: AgentSession[] = [];
+			const _resumeAgent: MissionTickOpts["_resumeAgent"] = async (s) => {
+				resumeCalls.push(s);
+			};
+
+			await runMissionTick(
+				makeOpts(overstoryDir, missionStore, sessionStore, makeGateEngine(), {
+					mailStore,
+					eventStore,
+					_listTmuxSessions: async () => [],
+					_resumeAgent,
+				}),
+			);
+
+			expect(resumeCalls).toHaveLength(1);
+			expect(resumeCalls[0]?.agentName).toBe("coordinator-resume");
+
+			const events = eventStore.getByAgent("engine");
+			const resumeEvent = events.find(
+				(e) => (e.eventType as string) === "engine_agent_resumed_on_mail",
+			);
+			expect(resumeEvent).toBeDefined();
+
+			mailStore.close?.();
+			eventStore.close?.();
+		});
+
+		test("no resume call when agent has no unread mail", async () => {
+			const worktreePath = join(overstoryDir, "wt-coord2");
+			await mkdir(worktreePath, { recursive: true });
+
+			const mailStore = createMailStore(join(overstoryDir, "mail2.db"));
+
+			missionStore.create({ id: "m-nomail", slug: "nomail-mission", objective: "test" });
+			missionStore.updateCurrentNode("m-nomail", "understand:await-plan");
+
+			const session = makeSession({
+				id: "sess-coord2",
+				agentName: "coordinator-nomail",
+				worktreePath,
+				tmuxSession: "tmux-coord2",
+			});
+			sessionStore.upsert(session);
+			missionStore.bindSessions("m-nomail", { coordinatorSessionId: "sess-coord2" });
+
+			const resumeCalls: AgentSession[] = [];
+			const _resumeAgent: MissionTickOpts["_resumeAgent"] = async (s) => {
+				resumeCalls.push(s);
+			};
+
+			await runMissionTick(
+				makeOpts(overstoryDir, missionStore, sessionStore, makeGateEngine(), {
+					mailStore,
+					_listTmuxSessions: async () => [],
+					_resumeAgent,
+				}),
+			);
+
+			expect(resumeCalls).toHaveLength(0);
+
+			mailStore.close?.();
+		});
+
+		test("no resume call when tmux is still alive", async () => {
+			const worktreePath = join(overstoryDir, "wt-coord3");
+			await mkdir(worktreePath, { recursive: true });
+
+			const mailStore = createMailStore(join(overstoryDir, "mail3.db"));
+
+			missionStore.create({ id: "m-alive", slug: "alive-mission", objective: "test" });
+			missionStore.updateCurrentNode("m-alive", "understand:await-plan");
+
+			const session = makeSession({
+				id: "sess-coord3",
+				agentName: "coordinator-alive",
+				worktreePath,
+				tmuxSession: "tmux-coord3",
+			});
+			sessionStore.upsert(session);
+			missionStore.bindSessions("m-alive", { coordinatorSessionId: "sess-coord3" });
+
+			mailStore.insert({
+				id: "mail-alive",
+				from: "worker",
+				to: "coordinator-alive",
+				subject: "done",
+				body: "done",
+				type: "worker_done",
+				priority: "normal",
+				threadId: null,
+			});
+
+			const resumeCalls: AgentSession[] = [];
+			const _resumeAgent: MissionTickOpts["_resumeAgent"] = async (s) => {
+				resumeCalls.push(s);
+			};
+
+			await runMissionTick(
+				makeOpts(overstoryDir, missionStore, sessionStore, makeGateEngine(), {
+					mailStore,
+					_listTmuxSessions: async () => [{ name: "tmux-coord3", pid: 1234 }],
+					_resumeAgent,
+				}),
+			);
+
+			expect(resumeCalls).toHaveLength(0);
+
+			mailStore.close?.();
+		});
+
+		test("no resume call when agent state is not waiting", async () => {
+			const worktreePath = join(overstoryDir, "wt-coord4");
+			await mkdir(worktreePath, { recursive: true });
+
+			const mailStore = createMailStore(join(overstoryDir, "mail4.db"));
+
+			missionStore.create({ id: "m-working", slug: "working-mission", objective: "test" });
+			missionStore.updateCurrentNode("m-working", "understand:await-plan");
+
+			const session = makeSession({
+				id: "sess-coord4",
+				agentName: "coordinator-working",
+				worktreePath,
+				tmuxSession: "tmux-coord4",
+				state: "working",
+			});
+			sessionStore.upsert(session);
+			missionStore.bindSessions("m-working", { coordinatorSessionId: "sess-coord4" });
+
+			mailStore.insert({
+				id: "mail-working",
+				from: "worker",
+				to: "coordinator-working",
+				subject: "done",
+				body: "done",
+				type: "worker_done",
+				priority: "normal",
+				threadId: null,
+			});
+
+			const resumeCalls: AgentSession[] = [];
+			const _resumeAgent: MissionTickOpts["_resumeAgent"] = async (s) => {
+				resumeCalls.push(s);
+			};
+
+			await runMissionTick(
+				makeOpts(overstoryDir, missionStore, sessionStore, makeGateEngine(), {
+					mailStore,
+					_listTmuxSessions: async () => [],
+					_resumeAgent,
+				}),
+			);
+
+			expect(resumeCalls).toHaveLength(0);
+
+			mailStore.close?.();
+		});
+
+		test("no resume call when worktree path does not exist", async () => {
+			const worktreePath = join(overstoryDir, "wt-missing-does-not-exist");
+			// deliberately do NOT mkdir
+
+			const mailStore = createMailStore(join(overstoryDir, "mail5.db"));
+
+			missionStore.create({ id: "m-nowt", slug: "nowt-mission", objective: "test" });
+			missionStore.updateCurrentNode("m-nowt", "understand:await-plan");
+
+			const session = makeSession({
+				id: "sess-coord5",
+				agentName: "coordinator-nowt",
+				worktreePath,
+				tmuxSession: "tmux-coord5",
+			});
+			sessionStore.upsert(session);
+			missionStore.bindSessions("m-nowt", { coordinatorSessionId: "sess-coord5" });
+
+			mailStore.insert({
+				id: "mail-nowt",
+				from: "worker",
+				to: "coordinator-nowt",
+				subject: "done",
+				body: "done",
+				type: "worker_done",
+				priority: "normal",
+				threadId: null,
+			});
+
+			const resumeCalls: AgentSession[] = [];
+			const _resumeAgent: MissionTickOpts["_resumeAgent"] = async (s) => {
+				resumeCalls.push(s);
+			};
+
+			await runMissionTick(
+				makeOpts(overstoryDir, missionStore, sessionStore, makeGateEngine(), {
+					mailStore,
+					_listTmuxSessions: async () => [],
+					_resumeAgent,
+				}),
+			);
+
+			expect(resumeCalls).toHaveLength(0);
+
+			mailStore.close?.();
+		});
+
+		test("retry cap: 6 ticks, 5 attempts, 1 mission_finding", async () => {
+			const worktreePath = join(overstoryDir, "wt-cap");
+			await mkdir(worktreePath, { recursive: true });
+
+			const mailStore = createMailStore(join(overstoryDir, "mail-cap.db"));
+
+			missionStore.create({ id: "m-cap", slug: "cap-mission", objective: "test" });
+			missionStore.updateCurrentNode("m-cap", "understand:await-plan");
+
+			const session = makeSession({
+				id: "sess-cap",
+				agentName: "coordinator-cap",
+				worktreePath,
+				tmuxSession: "tmux-cap",
+			});
+			sessionStore.upsert(session);
+			missionStore.bindSessions("m-cap", { coordinatorSessionId: "sess-cap" });
+
+			mailStore.insert({
+				id: "mail-cap",
+				from: "worker",
+				to: "coordinator-cap",
+				subject: "done",
+				body: "done",
+				type: "worker_done",
+				priority: "normal",
+				threadId: null,
+			});
+
+			let resumeCallCount = 0;
+			const _resumeAgent: MissionTickOpts["_resumeAgent"] = async () => {
+				resumeCallCount++;
+				throw new Error("tmux start failed");
+			};
+
+			const opts = makeOpts(overstoryDir, missionStore, sessionStore, makeGateEngine(), {
+				mailStore,
+				_listTmuxSessions: async () => [],
+				_resumeAgent,
+			});
+
+			for (let i = 0; i < 6; i++) {
+				await runMissionTick(opts);
+			}
+
+			expect(resumeCallCount).toBe(5);
+
+			const findingMails = mailStore
+				.getAll({ to: "coordinator-cap-mission" })
+				.filter((m) => m.type === "mission_finding");
+			// The coordinator name is `coordinator-${slug}` = "coordinator-cap-mission"
+			expect(findingMails).toHaveLength(1);
+
+			mailStore.close?.();
+		});
+
+		test("counter resets on success, fresh cap series after re-failure", async () => {
+			const worktreePath = join(overstoryDir, "wt-reset");
+			await mkdir(worktreePath, { recursive: true });
+
+			const mailStore = createMailStore(join(overstoryDir, "mail-reset.db"));
+			const eventStore = createEventStore(join(overstoryDir, "sessions-reset.db"));
+
+			missionStore.create({ id: "m-reset", slug: "reset-mission", objective: "test" });
+			missionStore.updateCurrentNode("m-reset", "understand:await-plan");
+
+			const session = makeSession({
+				id: "sess-reset",
+				agentName: "coordinator-reset",
+				worktreePath,
+				tmuxSession: "tmux-reset",
+			});
+			sessionStore.upsert(session);
+			missionStore.bindSessions("m-reset", { coordinatorSessionId: "sess-reset" });
+
+			mailStore.insert({
+				id: "mail-reset",
+				from: "worker",
+				to: "coordinator-reset",
+				subject: "done",
+				body: "done",
+				type: "worker_done",
+				priority: "normal",
+				threadId: null,
+			});
+
+			let callCount = 0;
+			const _resumeAgent: MissionTickOpts["_resumeAgent"] = async () => {
+				callCount++;
+				if (callCount < 3) throw new Error("fail");
+			};
+
+			const opts = makeOpts(overstoryDir, missionStore, sessionStore, makeGateEngine(), {
+				mailStore,
+				eventStore,
+				_listTmuxSessions: async () => [],
+				_resumeAgent,
+			});
+
+			// Run 3 ticks: fail, fail, succeed
+			for (let i = 0; i < 3; i++) {
+				await runMissionTick(opts);
+			}
+
+			expect(callCount).toBe(3);
+			const resumeEvents = eventStore
+				.getByAgent("engine")
+				.filter((e) => (e.eventType as string) === "engine_agent_resumed_on_mail");
+			expect(resumeEvents).toHaveLength(1);
+
+			// Re-enter waiting state and add new mail
+			sessionStore.updateState("coordinator-reset", "waiting");
+			mailStore.insert({
+				id: "mail-reset-2",
+				from: "worker",
+				to: "coordinator-reset",
+				subject: "done again",
+				body: "done",
+				type: "worker_done",
+				priority: "normal",
+				threadId: null,
+			});
+
+			// Make resumeAgent throw again
+			const resumeCallsPhase2: number[] = [];
+			const opts2 = makeOpts(overstoryDir, missionStore, sessionStore, makeGateEngine(), {
+				mailStore,
+				eventStore,
+				_listTmuxSessions: async () => [],
+				_resumeAgent: async () => {
+					resumeCallsPhase2.push(1);
+					throw new Error("fail again");
+				},
+			});
+
+			for (let i = 0; i < 6; i++) {
+				await runMissionTick(opts2);
+			}
+
+			expect(resumeCallsPhase2).toHaveLength(5);
+
+			const findingMails = mailStore
+				.getAll({ to: "coordinator-reset-mission" })
+				.filter((m) => m.type === "mission_finding");
+			expect(findingMails).toHaveLength(1);
+
+			mailStore.close?.();
+			eventStore.close?.();
+		});
 	});
 
 	test("does not send nudge for gate result still within grace period", async () => {
