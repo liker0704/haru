@@ -493,32 +493,59 @@ export interface SpecRejectedPayload {
 }
 
 /**
- * Stage C debug-loop protocol payloads. See `docs/architecture/decomposition-issue-tree.md`
+ * Stage C/E debug-loop protocol payloads. See `docs/architecture/decomposition-issue-tree.md`
  * §OV-PHASE4 and plan `/home/liker2/.claude/plans/2-stage-c-debug-loop.md`.
  */
 
-/** Engine → mission-analyst: pack failure context into debug-brief.md. */
-export interface DebugBriefRequestPayload {
-	missionId: string;
-	attemptN: number;
-	integrationBranch: string;
-	integrationSha: string;
-	/**
-	 * Agent name to address the resulting `debug_brief_ready` mail to.
-	 * Engine stamps this when dispatching debugger (typically
-	 * `debugger-<slug>-attempt-<N>`) so analyst doesn't have to guess
-	 * the per-attempt naming convention.
-	 */
-	debuggerName: string;
-	/** Subset of HoldoutCheck — id/level/name/status/message only (no details). */
-	failedGates: Array<{
-		id: string;
-		level: number;
-		name: string;
-		status: string;
-		message: string;
-	}>;
+/** GitHub check run status as returned by the GraphQL checks API. */
+export interface GhCheck {
+	name: string;
+	status: "COMPLETED" | "IN_PROGRESS" | "QUEUED";
+	conclusion: "SUCCESS" | "FAILURE" | "CANCELLED" | "TIMED_OUT" | "NEUTRAL" | "SKIPPED" | null;
+	detailsUrl?: string;
+	output?: { title?: string; summary?: string };
+	durationMs?: number;
 }
+
+/**
+ * Engine → mission-analyst: pack failure context into debug-brief.md.
+ *
+ * Discriminated union on `failureSource`:
+ * - `'holdout'`: post-merge integration gate failure (Stage C done-phase debug loop)
+ * - `'ci'`: PR CI check failure (Stage E pr-phase debug loop)
+ */
+export type DebugBriefRequestPayload =
+	| {
+			failureSource: "holdout";
+			missionId: string;
+			attemptN: number;
+			integrationBranch: string;
+			integrationSha: string;
+			/**
+			 * Agent name to address the resulting `debug_brief_ready` mail to.
+			 * Engine stamps this when dispatching debugger (typically
+			 * `debugger-<slug>-attempt-<N>`) so analyst doesn't have to guess
+			 * the per-attempt naming convention.
+			 */
+			debuggerName: string;
+			/** Subset of HoldoutCheck — id/level/name/status/message only (no details). */
+			failedGates: Array<{
+				id: string;
+				level: number;
+				name: string;
+				status: string;
+				message: string;
+			}>;
+	  }
+	| {
+			failureSource: "ci";
+			missionId: string;
+			attemptN: number;
+			prNumber: number;
+			prHeadSha: string;
+			debuggerName: string;
+			failedChecks: GhCheck[];
+	  };
 
 /** mission-analyst → debugger: brief ready, here are hypotheses. */
 export interface DebugBriefReadyPayload {

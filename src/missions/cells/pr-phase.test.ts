@@ -190,14 +190,10 @@ describe("prPhaseCell.buildSubgraph — subgraph integrity", () => {
 	});
 
 	test("T-w3-5: preflight with pr.enabled=false → {trigger: pr_phase_disabled}", async () => {
-		const handlers = prPhaseCell.buildHandlers(makeBaseDeps());
+		const handlers = prPhaseCell.buildHandlers(makeBaseDeps(), makeConfig({ pr: { enabled: false } }));
 		const preflight = handlers.preflight;
 		expect(preflight).toBeDefined();
 		if (!preflight) return;
-		const _disabledConfig = makeConfig({ pr: { enabled: false } });
-		// Handler reads config from closure (PhaseCellConfig). Builder will need
-		// to thread config through buildHandlers; for now we just call the handler
-		// with a context where the mission carries the disabled flag if needed.
 		const result = await preflight(
 			makeCtx({ mission: makeMission({ slug: "m1" }) as unknown as Mission }),
 		);

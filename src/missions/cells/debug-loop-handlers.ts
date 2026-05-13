@@ -206,6 +206,7 @@ export function makeDebugLoopHandlers(opts: DebugLoopOpts, deps: DebugLoopDeps):
 
 			// Construct debug_brief_request payload for mission-analyst.
 			const payload: DebugBriefRequestPayload = {
+				failureSource: "holdout",
 				missionId: mission.id,
 				attemptN: debugAttempts,
 				integrationBranch: featureBranch,

@@ -41,6 +41,26 @@ export interface PhaseCellConfig {
 	/** Mission tier — controls tier-conditional subgraph routing
 	 *  (e.g. plan-phase skips architect-design for `planned`). */
 	tier?: MissionTier;
+	/** PR-phase configuration (Stage E). All fields are optional for backwards compat. */
+	pr?: {
+		enabled?: boolean;
+		directTierIncludesPr?: boolean;
+		operatorGithubLogin?: string;
+		commentTriageAuthors?: string[];
+		ciTimeoutMs?: number;
+		commentsTimeoutMs?: number;
+		approvalTimeoutMs?: number;
+		mergeStrategy?: "squash" | "rebase" | "merge";
+		showCost?: boolean;
+		autoCloseSuperseded?: boolean;
+		maxTriageSpawnsPerMission?: number;
+		maxTriagePerAuthorPerHour?: number;
+		maxCoordinatorResumesPerPr?: number;
+		requireOperatorPermission?: boolean;
+		triage?: { minConfidence?: number };
+		ghBudget?: { rpm?: number; burst?: number; callTimeoutMs?: number; maxConcurrent?: number };
+		classifyCiRed?: { flakeThresholdMs?: number; maxFlakeRetries?: number };
+	};
 }
 
 export interface PhaseCellDeps {
@@ -70,5 +90,5 @@ export interface PhaseCellDeps {
 export interface PhaseCellDefinition {
 	cellType: string;
 	buildSubgraph(config: PhaseCellConfig): MissionGraph;
-	buildHandlers(deps: PhaseCellDeps): HandlerRegistry;
+	buildHandlers(deps: PhaseCellDeps, config?: PhaseCellConfig): HandlerRegistry;
 }
