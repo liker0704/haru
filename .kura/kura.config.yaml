@@ -26,6 +26,7 @@ domains:
   - watchdog
   - tier-classifier
   - compat
+  - haru-agent-lifecycle
 governance:
   max_entries: 100
   warn_entries: 150
