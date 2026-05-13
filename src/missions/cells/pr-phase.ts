@@ -344,7 +344,14 @@ function buildHandlers(deps: PhaseCellDeps, config?: PhaseCellConfig): HandlerRe
 
 			const { commentId, author } = comment;
 
-			// Rate caps checked before allowList (flood prevention)
+			// Allowlist check first (security-correct: non-allowlisted authors never touch counters)
+			const allowList = prCfg?.commentTriageAuthors ?? [];
+			if (!allowList.includes(author)) {
+				deps.missionStore.updatePrCommentAction(commentId, "reply_only", "responded");
+				return { trigger: "reply_only" };
+			}
+
+			// Per-mission cap check
 			const maxPerMission = prCfg?.maxTriageSpawnsPerMission ?? 50;
 			const prState = deps.missionStore.getPrState(ctx.missionId);
 			const prStart = prState?.createdAt ?? new Date(0).toISOString();
@@ -364,13 +371,6 @@ function buildHandlers(deps: PhaseCellDeps, config?: PhaseCellConfig): HandlerRe
 			if (authorCount >= maxPerAuthor) {
 				const payload = { kind: "per_author", limit: maxPerAuthor };
 				return { trigger: "pr_triage_flood", ...{ payload } };
-			}
-
-			// Allowlist check (deny by default when list is empty or not configured)
-			const allowList = prCfg?.commentTriageAuthors ?? [];
-			if (!allowList.includes(author)) {
-				deps.missionStore.updatePrCommentAction(commentId, "reply_only", "responded");
-				return { trigger: "reply_only" };
 			}
 
 			// Spawn triage agent

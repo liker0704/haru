@@ -190,7 +190,10 @@ describe("prPhaseCell.buildSubgraph — subgraph integrity", () => {
 	});
 
 	test("T-w3-5: preflight with pr.enabled=false → {trigger: pr_phase_disabled}", async () => {
-		const handlers = prPhaseCell.buildHandlers(makeBaseDeps(), makeConfig({ pr: { enabled: false } }));
+		const handlers = prPhaseCell.buildHandlers(
+			makeBaseDeps(),
+			makeConfig({ pr: { enabled: false } }),
+		);
 		const preflight = handlers.preflight;
 		expect(preflight).toBeDefined();
 		if (!preflight) return;
@@ -437,6 +440,7 @@ describe("prPhaseCell dispatch-triage handler", () => {
 			makeBaseDeps({
 				missionStore: missionStore as unknown as PhaseCellDeps["missionStore"],
 			}),
+			makeConfig(),
 		);
 		const dispatch = handlers["dispatch-triage"];
 		expect(dispatch).toBeDefined();
@@ -463,6 +467,7 @@ describe("prPhaseCell dispatch-triage handler", () => {
 			makeBaseDeps({
 				missionStore: missionStore as unknown as PhaseCellDeps["missionStore"],
 			}),
+			makeConfig(),
 		);
 		const dispatch = handlers["dispatch-triage"];
 		expect(dispatch).toBeDefined();
