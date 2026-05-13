@@ -14,7 +14,7 @@ import { validateTransition } from "../agents/state-machine.ts";
 import { resumeAgent } from "../commands/resume.ts";
 import { loadConfig } from "../config.ts";
 import type { OverstoryConfig } from "../config-types.ts";
-import type { EventStore } from "../events/types.ts";
+import type { EventStore, EventType } from "../events/types.ts";
 import type { MailStore } from "../mail/store.ts";
 import {
 	buildLifecycleGraph,
@@ -50,6 +50,10 @@ export interface MissionTickOpts {
 	intervalMs: number;
 	/** DI override: custom engine factory. */
 	_startEngine?: typeof startLifecycleEngine;
+	/** DI override: custom tmux session listing (test seam). */
+	_listTmuxSessions?: typeof listTmuxSessions;
+	/** DI override: custom resumeAgent (test seam). */
+	_resumeAgent?: typeof resumeAgent;
 }
 
 // === Grace period defaults (ms) ===
@@ -75,6 +79,16 @@ const MAX_TOTAL_WAIT_OVERRIDES: Record<string, number> = {
 	"await-refactor": 14_400_000, // 4 hours
 	"await-leads-done": 14_400_000, // 4 hours — direct-tier leads
 };
+
+const resumeAttempts = new Map<string, number>();
+const resumeFailureEmitted = new Set<string>();
+const MAX_RESUME_ATTEMPTS = 5;
+
+/** Reset module-local resume counters. Test-only escape hatch. */
+export function __resetResumeCountersForTesting(): void {
+	resumeAttempts.clear();
+	resumeFailureEmitted.clear();
+}
 
 function getGraceMs(nodeName: string, config?: OverstoryConfig): number {
 	const configOverride = config?.mission?.gates?.gracePeriods?.[nodeName];
@@ -147,6 +161,72 @@ function findSubgraphEdge(
 		}
 	}
 	return undefined;
+}
+
+// === Waiting agent auto-resume ===
+
+async function checkAndResumeWaitingAgents(mission: Mission, opts: MissionTickOpts): Promise<void> {
+	const listFn = opts._listTmuxSessions ?? listTmuxSessions;
+	const resumeFn = opts._resumeAgent ?? resumeAgent;
+	const tmuxSessions = await listFn();
+	const tmuxNames = new Set(tmuxSessions.map((s) => s.name));
+
+	for (const { sessionId } of getMissionRoleSessions(mission)) {
+		if (!sessionId) continue;
+		const session = opts.sessionStore.getAll().find((s) => s.id === sessionId);
+		if (!session || session.state !== "waiting") continue;
+		if (tmuxNames.has(session.tmuxSession)) continue;
+		if (!existsSync(session.worktreePath)) continue;
+
+		const unreadCount = opts.mailStore?.getUnread(session.agentName).length ?? 0;
+		if (unreadCount === 0) continue;
+
+		const attempts = resumeAttempts.get(session.agentName) ?? 0;
+		if (attempts >= MAX_RESUME_ATTEMPTS) {
+			if (!resumeFailureEmitted.has(session.agentName)) {
+				resumeFailureEmitted.add(session.agentName);
+				const coordName = mission.slug ? `coordinator-${mission.slug}` : "coordinator";
+				opts.mailStore?.insert({
+					id: "",
+					from: "engine",
+					to: coordName,
+					subject: `Cannot resume waiting agent: ${session.agentName}`,
+					body: `Agent ${session.agentName} has ${unreadCount} unread mail items but resume has failed ${attempts} times. Inspect worktree and tmux state manually.`,
+					type: "mission_finding",
+					priority: "high",
+					threadId: null,
+				});
+			}
+			continue;
+		}
+
+		try {
+			await resumeFn(session, opts.config, opts.projectRoot);
+			resumeAttempts.delete(session.agentName);
+			resumeFailureEmitted.delete(session.agentName);
+			opts.eventStore?.insert({
+				runId: mission.runId,
+				agentName: "engine",
+				sessionId: session.id,
+				eventType: "engine_agent_resumed_on_mail" as unknown as EventType,
+				toolName: null,
+				toolArgs: null,
+				toolDurationMs: null,
+				level: "info",
+				data: JSON.stringify({
+					missionId: mission.id,
+					agentName: session.agentName,
+					unreadCount,
+					attempts: attempts + 1,
+				}),
+			});
+		} catch (err) {
+			resumeAttempts.set(session.agentName, attempts + 1);
+			process.stderr.write(
+				`[mission-tick] resume ${session.agentName} attempt ${attempts + 1}: ${String(err)}\n`,
+			);
+		}
+	}
 }
 
 // === Dead agent detection ===
@@ -264,6 +344,11 @@ export async function runMissionTick(opts: MissionTickOpts): Promise<void> {
 
 async function processMission(mission: Mission, opts: MissionTickOpts): Promise<void> {
 	const { missionStore } = opts;
+
+	// Resume waiting agents whose tmux is dead and have unread mail.
+	// Runs before zombie-mark logic so we don't churn agents that are legitimately
+	// in `waiting` (sub-agent dispatch idle state) but just need a wake-up nudge.
+	await checkAndResumeWaitingAgents(mission, opts);
 
 	// === Dead agent detection for critical mission roles ===
 	await checkAndRecoverDeadAgents(mission, opts);
