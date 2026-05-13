@@ -1783,5 +1783,15 @@
 		"status": "active",
 		"createdAt": "2026-05-12T21:52:40.983Z",
 		"completedAt": null
+	},
+	{
+		"id": "group-2dab22e8",
+		"name": "engine-audit-batch",
+		"memberIssueIds": [
+			"haru-d754"
+		],
+		"status": "active",
+		"createdAt": "2026-05-13T06:58:45.079Z",
+		"completedAt": null
 	}
 ]
