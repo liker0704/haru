@@ -47,14 +47,23 @@ export async function evaluateAwaitCI(
 	const now = _deps?.now ?? (() => Date.now());
 
 	const result = await runGh(
-		["pr", "checks", String(pr.prNumber), "--json", "name,status,conclusion,detailsUrl,startedAt,completedAt"],
+		[
+			"pr",
+			"checks",
+			String(pr.prNumber),
+			"--json",
+			"name,status,conclusion,detailsUrl,startedAt,completedAt",
+		],
 		{ cwd: projectRoot },
 	);
 
 	if (result.stderr.includes("Bad credentials") || result.stderr.includes("gh: not logged in")) {
 		return { met: true, trigger: "gh_auth_missing" };
 	}
-	if (result.stderr.includes("X-RateLimit-Remaining: 0") || result.stderr.includes("Retry-After:")) {
+	if (
+		result.stderr.includes("X-RateLimit-Remaining: 0") ||
+		result.stderr.includes("Retry-After:")
+	) {
 		return { met: true, trigger: "pr_rate_limited" };
 	}
 
@@ -105,15 +114,17 @@ export async function evaluateAwaitComments(
 	const runGh = _deps?.runGh ?? getGhBudget().runGh;
 	const now = _deps?.now ?? (() => Date.now());
 
-	const result = await runGh(
-		["pr", "view", String(pr.prNumber), "--json", "comments,reviews"],
-		{ cwd: projectRoot },
-	);
+	const result = await runGh(["pr", "view", String(pr.prNumber), "--json", "comments,reviews"], {
+		cwd: projectRoot,
+	});
 
 	if (result.stderr.includes("Bad credentials") || result.stderr.includes("gh: not logged in")) {
 		return { met: true, trigger: "gh_auth_missing" };
 	}
-	if (result.stderr.includes("X-RateLimit-Remaining: 0") || result.stderr.includes("Retry-After:")) {
+	if (
+		result.stderr.includes("X-RateLimit-Remaining: 0") ||
+		result.stderr.includes("Retry-After:")
+	) {
 		return { met: true, trigger: "pr_rate_limited" };
 	}
 
@@ -148,12 +159,18 @@ export async function evaluateAwaitComments(
 			return {
 				met: true,
 				trigger: "new_comment",
-				payload: { commentId: newComment.id, author: newComment.author.login, body: newComment.body },
+				payload: {
+					commentId: newComment.id,
+					author: newComment.author.login,
+					body: newComment.body,
+				},
 			};
 		}
 
 		const hasApproval = parsed.reviews.some((r) => r.state === "APPROVED");
-		const pendingComments = missionStore.listPrComments(mission.id).filter((c) => c.status === "pending");
+		const pendingComments = missionStore
+			.listPrComments(mission.id)
+			.filter((c) => c.status === "pending");
 		if (hasApproval && pendingComments.length === 0) {
 			return { met: true, trigger: "approval_event" };
 		}
@@ -165,14 +182,14 @@ export async function evaluateAwaitComments(
 	return { met: false };
 }
 
-const OPERATOR_APPROVAL_REGEX = /^(approve?d?|lgtm|✅)\s*\.?\s*$/i;
+const OPERATOR_APPROVAL_REGEX = /^(approved?|lgtm|✅)\s*\.?\s*$/i;
 
 /** Check for PR approval, handling restrictive-wins and operator-override semantics. */
 // TODO(w3): when src/missions/cells/pr-phase-triggers.ts merges, type trigger as PrPhaseTrigger
 export async function evaluateAwaitApproval(
 	mission: Mission,
 	missionStore: MissionStore | null,
-	mailStore: MailStore | null,
+	_mailStore: MailStore | null,
 	projectRoot?: string,
 	gateEnteredAt?: string,
 	_deps?: {
@@ -187,7 +204,13 @@ export async function evaluateAwaitApproval(
 				requireOperatorPermission?: boolean;
 			};
 		};
-		addMail?: (msg: { to: string; from: string; type: string; subject: string; body: string }) => void;
+		addMail?: (msg: {
+			to: string;
+			from: string;
+			type: string;
+			subject: string;
+			body: string;
+		}) => void;
 	},
 ): Promise<GateEvalResult> {
 	if (!missionStore) return { met: false };
@@ -206,7 +229,10 @@ export async function evaluateAwaitApproval(
 	if (result.stderr.includes("Bad credentials") || result.stderr.includes("gh: not logged in")) {
 		return { met: true, trigger: "gh_auth_missing" };
 	}
-	if (result.stderr.includes("X-RateLimit-Remaining: 0") || result.stderr.includes("Retry-After:")) {
+	if (
+		result.stderr.includes("X-RateLimit-Remaining: 0") ||
+		result.stderr.includes("Retry-After:")
+	) {
 		return { met: true, trigger: "pr_rate_limited" };
 	}
 
@@ -309,7 +335,7 @@ export async function evaluateAwaitApproval(
 /** Check if debug fix has been committed for the current PR debug cycle. */
 // TODO(w3): when src/missions/cells/pr-phase-triggers.ts merges, type trigger as PrPhaseTrigger
 export function evaluateAwaitDebugComplete(
-	mission: Mission,
+	_mission: Mission,
 	mailStore: MailStore | null,
 	gateEnteredAt?: string,
 	_deps?: { now?: () => number; debugTimeoutMs?: number },
@@ -1276,7 +1302,12 @@ export async function evaluateGate(
 		case "await-ci":
 			return evaluateAwaitCI(mission, stores.missionStore ?? null, projectRoot, gateEnteredAt);
 		case "await-comments":
-			return evaluateAwaitComments(mission, stores.missionStore ?? null, projectRoot, gateEnteredAt);
+			return evaluateAwaitComments(
+				mission,
+				stores.missionStore ?? null,
+				projectRoot,
+				gateEnteredAt,
+			);
 		case "await-approval":
 			return evaluateAwaitApproval(
 				mission,
