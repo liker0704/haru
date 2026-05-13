@@ -13,6 +13,7 @@ import { checkConsistency } from "../doctor/consistency.ts";
 import { checkDatabases } from "../doctor/databases.ts";
 import { checkDependencies } from "../doctor/dependencies.ts";
 import { checkEcosystem } from "../doctor/ecosystem.ts";
+import { checkGithub } from "../doctor/github.ts";
 import { checkLogs } from "../doctor/logs.ts";
 import { checkMergeQueue } from "../doctor/merge-queue.ts";
 import { checkProviders } from "../doctor/providers.ts";
@@ -32,6 +33,7 @@ const ALL_CHECKS: Array<{ category: DoctorCategory; fn: DoctorCheckFn }> = [
 	{ category: "databases", fn: checkDatabases },
 	{ category: "consistency", fn: checkConsistency },
 	{ category: "agents", fn: checkAgents },
+	{ category: "config", fn: checkGithub },
 	{ category: "merge", fn: checkMergeQueue },
 	{ category: "logs", fn: checkLogs },
 	{ category: "version", fn: checkVersion },
