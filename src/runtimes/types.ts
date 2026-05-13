@@ -26,8 +26,18 @@ export interface SpawnOpts {
 	env: Record<string, string>;
 	/** Force a specific session ID at spawn (Claude Code --session-id). */
 	sessionId?: string;
-	/** Resume an existing session by ID instead of starting fresh (Claude Code --resume). */
-	resumeSessionId?: string;
+	/**
+	 * Resume an existing session by ID instead of starting fresh (Claude Code --resume).
+	 * `null` is accepted to model "intended resume but session id unavailable" — see `intendedResume`.
+	 */
+	resumeSessionId?: string | null;
+	/**
+	 * Caller intends to resume an existing session. When `true` AND `resumeSessionId`
+	 * is falsy (null/undefined/empty), `buildSpawnCommand` MUST throw
+	 * `OverstoryError('coordinator_session_unavailable')` rather than silently
+	 * fall back to a fresh spawn (da-03 contract).
+	 */
+	intendedResume?: boolean;
 }
 
 // === Readiness ===

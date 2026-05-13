@@ -2,10 +2,11 @@
 // Pure extraction — no new behavior. All implementation delegates to existing code.
 // Phase 0: file exists and compiles. Callers are not rewired until Phase 2.
 
-import { mkdir } from "node:fs/promises";
+import { mkdir, readdir, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { deployHooks } from "../agents/hooks-deployer.ts";
+import { OverstoryError } from "../errors.ts";
 import type { HeadroomSnapshot } from "../headroom/types.ts";
 import { estimateCost } from "../metrics/pricing.ts";
 import { parseTranscriptUsage } from "../metrics/transcript.ts";
@@ -59,6 +60,13 @@ export class ClaudeRuntime implements AgentRuntime {
 	 * @returns Shell command string suitable for tmux new-session -c
 	 */
 	buildSpawnCommand(opts: SpawnOpts): string {
+		if (opts.intendedResume && !opts.resumeSessionId) {
+			throw new OverstoryError(
+				"Coordinator session id unavailable; refusing to spawn fresh in place of resume.",
+				"coordinator_session_unavailable",
+			);
+		}
+
 		const permMode = opts.permissionMode === "bypass" ? "bypassPermissions" : "default";
 		let cmd = `claude --model ${opts.model} --permission-mode ${permMode}`;
 
@@ -273,6 +281,67 @@ export class ClaudeRuntime implements AgentRuntime {
 		if (home.length === 0) return null;
 		const projectKey = projectRoot.replace(/\//g, "-");
 		return join(home, ".claude", "projects", projectKey);
+	}
+
+	/**
+	 * Discover the Claude Code session UUID after agent spawn.
+	 *
+	 * Claude Code writes a JSONL transcript at
+	 * `~/.claude/projects/<sanitized-cwd>/<session-uuid>.jsonl` once the first user
+	 * message has been processed. Sanitization replaces `/` with `-`.
+	 *
+	 * Polls the project directory for up to `timeoutMs` (default 60s) at
+	 * `pollIntervalMs` cadence (default 1s). Returns the first .jsonl file whose
+	 * mtime is at or after `spawnedAfter` (epoch ms). Returns `null` when:
+	 * - The project directory never appears within the window.
+	 * - No qualifying .jsonl file appears within the window.
+	 * - Permission is denied reading the project directory.
+	 *
+	 * @param worktreePath - Agent's working directory (used to derive the projects key).
+	 * @param spawnedAfter - Epoch ms cutoff: transcripts older than this are ignored.
+	 * @param opts.timeoutMs - Total polling budget (default 60_000).
+	 * @param opts.pollIntervalMs - Sleep between scans (default 1_000).
+	 */
+	async discoverSessionId(
+		worktreePath: string,
+		spawnedAfter: number,
+		opts: { timeoutMs?: number; pollIntervalMs?: number } = {},
+	): Promise<string | null> {
+		const sanitized = worktreePath.replace(/\//g, "-");
+		const projectDir = join(process.env.HOME ?? homedir(), ".claude", "projects", sanitized);
+		const timeoutMs = opts.timeoutMs ?? 60_000;
+		const pollIntervalMs = opts.pollIntervalMs ?? 1_000;
+		const deadlineMs = Date.now() + timeoutMs;
+
+		while (Date.now() < deadlineMs) {
+			try {
+				const entries = await readdir(projectDir);
+				for (const file of entries) {
+					if (!file.endsWith(".jsonl")) continue;
+					const st = await stat(join(projectDir, file));
+					if (st.mtimeMs >= spawnedAfter) {
+						return file.replace(/\.jsonl$/, "");
+					}
+				}
+			} catch (err) {
+				const code = (err as NodeJS.ErrnoException).code;
+				if (code === "ENOENT") {
+					// Directory does not exist yet — keep polling.
+				} else if (code === "EACCES" || code === "EPERM") {
+					console.warn(
+						`[claude-runtime] permission denied reading ${projectDir}; cannot discover session id`,
+					);
+					return null;
+				} else {
+					throw err;
+				}
+			}
+
+			const remaining = deadlineMs - Date.now();
+			if (remaining <= 0) break;
+			await new Promise((resolve) => setTimeout(resolve, Math.min(pollIntervalMs, remaining)));
+		}
+		return null;
 	}
 
 	/**
