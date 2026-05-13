@@ -721,6 +721,31 @@ const MISSION_MIGRATIONS: Migration[] = [
 			return row ? row.sql.includes("'debug-escalation'") : false;
 		},
 	},
+	{
+		version: 12,
+		description: "Add mission_node_checkpoint_status side table for 2PC pending/confirmed tracking",
+		up: (db) => {
+			db.exec(`
+				CREATE TABLE IF NOT EXISTS mission_node_checkpoint_status (
+					mission_id TEXT NOT NULL,
+					node_id TEXT NOT NULL,
+					status TEXT NOT NULL CHECK (status IN ('pending', 'confirmed')),
+					pending_handler TEXT,
+					pending_recorded_at TEXT,
+					updated_at TEXT NOT NULL,
+					PRIMARY KEY (mission_id, node_id)
+				)
+			`);
+		},
+		detect: (db) => {
+			const row = db
+				.prepare<{ name: string }, []>(
+					"SELECT name FROM sqlite_master WHERE type='table' AND name='mission_node_checkpoint_status'",
+				)
+				.get();
+			return row !== null;
+		},
+	},
 ];
 
 /** Convert a database row (snake_case) to a Mission object (camelCase). */

@@ -274,6 +274,57 @@ describe("deleteCheckpoints", () => {
 	});
 });
 
+// === checkpoint status 2PC side table ===
+
+describe("checkpoint status 2PC side table", () => {
+	test("getCheckpointStatus returns null for unknown key/node", () => {
+		expect(checkpoints.getCheckpointStatus("mission-x", "node-a")).toBeNull();
+	});
+
+	test("markCheckpointPending stores pending status with handler name", () => {
+		checkpoints.markCheckpointPending("mission-1", "node-a", "my-handler");
+		const status = checkpoints.getCheckpointStatus("mission-1", "node-a");
+		expect(status?.status).toBe("pending");
+		expect(status?.pendingHandler).toBe("my-handler");
+		expect(status?.pendingRecordedAt).toBeTruthy();
+	});
+
+	test("markCheckpointConfirmed sets confirmed and clears handler fields", () => {
+		checkpoints.markCheckpointPending("mission-1", "node-a", "my-handler");
+		checkpoints.markCheckpointConfirmed("mission-1", "node-a");
+		const status = checkpoints.getCheckpointStatus("mission-1", "node-a");
+		expect(status?.status).toBe("confirmed");
+		expect(status?.pendingHandler).toBeNull();
+		expect(status?.pendingRecordedAt).toBeNull();
+	});
+
+	test("status table holds at most one row per (mission, node) — UPSERT semantics", () => {
+		checkpoints.markCheckpointPending("mission-1", "node-a", "h1");
+		checkpoints.markCheckpointPending("mission-1", "node-a", "h2");
+		checkpoints.markCheckpointConfirmed("mission-1", "node-a");
+
+		const { Database } = require("bun:sqlite");
+		const db2 = new Database(dbPath, { readonly: true });
+		const rows = db2
+			.prepare(
+				"SELECT COUNT(*) as cnt FROM mission_node_checkpoint_status WHERE mission_id = ? AND node_id = ?",
+			)
+			.get("mission-1", "node-a");
+		db2.close();
+		expect((rows as { cnt: number }).cnt).toBe(1);
+	});
+
+	test("saveCheckpoint (data table) during pending does not affect status side table", () => {
+		checkpoints.markCheckpointPending("mission-1", "node-a", "my-handler");
+		// Simulate handler-inner ctx.saveCheckpoint
+		checkpoints.saveCheckpoint("mission-1", "node-a", { progress: 50 });
+		// Status side table must still be pending
+		const status = checkpoints.getCheckpointStatus("mission-1", "node-a");
+		expect(status?.status).toBe("pending");
+		expect(status?.pendingHandler).toBe("my-handler");
+	});
+});
+
 // === schema idempotency ===
 
 describe("schema idempotency", () => {

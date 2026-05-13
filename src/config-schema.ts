@@ -98,6 +98,7 @@ export const KNOWN_FIELDS = {
 	runtimePi: new Set(["provider", "modelMap"]),
 	providerItem: new Set(["type", "baseUrl", "authTokenEnv"]),
 	mission: new Set([
+		"gates",
 		"planReview",
 		"graphExecution",
 		"maxConcurrent",
@@ -105,6 +106,7 @@ export const KNOWN_FIELDS = {
 		"holdout",
 		"cleanup",
 	]),
+	missionGates: new Set(["gracePeriods", "maxTotalWaitMs"]),
 	missionPlanReview: new Set(["enabled", "tier", "maxRounds", "criticModel"]),
 	missionHoldout: new Set(["enabled", "level3Enabled", "blockOnFailure"]),
 	missionCleanup: new Set(["purgeSessionTranscripts"]),

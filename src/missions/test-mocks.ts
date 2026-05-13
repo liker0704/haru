@@ -6,7 +6,7 @@
  * and architecture-review.test.ts.
  */
 
-import type { CheckpointStore, Mission, MissionStore } from "../types.ts";
+import type { CheckpointStatusRow, CheckpointStore, Mission, MissionStore } from "../types.ts";
 
 export interface StoredCheckpoint {
 	data: unknown;
@@ -117,6 +117,14 @@ export function createMockCheckpointStore(): CheckpointStore & {
 		deleteCheckpoints(_missionId: string): void {
 			checkpoints.clear();
 		},
+
+		getCheckpointStatus(_key: string, _nodeId: string): CheckpointStatusRow | null {
+			return null;
+		},
+
+		markCheckpointPending(_key: string, _nodeId: string, _handlerName: string): void {},
+
+		markCheckpointConfirmed(_key: string, _nodeId: string): void {},
 	};
 }
 

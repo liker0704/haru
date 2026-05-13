@@ -241,6 +241,13 @@ export interface MissionSummary {
 
 // === Checkpoint Persistence ===
 
+/** Status row from the 2PC side table mission_node_checkpoint_status. */
+export interface CheckpointStatusRow {
+	status: "pending" | "confirmed";
+	pendingHandler: string | null;
+	pendingRecordedAt: string | null;
+}
+
 /** A persisted execution checkpoint for a graph node. */
 export interface NodeCheckpoint {
 	nodeId: string;
@@ -303,6 +310,12 @@ export interface CheckpointStore {
 	): void;
 	/** Delete all checkpoints for a mission. */
 	deleteCheckpoints(missionId: string): void;
+	/** Get 2PC status row for a node (pending or confirmed). */
+	getCheckpointStatus(key: string, nodeId: string): CheckpointStatusRow | null;
+	/** Mark a node as pending before handler invocation (UPSERT into status side table). */
+	markCheckpointPending(key: string, nodeId: string, handlerName: string): void;
+	/** Mark a node as confirmed after successful advance (UPSERT into status side table). */
+	markCheckpointConfirmed(key: string, nodeId: string): void;
 }
 
 // === Mission Tier Types ===

@@ -688,6 +688,314 @@ describe("runMissionTick", () => {
 		});
 	});
 
+	// === commitAdvance transactionality ===
+
+	describe("commitAdvance — subgraph advance sites", () => {
+		function makeGateAtNode(nodeId: string): MissionTickOpts["_startEngine"] {
+			return () => ({
+				currentNodeId: () => nodeId,
+				step: async (): Promise<StepResult> => ({
+					status: "gate",
+					fromNodeId: nodeId,
+					toNodeId: nodeId,
+					trigger: null,
+				}),
+				run: async () => ({
+					status: "gate" as const,
+					steps: [],
+					currentNodeId: nodeId,
+					gateType: "async" as const,
+				}),
+				advanceNode: async (_trigger: string) => ({
+					status: "completed" as const,
+					steps: [],
+					currentNodeId: "done:completed",
+				}),
+				forceAdvance: async () => ({
+					status: "gate" as const,
+					fromNodeId: nodeId,
+					toNodeId: nodeId,
+					trigger: null,
+				}),
+			});
+		}
+
+		test("early-eval subgraph advance: currentNode and checkpoint status updated atomically", async () => {
+			// intake-phase:await-tier-set evaluates met=true when mission.tier is set.
+			// On advance, commitAdvance should call markCheckpointConfirmed on the status table.
+			const missionId = "m-commit-early";
+			missionStore.create({
+				id: missionId,
+				slug: "commit-early",
+				objective: "test",
+				tier: "direct",
+			});
+			missionStore.updateCurrentNode(missionId, "intake-phase:await-tier-set");
+
+			const engineFactory = makeGateAtNode("intake-phase:await-tier-set");
+			await runMissionTick(makeOpts(overstoryDir, missionStore, sessionStore, engineFactory));
+
+			// currentNode should have advanced to intake-phase:complete
+			const updatedMission = missionStore.getById(missionId);
+			expect(updatedMission?.currentNode).toBe("intake-phase:complete");
+
+			// markCheckpointConfirmed called via commitAdvance — status table reflects confirmed
+			const checkpointKey = "intake:active:m-commit-early";
+			const status = missionStore.checkpoints.getCheckpointStatus(
+				checkpointKey,
+				"intake-phase:await-tier-set",
+			);
+			expect(status?.status).toBe("confirmed");
+		});
+
+		test("late-eval non-subgraph advance: engine.advanceNode is called when no subgraph edge found", async () => {
+			// For top-level gates (not subgraph pattern), engine.advanceNode is called directly.
+			// We verify this by checking that the engine's advanceNode was invoked (currentNodeId unchanged
+			// since we use a mock engine, but missionStore.currentNode stays as set by engine).
+			const missionId = "m-nongraph";
+			// tier: "direct" means mission.tier !== null, so evaluateAwaitTierSet returns met: true
+			missionStore.create({ id: missionId, slug: "nongraph", objective: "test", tier: "direct" });
+			// Use a non-subgraph node whose nodeName matches "await-tier-set" in evaluateGate.
+			// "lifecycle:await-tier-set" has no "-phase:" so findSubgraphEdge returns undefined.
+			const testNodeId = "lifecycle:await-tier-set";
+			missionStore.updateCurrentNode(missionId, testNodeId);
+
+			let advanceNodeCalled = false;
+			const engineFactory: MissionTickOpts["_startEngine"] = () => ({
+				currentNodeId: () => testNodeId,
+				step: async (): Promise<StepResult> => ({
+					status: "gate",
+					fromNodeId: testNodeId,
+					toNodeId: testNodeId,
+					trigger: null,
+				}),
+				run: async () => ({
+					status: "gate" as const,
+					steps: [],
+					currentNodeId: testNodeId,
+					gateType: "async" as const,
+				}),
+				advanceNode: async () => {
+					advanceNodeCalled = true;
+					return {
+						status: "completed" as const,
+						steps: [],
+						currentNodeId: "done:completed",
+					};
+				},
+				forceAdvance: async () => ({
+					status: "gate" as const,
+					fromNodeId: testNodeId,
+					toNodeId: testNodeId,
+					trigger: null,
+				}),
+			});
+
+			await runMissionTick(makeOpts(overstoryDir, missionStore, sessionStore, engineFactory));
+
+			// engine.advanceNode was called (non-subgraph path, evaluateAwaitTierSet returned met:true)
+			expect(advanceNodeCalled).toBe(true);
+		});
+
+		test("non-subgraph fallback calls resolveGate before engine.advanceNode", async () => {
+			// Regression: resolveGate must fire on top-level gate advance so resolved_at is
+			// written — otherwise gateFilterTime defaults to entered_at on loop-back.
+			const missionId = "m-nongraph-rg";
+			missionStore.create({
+				id: missionId,
+				slug: "nongraph-rg",
+				objective: "test",
+				tier: "direct",
+			});
+			const testNodeId = "lifecycle:await-tier-set";
+			missionStore.updateCurrentNode(missionId, testNodeId);
+
+			let resolveGateCalled = false;
+			const origResolveGate = missionStore.resolveGate.bind(missionStore);
+			missionStore.resolveGate = (id: string, nodeId: string, trigger: string) => {
+				if (id === missionId && nodeId === testNodeId) resolveGateCalled = true;
+				origResolveGate(id, nodeId, trigger);
+			};
+
+			const engineFactory: MissionTickOpts["_startEngine"] = () => ({
+				currentNodeId: () => testNodeId,
+				step: async (): Promise<StepResult> => ({
+					status: "gate",
+					fromNodeId: testNodeId,
+					toNodeId: testNodeId,
+					trigger: null,
+				}),
+				run: async () => ({
+					status: "gate" as const,
+					steps: [],
+					currentNodeId: testNodeId,
+					gateType: "async" as const,
+				}),
+				advanceNode: async (_trigger: string) => ({
+					status: "completed" as const,
+					steps: [],
+					currentNodeId: "done:completed",
+				}),
+				forceAdvance: async () => ({
+					status: "gate" as const,
+					fromNodeId: testNodeId,
+					toNodeId: testNodeId,
+					trigger: null,
+				}),
+			});
+
+			await runMissionTick(makeOpts(overstoryDir, missionStore, sessionStore, engineFactory));
+
+			expect(resolveGateCalled).toBe(true);
+		});
+
+		test("commitAdvance confirms checkpoint status inside missionStore.transaction", async () => {
+			// Verify that markCheckpointConfirmed is called inside commitAdvance by checking
+			// that after advance, the status table row reflects confirmed.
+			const missionId = "m-commit-tx";
+			missionStore.create({ id: missionId, slug: "commit-tx", objective: "test", tier: "direct" });
+			missionStore.updateCurrentNode(missionId, "intake-phase:await-tier-set");
+
+			// Pre-mark as pending to verify confirmed is written on advance
+			missionStore.checkpoints.markCheckpointPending(
+				"intake:active:m-commit-tx",
+				"intake-phase:await-tier-set",
+				"dispatch-tier-classifier",
+			);
+
+			const engineFactory = makeGateAtNode("intake-phase:await-tier-set");
+			await runMissionTick(makeOpts(overstoryDir, missionStore, sessionStore, engineFactory));
+
+			const status = missionStore.checkpoints.getCheckpointStatus(
+				"intake:active:m-commit-tx",
+				"intake-phase:await-tier-set",
+			);
+			expect(status?.status).toBe("confirmed");
+		});
+	});
+
+	// === engine_pending_unsafe_replay event emission ===
+
+	describe("engine_pending_unsafe_replay event", () => {
+		function makeGateEngine(nodeId: string): MissionTickOpts["_startEngine"] {
+			return () => ({
+				currentNodeId: () => nodeId,
+				step: async (): Promise<StepResult> => ({
+					status: "gate",
+					fromNodeId: nodeId,
+					toNodeId: nodeId,
+					trigger: null,
+				}),
+				run: async () => ({
+					status: "gate" as const,
+					steps: [],
+					currentNodeId: nodeId,
+					gateType: "async" as const,
+				}),
+				advanceNode: async () => ({
+					status: "completed" as const,
+					steps: [],
+					currentNodeId: "done:completed",
+				}),
+				forceAdvance: async () => ({
+					status: "gate" as const,
+					fromNodeId: nodeId,
+					toNodeId: nodeId,
+					trigger: null,
+				}),
+			});
+		}
+
+		test("emits engine_pending_unsafe_replay when pending non-safe handler at gated node", async () => {
+			const eventStore = createEventStore(dbPath);
+			const missionId = "m-unsafe-replay";
+			missionStore.create({
+				id: missionId,
+				slug: "unsafe-replay",
+				objective: "test",
+				tier: "direct",
+			});
+			const nodeId = "intake-phase:await-spec-ready";
+			missionStore.updateCurrentNode(missionId, nodeId);
+			// Pre-seed pending status for a non-replay-safe handler
+			missionStore.checkpoints.markCheckpointPending(
+				"intake:active:m-unsafe-replay",
+				nodeId,
+				"spec-rejected",
+			);
+
+			await runMissionTick(
+				makeOpts(overstoryDir, missionStore, sessionStore, makeGateEngine(nodeId), {
+					eventStore,
+				}),
+			);
+
+			const events = eventStore.getByAgent("engine");
+			const replayEvents = events.filter((e) => e.eventType === "engine_pending_unsafe_replay");
+			expect(replayEvents.length).toBeGreaterThanOrEqual(1);
+			const parsed = JSON.parse(replayEvents[0]?.data ?? "{}") as {
+				missionId: string;
+				handlerName: string;
+			};
+			expect(parsed.missionId).toBe(missionId);
+			expect(parsed.handlerName).toBe("spec-rejected");
+
+			eventStore.close?.();
+		});
+
+		test("does not emit engine_pending_unsafe_replay for replay-safe handler", async () => {
+			const eventStore = createEventStore(dbPath);
+			const missionId = "m-safe-handler";
+			missionStore.create({
+				id: missionId,
+				slug: "safe-handler",
+				objective: "test",
+				tier: "direct",
+			});
+			const nodeId = "intake-phase:await-spec-ready";
+			missionStore.updateCurrentNode(missionId, nodeId);
+			// Pre-seed pending status for a replay-SAFE handler
+			missionStore.checkpoints.markCheckpointPending(
+				"intake:active:m-safe-handler",
+				nodeId,
+				"summary",
+			);
+
+			await runMissionTick(
+				makeOpts(overstoryDir, missionStore, sessionStore, makeGateEngine(nodeId), {
+					eventStore,
+				}),
+			);
+
+			const events = eventStore.getByAgent("engine");
+			const replayEvents = events.filter((e) => e.eventType === "engine_pending_unsafe_replay");
+			expect(replayEvents).toHaveLength(0);
+
+			eventStore.close?.();
+		});
+
+		test("does not emit engine_pending_unsafe_replay when no pending status", async () => {
+			const eventStore = createEventStore(dbPath);
+			const missionId = "m-no-pending";
+			missionStore.create({ id: missionId, slug: "no-pending", objective: "test", tier: "direct" });
+			const nodeId = "intake-phase:await-spec-ready";
+			missionStore.updateCurrentNode(missionId, nodeId);
+			// No pending status set
+
+			await runMissionTick(
+				makeOpts(overstoryDir, missionStore, sessionStore, makeGateEngine(nodeId), {
+					eventStore,
+				}),
+			);
+
+			const events = eventStore.getByAgent("engine");
+			const replayEvents = events.filter((e) => e.eventType === "engine_pending_unsafe_replay");
+			expect(replayEvents).toHaveLength(0);
+
+			eventStore.close?.();
+		});
+	});
+
 	test("does not send nudge for gate result still within grace period", async () => {
 		missionStore.create({ id: "m-gate", slug: "gate-mission", objective: "test" });
 		// Set currentNode so processMission can read it after step().

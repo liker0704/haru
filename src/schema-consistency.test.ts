@@ -358,5 +358,26 @@ describe("SQL schema consistency", () => {
 
 			expect(actual).toEqual(expected);
 		});
+
+		test("mission_node_checkpoint_status table columns match 2PC status side table schema", () => {
+			const dbPath = join(tmpDir, "sessions.db");
+			const store = createMissionStore(dbPath);
+
+			const db = new Database(dbPath, { readonly: true });
+			const actual = getTableColumns(db, "mission_node_checkpoint_status");
+			db.close();
+			store.close();
+
+			const expected = [
+				"mission_id",
+				"node_id",
+				"pending_handler",
+				"pending_recorded_at",
+				"status",
+				"updated_at",
+			].sort();
+
+			expect(actual).toEqual(expected);
+		});
 	});
 });

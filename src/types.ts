@@ -195,6 +195,7 @@ export type {
 	ArchitectureDecision,
 	ArchitectureInterface,
 	ArchitectureTddAssignment,
+	CheckpointStatusRow,
 	CheckpointStore,
 	GraphTransitionResult,
 	HoldoutCheck,
