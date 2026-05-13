@@ -250,6 +250,216 @@ describe("mailCommand", () => {
 		});
 	});
 
+	describe("ack (per #284)", () => {
+		test("ack happy path: claimed convergence message transitions to acked", async () => {
+			// Seed a convergence message and claim it
+			const store = createMailStore(join(tempDir, ".overstory", "mail.db"));
+			const client = createMailClient(store);
+			const verdictId = client.sendProtocol({
+				from: "critic-a",
+				to: "plan-review-lead",
+				subject: "Verdict",
+				body: "APPROVE",
+				type: "plan_critic_verdict",
+				payload: {
+					criticType: "devil-advocate",
+					verdict: "APPROVE",
+					concerns: [],
+					notes: [],
+					round: 1,
+					confidence: 0.9,
+				},
+			});
+			client.claim("plan-review-lead");
+			client.close();
+
+			output = "";
+			await mailCommand(["ack", verdictId, "--agent", "plan-review-lead"]);
+			expect(output).toContain("Acked message");
+
+			// Verify state transitioned
+			const store2 = createMailStore(join(tempDir, ".overstory", "mail.db"));
+			const msg = store2.getById(verdictId);
+			expect(msg?.state).toBe("acked");
+			store2.close();
+		});
+
+		test("ack already-acked message returns success with idempotent note", async () => {
+			const store = createMailStore(join(tempDir, ".overstory", "mail.db"));
+			const client = createMailClient(store);
+			const verdictId = client.sendProtocol({
+				from: "critic-a",
+				to: "plan-review-lead",
+				subject: "Verdict",
+				body: "APPROVE",
+				type: "plan_critic_verdict",
+				payload: {
+					criticType: "security",
+					verdict: "APPROVE",
+					concerns: [],
+					notes: [],
+					round: 1,
+					confidence: 0.9,
+				},
+			});
+			client.claim("plan-review-lead");
+			client.ack(verdictId);
+			client.close();
+
+			output = "";
+			await mailCommand(["ack", verdictId, "--agent", "plan-review-lead"]);
+			expect(output).toContain("already acked");
+		});
+
+		test("ack for wrong agent is rejected", async () => {
+			const store = createMailStore(join(tempDir, ".overstory", "mail.db"));
+			const client = createMailClient(store);
+			const verdictId = client.sendProtocol({
+				from: "critic-a",
+				to: "plan-review-lead",
+				subject: "Verdict",
+				body: "APPROVE",
+				type: "plan_critic_verdict",
+				payload: {
+					criticType: "performance",
+					verdict: "APPROVE",
+					concerns: [],
+					notes: [],
+					round: 1,
+					confidence: 0.8,
+				},
+			});
+			client.claim("plan-review-lead");
+			client.close();
+
+			let threwError = false;
+			try {
+				await mailCommand(["ack", verdictId, "--agent", "some-other-agent"]);
+			} catch (err) {
+				threwError = true;
+				expect(String(err)).toContain("cannot ack");
+			}
+			expect(threwError).toBe(true);
+		});
+
+		test("ack for non-existent message gives clear error", async () => {
+			let threwError = false;
+			try {
+				await mailCommand(["ack", "msg-doesnotexist", "--agent", "plan-review-lead"]);
+			} catch (err) {
+				threwError = true;
+				expect(String(err)).toContain("Message not found");
+			}
+			expect(threwError).toBe(true);
+		});
+
+		test("ack without --agent succeeds when message is claimed", async () => {
+			// --agent is optional (validates ownership only when provided)
+			const store = createMailStore(join(tempDir, ".overstory", "mail.db"));
+			const client = createMailClient(store);
+			const verdictId = client.sendProtocol({
+				from: "critic-a",
+				to: "plan-review-lead",
+				subject: "Verdict",
+				body: "APPROVE",
+				type: "plan_critic_verdict",
+				payload: {
+					criticType: "second-opinion",
+					verdict: "APPROVE",
+					concerns: [],
+					notes: [],
+					round: 1,
+					confidence: 0.92,
+				},
+			});
+			client.claim("plan-review-lead");
+			client.close();
+
+			output = "";
+			await mailCommand(["ack", verdictId]);
+			expect(output).toContain("Acked message");
+		});
+
+		test("ack with --json emits structured success output", async () => {
+			const store = createMailStore(join(tempDir, ".overstory", "mail.db"));
+			const client = createMailClient(store);
+			const verdictId = client.sendProtocol({
+				from: "critic-a",
+				to: "plan-review-lead",
+				subject: "Verdict",
+				body: "APPROVE",
+				type: "plan_critic_verdict",
+				payload: {
+					criticType: "devil-advocate",
+					verdict: "APPROVE",
+					concerns: [],
+					notes: [],
+					round: 1,
+					confidence: 0.88,
+				},
+			});
+			client.claim("plan-review-lead");
+			client.close();
+
+			output = "";
+			await mailCommand(["ack", verdictId, "--agent", "plan-review-lead", "--json"]);
+			const parsed = JSON.parse(stripAnsi(output));
+			expect(parsed.alreadyAcked).toBe(false);
+			expect(parsed.id).toBe(verdictId);
+		});
+	});
+
+	describe("integration: rapid-arrival convergence messages (per #284)", () => {
+		test("4 rapid plan_critic_verdict messages all surface and remain claimed after inject", async () => {
+			// Seed 4 convergence messages in close succession
+			const store = createMailStore(join(tempDir, ".overstory", "mail.db"));
+			const client = createMailClient(store);
+			const verdictIds: string[] = [];
+			for (const critic of ["devil-advocate", "security", "performance", "second-opinion"]) {
+				const id = client.sendProtocol({
+					from: `critic-${critic}`,
+					to: "plan-review-lead",
+					subject: `Verdict from ${critic}`,
+					body: "APPROVE",
+					type: "plan_critic_verdict",
+					payload: {
+						criticType: critic as "devil-advocate" | "security" | "performance" | "second-opinion",
+						verdict: "APPROVE",
+						concerns: [],
+						notes: [],
+						round: 1,
+						confidence: 0.9,
+					},
+				});
+				verdictIds.push(id);
+			}
+			client.close();
+
+			// Simulate the hook-injected check
+			output = "";
+			await mailCommand(["check", "--agent", "plan-review-lead", "--inject"]);
+			// All 4 verdicts must appear in the banner
+			expect(output).toContain("4 new messages");
+
+			// After inject, all 4 should be in claimed state (not acked)
+			output = "";
+			await mailCommand(["list", "--agent", "plan-review-lead", "--state", "claimed"]);
+			expect(output).toContain("Total: 4 messages");
+
+			// Explicitly ack all 4 — verify-then-ack discipline
+			for (const id of verdictIds) {
+				output = "";
+				await mailCommand(["ack", id, "--agent", "plan-review-lead"]);
+				expect(output).toContain("Acked message");
+			}
+
+			// Zero claimed remaining — no silent verdict loss
+			output = "";
+			await mailCommand(["list", "--agent", "plan-review-lead", "--state", "claimed"]);
+			expect(output).toContain("No messages found");
+		});
+	});
+
 	describe("auto-nudge (pending nudge markers)", () => {
 		test("urgent message writes pending nudge marker instead of tmux keys", async () => {
 			await mailCommand([

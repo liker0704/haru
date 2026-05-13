@@ -788,6 +788,68 @@ function handlePurge(opts: PurgeOpts, cwd: string): void {
 	}
 }
 
+interface AckOpts {
+	agent?: string;
+	json?: boolean;
+}
+
+/**
+ * haru mail ack <id>
+ *
+ * Explicit per-message ack for convergence-typed mail (per #284).
+ * Transitions a `claimed` message to `acked`. Validates the message exists
+ * and (if --agent provided) that the calling agent is the recipient.
+ * Idempotent: acking an already-acked message returns success with a note.
+ */
+function handleAck(id: string, opts: AckOpts, cwd: string): void {
+	const json = opts.json ?? false;
+	const agent = opts.agent !== undefined ? canonicalizeMailAgentName(opts.agent) : undefined;
+
+	const store = openStore(cwd);
+	try {
+		const msg = store.getById(id);
+		if (!msg) {
+			throw new ValidationError(`Message not found: ${id}`, { field: "id", value: id });
+		}
+
+		// Agent ownership check — surfaces clear error before store call
+		if (agent !== undefined && msg.to !== agent) {
+			throw new ValidationError(`Agent '${agent}' cannot ack message owned by '${msg.to}': ${id}`, {
+				field: "agent",
+				value: agent,
+			});
+		}
+
+		// Idempotent: already-acked is a success, not an error
+		if (msg.state === "acked") {
+			if (json) {
+				jsonOutput("mail ack", { id, alreadyAcked: true });
+			} else {
+				printHint(`Message ${accent(id)} was already acked`);
+			}
+			return;
+		}
+
+		// State guard: only `claimed` messages can transition to `acked` via this path.
+		// A message that's been re-queued (claim released) would be `queued`, not `claimed`.
+		if (msg.state !== "claimed") {
+			throw new ValidationError(
+				`Cannot ack message in state '${msg.state}': ${id} (expected 'claimed')`,
+				{ field: "state", value: msg.state },
+			);
+		}
+
+		store.ack(id, agent);
+		if (json) {
+			jsonOutput("mail ack", { id, alreadyAcked: false });
+		} else {
+			printSuccess("Acked message", id);
+		}
+	} finally {
+		store.close();
+	}
+}
+
 interface DlqOpts {
 	agent?: string;
 	limit?: string;
@@ -969,6 +1031,17 @@ export async function mailCommand(args: string[]): Promise<void> {
 		.exitOverride()
 		.action((opts: PurgeOpts) => {
 			handlePurge(opts, root);
+		});
+
+	program
+		.command("ack")
+		.description("Explicitly ack a claimed convergence-typed message (per #284)")
+		.argument("<message-id>", "Message ID to ack")
+		.option("--agent <name>", "Agent name (validates ownership)")
+		.option("--json", "Output as JSON")
+		.exitOverride()
+		.action((id: string, opts: AckOpts) => {
+			handleAck(id, opts, root);
 		});
 
 	program

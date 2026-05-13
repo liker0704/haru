@@ -414,6 +414,32 @@ const DEFAULT_BACKOFF_BASE_SEC = 5;
 const DEFAULT_BACKOFF_MAX_SEC = 60;
 
 /**
+ * Convergence-critical message types — never re-queued by stale-claim expiry (per #284).
+ *
+ * Plan review rounds can take 30+ minutes; coordinators wait hours on
+ * `worker_done` from parallel builders. The default 120s lease would
+ * re-queue these claims and cause duplicate delivery, breaking the
+ * verify-then-ack discipline used by convergence agents. Treat these as
+ * having effectively infinite lease — they must be ack'd explicitly via
+ * `ha mail ack <id>` (or nack'd if processing failed).
+ *
+ * Kept in sync with `CONVERGENCE_MAIL_TYPES` in mail/client.ts. Validated
+ * at module load via `assertSafeForDdl` to prevent SQL injection in the
+ * embedded WHERE clause.
+ */
+const CONVERGENCE_TYPES_FOR_LEASE: readonly string[] = [
+	"plan_critic_verdict",
+	"worker_done",
+	"merge_ready",
+	"result",
+] as const;
+
+for (const t of CONVERGENCE_TYPES_FOR_LEASE) assertSafeForDdl(t);
+
+/** SQL fragment listing convergence types as quoted literals for use in WHERE clauses. */
+const CONVERGENCE_TYPES_SQL = CONVERGENCE_TYPES_FOR_LEASE.map((t) => `'${t}'`).join(",");
+
+/**
  * Create a new MailStore backed by a SQLite database at the given path.
  *
  * Initializes the database with WAL mode and a 5-second busy timeout.
@@ -511,12 +537,17 @@ export function createMailStore(dbPath: string): MailStore {
 		WHERE id = $id AND state IN ('queued', 'claimed')
 	`);
 
-	// Claim: expire stale claims (scoped to agent), then atomically claim
+	// Claim: expire stale claims (scoped to agent), then atomically claim.
+	// Per #284: convergence-typed claims (plan_critic_verdict, worker_done,
+	// merge_ready, result) are NEVER re-queued by lease expiry. These drive
+	// multi-actor convergence loops that can take 30+ min; re-queuing would
+	// cause duplicate delivery and break the explicit-ack discipline.
 	const expireClaimsStmt = db.prepare<void, { $timeout_sec: number; $to_agent: string }>(`
 		UPDATE messages
 		SET state = 'queued', claimed_at = NULL
 		WHERE state = 'claimed'
 		  AND to_agent = $to_agent
+		  AND type NOT IN (${CONVERGENCE_TYPES_SQL})
 		  AND claimed_at < datetime('now', '-' || $timeout_sec || ' seconds')
 	`);
 

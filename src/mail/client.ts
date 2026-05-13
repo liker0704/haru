@@ -67,7 +67,7 @@ export interface MailClient {
 	claim(agentName: string, leaseTimeoutSec?: number, missionId?: string): MailMessage[];
 
 	/** Acknowledge a claimed message as successfully processed. */
-	ack(id: string): void;
+	ack(id: string, agentName?: string): void;
 
 	/** Acknowledge multiple messages in a single transaction. */
 	ackBatch(ids: string[]): void;
@@ -157,6 +157,30 @@ const PROTOCOL_TYPES = new Set<string>([
 	"plan_revision_complete",
 	"decision_gate",
 ]);
+
+/**
+ * Convergence-critical message types — never auto-acked on hook inject (per #284).
+ *
+ * These messages drive multi-actor convergence (plan review verdicts, worker
+ * completion, merge readiness, generic results). The LLM consumer reads the
+ * concatenated stdout banner but its attention may register only one message;
+ * acking all of them silently loses the unattended ones. The agent must call
+ * `ha mail ack <id>` explicitly after integrating each verdict.
+ *
+ * Start narrow: only the verdict/result family. Non-convergence types
+ * (status updates, questions, errors) keep at-most-once semantics.
+ */
+const CONVERGENCE_MAIL_TYPES = new Set<string>([
+	"plan_critic_verdict",
+	"worker_done",
+	"merge_ready",
+	"result",
+]);
+
+/** True if the given message type drives convergence and must be ack'd explicitly (per #284). */
+export function isConvergenceType(type: string): boolean {
+	return CONVERGENCE_MAIL_TYPES.has(type);
+}
 
 /**
  * Format messages for hook injection.
@@ -357,8 +381,14 @@ export function createMailClient(store: MailStore): MailClient {
 		checkInject(agentName, missionId): { output: string; messageIds: string[] } {
 			// Deferred ack: claim messages but DO NOT ack here.
 			// Caller must ack after successful stdout output to prevent message loss on crash.
+			//
+			// Per #284: convergence-typed messages are excluded from the returned
+			// messageIds list — they are surfaced in `output` but remain `state='claimed'`
+			// so the agent can re-list them via `ha mail list --state claimed` and ack
+			// each one explicitly after integrating it. This prevents silent verdict
+			// loss when multiple convergence messages arrive in a single inject batch.
 			const messages = collectMessagesForMailbox(store, agentName, undefined, missionId);
-			const messageIds = messages.map((m) => m.id);
+			const messageIds = messages.filter((m) => !isConvergenceType(m.type)).map((m) => m.id);
 			return { output: formatForInjection(messages), messageIds };
 		},
 
@@ -370,8 +400,8 @@ export function createMailClient(store: MailStore): MailClient {
 			return collectMessagesForMailbox(store, agentName, leaseTimeoutSec, missionId);
 		},
 
-		ack(id): void {
-			store.ack(id);
+		ack(id, agentName): void {
+			store.ack(id, agentName);
 		},
 
 		ackBatch(ids): void {

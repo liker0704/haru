@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { MailError } from "../errors.ts";
 import { cleanupTempDir } from "../test-helpers.ts";
 import type { WorkerDonePayload } from "../types.ts";
-import { createMailClient, type MailClient, parsePayload } from "./client.ts";
+import { createMailClient, isConvergenceType, type MailClient, parsePayload } from "./client.ts";
 import { createMailStore, type MailStore } from "./store.ts";
 
 describe("createMailClient", () => {
@@ -797,6 +797,240 @@ describe("createMailClient", () => {
 
 			const { output: result } = client.checkInject("orchestrator");
 			expect(result).not.toContain("Payload:");
+		});
+	});
+
+	describe("isConvergenceType (per #284)", () => {
+		test("returns true for plan_critic_verdict", () => {
+			expect(isConvergenceType("plan_critic_verdict")).toBe(true);
+		});
+
+		test("returns true for worker_done", () => {
+			expect(isConvergenceType("worker_done")).toBe(true);
+		});
+
+		test("returns true for merge_ready", () => {
+			expect(isConvergenceType("merge_ready")).toBe(true);
+		});
+
+		test("returns true for result", () => {
+			expect(isConvergenceType("result")).toBe(true);
+		});
+
+		test("returns false for status", () => {
+			expect(isConvergenceType("status")).toBe(false);
+		});
+
+		test("returns false for question", () => {
+			expect(isConvergenceType("question")).toBe(false);
+		});
+
+		test("returns false for error", () => {
+			expect(isConvergenceType("error")).toBe(false);
+		});
+
+		test("returns false for dispatch", () => {
+			expect(isConvergenceType("dispatch")).toBe(false);
+		});
+	});
+
+	describe("checkInject convergence behavior (per #284)", () => {
+		test("convergence-typed messages are excluded from returned messageIds", () => {
+			// Mix convergence and non-convergence types
+			const verdictId = client.sendProtocol({
+				from: "critic-a",
+				to: "plan-review-lead",
+				subject: "Verdict",
+				body: "APPROVE",
+				type: "plan_critic_verdict",
+				payload: {
+					criticType: "devil-advocate",
+					verdict: "APPROVE",
+					concerns: [],
+					notes: [],
+					round: 1,
+					confidence: 0.9,
+				},
+			});
+			const statusId = client.send({
+				from: "agent-a",
+				to: "plan-review-lead",
+				subject: "Progress",
+				body: "Working",
+				type: "status",
+			});
+
+			const { messageIds } = client.checkInject("plan-review-lead");
+			// Only the non-convergence message should be in messageIds for ack
+			expect(messageIds).toContain(statusId);
+			expect(messageIds).not.toContain(verdictId);
+		});
+
+		test("convergence-typed messages remain claimed after checkInject + ackBatch", () => {
+			const verdictId = client.sendProtocol({
+				from: "critic-a",
+				to: "plan-review-lead",
+				subject: "Verdict",
+				body: "APPROVE",
+				type: "plan_critic_verdict",
+				payload: {
+					criticType: "security",
+					verdict: "APPROVE",
+					concerns: [],
+					notes: [],
+					round: 1,
+					confidence: 0.85,
+				},
+			});
+
+			const { messageIds, output } = client.checkInject("plan-review-lead");
+			expect(output).toContain("plan_critic_verdict");
+			// Caller would now ackBatch; verdict id is NOT in the list
+			client.ackBatch(messageIds);
+
+			const msg = store.getById(verdictId);
+			expect(msg).not.toBeNull();
+			expect(msg?.state).toBe("claimed");
+		});
+
+		test("non-convergence messages are acked after checkInject + ackBatch", () => {
+			const statusId = client.send({
+				from: "agent-a",
+				to: "plan-review-lead",
+				subject: "Progress",
+				body: "Working",
+				type: "status",
+			});
+
+			const { messageIds } = client.checkInject("plan-review-lead");
+			client.ackBatch(messageIds);
+
+			const msg = store.getById(statusId);
+			expect(msg).not.toBeNull();
+			expect(msg?.state).toBe("acked");
+		});
+
+		test("multiple rapid convergence verdicts all surface and remain claimed", () => {
+			// Simulate 4 critics reporting in close succession (the #284 scenario)
+			const ids: string[] = [];
+			for (const critic of ["devil-advocate", "security", "performance", "second-opinion"]) {
+				const id = client.sendProtocol({
+					from: `critic-${critic}`,
+					to: "plan-review-lead",
+					subject: `Verdict from ${critic}`,
+					body: `APPROVE from ${critic}`,
+					type: "plan_critic_verdict",
+					payload: {
+						criticType: critic as "devil-advocate" | "security" | "performance" | "second-opinion",
+						verdict: "APPROVE",
+						concerns: [],
+						notes: [],
+						round: 1,
+						confidence: 0.9,
+					},
+				});
+				ids.push(id);
+			}
+
+			const { messageIds, output } = client.checkInject("plan-review-lead");
+			// All 4 verdicts should appear in the banner
+			expect(output).toContain("4 new messages");
+			// None of them should be in the ack list
+			for (const id of ids) {
+				expect(messageIds).not.toContain(id);
+			}
+			// All 4 visible via list with state=claimed
+			client.ackBatch(messageIds);
+			const claimed = client.list({ to: "plan-review-lead", state: "claimed" });
+			expect(claimed).toHaveLength(4);
+			// And after explicit ack of all 4, zero claimed remain
+			for (const id of ids) {
+				client.ack(id);
+			}
+			const remaining = client.list({ to: "plan-review-lead", state: "claimed" });
+			expect(remaining).toHaveLength(0);
+		});
+
+		test("lease expiry does NOT re-queue convergence-typed claims", async () => {
+			// Insert a convergence message and claim it with a 1-second lease
+			const verdictId = client.sendProtocol({
+				from: "critic-a",
+				to: "plan-review-lead",
+				subject: "Verdict",
+				body: "BLOCK",
+				type: "plan_critic_verdict",
+				payload: {
+					criticType: "devil-advocate",
+					verdict: "BLOCK",
+					concerns: [],
+					notes: [],
+					round: 1,
+					confidence: 0.9,
+				},
+			});
+			client.claim("plan-review-lead", 1);
+
+			// Sleep past the lease — SQLite datetime('now') is second-resolution
+			// so we need >2s sleep to guarantee claimed_at < now-1s
+			await Bun.sleep(2100);
+
+			// Re-claim with lease=1; expiry would trigger for non-convergence types
+			const reClaim = client.claim("plan-review-lead", 1);
+			// The convergence message should NOT have been re-queued
+			expect(reClaim.map((m) => m.id)).not.toContain(verdictId);
+
+			// Verify state is still claimed (lease did not return it to queued)
+			const msg = store.getById(verdictId);
+			expect(msg?.state).toBe("claimed");
+		});
+
+		test("lease expiry DOES re-queue non-convergence claims", async () => {
+			// Control test: status type should still expire normally
+			const statusId = client.send({
+				from: "agent-a",
+				to: "plan-review-lead",
+				subject: "Progress",
+				body: "Working",
+				type: "status",
+			});
+			client.claim("plan-review-lead", 1);
+
+			// Sleep past the lease — SQLite datetime('now') is second-resolution
+			await Bun.sleep(2100);
+
+			// Re-claim with lease=1 — expiry should re-queue then claim again
+			const reClaim = client.claim("plan-review-lead", 1);
+			expect(reClaim.map((m) => m.id)).toContain(statusId);
+		});
+
+		test("idempotent ack of convergence types", () => {
+			const verdictId = client.sendProtocol({
+				from: "critic-a",
+				to: "plan-review-lead",
+				subject: "Verdict",
+				body: "APPROVE",
+				type: "plan_critic_verdict",
+				payload: {
+					criticType: "devil-advocate",
+					verdict: "APPROVE",
+					concerns: [],
+					notes: [],
+					round: 1,
+					confidence: 0.95,
+				},
+			});
+
+			client.claim("plan-review-lead");
+			client.ack(verdictId);
+
+			const msg = store.getById(verdictId);
+			expect(msg?.state).toBe("acked");
+
+			// Second ack of an already-acked convergence message — store.ack throws
+			// MailError because state is no longer 'claimed'. The CLI handler is
+			// responsible for translating that to an idempotent success; at the
+			// client/store layer the strict state-guard semantics are preserved.
+			expect(() => client.ack(verdictId)).toThrow(MailError);
 		});
 	});
 
