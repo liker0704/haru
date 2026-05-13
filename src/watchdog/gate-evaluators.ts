@@ -7,10 +7,12 @@
  */
 
 import type { MailStore } from "../mail/store.ts";
+import { baselineExists, compareSnapshotDiff } from "../missions/baseline-snapshot.ts";
+import { type GhBudget, getGhBudget } from "../missions/gh-budget.ts";
 import type { MissionStore } from "../missions/types.ts";
 import { isProcessRunning } from "../process/util.ts";
 import type { SessionStore } from "../sessions/store.ts";
-import type { Mission } from "../types.ts";
+import type { HoldoutCheck, Mission, MissionPrCommentRow } from "../types.ts";
 
 export interface GateEvalResult {
 	met: boolean;
@@ -18,6 +20,340 @@ export interface GateEvalResult {
 	nudgeTarget?: string;
 	nudgeMessage?: string;
 	unknown?: boolean;
+	payload?: Record<string, unknown>;
+}
+
+const DEFAULT_CI_TIMEOUT_MS = 14_400_000; // 4h
+const DEFAULT_COMMENTS_TIMEOUT_MS = 604_800_000; // 7d
+const DEFAULT_APPROVAL_TIMEOUT_MS = 172_800_000; // 48h
+const DEFAULT_DEBUG_TIMEOUT_MS = 3_600_000; // 1h
+
+// TODO(w3): when src/missions/cells/pr-phase-triggers.ts merges, type trigger as PrPhaseTrigger
+
+/** Check GitHub CI status for the mission's PR. */
+// TODO(w3): when src/missions/cells/pr-phase-triggers.ts merges, type trigger as PrPhaseTrigger
+export async function evaluateAwaitCI(
+	mission: Mission,
+	missionStore: MissionStore | null,
+	projectRoot?: string,
+	gateEnteredAt?: string,
+	_deps?: { runGh?: GhBudget["runGh"]; now?: () => number },
+): Promise<GateEvalResult> {
+	if (!missionStore) return { met: false };
+	const pr = missionStore.getPrState(mission.id);
+	if (!pr) return { met: false };
+
+	const runGh = _deps?.runGh ?? getGhBudget().runGh;
+	const now = _deps?.now ?? (() => Date.now());
+
+	const result = await runGh(
+		[
+			"pr",
+			"checks",
+			String(pr.prNumber),
+			"--json",
+			"name,status,conclusion,detailsUrl,startedAt,completedAt",
+		],
+		{ cwd: projectRoot },
+	);
+
+	if (result.stderr.includes("Bad credentials") || result.stderr.includes("gh: not logged in")) {
+		return { met: true, trigger: "gh_auth_missing" };
+	}
+	if (
+		result.stderr.includes("X-RateLimit-Remaining: 0") ||
+		result.stderr.includes("Retry-After:")
+	) {
+		return { met: true, trigger: "pr_rate_limited" };
+	}
+
+	let checks: Array<{ name: string; status: string; conclusion: string | null }> = [];
+	try {
+		const parsed = JSON.parse(result.stdout) as unknown;
+		if (Array.isArray(parsed) && parsed.length > 0) {
+			checks = parsed as typeof checks;
+		}
+	} catch {
+		// parse failure — fall through to elapsed check
+	}
+
+	if (checks.length > 0) {
+		const anyCompletedFailure = checks.some(
+			(c) => c.status === "COMPLETED" && c.conclusion !== null && c.conclusion !== "SUCCESS",
+		);
+		const anyInProgress = checks.some((c) => c.status !== "COMPLETED");
+		const allCompletedSuccess = !anyCompletedFailure && !anyInProgress;
+
+		const worstStatus = anyCompletedFailure ? "FAILURE" : anyInProgress ? "IN_PROGRESS" : "SUCCESS";
+		missionStore.updatePrCiStatus(mission.id, worstStatus);
+
+		if (allCompletedSuccess) return { met: true, trigger: "ci_passed" };
+		if (anyCompletedFailure) return { met: true, trigger: "ci_failed" };
+		// some IN_PROGRESS — fall through to elapsed check
+	}
+
+	if (gateEnteredAt && now() - new Date(gateEnteredAt).getTime() >= DEFAULT_CI_TIMEOUT_MS) {
+		return { met: true, trigger: "ci_timeout" };
+	}
+	return { met: false };
+}
+
+/** Check for new review comments on the mission's PR. */
+// TODO(w3): when src/missions/cells/pr-phase-triggers.ts merges, type trigger as PrPhaseTrigger
+export async function evaluateAwaitComments(
+	mission: Mission,
+	missionStore: MissionStore | null,
+	projectRoot?: string,
+	gateEnteredAt?: string,
+	_deps?: { runGh?: GhBudget["runGh"]; now?: () => number },
+): Promise<GateEvalResult> {
+	if (!missionStore) return { met: false };
+	const pr = missionStore.getPrState(mission.id);
+	if (!pr) return { met: false };
+
+	const runGh = _deps?.runGh ?? getGhBudget().runGh;
+	const now = _deps?.now ?? (() => Date.now());
+
+	const result = await runGh(["pr", "view", String(pr.prNumber), "--json", "comments,reviews"], {
+		cwd: projectRoot,
+	});
+
+	if (result.stderr.includes("Bad credentials") || result.stderr.includes("gh: not logged in")) {
+		return { met: true, trigger: "gh_auth_missing" };
+	}
+	if (
+		result.stderr.includes("X-RateLimit-Remaining: 0") ||
+		result.stderr.includes("Retry-After:")
+	) {
+		return { met: true, trigger: "pr_rate_limited" };
+	}
+
+	type PrViewCommentsResult = {
+		comments: Array<{ id: string; author: { login: string }; body: string }>;
+		reviews: Array<{ state: string; author: { login: string } }>;
+	};
+	let parsed: PrViewCommentsResult | null = null;
+	try {
+		parsed = JSON.parse(result.stdout) as PrViewCommentsResult;
+	} catch {
+		// parse failure — fall through to elapsed check
+	}
+
+	if (parsed) {
+		const existing = new Set(missionStore.listPrComments(mission.id).map((c) => c.commentId));
+		const newComment = parsed.comments.find((c) => !existing.has(c.id));
+		if (newComment) {
+			const row: MissionPrCommentRow = {
+				missionId: mission.id,
+				prNumber: pr.prNumber,
+				commentId: newComment.id,
+				author: newComment.author.login,
+				body: newComment.body,
+				action: null,
+				status: "pending",
+				fixCycles: 0,
+				detectedAt: new Date(now()).toISOString(),
+				resolvedAt: null,
+			};
+			missionStore.recordPrComment(row);
+			return {
+				met: true,
+				trigger: "new_comment",
+				payload: {
+					commentId: newComment.id,
+					author: newComment.author.login,
+					body: newComment.body,
+				},
+			};
+		}
+
+		const hasApproval = parsed.reviews.some((r) => r.state === "APPROVED");
+		const pendingComments = missionStore
+			.listPrComments(mission.id)
+			.filter((c) => c.status === "pending");
+		if (hasApproval && pendingComments.length === 0) {
+			return { met: true, trigger: "approval_event" };
+		}
+	}
+
+	if (gateEnteredAt && now() - new Date(gateEnteredAt).getTime() >= DEFAULT_COMMENTS_TIMEOUT_MS) {
+		return { met: true, trigger: "comments_stale" };
+	}
+	return { met: false };
+}
+
+const OPERATOR_APPROVAL_REGEX = /^(approved?|lgtm|✅)\s*\.?\s*$/i;
+
+/** Check for PR approval, handling restrictive-wins and operator-override semantics. */
+// TODO(w3): when src/missions/cells/pr-phase-triggers.ts merges, type trigger as PrPhaseTrigger
+export async function evaluateAwaitApproval(
+	mission: Mission,
+	missionStore: MissionStore | null,
+	_mailStore: MailStore | null,
+	projectRoot?: string,
+	gateEnteredAt?: string,
+	_deps?: {
+		runGh?: GhBudget["runGh"];
+		now?: () => number;
+		config?: {
+			pr?: {
+				operatorGithubLogin?: string;
+				approvalTimeoutMs?: number;
+				commentsTimeoutMs?: number;
+				ciTimeoutMs?: number;
+				requireOperatorPermission?: boolean;
+			};
+		};
+		addMail?: (msg: {
+			to: string;
+			from: string;
+			type: string;
+			subject: string;
+			body: string;
+		}) => void;
+	},
+): Promise<GateEvalResult> {
+	if (!missionStore) return { met: false };
+	const pr = missionStore.getPrState(mission.id);
+	if (!pr) return { met: false };
+
+	const runGh = _deps?.runGh ?? getGhBudget().runGh;
+	const now = _deps?.now ?? (() => Date.now());
+	const prConfig = _deps?.config?.pr;
+
+	const result = await runGh(
+		["pr", "view", String(pr.prNumber), "--json", "reviewDecision,reviews,headRefOid"],
+		{ cwd: projectRoot },
+	);
+
+	if (result.stderr.includes("Bad credentials") || result.stderr.includes("gh: not logged in")) {
+		return { met: true, trigger: "gh_auth_missing" };
+	}
+	if (
+		result.stderr.includes("X-RateLimit-Remaining: 0") ||
+		result.stderr.includes("Retry-After:")
+	) {
+		return { met: true, trigger: "pr_rate_limited" };
+	}
+
+	type PrViewApprovalResult = {
+		reviewDecision: "APPROVED" | "CHANGES_REQUESTED" | "COMMENTED" | null;
+		reviews: Array<{ state: string; author: { login: string }; submittedAt: string }>;
+		headRefOid: string;
+		comments?: Array<{ id: string; author: { login: string }; body: string }>;
+	};
+	let parsed: PrViewApprovalResult | null = null;
+	try {
+		parsed = JSON.parse(result.stdout) as PrViewApprovalResult;
+	} catch {
+		return { met: false };
+	}
+	if (!parsed) return { met: false };
+
+	// Build chronological latestByReviewer map (last state per reviewer)
+	const relevantReviews = parsed.reviews
+		.filter((r) => r.state === "APPROVED" || r.state === "CHANGES_REQUESTED")
+		.sort((a, b) => a.submittedAt.localeCompare(b.submittedAt));
+	const latestByReviewer = new Map<string, string>();
+	for (const r of relevantReviews) {
+		latestByReviewer.set(r.author.login, r.state);
+	}
+
+	const hasOutstandingChangesRequested = [...latestByReviewer.values()].some(
+		(s) => s === "CHANGES_REQUESTED",
+	);
+	const hasAnyApproval = [...latestByReviewer.values()].some((s) => s === "APPROVED");
+
+	const operatorLogin = prConfig?.operatorGithubLogin;
+	const comments = parsed.comments ?? [];
+	const prUrl = pr.prUrl;
+
+	/** Try operator comment-approval: find matching comment, optionally check permission. */
+	async function tryOperatorOverride(): Promise<boolean> {
+		if (!operatorLogin) return false;
+		const matchingComment = comments.find(
+			(c) => c.author.login === operatorLogin && OPERATOR_APPROVAL_REGEX.test(c.body),
+		);
+		if (!matchingComment) return false;
+		if (prConfig?.requireOperatorPermission === false) return true;
+		// Check permission via gh api
+		try {
+			const urlParts = prUrl.match(/github\.com\/([^/]+)\/([^/]+)\/pull\//);
+			if (!urlParts) return false;
+			const owner = urlParts[1];
+			const repo = urlParts[2];
+			const permResult = await runGh(
+				["api", `repos/${owner}/${repo}/collaborators/${operatorLogin}/permission`],
+				{ cwd: projectRoot },
+			);
+			const permParsed = JSON.parse(permResult.stdout) as { permission?: string };
+			return permParsed.permission === "admin" || permParsed.permission === "maintain";
+		} catch {
+			return false;
+		}
+	}
+
+	if (hasOutstandingChangesRequested) {
+		const overrideApproved = await tryOperatorOverride();
+		if (overrideApproved) {
+			missionStore.setApprovedHeadSha(mission.id, parsed.headRefOid);
+			return { met: true, trigger: "approved" };
+		}
+		return { met: true, trigger: "changes_requested" };
+	}
+
+	if (hasAnyApproval) {
+		missionStore.setApprovedHeadSha(mission.id, parsed.headRefOid);
+		return { met: true, trigger: "approved" };
+	}
+
+	// Comment-approval path: reviewDecision===null + operator LGTM comment + permission
+	if (parsed.reviewDecision === null && operatorLogin) {
+		const overrideApproved = await tryOperatorOverride();
+		if (overrideApproved) {
+			missionStore.setApprovedHeadSha(mission.id, parsed.headRefOid);
+			return { met: true, trigger: "approved" };
+		}
+	}
+
+	// Elapsed > approvalTimeoutMs → emit reminder + trigger
+	const approvalTimeoutMs = prConfig?.approvalTimeoutMs ?? DEFAULT_APPROVAL_TIMEOUT_MS;
+	if (gateEnteredAt && now() - new Date(gateEnteredAt).getTime() > approvalTimeoutMs) {
+		_deps?.addMail?.({
+			to: `coordinator-${mission.slug}`,
+			from: "gate-evaluator",
+			type: "status",
+			subject: "PR approval pending — operator nudge",
+			body: `PR #${pr.prNumber} has been awaiting approval for over ${Math.round(approvalTimeoutMs / 3_600_000)}h.`,
+		});
+		return { met: true, trigger: "approval_pending_long" };
+	}
+
+	return { met: false };
+}
+
+/** Check if debug fix has been committed for the current PR debug cycle. */
+// TODO(w3): when src/missions/cells/pr-phase-triggers.ts merges, type trigger as PrPhaseTrigger
+export function evaluateAwaitDebugComplete(
+	_mission: Mission,
+	mailStore: MailStore | null,
+	gateEnteredAt?: string,
+	_deps?: { now?: () => number; debugTimeoutMs?: number },
+): GateEvalResult {
+	if (!mailStore) return { met: false };
+
+	const msgs = filterMailSinceGate(mailStore.getAll({}), gateEnteredAt);
+	if (msgs.some((m) => (m.type as string) === "fix_committed")) {
+		return { met: true, trigger: "fix_committed" };
+	}
+
+	const now = _deps?.now ?? (() => Date.now());
+	const debugTimeoutMs = _deps?.debugTimeoutMs ?? DEFAULT_DEBUG_TIMEOUT_MS;
+	if (gateEnteredAt && now() - new Date(gateEnteredAt).getTime() > debugTimeoutMs) {
+		return { met: true, trigger: "debug_timeout" };
+	}
+
+	return { met: false };
 }
 
 /**
@@ -659,16 +995,16 @@ export function evaluateAwaitTierSet(mission: Mission): GateEvalResult {
 }
 
 /**
- * Stage C: post-merge holdout gate (was: dead-code `done-phase:holdout` per concept review).
+ * Stage C: post-merge holdout gate with snapshot-diff semantics (w11).
  *
- * Spawns a detached subprocess running `holdout-runner.ts` against the mission
- * feature branch worktree, polling `<artifactRoot>/debug/holdout-result-<attemptN>.json`
- * for the JSON result. Daemon never blocks >100ms; subprocess survives parent
- * restart via `detached: true` + `unref()` (pattern from `src/commands/watch.ts:163-173`).
+ * Compares baseline.json against holdout-result-<N>.json using compareSnapshotDiff.
+ * Falls back to the subprocess-spawn path when no current result file exists yet.
  *
  * Result triggers:
- *   - `holdout_pass`: all gates green → cleanup → mission auto-completes
- *   - `holdout_fail`: one or more gates red → dispatch-debugger (debug-loop entry)
+ *   - `holdout_pass`: no new failures vs baseline
+ *   - `holdout_fail`: new failures detected
+ *   - `holdout_baseline_missing`: neither sentinel nor baseline.json present
+ *   - `holdout_baseline_corrupt`: baseline.json unparseable or sentinel/file invariant broken
  *   - `holdout_skip`: legacy mission with null featureBranch (graceful degradation)
  */
 export async function evaluateHoldoutGate(
@@ -678,91 +1014,98 @@ export async function evaluateHoldoutGate(
 	projectRoot: string | undefined,
 	_gateEnteredAt?: string,
 ): Promise<GateEvalResult> {
-	// Legacy in-flight mission (pre-Stage-C) — no integration target known.
-	// Skip cleanly so the mission auto-completes via pre-existing path.
 	if (!mission.featureBranch) {
 		return { met: true, trigger: "holdout_skip" };
 	}
 	if (!missionStore) return { met: false };
 	if (!projectRoot) {
-		// Defensive: caller didn't thread projectRoot through. Treat as skip rather
-		// than spawn a subprocess with wrong cwd. Future evaluateGate signature
-		// will make projectRoot required.
 		return { met: true, trigger: "holdout_skip" };
 	}
 
 	const attemptN = readDebugAttempts(missionStore, mission.id);
+	const baselinePath = `${artifactRoot}/results/baseline.json`;
+	const sentinelPresent = await baselineExists(artifactRoot);
+	const baselineFile = Bun.file(baselinePath);
+	const baselineFileExists = await baselineFile.exists();
+
+	if (!baselineFileExists && !sentinelPresent) {
+		return { met: true, trigger: "holdout_baseline_missing" };
+	}
+
+	// Try to parse baseline
+	let baseline: HoldoutCheck[];
+	try {
+		baseline = (await baselineFile.json()) as HoldoutCheck[];
+	} catch {
+		return { met: true, trigger: "holdout_baseline_corrupt" };
+	}
+
+	// Invariant: sentinel must be present when file is present
+	if (baselineFileExists && !sentinelPresent) {
+		return { met: true, trigger: "holdout_baseline_corrupt" };
+	}
+
+	// Read current holdout result
 	const resultPath = `${artifactRoot}/debug/holdout-result-${attemptN}.json`;
 	const resultFile = Bun.file(resultPath);
 
-	if (await resultFile.exists()) {
-		const parsed = (await resultFile.json()) as {
-			checks: Array<{ status: string; level: number; name: string }>;
-		};
-		const allPassed = parsed.checks.every((c) => c.status === "pass" || c.status === "skip");
+	if (!(await resultFile.exists())) {
+		// No result yet — fall back to subprocess-spawn path for forward-compat.
+		const cp = missionStore.checkpoints.getCheckpoint(mission.id, "done-phase:holdout");
+		const cpData = cp?.data as { pid?: number; attemptN?: number; startedAt?: string } | null;
+
+		if (cpData?.pid && cpData.attemptN === attemptN) {
+			if (isProcessRunning(cpData.pid)) {
+				return {
+					met: false,
+					nudgeMessage: `Quality gates running (pid ${cpData.pid}, attempt ${attemptN})`,
+				};
+			}
+			missionStore.checkpoints.saveCheckpoint(mission.id, "done-phase:holdout", {
+				attemptN,
+				crashedPid: cpData.pid,
+				completedAt: new Date().toISOString(),
+			});
+			return { met: true, trigger: "holdout_fail" };
+		}
+
+		const runnerPath = new URL("../missions/holdout-runner.ts", import.meta.url).pathname;
+		const debugDir = `${artifactRoot}/debug`;
+		await Bun.write(`${debugDir}/.keep`, "");
+
+		const subproc = Bun.spawn(
+			["bun", "run", runnerPath, mission.id, String(attemptN), projectRoot, resultPath],
+			{ detached: true, stdio: ["ignore", "ignore", "ignore"] },
+		);
+		subproc.unref();
+
 		missionStore.checkpoints.saveCheckpoint(mission.id, "done-phase:holdout", {
+			pid: subproc.pid,
 			attemptN,
-			checks: parsed.checks,
-			completedAt: new Date().toISOString(),
+			featureBranch: mission.featureBranch,
+			startedAt: new Date().toISOString(),
 		});
+
+		return {
+			met: false,
+			nudgeMessage: `Quality gates dispatched (pid ${subproc.pid}, attempt ${attemptN})`,
+		};
+	}
+
+	const parsed = (await resultFile.json()) as { checks: HoldoutCheck[] };
+	const diff = compareSnapshotDiff(baseline, parsed.checks);
+
+	if (diff.newFailures.length === 0) {
 		return {
 			met: true,
-			trigger: allPassed ? "holdout_pass" : "holdout_fail",
+			trigger: "holdout_pass",
+			payload: { newFailures: diff.newFailures, resolvedFailures: diff.resolvedFailures },
 		};
 	}
-
-	// No result file yet — check subprocess state via checkpoint
-	const cp = missionStore.checkpoints.getCheckpoint(mission.id, "done-phase:holdout");
-	const cpData = cp?.data as { pid?: number; attemptN?: number; startedAt?: string } | null;
-
-	if (cpData?.pid && cpData.attemptN === attemptN) {
-		// Subprocess pid recorded — verify it's still alive (B3 fix from review).
-		// If dead AND no result file → crash detection (treat as holdout_fail);
-		// engine will dispatch debugger on next tick.
-		if (isProcessRunning(cpData.pid)) {
-			return {
-				met: false,
-				nudgeMessage: `Quality gates running (pid ${cpData.pid}, attempt ${attemptN})`,
-			};
-		}
-		missionStore.checkpoints.saveCheckpoint(mission.id, "done-phase:holdout", {
-			attemptN,
-			crashedPid: cpData.pid,
-			completedAt: new Date().toISOString(),
-		});
-		return { met: true, trigger: "holdout_fail" };
-	}
-
-	// Need to spawn fresh subprocess.
-	// Plan note: Bun.spawn with detached + unref + stdio=ignore lets subprocess
-	// survive parent daemon restart per src/commands/watch.ts:163-173 pattern.
-	const runnerPath = new URL("../missions/holdout-runner.ts", import.meta.url).pathname;
-	// Ensure debug dir exists for result file output.
-	const debugDir = `${artifactRoot}/debug`;
-	await Bun.write(`${debugDir}/.keep`, "");
-
-	// B1 fix from review: pass projectRoot as the cwd for quality gates. The
-	// featureBranch is informational (recorded for diagnostics) — actual cwd
-	// is the canonical repo root where merger merges ws branches.
-	const subproc = Bun.spawn(
-		["bun", "run", runnerPath, mission.id, String(attemptN), projectRoot, resultPath],
-		{
-			detached: true,
-			stdio: ["ignore", "ignore", "ignore"],
-		},
-	);
-	subproc.unref();
-
-	missionStore.checkpoints.saveCheckpoint(mission.id, "done-phase:holdout", {
-		pid: subproc.pid,
-		attemptN,
-		featureBranch: mission.featureBranch,
-		startedAt: new Date().toISOString(),
-	});
-
 	return {
-		met: false,
-		nudgeMessage: `Quality gates dispatched (pid ${subproc.pid}, attempt ${attemptN})`,
+		met: true,
+		trigger: "holdout_fail",
+		payload: { newFailures: diff.newFailures, resolvedFailures: diff.resolvedFailures },
 	};
 }
 
@@ -955,6 +1298,26 @@ export async function evaluateGate(
 				stores.missionStore ?? null,
 				gateEnteredAt,
 			);
+		// PR-phase gates (Stage E)
+		case "await-ci":
+			return evaluateAwaitCI(mission, stores.missionStore ?? null, projectRoot, gateEnteredAt);
+		case "await-comments":
+			return evaluateAwaitComments(
+				mission,
+				stores.missionStore ?? null,
+				projectRoot,
+				gateEnteredAt,
+			);
+		case "await-approval":
+			return evaluateAwaitApproval(
+				mission,
+				stores.missionStore ?? null,
+				stores.mailStore,
+				projectRoot,
+				gateEnteredAt,
+			);
+		case "await-debug-complete":
+			return evaluateAwaitDebugComplete(mission, stores.mailStore, gateEnteredAt);
 		default:
 			return { met: false, unknown: true };
 	}
