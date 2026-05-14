@@ -10,6 +10,7 @@
  * per-role loop has nothing to check.
  */
 
+import { Database } from "bun:sqlite";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -28,6 +29,31 @@ import {
 	type MissionTickOpts,
 	runMissionTick,
 } from "./mission-tick.ts";
+
+/**
+ * Directly seed a mission_gate_state row at max_nudges with last_nudge_at=NULL
+ * so the nudge-interval check passes on the first tick and the ceiling-emit branch fires.
+ * Using a direct SQLite connection because incrementNudgeCount sets last_nudge_at=now
+ * which would block the nudge_interval check for 60s.
+ */
+function seedGateAtCeiling(dbPath: string, missionId: string, nodeId: string): void {
+	// entered_at = 5 minutes ago so elapsed (5m) > grace_ms (0) but < max_total_wait_ms (1h).
+	// last_nudge_at = NULL so sinceLastNudge = now >> nudge_interval_ms (60s), letting the
+	// ceiling-emit branch fire on the first tick.
+	const enteredAt = new Date(Date.now() - 300_000).toISOString();
+	const db = new Database(dbPath);
+	db.exec("PRAGMA busy_timeout=5000");
+	db.exec(
+		`INSERT OR IGNORE INTO mission_gate_state
+		 (mission_id, node_id, entered_at, grace_ms, max_total_wait_ms)
+		 VALUES ('${missionId}', '${nodeId}', '${enteredAt}', 0, 3600000)`,
+	);
+	db.exec(
+		`UPDATE mission_gate_state SET nudge_count = 3, last_nudge_at = NULL
+		 WHERE mission_id = '${missionId}' AND node_id = '${nodeId}'`,
+	);
+	db.close();
+}
 
 // === Helpers ===
 
@@ -993,6 +1019,104 @@ describe("runMissionTick", () => {
 			expect(replayEvents).toHaveLength(0);
 
 			eventStore.close?.();
+		});
+	});
+
+	describe("ceiling-emit branch", () => {
+		function makeGateAtNodeEngine(nodeId: string): MissionTickOpts["_startEngine"] {
+			return () => ({
+				currentNodeId: () => nodeId,
+				step: async (): Promise<StepResult> => ({
+					status: "gate",
+					fromNodeId: nodeId,
+					toNodeId: nodeId,
+					trigger: null,
+				}),
+				run: async () => ({
+					status: "gate" as const,
+					steps: [],
+					currentNodeId: nodeId,
+					gateType: "async" as const,
+				}),
+				advanceNode: async () => ({
+					status: "completed" as const,
+					steps: [],
+					currentNodeId: "done:completed",
+				}),
+				forceAdvance: async () => ({
+					status: "gate" as const,
+					fromNodeId: nodeId,
+					toNodeId: nodeId,
+					trigger: null,
+				}),
+			});
+		}
+
+		test("arch-review-stall payload → mission_finding mail; second tick does not re-emit", async () => {
+			const mailStore = createMailStore(join(overstoryDir, "mail-arch-stall.db"));
+			const slug = "arch-stall";
+			const missionId = "m-arch-stall";
+			const nodeId = "execute-phase:arch-review-dispatch";
+
+			missionStore.create({ id: missionId, slug, objective: "test" });
+			missionStore.updateCurrentNode(missionId, nodeId);
+
+			// Seed gate state at ceiling: grace_ms=0, nudge_count=max_nudges(3), last_nudge_at=NULL.
+			// Direct DB insert so last_nudge_at stays NULL (incrementNudgeCount would set it to now,
+			// blocking the nudge_interval check for 60s).
+			seedGateAtCeiling(dbPath, missionId, nodeId);
+
+			const engineFactory = makeGateAtNodeEngine(nodeId);
+
+			// No dispatch mail to architect-arch-stall → evaluateArchReviewDispatch returns stall payload.
+			await runMissionTick(
+				makeOpts(overstoryDir, missionStore, sessionStore, engineFactory, { mailStore }),
+			);
+
+			const coordMails = mailStore.getAll({ to: `coordinator-${slug}` });
+			const findingMail = coordMails.find((m) => m.type === "mission_finding");
+			expect(findingMail).toBeDefined();
+			expect(findingMail?.subject).toContain("arch-review-dispatch");
+
+			// Second tick — ceiling_emitted_at is now set; must NOT re-emit.
+			await runMissionTick(
+				makeOpts(overstoryDir, missionStore, sessionStore, engineFactory, { mailStore }),
+			);
+
+			const findingMails = mailStore
+				.getAll({ to: `coordinator-${slug}` })
+				.filter((m) => m.type === "mission_finding");
+			expect(findingMails).toHaveLength(1);
+
+			mailStore.close?.();
+		});
+
+		test("no special payload (dispatch-planning stall) → question mail, not mission_finding", async () => {
+			const mailStore = createMailStore(join(overstoryDir, "mail-q-ceil.db"));
+			const slug = "q-ceil";
+			const missionId = "m-q-ceil";
+			const nodeId = "understand-phase:dispatch-planning";
+
+			missionStore.create({ id: missionId, slug, objective: "test" });
+			missionStore.updateCurrentNode(missionId, nodeId);
+
+			// Seed gate state at ceiling with last_nudge_at=NULL so nudge interval check passes.
+			seedGateAtCeiling(dbPath, missionId, nodeId);
+
+			const engineFactory = makeGateAtNodeEngine(nodeId);
+
+			// No dispatch mail → evaluateDispatchPlanning returns met:false with no payload.
+			await runMissionTick(
+				makeOpts(overstoryDir, missionStore, sessionStore, engineFactory, { mailStore }),
+			);
+
+			const coordMails = mailStore.getAll({ to: `coordinator-${slug}` });
+			const questionMail = coordMails.find((m) => m.type === "question");
+			const findingMail = coordMails.find((m) => m.type === "mission_finding");
+			expect(questionMail).toBeDefined();
+			expect(findingMail).toBeUndefined();
+
+			mailStore.close?.();
 		});
 	});
 

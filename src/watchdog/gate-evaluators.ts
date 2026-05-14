@@ -763,6 +763,10 @@ export function evaluateArchReviewDispatch(
 		met: false,
 		nudgeTarget: `coordinator-${mission.slug}`,
 		nudgeMessage: "Dispatch architect for post-merge architecture review",
+		payload: {
+			kind: "arch-review-stall",
+			reason: "no architect dispatch observed within grace period",
+		},
 	};
 }
 

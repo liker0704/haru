@@ -33,4 +33,10 @@ describe("executePhaseCell.buildSubgraph", () => {
 		const node = graph.nodes.find((n) => n.id === "execute-phase:dispatch-ready");
 		expect(node).toBeDefined();
 	});
+
+	test("arch-review-dispatch has gateTimeout: 900", () => {
+		const node = graph.nodes.find((n) => n.id === "execute-phase:arch-review-dispatch");
+		expect(node).toBeDefined();
+		expect(node?.gateTimeout).toBe(900);
+	});
 });

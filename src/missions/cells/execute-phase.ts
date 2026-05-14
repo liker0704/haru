@@ -57,7 +57,10 @@ function buildSubgraph(_config: PhaseCellConfig): MissionGraph {
 				id: `${CELL_TYPE}:arch-review-dispatch`,
 				cellType: CELL_TYPE,
 				gate: "async",
-				gateTimeout: 120,
+				// 900s = coordinator wake (~2m) + ha sling architect (~1m) + dispatch mail (~10s)
+				// + watchdog tick interval headroom. Higher values just delay the escalation
+				// emission; the actual work is short.
+				gateTimeout: 900,
 			},
 			{
 				kind: "cell",

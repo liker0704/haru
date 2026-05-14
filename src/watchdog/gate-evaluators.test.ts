@@ -16,6 +16,7 @@ import * as gateEvaluators from "./gate-evaluators.ts";
 import {
 	computeAdaptiveResearchTimeout,
 	evaluateArchitectDesign,
+	evaluateArchReviewDispatch,
 	evaluateAwaitPlan,
 	evaluateAwaitResearch,
 	evaluateAwaitResearchComplete,
@@ -1504,6 +1505,66 @@ describe("evaluateHoldoutGate (snapshot-diff rewrite) [T-w5-22..T-w5-26]", () =>
 			| undefined;
 		expect(payload).toBeDefined();
 		expect(payload?.newFailures).toEqual([]);
+	});
+});
+
+describe("evaluateArchReviewDispatch", () => {
+	// evaluateArchReviewDispatch must not branch on autonomy — test all valid modes.
+	const autonomyModes = ["supervised", "auto-spec", "auto-all"] as const;
+
+	for (const autonomy of autonomyModes) {
+		it(`dispatch mail observed → met:true (autonomy=${autonomy})`, () => {
+			const mission = makeMission({ slug: "test", autonomy });
+			const mailStore = createTestMailStore([
+				{
+					from: "coordinator-test",
+					to: "architect-test",
+					type: "dispatch",
+					subject: "Architecture Review: post-merge reconciliation",
+				},
+			]);
+			const result = evaluateArchReviewDispatch(mission, mailStore);
+			expect(result.met).toBe(true);
+			expect(result.trigger).toBe("review_dispatched");
+		});
+	}
+
+	it("null/undefined autonomy (unchecked by evaluator) — dispatch observed → met:true", () => {
+		// The evaluator ignores mission.autonomy entirely; null/undefined autonomy is irrelevant.
+		// Verify by building a mission object with autonomy coerced to null.
+		const base = makeMission({ slug: "test" });
+		const mission = { ...base, autonomy: null } as unknown as typeof base;
+		const mailStore = createTestMailStore([
+			{
+				from: "coordinator-test",
+				to: "architect-test",
+				type: "dispatch",
+				subject: "Architecture Review: post-merge reconciliation",
+			},
+		]);
+		const result = evaluateArchReviewDispatch(mission, mailStore);
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("review_dispatched");
+	});
+
+	it("no dispatch observed → met:false with arch-review-stall payload", () => {
+		const mission = makeMission({ slug: "test" });
+		const mailStore = createTestMailStore([]);
+		const result = evaluateArchReviewDispatch(mission, mailStore);
+		expect(result.met).toBe(false);
+		expect(result.nudgeTarget).toBe("coordinator-test");
+		expect(result.nudgeMessage).toContain("architect");
+		expect(result.payload).toEqual({
+			kind: "arch-review-stall",
+			reason: "no architect dispatch observed within grace period",
+		});
+	});
+
+	it("null mailStore → met:false, no payload", () => {
+		const mission = makeMission({ slug: "test" });
+		const result = evaluateArchReviewDispatch(mission, null);
+		expect(result.met).toBe(false);
+		expect(result.payload).toBeUndefined();
 	});
 });
 
