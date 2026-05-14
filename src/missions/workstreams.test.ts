@@ -492,6 +492,13 @@ describe("slingArgsFromHandoff", () => {
 		const args = slingArgsFromHandoff(withBrief, { parentAgent: "exec-director", depth: 1 });
 		expect(args).not.toContain("--spec");
 	});
+
+	test("includes --workstream-id when handoff.workstreamId is set", () => {
+		const args = slingArgsFromHandoff(handoff, { parentAgent: "exec-director", depth: 1 });
+		expect(args).toContain("--workstream-id");
+		const idx = args.indexOf("--workstream-id");
+		expect(args[idx + 1]).toBe("ws-auth");
+	});
 });
 
 // === detectCrossMissionScopeConflicts ===

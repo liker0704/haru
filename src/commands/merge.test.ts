@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { ValidationError } from "../errors.ts";
 import { createMergeQueue } from "../merge/queue.ts";
 import type { MergeEntry } from "../merge/types.ts";
+import { createMissionStore } from "../missions/store.ts";
 import {
 	cleanupTempDir,
 	commitFile,
@@ -210,6 +211,69 @@ merge:
 			const parsed = JSON.parse(output);
 			expect(parsed.agentName).toBe("my-builder");
 			expect(parsed.taskId).toBe("bead-xyz");
+		});
+
+		test("handleBranch derives missionId from branch slug and enqueues it so recordWorkstreamMerge flips workstream_status", async () => {
+			await setupProject(repoDir, defaultBranch);
+
+			// Create sessions.db with a mission whose slug matches the branch slug segment.
+			// Branch convention: haru/<slug>/<taskId> (3-part, parseTaskId returns parts[2]).
+			const sessionsDbPath = join(repoDir, ".overstory", "sessions.db");
+			const missionStore = createMissionStore(sessionsDbPath);
+			try {
+				missionStore.create({
+					id: "mission-merge-test",
+					slug: "mission-slug",
+					objective: "Test workstream merge",
+					runId: "run-1",
+					artifactRoot: join(repoDir, ".overstory", "missions", "mission-merge-test"),
+				});
+			} finally {
+				missionStore.close();
+			}
+
+			// Use 3-part branch so parseTaskId correctly extracts the task ID.
+			const branchName = "haru/mission-slug/task-reg-01";
+			await createCleanFeatureBranch(repoDir, branchName);
+
+			// Write spec-meta so handleBranch reads workstreamId from it.
+			const specsDir = join(repoDir, ".overstory", "specs");
+			await mkdir(specsDir, { recursive: true });
+			await Bun.write(
+				join(specsDir, "task-reg-01.meta.json"),
+				JSON.stringify({
+					taskId: "task-reg-01",
+					workstreamId: "ws-1",
+					briefPath: "plan/brief.md",
+					briefRevision: "rev1",
+					specRevision: "rev1",
+					status: "current",
+					generatedAt: new Date().toISOString(),
+					generatedBy: "lead",
+				}),
+			);
+
+			const originalWrite = process.stdout.write.bind(process.stdout);
+			process.stdout.write = (): boolean => true;
+			try {
+				await mergeCommand({ branch: branchName });
+			} finally {
+				process.stdout.write = originalWrite;
+			}
+
+			// Verify workstream_status was flipped to merged via the spec-meta path.
+			const { Database } = await import("bun:sqlite");
+			const db = new Database(sessionsDbPath);
+			try {
+				const row = db
+					.prepare(
+						"SELECT status FROM workstream_status WHERE mission_id = ? AND workstream_id = ?",
+					)
+					.get("mission-merge-test", "ws-1") as { status: string } | null;
+				expect(row?.status).toBe("merged");
+			} finally {
+				db.close();
+			}
 		});
 	});
 
@@ -732,9 +796,13 @@ describe("recordWorkstreamMerge", () => {
 		db.close();
 	});
 
-	test("fallback path: workstreamId=null, branch parsed -> status=merged, updated_by=engine-branch-parse", async () => {
+	test("fallback path: workstreamId=null, branch parsed and in workstream_status -> status=merged, updated_by=engine-branch-parse", async () => {
 		const db = createTestDb();
 		insertMission(db, "mission-2");
+		// Pre-populate workstream_status so the gated fallback check passes.
+		db.prepare(
+			"INSERT INTO workstream_status (mission_id, workstream_id, status, updated_at, updated_by) VALUES (?, ?, ?, ?, ?)",
+		).run("mission-2", "ws-42", "active", new Date().toISOString(), "engine");
 
 		await recordWorkstreamMerge(
 			makeMergeEntry({
@@ -758,6 +826,62 @@ describe("recordWorkstreamMerge", () => {
 			.prepare("SELECT has_emitted_ws_producer_write FROM missions WHERE id = ?")
 			.get("mission-2") as { has_emitted_ws_producer_write: number } | null;
 		expect(mRow?.has_emitted_ws_producer_write).toBe(1);
+		db.close();
+	});
+
+	test("gated fallback: branch-parsed workstream id not in workstream_status -> no write, stderr note", async () => {
+		const db = createTestDb();
+		insertMission(db, "mission-5");
+		// workstream_status has ws-1 but NOT ws-99 (which is what the branch parses to)
+
+		let stderrOutput = "";
+		const originalWrite = process.stderr.write.bind(process.stderr);
+		process.stderr.write = (chunk: unknown): boolean => {
+			stderrOutput += String(chunk);
+			return true;
+		};
+
+		try {
+			await recordWorkstreamMerge(
+				makeMergeEntry({
+					missionId: "mission-5",
+					workstreamId: null,
+					branchName: "haru/some-slug/builder-ws-99/task-7",
+				}),
+				"/unused",
+				db,
+			);
+		} finally {
+			process.stderr.write = originalWrite;
+		}
+
+		const rows = db
+			.prepare("SELECT * FROM workstream_status WHERE mission_id = ?")
+			.all("mission-5");
+		expect(rows).toHaveLength(0);
+		expect(stderrOutput).toContain("not in mission");
+		db.close();
+	});
+
+	test("regression: entry.workstreamId set from spec-meta + missionId from slug -> flips to merged", async () => {
+		const db = createTestDb();
+		insertMission(db, "mission-r1");
+
+		// Simulates the primary fix: handleBranch populates both fields.
+		await recordWorkstreamMerge(
+			makeMergeEntry({
+				missionId: "mission-r1",
+				workstreamId: "ws-1",
+				branchName: "haru/mission-slug/builder-ws-1/task-abc",
+			}),
+			"/unused",
+			db,
+		);
+
+		const wsRow = db
+			.prepare("SELECT status FROM workstream_status WHERE mission_id = ? AND workstream_id = ?")
+			.get("mission-r1", "ws-1") as { status: string } | null;
+		expect(wsRow?.status).toBe("merged");
 		db.close();
 	});
 

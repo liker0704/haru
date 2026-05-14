@@ -103,6 +103,8 @@ export interface SpawnOptions {
 	architecturePath?: string;
 	/** Path to test-plan.yaml for Flash Quality. */
 	testPlanPath?: string;
+	/** Mission workstream id propagated into agent env as HARU_WORKSTREAM_ID. */
+	workstreamId?: string;
 }
 
 /** Result of a successful spawn. */
@@ -509,6 +511,34 @@ async function executePostWorktreeSteps(
 	);
 }
 
+// === Env helpers ===
+
+/**
+ * Build the HARU_* environment variable block for agent spawns.
+ * Centralised so all three spawn paths (headless directEnv, tmux buildSpawnCommand,
+ * tmux createSession) stay in sync when new HARU_* vars are added.
+ *
+ * Exported as buildHaruAgentEnvForTest for unit-testing env construction without
+ * running the full spawn pipeline.
+ */
+export function buildHaruAgentEnvForTest(
+	base: Record<string, string>,
+	name: string,
+	parentAgent: string | null,
+	worktreePath: string,
+	taskId: string,
+	workstreamId: string | undefined,
+): Record<string, string> {
+	return {
+		...base,
+		HARU_AGENT_NAME: name,
+		HARU_PARENT_AGENT: parentAgent ?? "",
+		HARU_WORKTREE_PATH: worktreePath,
+		HARU_TASK_ID: taskId,
+		...(workstreamId ? { HARU_WORKSTREAM_ID: workstreamId } : {}),
+	};
+}
+
 // === Headless spawn (step 12-14 headless path) ===
 
 async function spawnHeadless(
@@ -521,15 +551,16 @@ async function spawnHeadless(
 	overstoryDir: string,
 ): Promise<SpawnResult> {
 	const { sessionStore: store } = deps;
-	const { name, capability, taskId, parentAgent, depth, runId } = opts;
+	const { name, capability, taskId, parentAgent, depth, runId, workstreamId } = opts;
 
-	const directEnv = {
-		...runtime.buildEnv(resolvedModel),
-		HARU_AGENT_NAME: name,
-		HARU_PARENT_AGENT: parentAgent ?? "",
-		HARU_WORKTREE_PATH: worktreePath,
-		HARU_TASK_ID: taskId,
-	};
+	const directEnv = buildHaruAgentEnvForTest(
+		runtime.buildEnv(resolvedModel),
+		name,
+		parentAgent,
+		worktreePath,
+		taskId,
+		workstreamId,
+	);
 
 	if (!runtime.buildDirectSpawn) {
 		throw new Error("Runtime does not support headless spawn");
@@ -611,7 +642,7 @@ async function spawnInteractive(
 	overstoryDir: string,
 ): Promise<SpawnResult> {
 	const { sessionStore: store, config, tmux } = deps;
-	const { name, capability, taskId, parentAgent, depth, runId } = opts;
+	const { name, capability, taskId, parentAgent, depth, runId, workstreamId } = opts;
 
 	// 11c. Preflight: verify tmux is available
 	await tmux.ensureTmuxAvailable();
@@ -620,27 +651,23 @@ async function spawnInteractive(
 	const tmuxSessionName = `haru-${sanitizeTmuxName(config.project.name)}-${name}`;
 	const sessionId = crypto.randomUUID();
 	const spawnTimestamp = Date.now();
+	const agentEnv = buildHaruAgentEnvForTest(
+		runtime.buildEnv(resolvedModel),
+		name,
+		parentAgent,
+		worktreePath,
+		taskId,
+		workstreamId,
+	);
 	const spawnCmd = runtime.buildSpawnCommand({
 		model: resolvedModel.model,
 		permissionMode: "bypass",
 		sessionId,
 		cwd: worktreePath,
 		sharedWritableDirs: getSharedWritableDirs(config.project.root, capability),
-		env: {
-			...runtime.buildEnv(resolvedModel),
-			HARU_AGENT_NAME: name,
-			HARU_PARENT_AGENT: parentAgent ?? "",
-			HARU_WORKTREE_PATH: worktreePath,
-			HARU_TASK_ID: taskId,
-		},
+		env: agentEnv,
 	});
-	const pid = await tmux.createSession(tmuxSessionName, worktreePath, spawnCmd, {
-		...runtime.buildEnv(resolvedModel),
-		HARU_AGENT_NAME: name,
-		HARU_PARENT_AGENT: parentAgent ?? "",
-		HARU_WORKTREE_PATH: worktreePath,
-		HARU_TASK_ID: taskId,
-	});
+	const pid = await tmux.createSession(tmuxSessionName, worktreePath, spawnCmd, agentEnv);
 
 	// 13. Record session BEFORE sending the beacon (haru-036f ordering guarantee).
 	const session: AgentSession = {

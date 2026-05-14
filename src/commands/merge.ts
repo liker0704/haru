@@ -22,6 +22,7 @@ import { jsonOutput } from "../json.ts";
 import { accent, printHint } from "../logging/color.ts";
 import { createMergeQueue } from "../merge/queue.ts";
 import { createMergeResolver } from "../merge/resolver.ts";
+import { createMissionStore } from "../missions/store.ts";
 import { createMulchClient } from "../mulch/client.ts";
 import type { MergeEntry, MergeResult } from "../types.ts";
 
@@ -275,12 +276,29 @@ async function handleBranch(
 			// Non-fatal; recordWorkstreamMerge will warn later if workstreamId absent.
 		}
 
+		// Derive missionId from branch slug so recordWorkstreamMerge can flip
+		// workstream_status — it short-circuits if missionId is absent.
+		let missionId: string | null = null;
+		const slugMatch = /^haru\/([^/]+)\//.exec(branchName);
+		const slug = slugMatch?.[1];
+		if (slug) {
+			const missionStore = createMissionStore(
+				join(repoRoot, detectHaruDir(repoRoot), "sessions.db"),
+			);
+			try {
+				missionId = missionStore.getBySlug(slug)?.id ?? null;
+			} finally {
+				missionStore.close();
+			}
+		}
+
 		entry = queue.enqueue({
 			branchName,
 			taskId,
 			agentName,
 			filesModified,
 			workstreamId,
+			missionId,
 		});
 	}
 
@@ -408,10 +426,6 @@ export async function recordWorkstreamMerge(
 		if (parsed) {
 			workstreamId = parsed;
 			updatedBy = "engine-branch-parse";
-			process.stderr.write(
-				`[merge] note: workstreamId absent from merge entry for branch ${entry.branchName}; ` +
-					`recovered from branch name. Root cause: spec-meta.json missing workstreamId.\n`,
-			);
 		} else {
 			process.stderr.write(
 				`[merge] warning: workstreamId absent for branch ${entry.branchName} -- ` +
@@ -427,9 +441,28 @@ export async function recordWorkstreamMerge(
 	// half-applied state (e.g., sticky flag flipped but status row missing → future
 	// fallback misfires).
 	try {
-		const { updateWorkstreamStatus } = await import("../missions/workstreams.ts");
+		const { updateWorkstreamStatus, getWorkstreamStatuses } = await import(
+			"../missions/workstreams.ts"
+		);
 		const ownDb = db ?? openSessionsDbForWrite(overstoryDir);
 		try {
+			// Gate the branch-parse fallback: only accept the parsed workstream id if it
+			// is already known to this mission in workstream_status. Prevents stray branch
+			// name segments from being mistaken for valid workstream ids.
+			if (updatedBy === "engine-branch-parse" && entry.missionId) {
+				const statuses = getWorkstreamStatuses(ownDb, entry.missionId);
+				if (!statuses.has(workstreamId)) {
+					process.stderr.write(
+						`[merge] note: branch-parsed '${workstreamId}' not in mission ${entry.missionId} workstreams; skipping fallback.\n`,
+					);
+					return;
+				}
+				process.stderr.write(
+					`[merge] note: workstreamId absent from merge entry for branch ${entry.branchName}; ` +
+						`recovered from branch name. Root cause: spec-meta.json missing workstreamId.\n`,
+				);
+			}
+
 			const tx = ownDb.transaction((m: string, ws: string) => {
 				updateWorkstreamStatus(
 					ownDb,

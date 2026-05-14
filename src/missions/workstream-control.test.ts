@@ -11,6 +11,7 @@ import {
 	validateCurrentMissionSpec,
 	validateWorkstreamResume,
 } from "./workstream-control.ts";
+import { type ExecutionHandoff, slingArgsFromHandoff } from "./workstreams.ts";
 
 let tempDir: string;
 let mission: Mission;
@@ -285,5 +286,26 @@ describe("validateWorkstreamResume", () => {
 
 		expect(result.ok).toBe(false);
 		expect(result.reason).toContain("superseded");
+	});
+});
+
+// === Dispatch command building ===
+
+describe("dispatch command argv includes --workstream-id", () => {
+	const handoff: ExecutionHandoff = {
+		workstreamId: "ws-auth",
+		taskId: "task-001",
+		objective: "Auth refactor",
+		fileScope: [],
+		briefPath: null,
+		dependsOn: [],
+		status: "planned",
+	};
+
+	test("slingArgsFromHandoff (used by missionHandoff dispatch loop) includes --workstream-id", () => {
+		const args = slingArgsFromHandoff(handoff, { parentAgent: "execution-director", depth: 1 });
+		expect(args).toContain("--workstream-id");
+		const idx = args.indexOf("--workstream-id");
+		expect(args[idx + 1]).toBe("ws-auth");
 	});
 });

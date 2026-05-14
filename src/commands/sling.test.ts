@@ -794,6 +794,59 @@ describe("slingCommand mission spec enforcement", () => {
 			slingCommand("task-001", { capability: "builder", spec: specPath }),
 		).rejects.toThrow("does not match requested task task-001");
 	});
+
+	describe("--workstream-id flag", () => {
+		test("writeSpecCompanionMeta is called when both --workstream-id and --spec are provided", async () => {
+			const specPath = join(repoDir, ".haru", "specs", "task-ws-01.md");
+			await mkdir(join(repoDir, ".haru", "specs"), { recursive: true });
+			await Bun.write(specPath, "# Spec content\n");
+
+			// Use depth=99 to trigger depth-limit failure AFTER writeSpecCompanionMeta
+			// runs (depth check comes after spec-meta write) but BEFORE any real spawn.
+			try {
+				await slingCommand("task-ws-01", {
+					capability: "builder",
+					spec: specPath,
+					workstreamId: "ws-sling-test",
+					skipTaskCheck: true,
+					forceHierarchy: true,
+					depth: "99",
+				});
+			} catch {
+				// Expected: depth limit exceeded.
+			}
+
+			const { readSpecMeta } = await import("../missions/spec-meta.ts");
+			const meta = await readSpecMeta(repoDir, "task-ws-01");
+			expect(meta).not.toBeNull();
+			expect(meta?.workstreamId).toBe("ws-sling-test");
+		});
+
+		test("warns to stderr when --workstream-id provided without --spec", async () => {
+			let stderrOutput = "";
+			const originalWrite = process.stderr.write.bind(process.stderr);
+			process.stderr.write = (chunk: unknown): boolean => {
+				stderrOutput += String(chunk);
+				return true;
+			};
+
+			try {
+				await slingCommand("task-ws-02", {
+					capability: "builder",
+					workstreamId: "ws-no-spec",
+					skipTaskCheck: true,
+					forceHierarchy: true,
+					depth: "99",
+				});
+			} catch {
+				// Expected: depth limit exceeded after warning is emitted.
+			} finally {
+				process.stderr.write = originalWrite;
+			}
+
+			expect(stderrOutput).toContain("workstreamId not persisted");
+		});
+	});
 });
 
 /**
@@ -1845,35 +1898,45 @@ describe("slingCommand circuit breaker gate", () => {
 		await writeBreakerConfig(repoDir, true);
 
 		// No breaker record = defaults to closed; assertion is that the breaker-open
-		// error specifically is NOT raised. The command may resolve or fail later
-		// (e.g. tmux); only the breaker error is forbidden here.
+		// error specifically is NOT raised. Use depth=99 to trigger a depth-limit
+		// failure after the breaker check so no real tmux session is spawned.
 		let caught: unknown = null;
 		try {
-			await slingCommand("task-cb-002", { capability: "builder" });
+			await slingCommand("task-cb-002", {
+				capability: "builder",
+				skipTaskCheck: true,
+				forceHierarchy: true,
+				depth: "99",
+			});
 		} catch (e) {
 			caught = e;
 		}
 		if (caught !== null) {
 			expect(String(caught)).not.toContain("Circuit breaker is open");
 		}
-	}, 30000);
+	});
 
 	test("skips breaker check when config.resilience is absent", async () => {
 		await writeBreakerConfig(repoDir, false);
 
 		// No resilience config = no breaker check; assertion is that the breaker-open
-		// error specifically is NOT raised. The command may resolve or fail later
-		// (e.g. tmux); only the breaker error is forbidden here.
+		// error specifically is NOT raised. Use depth=99 to trigger a depth-limit
+		// failure after the (skipped) breaker check so no real tmux session is spawned.
 		let caught: unknown = null;
 		try {
-			await slingCommand("task-cb-003", { capability: "builder" });
+			await slingCommand("task-cb-003", {
+				capability: "builder",
+				skipTaskCheck: true,
+				forceHierarchy: true,
+				depth: "99",
+			});
 		} catch (e) {
 			caught = e;
 		}
 		if (caught !== null) {
 			expect(String(caught)).not.toContain("Circuit breaker is open");
 		}
-	}, 30000);
+	});
 
 	test("sends error mail to coordinator when breaker is tripped with no parent", async () => {
 		await writeBreakerConfig(repoDir, true);
