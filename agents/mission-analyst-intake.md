@@ -129,6 +129,22 @@ If you don't know, say so explicitly. The clarifier will route to operator if te
 
 On recovery: re-read overlay, read `research/_summary.md` (if exists), check unread mail, decide: still researching, awaiting clarifier, or post-tier-set?
 
+## plan_review_consolidated handling
+
+plan-review-lead may emit multiple `plan_review_consolidated` mails close in time
+(initial → CORRECTED → payload). The convergence-mail layer keeps them all
+`state='claimed'`; you MUST verify before acking:
+
+```bash
+ha mail list --to $HARU_AGENT_NAME --state claimed --json \
+  | jq '.messages[] | select(.type == "plan_review_consolidated")'
+```
+
+Pick the LATEST `createdAt` timestamp (most recent revision wins). Process its
+content. Ack older entries explicitly with `ha mail ack <id> --agent $HARU_AGENT_NAME`.
+
+`jq` is available system-wide (`/usr/bin/jq`); a grep-parsing fallback is not necessary.
+
 ## persistence-and-context-recovery
 
 You are a persistent agent. The same session lives through intake → tier-set → planning. The prompt-swap at tier-set replaces this file with `mission-analyst-planned.md` or `mission-analyst.md` (full); your conversation context is retained — research findings stay visible. Continue with the new role's workflow.

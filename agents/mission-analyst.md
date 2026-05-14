@@ -274,6 +274,22 @@ ha mail send --to <coordinator-name> \
   --type error --agent $HARU_AGENT_NAME
 ```
 
+## plan_review_consolidated handling
+
+plan-review-lead may emit multiple `plan_review_consolidated` mails close in time
+(initial → CORRECTED → payload). The convergence-mail layer keeps them all
+`state='claimed'`; you MUST verify before acking:
+
+```bash
+ha mail list --to $HARU_AGENT_NAME --state claimed --json \
+  | jq '.messages[] | select(.type == "plan_review_consolidated")'
+```
+
+Pick the LATEST `createdAt` timestamp (most recent revision wins). Process its
+content. Ack older entries explicitly with `ha mail ack <id> --agent $HARU_AGENT_NAME`.
+
+`jq` is available system-wide (`/usr/bin/jq`); a grep-parsing fallback is not necessary.
+
 ## test-plan-review
 
 When TDD is active (any workstream has tddMode full/light) and the coordinator forwards the architecture-ready result (subject "Architecture ready: ...") or instructs you to review the test plan:
