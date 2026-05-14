@@ -215,6 +215,25 @@ describe("captureBaseline", () => {
 		expect(await pathExists(join(freshArtifactRoot, "results", "baseline.json"))).toBe(true);
 		expect(await pathExists(join(freshArtifactRoot, "results", ".baseline-captured"))).toBe(true);
 	});
+
+	test("T-28: smoke — captureBaseline → read baseline.json → compareSnapshotDiff(baseline, baseline) yields holdout_pass equivalent", async () => {
+		const checks: HoldoutCheck[] = [
+			fakeCheck("l1-tests", "pass"),
+			fakeCheck("l1-lint", "pass"),
+			fakeCheck("l1-tsc", "fail", { message: "preexisting failure" }),
+		];
+		await captureBaseline("mission-smoke", artifactRoot, projectRoot, {
+			runQualityGates: async () => checks,
+		});
+
+		const baselineRaw = await Bun.file(join(artifactRoot, "results", "baseline.json")).text();
+		const baseline = JSON.parse(baselineRaw) as HoldoutCheck[];
+
+		const diff = compareSnapshotDiff(baseline, checks);
+		expect(diff.newFailures).toEqual([]);
+		expect(diff.unchanged.map((c) => c.id)).toContain("l1-tsc");
+		expect(diff.resolvedFailures).toEqual([]);
+	});
 });
 
 describe("backfillBaseline", () => {
