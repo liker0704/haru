@@ -49,6 +49,7 @@ function createMockTracker(
 		},
 		claim: async () => {},
 		close: async () => {},
+		comment: async () => {},
 		list: async () => [],
 		sync: async () => {},
 	};
@@ -353,6 +354,7 @@ describe("bridgeWorkstreamsToTasks edge cases", () => {
 			},
 			claim: async () => {},
 			close: async () => {},
+			comment: async () => {},
 			list: async () => [],
 			sync: async () => {},
 		};

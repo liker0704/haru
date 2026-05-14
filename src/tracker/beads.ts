@@ -39,6 +39,24 @@ export function createBeadsTracker(cwd: string): TrackerClient {
 			return client.close(id, reason);
 		},
 
+		async comment(id, body) {
+			// Beads (`bd`) has no first-class comment subcommand at time of writing;
+			// we invoke `bd comment <id> --body <body>` optimistically. If the
+			// installed `bd` version lacks the subcommand, this throws AgentError
+			// and the caller should fall back to mail / structured-close-reason.
+			// See docs/architecture/agent-commenting-policy.md.
+			const proc = Bun.spawn(["bd", "comment", id, "--body", body], {
+				cwd,
+				stdout: "pipe",
+				stderr: "pipe",
+			});
+			const exitCode = await proc.exited;
+			if (exitCode !== 0) {
+				const stderr = await new Response(proc.stderr).text();
+				throw new AgentError(`bd comment ${id} failed (exit ${exitCode}): ${stderr.trim()}`);
+			}
+		},
+
 		async list(options) {
 			const issues = await client.list(options);
 			return issues as TrackerIssue[];

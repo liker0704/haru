@@ -142,6 +142,10 @@ export function createGitHubTracker(cwd: string): TrackerClient {
 			await runGh(args, cwd, `close ${id}`);
 		},
 
+		async comment(id, body) {
+			await runGh(["issue", "comment", id, "--body", body], cwd, `comment ${id}`);
+		},
+
 		async list(options) {
 			const args = ["issue", "list", "--json", GH_JSON_FIELDS];
 			if (options?.status) {

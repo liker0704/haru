@@ -170,6 +170,10 @@ export function createSeedsTracker(cwd: string): TrackerClient {
 			await runSd(args, cwd, `close ${id}`);
 		},
 
+		async comment(id, body) {
+			await runSd(["comment", id, "--body", body], cwd, `comment ${id}`);
+		},
+
 		async list(options) {
 			const args = ["list", "--json"];
 			if (options?.status) {

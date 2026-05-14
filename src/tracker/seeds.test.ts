@@ -323,6 +323,48 @@ describe("createSeedsTracker — close()", () => {
 	});
 });
 
+describe("createSeedsTracker — comment()", () => {
+	let spawnSpy: ReturnType<typeof spyOn>;
+
+	beforeEach(() => {
+		spawnSpy = spyOn(Bun, "spawn");
+	});
+
+	afterEach(() => {
+		spawnSpy.mockRestore();
+	});
+
+	test("calls [su, comment, <id>, --body, <body>]", async () => {
+		spawnSpy.mockImplementation(() => mockSpawnResult("", "", 0));
+
+		const tracker = createSeedsTracker(TEST_CWD);
+		await tracker.comment("sd-20", "Resolved by abc123");
+
+		const callArgs = spawnSpy.mock.calls[0] as unknown[];
+		const cmd = callArgs[0] as string[];
+		expect(cmd).toEqual(["su", "comment", "sd-20", "--body", "Resolved by abc123"]);
+	});
+
+	test("propagates cwd to Bun.spawn", async () => {
+		spawnSpy.mockImplementation(() => mockSpawnResult("", "", 0));
+
+		const customCwd = "/my/custom/project";
+		const tracker = createSeedsTracker(customCwd);
+		await tracker.comment("sd-1", "note");
+
+		const callArgs = spawnSpy.mock.calls[0] as unknown[];
+		const opts = callArgs[1] as { cwd: string };
+		expect(opts.cwd).toBe(customCwd);
+	});
+
+	test("throws AgentError on non-zero exit code", async () => {
+		spawnSpy.mockImplementation(() => mockSpawnResult("", "issue not found", 1));
+
+		const tracker = createSeedsTracker(TEST_CWD);
+		await expect(tracker.comment("sd-999", "hello")).rejects.toThrow(AgentError);
+	});
+});
+
 describe("createSeedsTracker — list()", () => {
 	let spawnSpy: ReturnType<typeof spyOn>;
 

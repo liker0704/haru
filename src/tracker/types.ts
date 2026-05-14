@@ -41,6 +41,18 @@ export interface TrackerClient {
 	/** Close an issue with an optional reason. */
 	close(id: string, reason?: string): Promise<void>;
 
+	/**
+	 * Add a comment / note to an issue without closing it.
+	 *
+	 * Used by lead/reviewer/debugger agents to record progress milestones
+	 * (merge SHAs, review verdicts, fix descriptions) against tracker issues.
+	 * See `docs/architecture/agent-commenting-policy.md` for who comments and when.
+	 *
+	 * @throws AgentError if the backend CLI does not support comments
+	 *   (some adapters may fall back to a marker file — see adapter docs).
+	 */
+	comment(id: string, body: string): Promise<void>;
+
 	/** List issues with optional filters. */
 	list(options?: { status?: string; limit?: number }): Promise<TrackerIssue[]>;
 

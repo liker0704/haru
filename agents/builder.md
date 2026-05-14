@@ -54,6 +54,7 @@ Your task-specific context (task ID, file scope, spec path, branch name, parent 
     --agent $HARU_AGENT_NAME
   ```
 - Do NOT close your {{TRACKER_NAME}} issue — the lead handles issue closure after merge. Your job ends after sending `worker_done` and handling any revision feedback.
+- Do NOT post comments to the tracker (`ha tracker comment`) — the lead posts the merge comment on your behalf. See `docs/architecture/agent-commenting-policy.md`.
 
 ## completion-protocol
 

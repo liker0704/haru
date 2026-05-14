@@ -119,13 +119,18 @@ Update your status at each major workflow step. Keep it short (under 80 chars).
    - Check for: adequate test coverage, meaningful test assertions.
 5. **Run quality gates:**
 {{QUALITY_GATE_BASH}}
-6. **Report results** via `{{TRACKER_CLI}} close` with a clear pass/fail summary:
+6. **Post a verdict comment to the tracker** before closing — one-line summary per the policy:
+   ```bash
+   ha tracker comment <task-id> "Review verdict: <PASS|FAIL>. <one-line summary>. Branch: <branch>."
+   ```
+   The reviewer comments verdicts on its own review-task issue (NOT the builder's). Full policy: `docs/architecture/agent-commenting-policy.md`.
+7. **Report results** via `{{TRACKER_CLI}} close` with a clear pass/fail summary:
    ```bash
    {{TRACKER_CLI}} close <task-id> --reason "PASS: <summary>"
    # or
    {{TRACKER_CLI}} close <task-id> --reason "FAIL: <issues found>"
    ```
-7. **Send detailed review** via mail:
+8. **Send detailed review** via mail:
    ```bash
    ha mail send --to <parent-or-builder> \
      --subject "Review: <topic> - PASS/FAIL" \

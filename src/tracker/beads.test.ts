@@ -264,6 +264,50 @@ describe("createBeadsTracker — close()", () => {
 	});
 });
 
+describe("createBeadsTracker — comment()", () => {
+	let spawnSpy: ReturnType<typeof spyOn>;
+
+	beforeEach(() => {
+		spawnSpy = spyOn(Bun, "spawn");
+	});
+
+	afterEach(() => {
+		spawnSpy.mockRestore();
+	});
+
+	test("calls [bd, comment, <id>, --body, <body>]", async () => {
+		spawnSpy.mockImplementation(() => mockSpawnResult("", "", 0));
+
+		const tracker = createBeadsTracker(TEST_CWD);
+		await tracker.comment("bd-7", "Resolved by abc123");
+
+		// beads.ts spawns `bd comment` directly (not via createBeadsClient).
+		expect(spawnSpy).toHaveBeenCalledTimes(1);
+		const callArgs = spawnSpy.mock.calls[0] as unknown[];
+		const cmd = callArgs[0] as string[];
+		expect(cmd).toEqual(["bd", "comment", "bd-7", "--body", "Resolved by abc123"]);
+	});
+
+	test("propagates cwd to Bun.spawn", async () => {
+		spawnSpy.mockImplementation(() => mockSpawnResult("", "", 0));
+
+		const customCwd = "/my/custom/project";
+		const tracker = createBeadsTracker(customCwd);
+		await tracker.comment("bd-1", "note");
+
+		const callArgs = spawnSpy.mock.calls[0] as unknown[];
+		const opts = callArgs[1] as { cwd: string };
+		expect(opts.cwd).toBe(customCwd);
+	});
+
+	test("throws AgentError on non-zero exit code", async () => {
+		spawnSpy.mockImplementation(() => mockSpawnResult("", "bd: unknown command 'comment'", 1));
+
+		const tracker = createBeadsTracker(TEST_CWD);
+		await expect(tracker.comment("bd-1", "hello")).rejects.toThrow(AgentError);
+	});
+});
+
 describe("createBeadsTracker — list()", () => {
 	let spawnSpy: ReturnType<typeof spyOn>;
 

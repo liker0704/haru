@@ -13,6 +13,7 @@ describe("createTrackerClient", () => {
 		expect(client.create).toBeTypeOf("function");
 		expect(client.claim).toBeTypeOf("function");
 		expect(client.close).toBeTypeOf("function");
+		expect(client.comment).toBeTypeOf("function");
 		expect(client.list).toBeTypeOf("function");
 		expect(client.sync).toBeTypeOf("function");
 	});
@@ -25,6 +26,7 @@ describe("createTrackerClient", () => {
 		expect(client.create).toBeTypeOf("function");
 		expect(client.claim).toBeTypeOf("function");
 		expect(client.close).toBeTypeOf("function");
+		expect(client.comment).toBeTypeOf("function");
 		expect(client.list).toBeTypeOf("function");
 		expect(client.sync).toBeTypeOf("function");
 	});

@@ -313,7 +313,12 @@ Track count against expected builders + reviewers. Re-list before declaring "all
       ha mail ack <reviewer-result-id> --agent $HARU_AGENT_NAME
       ```
       The builder auto-resumes from waiting state, processes feedback, and sends another `worker_done`. Spawn a new reviewer to validate the revision. Repeat until PASS. Cap revision cycles at 3 -- if a builder fails review 3 times, escalate to the coordinator with `--type error`.
-14. **Close your task** once all builders have passed review and all `merge_ready` signals have been sent:
+14. **Post a merge comment to the tracker** BEFORE closing — one comment per merged workstream:
+    ```bash
+    ha tracker comment <task-id> "Resolved by <commit-sha> (<short subject>). Tests: <N> pass / <M> fail. Reviewer verdict: <PASS|self-verified>."
+    ```
+    The lead is the only agent that comments on builder/reviewer outcomes. Builders never call `ha tracker comment` themselves. Full policy: `docs/architecture/agent-commenting-policy.md`.
+15. **Close your task** once all builders have passed review, all `merge_ready` signals have been sent, and the merge comment is posted:
     ```bash
     {{TRACKER_CLI}} close <task-id> --reason "<summary of what was accomplished across all subtasks>"
     ```
