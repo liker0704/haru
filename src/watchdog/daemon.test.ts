@@ -3438,13 +3438,7 @@ describe("daemon source freshness", () => {
 	}
 
 	function getDriftEvents(eventStore: ReturnType<typeof createEventStore>): StoredEvent[] {
-		return eventStore.getByAgent("watchdog").filter((e) => {
-			try {
-				return (JSON.parse(e.data ?? "{}") as { type?: string }).type === "daemon_source_drift";
-			} catch {
-				return false;
-			}
-		});
+		return eventStore.getByAgent("watchdog").filter((e) => e.eventType === "daemon_source_drift");
 	}
 
 	test("daemon emits one-shot warning on HEAD drift", async () => {
