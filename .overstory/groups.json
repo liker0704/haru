@@ -1845,5 +1845,16 @@
 		"status": "active",
 		"createdAt": "2026-05-14T12:59:50.030Z",
 		"completedAt": null
+	},
+	{
+		"id": "group-0e944003",
+		"name": "watchdog-foundation-batch",
+		"memberIssueIds": [
+			"haru-b49a",
+			"haru-a2f8"
+		],
+		"status": "active",
+		"createdAt": "2026-05-14T19:58:25.940Z",
+		"completedAt": null
 	}
 ]
