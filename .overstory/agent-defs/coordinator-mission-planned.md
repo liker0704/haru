@@ -187,8 +187,12 @@ Goal: Get a validated plan and hand off to execution.
    - Dependencies correct?
    - Review verdict: `APPROVE` or `APPROVE_WITH_NOTES` → proceed. `RECOMMEND_CHANGES` → request revision.
 4. **If plan needs revision:** send revision dispatch to analyst.
-5. **If critical concerns with low confidence:** freeze for operator (rare).
+5. **If critical concerns with low confidence:** freeze for operator (rare). **Freeze remains valid in auto-* modes ONLY when criteria are fatal** (security-sensitive change, scope expansion, irrecoverable failure). Otherwise auto-* modes proceed without operator confirmation.
 6. **When plan approved — execute handoff:**
+
+   **Autonomy check (do this first):** Your mission's autonomy mode is `{{MISSION_AUTONOMY}}` (substituted by the engine; absent or `null` → treat as `supervised`). If it is `auto-spec` or `auto-all`, do NOT ask the operator — emit `ha mission handoff` directly. Only emit an `operator_question` to confirm handoff when the value is `supervised`.
+
+   If autonomy is mutated mid-mission via `ha mission update`, the operator must restart this coordinator (`ha stop` + re-spawn) for the new value to take effect — overlay autonomy is a snapshot at spawn time.
    ```bash
    ha mission handoff
    ```
