@@ -247,6 +247,50 @@ describe("prPhaseCell preflight + create handlers", () => {
 		expect(calls.some((c) => c.args[0] === "auth" && c.args[1] === "status")).toBe(true);
 	});
 
+	test("T-w3-308: stderr '429' no longer fires pr_rate_limited — falls through to pr_create_network_fail (#308)", async () => {
+		const { budget } = makeFakeGhBudget(({ args }) => {
+			if (args[0] === "pr" && args[1] === "create") {
+				return { exitCode: 1, stderr: "error 429 too many requests" };
+			}
+			return { exitCode: 0 };
+		});
+		setGhBudget(budget);
+
+		const handlers = prPhaseCell.buildHandlers(makeBaseDeps());
+		const create = handlers.create;
+		expect(create).toBeDefined();
+		if (!create) return;
+
+		const result = await create(
+			makeCtx({
+				mission: makeMission({ featureBranch: "feature/x" }) as unknown as Mission,
+			}),
+		);
+		expect(result.trigger).toBe("pr_create_network_fail");
+	});
+
+	test("T-w3-308b: stderr 'rate limit' no longer fires pr_rate_limited — falls through to pr_create_network_fail (#308)", async () => {
+		const { budget } = makeFakeGhBudget(({ args }) => {
+			if (args[0] === "pr" && args[1] === "create") {
+				return { exitCode: 1, stderr: "rate limit exceeded" };
+			}
+			return { exitCode: 0 };
+		});
+		setGhBudget(budget);
+
+		const handlers = prPhaseCell.buildHandlers(makeBaseDeps());
+		const create = handlers.create;
+		expect(create).toBeDefined();
+		if (!create) return;
+
+		const result = await create(
+			makeCtx({
+				mission: makeMission({ featureBranch: "feature/x" }) as unknown as Mission,
+			}),
+		);
+		expect(result.trigger).toBe("pr_create_network_fail");
+	});
+
 	test("T-w3-7: gh pr create 'already exists' → looks up existing PR and returns pr_already_exists", async () => {
 		const upsertCalls: Array<{ missionId: string; prNumber: number; prUrl: string }> = [];
 		const missionStore = createMockMissionStore();
@@ -779,6 +823,101 @@ describe("prPhaseCell merge handler", () => {
 		expect(flat).toContain("SQUASH");
 	});
 
+	test("T-w3-307-vars: typed variables — pullRequestId and expectedHeadOid as separate -f flags, not in query= (#307)", async () => {
+		const missionStore = createMockMissionStore();
+		missionStore.getPrState = () => ({
+			missionId: "m1",
+			prNumber: 1,
+			prUrl: "url",
+			branch: "feature/x",
+			createdAt: "",
+			lastCiStatus: null,
+			lastReviewDecision: null,
+			approvedHeadSha: "sha-test",
+			mergedAt: null,
+		});
+
+		const { budget, calls } = makeFakeGhBudget(({ args }) => {
+			if (args[0] === "pr" && args[1] === "view") {
+				return {
+					exitCode: 0,
+					stdout: JSON.stringify({ headRefOid: "sha-test", id: "PR_ID_123" }),
+				};
+			}
+			if (args[0] === "api" && args[1] === "graphql") {
+				return { exitCode: 0, stdout: JSON.stringify({ data: { mergePullRequest: {} } }) };
+			}
+			return { exitCode: 0 };
+		});
+		setGhBudget(budget);
+
+		const handlers = prPhaseCell.buildHandlers(
+			makeBaseDeps({ missionStore: missionStore as unknown as PhaseCellDeps["missionStore"] }),
+		);
+		const merge = handlers.merge;
+		expect(merge).toBeDefined();
+		if (!merge) return;
+
+		await merge(
+			makeCtx({ nodeId: "pr-phase:merge", mission: makeMission() as unknown as Mission }),
+		);
+
+		const graphqlCalls = calls.filter((c) => c.args[0] === "api" && c.args[1] === "graphql");
+		expect(graphqlCalls).toHaveLength(1);
+		const gqlArgs = graphqlCalls[0]?.args ?? ([] as readonly string[]);
+
+		// id and sha must appear as separate -f values, not interpolated into query=
+		expect(gqlArgs.some((a) => a.startsWith("pullRequestId="))).toBe(true);
+		expect(gqlArgs.some((a) => a.startsWith("expectedHeadOid="))).toBe(true);
+
+		const queryArg = gqlArgs.find((a) => a.startsWith("query=")) ?? "";
+		expect(queryArg).not.toContain("PR_ID_123");
+		expect(queryArg).not.toContain("sha-test");
+	});
+
+	test("T-w3-307-allowlist: invalid mergeStrategy → pr_merge_conflict, no graphql call (#307)", async () => {
+		const missionStore = createMockMissionStore();
+		missionStore.getPrState = () => ({
+			missionId: "m1",
+			prNumber: 1,
+			prUrl: "url",
+			branch: "feature/x",
+			createdAt: "",
+			lastCiStatus: null,
+			lastReviewDecision: null,
+			approvedHeadSha: "sha1",
+			mergedAt: null,
+		});
+
+		const { budget, calls } = makeFakeGhBudget(({ args }) => {
+			if (args[0] === "pr" && args[1] === "view") {
+				return { exitCode: 0, stdout: JSON.stringify({ headRefOid: "sha1", id: "PR_1" }) };
+			}
+			return { exitCode: 0 };
+		});
+		setGhBudget(budget);
+
+		const config = makeConfig({ pr: { mergeStrategy: "DROP TABLE" as unknown as "squash" } });
+		const handlers = prPhaseCell.buildHandlers(
+			makeBaseDeps({ missionStore: missionStore as unknown as PhaseCellDeps["missionStore"] }),
+			config,
+		);
+		const merge = handlers.merge;
+		expect(merge).toBeDefined();
+		if (!merge) return;
+
+		const result = await merge(
+			makeCtx({ nodeId: "pr-phase:merge", mission: makeMission() as unknown as Mission }),
+		);
+
+		expect(result.trigger).toBe("pr_merge_conflict");
+		const payload = (result as { payload?: { reason?: string } }).payload ?? {};
+		expect(payload.reason).toMatch(/invalid mergeMethod/);
+
+		const graphqlCalls = calls.filter((c) => c.args[0] === "api" && c.args[1] === "graphql");
+		expect(graphqlCalls).toHaveLength(0);
+	});
+
 	test("T-w3-23: matching SHA but graphql staleData error → pr_head_changed", async () => {
 		const missionStore = createMockMissionStore();
 		missionStore.getPrState = () => ({
@@ -819,4 +958,226 @@ describe("prPhaseCell merge handler", () => {
 		);
 		expect(result.trigger).toBe("pr_head_changed");
 	});
+});
+
+// =============================================================================
+// #302 — coordinatorResumeCount increment: T-w3-24 .. T-w3-25
+// =============================================================================
+
+describe("prPhaseCell resume-coordinator #302 — coordinatorResumeCount increment", () => {
+	test("T-w3-24: coordinator storm — 10 sequential events cap=3 → exactly 3 spawns, 4th floods (#302)", async () => {
+		let spawnCount = 0;
+		const fakeSpawn = ((_args: string[], _opts?: unknown) => {
+			spawnCount++;
+			return {
+				unref: () => {},
+				exited: Promise.resolve(0),
+				stdout: null,
+				stderr: null,
+			} as unknown as ReturnType<typeof Bun.spawn>;
+		}) as unknown as typeof Bun.spawn;
+
+		const config = makeConfig({ pr: { maxCoordinatorResumesPerPr: 3 } });
+		const handlers = prPhaseCell.buildHandlers(makeBaseDeps({ spawn: fakeSpawn }), config);
+		const resume = handlers["resume-coordinator"];
+		expect(resume).toBeDefined();
+		if (!resume) throw new Error("missing handler");
+
+		const mission = makeMission() as Mission;
+		(mission as { coordinatorSessionId: string | null }).coordinatorSessionId = "sess-abc";
+		(mission as { artifactRoot: string | null }).artifactRoot = "/tmp/a";
+
+		let persistedCount = 0;
+		let fourthResult: { trigger?: string; payload?: { kind?: string } } | null = null;
+
+		for (let i = 0; i < 10; i++) {
+			const capturedCount = persistedCount;
+			const result = await resume(
+				makeCtx({
+					nodeId: "pr-phase:resume-coordinator",
+					mission,
+					checkpoint: {
+						coordinatorResumeCount: capturedCount,
+						comment: { commentId: `cs${i}`, author: "op", body: "msg" },
+						classification: { action: "refactor_request", confidence: 0.95 },
+					},
+					saveCheckpoint: async (data: unknown) => {
+						const cp = data as { coordinatorResumeCount?: number };
+						if (cp?.coordinatorResumeCount !== undefined) {
+							persistedCount = cp.coordinatorResumeCount;
+						}
+					},
+				}),
+			);
+			if (i === 3) {
+				fourthResult = result as { trigger?: string; payload?: { kind?: string } };
+			}
+		}
+
+		expect(spawnCount).toBe(3);
+		expect(fourthResult?.trigger).toBe("pr_triage_flood");
+		expect(fourthResult?.payload?.kind).toBe("coordinator_resume_cap");
+	});
+
+	test("T-w3-25: saveCheckpoint called with coordinatorResumeCount+1 before spawn (#302)", async () => {
+		const callOrder: string[] = [];
+		let savedData: unknown = null;
+
+		const fakeSpawn = ((_args: string[], _opts?: unknown) => {
+			callOrder.push("spawn");
+			return {
+				unref: () => {},
+				exited: Promise.resolve(0),
+				stdout: null,
+				stderr: null,
+			} as unknown as ReturnType<typeof Bun.spawn>;
+		}) as unknown as typeof Bun.spawn;
+
+		const config = makeConfig({ pr: { maxCoordinatorResumesPerPr: 3 } });
+		const handlers = prPhaseCell.buildHandlers(makeBaseDeps({ spawn: fakeSpawn }), config);
+		const resume = handlers["resume-coordinator"];
+		expect(resume).toBeDefined();
+		if (!resume) throw new Error("missing handler");
+
+		const mission = makeMission() as Mission;
+		(mission as { coordinatorSessionId: string | null }).coordinatorSessionId = "sess-abc";
+		(mission as { artifactRoot: string | null }).artifactRoot = "/tmp/a";
+
+		await resume(
+			makeCtx({
+				nodeId: "pr-phase:resume-coordinator",
+				mission,
+				checkpoint: {
+					coordinatorResumeCount: 2,
+					comment: { commentId: "cs-inc", author: "op", body: "msg" },
+					classification: { action: "refactor_request", confidence: 0.95 },
+				},
+				saveCheckpoint: async (data: unknown) => {
+					callOrder.push("saveCheckpoint");
+					savedData = data;
+				},
+			}),
+		);
+
+		// saveCheckpoint must fire before spawn
+		expect(callOrder.indexOf("saveCheckpoint")).toBeLessThan(callOrder.indexOf("spawn"));
+		const cp = savedData as { coordinatorResumeCount?: number } | null;
+		expect(cp?.coordinatorResumeCount).toBe(3);
+	});
+});
+
+// =============================================================================
+// #304 — Detached spawn structural verification: T-w3-304-dispatch, T-w3-304-resume
+// =============================================================================
+
+describe("prPhaseCell #304 — detached spawn structural verification", () => {
+	test("T-w3-304-dispatch: dispatch-triage spawn receives detached:true and calls unref() (#304)", async () => {
+		// NOTE (da-r1-09): structural verification only — proves we pass the right
+		// flags. A true functional deadlock-prevention test requires a real
+		// subprocess emitting stdout until the pipe buffer fills; out of scope.
+		let unrefCalled = 0;
+		const capturedOpts: unknown[] = [];
+
+		const fakeSpawn = ((_args: string[], opts?: unknown) => {
+			capturedOpts.push(opts);
+			return {
+				unref: () => {
+					unrefCalled++;
+				},
+				exited: Promise.resolve(0),
+				stdout: null,
+				stderr: null,
+			} as unknown as ReturnType<typeof Bun.spawn>;
+		}) as unknown as typeof Bun.spawn;
+
+		const missionStore = createMockMissionStore();
+		missionStore.countTriageSpawnsSince = () => 0;
+		missionStore.countTriagePerAuthorSince = () => 0;
+
+		const handlers = prPhaseCell.buildHandlers(
+			makeBaseDeps({
+				spawn: fakeSpawn,
+				missionStore: missionStore as unknown as PhaseCellDeps["missionStore"],
+			}),
+			makeConfig(),
+		);
+		const dispatch = handlers["dispatch-triage"];
+		expect(dispatch).toBeDefined();
+		if (!dispatch) throw new Error("missing handler");
+
+		await dispatch(
+			makeCtx({
+				nodeId: "pr-phase:dispatch-triage",
+				mission: makeMission() as unknown as Mission,
+				checkpoint: {
+					comment: { commentId: "d304", author: "op", body: "fix this" },
+				},
+			}),
+		);
+
+		expect(capturedOpts).toHaveLength(1);
+		const opts = capturedOpts[0] as { detached?: boolean } | undefined;
+		expect(opts?.detached).toBe(true);
+		expect(unrefCalled).toBe(1);
+	});
+
+	test("T-w3-304-resume: resume-coordinator spawn receives detached:true and calls unref() (#304)", async () => {
+		// NOTE (da-r1-09): structural verification only — proves we pass the right
+		// flags. A true functional deadlock-prevention test requires a real
+		// subprocess emitting stdout until the pipe buffer fills; out of scope.
+		let unrefCalled = 0;
+		const capturedOpts: unknown[] = [];
+
+		const fakeSpawn = ((_args: string[], opts?: unknown) => {
+			capturedOpts.push(opts);
+			return {
+				unref: () => {
+					unrefCalled++;
+				},
+				exited: Promise.resolve(0),
+				stdout: null,
+				stderr: null,
+			} as unknown as ReturnType<typeof Bun.spawn>;
+		}) as unknown as typeof Bun.spawn;
+
+		const config = makeConfig({ pr: { maxCoordinatorResumesPerPr: 3 } });
+		const handlers = prPhaseCell.buildHandlers(makeBaseDeps({ spawn: fakeSpawn }), config);
+		const resume = handlers["resume-coordinator"];
+		expect(resume).toBeDefined();
+		if (!resume) throw new Error("missing handler");
+
+		const mission = makeMission() as Mission;
+		(mission as { coordinatorSessionId: string | null }).coordinatorSessionId = "sess-abc";
+		(mission as { artifactRoot: string | null }).artifactRoot = "/tmp/a";
+
+		await resume(
+			makeCtx({
+				nodeId: "pr-phase:resume-coordinator",
+				mission,
+				checkpoint: {
+					coordinatorResumeCount: 0,
+					comment: { commentId: "r304", author: "op", body: "msg" },
+					classification: { action: "refactor_request", confidence: 0.95 },
+				},
+			}),
+		);
+
+		expect(capturedOpts).toHaveLength(1);
+		const opts = capturedOpts[0] as { detached?: boolean } | undefined;
+		expect(opts?.detached).toBe(true);
+		expect(unrefCalled).toBe(1);
+	});
+});
+
+// =============================================================================
+// #305 — Per-mission spawn-cap race: skipped pending ws-store-schema
+// =============================================================================
+
+// TODO(blocked on ws-store-schema #305 helper): unskip once MissionStore exposes
+// tryClaimTriageSlot(missionId, commentId, prStart, cap): boolean.
+test.skip("T-w3-305: concurrent dispatch fuzz — 10 parallel events cap=3 → exactly 3 spawns (blocked on ws-store-schema tryClaimTriageSlot)", async () => {
+	// Stub tryClaimTriageSlot on the mock to return true exactly 3 times
+	// and false thereafter (simulating the real atomic SQL).
+	// Run 10 parallel new_comment events.
+	// Assert exactly 3 spawn invocations regardless of arrival order.
 });

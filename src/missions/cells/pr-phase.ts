@@ -15,6 +15,8 @@ import type { PhaseCellConfig, PhaseCellDefinition, PhaseCellDeps } from "./type
 
 const CELL_TYPE = "pr-phase";
 
+const MERGE_METHOD_ALLOWLIST = new Set(["SQUASH", "MERGE", "REBASE"]);
+
 function edge(from: string, to: string, trigger: PrPhaseTrigger | "timeout" | "escalated") {
 	return { from: `${CELL_TYPE}:${from}`, to: `${CELL_TYPE}:${to}`, trigger };
 }
@@ -245,9 +247,6 @@ function buildHandlers(deps: PhaseCellDeps, config?: PhaseCellConfig): HandlerRe
 				if (/branch protection/i.test(stderr)) {
 					return { trigger: "pr_branch_protected" };
 				}
-				if (/rate.?limit/i.test(stderr) || /429/.test(stderr)) {
-					return { trigger: "pr_rate_limited" };
-				}
 				return { trigger: "pr_create_network_fail" };
 			}
 
@@ -351,6 +350,8 @@ function buildHandlers(deps: PhaseCellDeps, config?: PhaseCellConfig): HandlerRe
 				return { trigger: "reply_only" };
 			}
 
+			// TODO(blocked on ws-store-schema #305 helper): replace count+update with atomic
+			// tryClaimTriageSlot(missionId, commentId, prStart, cap) once MissionStore exposes it.
 			// Per-mission cap check
 			const maxPerMission = prCfg?.maxTriageSpawnsPerMission ?? 50;
 			const prState = deps.missionStore.getPrState(ctx.missionId);
@@ -376,15 +377,16 @@ function buildHandlers(deps: PhaseCellDeps, config?: PhaseCellConfig): HandlerRe
 			// Spawn triage agent
 			deps.missionStore.updatePrCommentAction(commentId, "pending", "in_progress");
 			const spawnFn = deps.spawn ?? Bun.spawn;
-			(spawnFn as (args: string[]) => unknown)([
-				"ha",
-				"sling",
-				`triage-${commentId}`,
-				"--capability",
-				"triage",
-				"--comment-id",
-				commentId,
-			]);
+			const triageProc = spawnFn(
+				["ha", "sling", `triage-${commentId}`, "--capability", "triage", "--comment-id", commentId],
+				{
+					cwd: deps.projectRoot,
+					stdout: "pipe",
+					stderr: "pipe",
+					detached: true,
+				},
+			);
+			triageProc.unref();
 
 			return { trigger: "new_comment" };
 		},
@@ -425,20 +427,34 @@ function buildHandlers(deps: PhaseCellDeps, config?: PhaseCellConfig): HandlerRe
 			].join("\n");
 			await Bun.write(specPath, specContent);
 
+			await ctx.saveCheckpoint({
+				...cp,
+				coordinatorResumeCount: resumeCount + 1,
+			});
+
 			const spawnFn = deps.spawn ?? Bun.spawn;
-			(spawnFn as (args: string[]) => unknown)([
-				"ha",
-				"sling",
-				`coordinator-resume-${commentId}`,
-				"--capability",
-				"coordinator",
-				"--spec",
-				specPath,
-				"--files",
-				commentFilePath,
-				"--resume-session-id",
-				mission.coordinatorSessionId,
-			]);
+			const resumeProc = spawnFn(
+				[
+					"ha",
+					"sling",
+					`coordinator-resume-${commentId}`,
+					"--capability",
+					"coordinator",
+					"--spec",
+					specPath,
+					"--files",
+					commentFilePath,
+					"--resume-session-id",
+					mission.coordinatorSessionId,
+				],
+				{
+					cwd: deps.projectRoot,
+					stdout: "pipe",
+					stderr: "pipe",
+					detached: true,
+				},
+			);
+			resumeProc.unref();
 
 			return { trigger: "coordinator_done" };
 		},
@@ -467,12 +483,22 @@ function buildHandlers(deps: PhaseCellDeps, config?: PhaseCellConfig): HandlerRe
 				return { trigger: "pr_head_changed", ...{ payload } };
 			}
 
-			const mergeMethod = (prCfg?.mergeStrategy ?? "squash").toUpperCase();
+			const raw = (prCfg?.mergeStrategy ?? "squash").toUpperCase();
+			if (!MERGE_METHOD_ALLOWLIST.has(raw)) {
+				const payload = { reason: `invalid mergeMethod: ${raw}` };
+				return { trigger: "pr_merge_conflict", ...{ payload } };
+			}
+			const mergeMethod = raw;
+			const mutation = `mutation($pullRequestId: ID!, $expectedHeadOid: GitObjectID!) { mergePullRequest(input: {pullRequestId: $pullRequestId, expectedHeadOid: $expectedHeadOid, mergeMethod: ${mergeMethod}}) { pullRequest { merged } } }`;
 			const graphqlResult = await getGhBudget().runGh([
 				"api",
 				"graphql",
-				"-F",
-				`query=mutation { mergePullRequest(input: {pullRequestId: "${current.id}", expectedHeadOid: "${prState.approvedHeadSha}", mergeMethod: ${mergeMethod}}) { pullRequest { merged } } }`,
+				"-f",
+				`query=${mutation}`,
+				"-f",
+				`pullRequestId=${current.id}`,
+				"-f",
+				`expectedHeadOid=${prState.approvedHeadSha}`,
 			]);
 
 			if (graphqlResult.exitCode !== 0) {
