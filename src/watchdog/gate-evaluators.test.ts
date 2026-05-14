@@ -8,15 +8,14 @@ import { type GhBudget, type GhInvocationResult, setGhBudget } from "../missions
 import { createMockMissionStore, makeMission } from "../missions/test-mocks.ts";
 import type { SessionStore } from "../sessions/store.ts";
 import type { MissionPrCommentRow } from "../types.ts";
-// Namespace import for evaluators not yet implemented (RED phase). Named imports
-// would crash module load; namespace access resolves to `undefined` at runtime
-// so calling these functions throws "is not a function" inside the test (RED),
-// while existing tests remain runnable.
-import * as gateEvaluators from "./gate-evaluators.ts";
 import {
 	computeAdaptiveResearchTimeout,
 	evaluateArchitectDesign,
 	evaluateArchReviewDispatch,
+	evaluateAwaitApproval,
+	evaluateAwaitCI,
+	evaluateAwaitComments,
+	evaluateAwaitDebugComplete,
 	evaluateAwaitPlan,
 	evaluateAwaitResearch,
 	evaluateAwaitResearchComplete,
@@ -29,60 +28,8 @@ import {
 	evaluateUnderstandReady,
 	evaluateWsCompletion,
 	filterMailSinceGate,
-	type GateEvalResult,
+	type PrConfig,
 } from "./gate-evaluators.ts";
-
-const evaluatorsAny = gateEvaluators as Record<string, unknown>;
-const evaluateAwaitCI = evaluatorsAny.evaluateAwaitCI as (
-	mission: ReturnType<typeof makeMission>,
-	missionStore: ReturnType<typeof createMockMissionStore> | null,
-	projectRoot?: string,
-	gateEnteredAt?: string,
-	deps?: {
-		runGh?: GhBudget["runGh"];
-		now?: () => number;
-	},
-) => Promise<GateEvalResult>;
-const evaluateAwaitComments = evaluatorsAny.evaluateAwaitComments as (
-	mission: ReturnType<typeof makeMission>,
-	missionStore: ReturnType<typeof createMockMissionStore> | null,
-	projectRoot?: string,
-	gateEnteredAt?: string,
-	deps?: { runGh?: GhBudget["runGh"]; now?: () => number },
-) => Promise<GateEvalResult & { payload?: unknown }>;
-const evaluateAwaitApproval = evaluatorsAny.evaluateAwaitApproval as (
-	mission: ReturnType<typeof makeMission>,
-	missionStore: ReturnType<typeof createMockMissionStore> | null,
-	mailStore: MailStore | null,
-	projectRoot?: string,
-	gateEnteredAt?: string,
-	deps?: {
-		runGh?: GhBudget["runGh"];
-		now?: () => number;
-		config?: {
-			pr?: {
-				operatorGithubLogin?: string;
-				approvalTimeoutMs?: number;
-				commentsTimeoutMs?: number;
-				ciTimeoutMs?: number;
-				requireOperatorPermission?: boolean;
-			};
-		};
-		addMail?: (msg: {
-			to: string;
-			from: string;
-			type: string;
-			subject: string;
-			body: string;
-		}) => void;
-	},
-) => Promise<GateEvalResult>;
-const evaluateAwaitDebugComplete = evaluatorsAny.evaluateAwaitDebugComplete as (
-	mission: ReturnType<typeof makeMission>,
-	mailStore: MailStore | null,
-	gateEnteredAt?: string,
-	deps?: { now?: () => number; debugTimeoutMs?: number },
-) => GateEvalResult;
 
 type TestMessage = {
 	from: string;
@@ -988,17 +935,51 @@ describe("evaluateAwaitCI [T-w5-1..T-w5-6]", () => {
 		expect(result.trigger).toBe("gh_auth_missing");
 	});
 
-	it("T-w5-6: stderr rate-limit headers → met:true, trigger=pr_rate_limited [arch §5.10]", async () => {
+	it("T-w5-28: custom ciTimeoutMs (5min) fires ci_timeout at 10min elapsed [#303]", async () => {
 		const { store } = trackingMissionStore(42);
+		const gateEnteredAt = "2026-02-01T00:00:00Z";
+		const nowMs = Date.parse("2026-02-01T00:10:00Z"); // 10min elapsed
+		const checksJson = JSON.stringify([{ name: "build", status: "IN_PROGRESS", conclusion: null }]);
+		const budget = fakeBudget(() => makeGhResult(checksJson));
+		const mission = makeMission({ id: "m1", slug: "test" });
+		const prConfig: PrConfig = { ciTimeoutMs: 300_000 }; // 5min
+		const result = await evaluateAwaitCI(mission, store, undefined, gateEnteredAt, {
+			runGh: budget.runGh,
+			now: () => nowMs,
+			prConfig,
+		});
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("ci_timeout");
+	});
+
+	it("T-w5-29: no prConfig keeps 4h default — 3h elapsed returns met:false [#303]", async () => {
+		const { store } = trackingMissionStore(42);
+		const gateEnteredAt = "2026-02-01T00:00:00Z";
+		const nowMs = Date.parse("2026-02-01T03:00:00Z"); // 3h elapsed (< 4h default)
+		const checksJson = JSON.stringify([{ name: "build", status: "IN_PROGRESS", conclusion: null }]);
+		const budget = fakeBudget(() => makeGhResult(checksJson));
+		const mission = makeMission({ id: "m1", slug: "test" });
+		const result = await evaluateAwaitCI(mission, store, undefined, gateEnteredAt, {
+			runGh: budget.runGh,
+			now: () => nowMs,
+		});
+		expect(result.met).toBe(false);
+	});
+
+	it("T-w5-30: stderr X-RateLimit headers + COMPLETED SUCCESS → trigger=ci_passed, NOT pr_rate_limited [#308]", async () => {
+		const { store } = trackingMissionStore(42);
+		const checksJson = JSON.stringify([
+			{ name: "build", status: "COMPLETED", conclusion: "SUCCESS" },
+		]);
 		const budget = fakeBudget(() =>
-			makeGhResult("", "Retry-After: 60\nX-RateLimit-Remaining: 0\n", 1),
+			makeGhResult(checksJson, "X-RateLimit-Remaining: 0\nRetry-After: 60\n", 0),
 		);
 		const mission = makeMission({ id: "m1", slug: "test" });
 		const result = await evaluateAwaitCI(mission, store, undefined, undefined, {
 			runGh: budget.runGh,
 		});
 		expect(result.met).toBe(true);
-		expect(result.trigger).toBe("pr_rate_limited");
+		expect(result.trigger).toBe("ci_passed");
 	});
 });
 
@@ -1066,6 +1047,39 @@ describe("evaluateAwaitComments [T-w5-7..T-w5-9]", () => {
 		expect(result.met).toBe(true);
 		expect(result.trigger).toBe("comments_stale");
 	});
+
+	it("T-w5-31: custom commentsTimeoutMs (5min) fires comments_stale at 10min elapsed [#303]", async () => {
+		const { store } = trackingMissionStore(42);
+		const gateEnteredAt = "2026-02-01T00:00:00Z";
+		const nowMs = Date.parse("2026-02-01T00:10:00Z"); // 10min elapsed
+		const budget = fakeBudget(() => makeGhResult(JSON.stringify({ comments: [], reviews: [] })));
+		const mission = makeMission({ id: "m1", slug: "test" });
+		const prConfig: PrConfig = { commentsTimeoutMs: 300_000 }; // 5min
+		const result = await evaluateAwaitComments(mission, store, undefined, gateEnteredAt, {
+			runGh: budget.runGh,
+			now: () => nowMs,
+			prConfig,
+		});
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("comments_stale");
+	});
+
+	it("T-w5-32: stderr X-RateLimit headers + no new comments → met:false, NOT pr_rate_limited [#308]", async () => {
+		const { store } = trackingMissionStore(42);
+		const budget = fakeBudget(() =>
+			makeGhResult(
+				JSON.stringify({ comments: [], reviews: [] }),
+				"X-RateLimit-Remaining: 0\nRetry-After: 60\n",
+				0,
+			),
+		);
+		const mission = makeMission({ id: "m1", slug: "test" });
+		const result = await evaluateAwaitComments(mission, store, undefined, undefined, {
+			runGh: budget.runGh,
+		});
+		expect(result.met).toBe(false);
+		expect(result.trigger).toBeUndefined();
+	});
 });
 
 describe("evaluateAwaitApproval [T-w5-10..T-w5-18]", () => {
@@ -1110,7 +1124,7 @@ describe("evaluateAwaitApproval [T-w5-10..T-w5-18]", () => {
 		const mission = makeMission({ id: "m1", slug: "test" });
 		const result = await evaluateAwaitApproval(mission, store, null, undefined, undefined, {
 			runGh: budget.runGh,
-			config: { pr: { operatorGithubLogin: "opuser" } },
+			prConfig: { operatorGithubLogin: "opuser" },
 		});
 		expect(result.met).toBe(true);
 		expect(result.trigger).toBe("changes_requested");
@@ -1196,7 +1210,7 @@ describe("evaluateAwaitApproval [T-w5-10..T-w5-18]", () => {
 		const mission = makeMission({ id: "m1", slug: "test" });
 		const result = await evaluateAwaitApproval(mission, store, null, undefined, undefined, {
 			runGh: budget.runGh,
-			config: { pr: { operatorGithubLogin: "opuser" } },
+			prConfig: { operatorGithubLogin: "opuser" },
 		});
 		expect(result.met).toBe(true);
 		expect(result.trigger).toBe("approved");
@@ -1220,7 +1234,7 @@ describe("evaluateAwaitApproval [T-w5-10..T-w5-18]", () => {
 		const mission = makeMission({ id: "m1", slug: "test" });
 		const result = await evaluateAwaitApproval(mission, store, null, undefined, undefined, {
 			runGh: budget.runGh,
-			config: { pr: { operatorGithubLogin: "opuser" } },
+			prConfig: { operatorGithubLogin: "opuser" },
 		});
 		expect(result.met).toBe(true);
 		expect(result.trigger).toBe("approved");
@@ -1244,7 +1258,7 @@ describe("evaluateAwaitApproval [T-w5-10..T-w5-18]", () => {
 		const mission = makeMission({ id: "m1", slug: "test" });
 		const result = await evaluateAwaitApproval(mission, store, null, undefined, undefined, {
 			runGh: budget.runGh,
-			config: { pr: { operatorGithubLogin: "opuser" } },
+			prConfig: { operatorGithubLogin: "opuser" },
 		});
 		expect(result.met).toBe(false);
 	});
@@ -1261,7 +1275,7 @@ describe("evaluateAwaitApproval [T-w5-10..T-w5-18]", () => {
 		const mission = makeMission({ id: "m1", slug: "test" });
 		const result = await evaluateAwaitApproval(mission, store, null, undefined, undefined, {
 			runGh: budget.runGh,
-			config: { pr: { operatorGithubLogin: "opuser" } },
+			prConfig: { operatorGithubLogin: "opuser" },
 		});
 		expect(result.met).toBe(false);
 	});
@@ -1293,6 +1307,59 @@ describe("evaluateAwaitApproval [T-w5-10..T-w5-18]", () => {
 		expect(sentMails.length).toBe(1);
 		expect(result.met).toBe(true);
 		expect(result.trigger).toBe("approval_pending_long");
+	});
+
+	it("T-w5-33: custom approvalTimeoutMs (5min) fires approval_pending_long at 10min, emits addMail [#303]", async () => {
+		const { store } = trackingMissionStore(42);
+		const gateEnteredAt = "2026-02-01T00:00:00Z";
+		const nowMs = Date.parse("2026-02-01T00:10:00Z"); // 10min elapsed
+		const prViewJson = JSON.stringify({
+			reviewDecision: null,
+			headRefOid: "sha1",
+			reviews: [],
+			comments: [],
+		});
+		const budget = fakeBudget(() => makeGhResult(prViewJson));
+		const sentMails: Array<{
+			to: string;
+			from: string;
+			type: string;
+			subject: string;
+			body: string;
+		}> = [];
+		const mission = makeMission({ id: "m1", slug: "test" });
+		const prConfig: PrConfig = { approvalTimeoutMs: 300_000 }; // 5min
+		const result = await evaluateAwaitApproval(mission, store, null, undefined, gateEnteredAt, {
+			runGh: budget.runGh,
+			now: () => nowMs,
+			prConfig,
+			addMail: (msg) => sentMails.push(msg),
+		});
+		expect(sentMails.length).toBe(1);
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("approval_pending_long");
+	});
+
+	it("T-w5-34: stderr X-RateLimit headers + APPROVED review → trigger=approved, NOT pr_rate_limited [#308]", async () => {
+		const { store } = trackingMissionStore(42);
+		const prViewJson = JSON.stringify({
+			reviewDecision: "APPROVED",
+			headRefOid: "sha1",
+			reviews: [
+				{ state: "APPROVED", author: { login: "reviewerA" }, submittedAt: "2026-02-01T00:00:00Z" },
+			],
+			comments: [],
+		});
+		const budget = fakeBudget(() =>
+			makeGhResult(prViewJson, "X-RateLimit-Remaining: 0\nRetry-After: 60\n", 0),
+		);
+		const mission = makeMission({ id: "m1", slug: "test" });
+		const mailStore = createSimpleMailStore([]);
+		const result = await evaluateAwaitApproval(mission, store, mailStore, undefined, undefined, {
+			runGh: budget.runGh,
+		});
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("approved");
 	});
 });
 

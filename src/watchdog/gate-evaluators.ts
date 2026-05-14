@@ -23,6 +23,20 @@ export interface GateEvalResult {
 	payload?: Record<string, unknown>;
 }
 
+/**
+ * Curated subset of OverstoryConfig.pr threaded to PR-phase gate evaluators.
+ * Kept local to this module (per #303) to avoid pulling the full OverstoryConfig
+ * type. Mirrors the corresponding fields on OverstoryConfig.pr — undefined
+ * fields fall back to the DEFAULT_*_TIMEOUT_MS constants below.
+ */
+export type PrConfig = {
+	operatorGithubLogin?: string;
+	approvalTimeoutMs?: number;
+	commentsTimeoutMs?: number;
+	ciTimeoutMs?: number;
+	requireOperatorPermission?: boolean;
+};
+
 const DEFAULT_CI_TIMEOUT_MS = 14_400_000; // 4h
 const DEFAULT_COMMENTS_TIMEOUT_MS = 604_800_000; // 7d
 const DEFAULT_APPROVAL_TIMEOUT_MS = 172_800_000; // 48h
@@ -37,7 +51,7 @@ export async function evaluateAwaitCI(
 	missionStore: MissionStore | null,
 	projectRoot?: string,
 	gateEnteredAt?: string,
-	_deps?: { runGh?: GhBudget["runGh"]; now?: () => number },
+	_deps?: { runGh?: GhBudget["runGh"]; now?: () => number; prConfig?: PrConfig },
 ): Promise<GateEvalResult> {
 	if (!missionStore) return { met: false };
 	const pr = missionStore.getPrState(mission.id);
@@ -59,12 +73,6 @@ export async function evaluateAwaitCI(
 
 	if (result.stderr.includes("Bad credentials") || result.stderr.includes("gh: not logged in")) {
 		return { met: true, trigger: "gh_auth_missing" };
-	}
-	if (
-		result.stderr.includes("X-RateLimit-Remaining: 0") ||
-		result.stderr.includes("Retry-After:")
-	) {
-		return { met: true, trigger: "pr_rate_limited" };
 	}
 
 	let checks: Array<{ name: string; status: string; conclusion: string | null }> = [];
@@ -92,7 +100,8 @@ export async function evaluateAwaitCI(
 		// some IN_PROGRESS — fall through to elapsed check
 	}
 
-	if (gateEnteredAt && now() - new Date(gateEnteredAt).getTime() >= DEFAULT_CI_TIMEOUT_MS) {
+	const ciTimeoutMs = _deps?.prConfig?.ciTimeoutMs ?? DEFAULT_CI_TIMEOUT_MS;
+	if (gateEnteredAt && now() - new Date(gateEnteredAt).getTime() >= ciTimeoutMs) {
 		return { met: true, trigger: "ci_timeout" };
 	}
 	return { met: false };
@@ -105,7 +114,7 @@ export async function evaluateAwaitComments(
 	missionStore: MissionStore | null,
 	projectRoot?: string,
 	gateEnteredAt?: string,
-	_deps?: { runGh?: GhBudget["runGh"]; now?: () => number },
+	_deps?: { runGh?: GhBudget["runGh"]; now?: () => number; prConfig?: PrConfig },
 ): Promise<GateEvalResult> {
 	if (!missionStore) return { met: false };
 	const pr = missionStore.getPrState(mission.id);
@@ -120,12 +129,6 @@ export async function evaluateAwaitComments(
 
 	if (result.stderr.includes("Bad credentials") || result.stderr.includes("gh: not logged in")) {
 		return { met: true, trigger: "gh_auth_missing" };
-	}
-	if (
-		result.stderr.includes("X-RateLimit-Remaining: 0") ||
-		result.stderr.includes("Retry-After:")
-	) {
-		return { met: true, trigger: "pr_rate_limited" };
 	}
 
 	type PrViewCommentsResult = {
@@ -176,7 +179,8 @@ export async function evaluateAwaitComments(
 		}
 	}
 
-	if (gateEnteredAt && now() - new Date(gateEnteredAt).getTime() >= DEFAULT_COMMENTS_TIMEOUT_MS) {
+	const commentsTimeoutMs = _deps?.prConfig?.commentsTimeoutMs ?? DEFAULT_COMMENTS_TIMEOUT_MS;
+	if (gateEnteredAt && now() - new Date(gateEnteredAt).getTime() >= commentsTimeoutMs) {
 		return { met: true, trigger: "comments_stale" };
 	}
 	return { met: false };
@@ -195,15 +199,7 @@ export async function evaluateAwaitApproval(
 	_deps?: {
 		runGh?: GhBudget["runGh"];
 		now?: () => number;
-		config?: {
-			pr?: {
-				operatorGithubLogin?: string;
-				approvalTimeoutMs?: number;
-				commentsTimeoutMs?: number;
-				ciTimeoutMs?: number;
-				requireOperatorPermission?: boolean;
-			};
-		};
+		prConfig?: PrConfig;
 		addMail?: (msg: {
 			to: string;
 			from: string;
@@ -219,7 +215,7 @@ export async function evaluateAwaitApproval(
 
 	const runGh = _deps?.runGh ?? getGhBudget().runGh;
 	const now = _deps?.now ?? (() => Date.now());
-	const prConfig = _deps?.config?.pr;
+	const prConfig = _deps?.prConfig;
 
 	const result = await runGh(
 		["pr", "view", String(pr.prNumber), "--json", "reviewDecision,reviews,headRefOid"],
@@ -228,12 +224,6 @@ export async function evaluateAwaitApproval(
 
 	if (result.stderr.includes("Bad credentials") || result.stderr.includes("gh: not logged in")) {
 		return { met: true, trigger: "gh_auth_missing" };
-	}
-	if (
-		result.stderr.includes("X-RateLimit-Remaining: 0") ||
-		result.stderr.includes("Retry-After:")
-	) {
-		return { met: true, trigger: "pr_rate_limited" };
 	}
 
 	type PrViewApprovalResult = {
@@ -1220,6 +1210,7 @@ export async function evaluateGate(
 	/** Stage C: project root passed through for holdout subprocess cwd. Optional
 	 * for backward compat with evaluators that don't need it. */
 	projectRoot?: string,
+	prConfig?: PrConfig,
 ): Promise<GateEvalResult> {
 	// Node IDs follow cellType:nodeName convention
 	const parts = nodeId.split(":");
@@ -1304,13 +1295,16 @@ export async function evaluateGate(
 			);
 		// PR-phase gates (Stage E)
 		case "await-ci":
-			return evaluateAwaitCI(mission, stores.missionStore ?? null, projectRoot, gateEnteredAt);
+			return evaluateAwaitCI(mission, stores.missionStore ?? null, projectRoot, gateEnteredAt, {
+				prConfig,
+			});
 		case "await-comments":
 			return evaluateAwaitComments(
 				mission,
 				stores.missionStore ?? null,
 				projectRoot,
 				gateEnteredAt,
+				{ prConfig },
 			);
 		case "await-approval":
 			return evaluateAwaitApproval(
@@ -1319,6 +1313,7 @@ export async function evaluateGate(
 				stores.mailStore,
 				projectRoot,
 				gateEnteredAt,
+				{ prConfig },
 			);
 		case "await-debug-complete":
 			return evaluateAwaitDebugComplete(mission, stores.mailStore, gateEnteredAt);

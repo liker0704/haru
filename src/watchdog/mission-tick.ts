@@ -545,6 +545,7 @@ async function processMission(mission: Mission, opts: MissionTickOpts): Promise<
 			artifactRoot,
 			gateFilterTime,
 			opts.projectRoot,
+			opts.config.pr,
 		);
 		if (earlyEval.met && earlyEval.trigger) {
 			const advanceEdge = findSubgraphEdge(tickGraph, currentNodeId, earlyEval.trigger);
