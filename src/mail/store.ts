@@ -50,6 +50,27 @@ export interface MailStore {
 	): MailMessage[];
 
 	getUnread(agentName: string, missionId?: string): MailMessage[];
+
+	/**
+	 * Return pending mail for an agent that is currently in `waiting` state.
+	 *
+	 * Includes both:
+	 * - All `queued` messages addressed to the agent (new arrivals), AND
+	 * - All `claimed` messages addressed to the agent whose `claimed_at` is
+	 *   strictly before `claimedBefore` — i.e. messages the agent claimed but
+	 *   never ack'd before transitioning to waiting.
+	 *
+	 * The second clause exists for the convergence-mail / verify-then-ack
+	 * discipline (#314): an agent can claim multiple convergence messages,
+	 * ack one, then go waiting with the others still in `claimed` state. The
+	 * watchdog must consider those unprocessed claims when deciding whether to
+	 * auto-resume — otherwise the agent deadlocks (see #323).
+	 *
+	 * Claims with `claimed_at >= claimedBefore` are treated as in-flight
+	 * work claimed AFTER the agent's last activity and are excluded.
+	 */
+	getPendingForWaitingAgent(agentName: string, claimedBefore: string): MailMessage[];
+
 	getAll(filters?: {
 		from?: string;
 		to?: string;
@@ -527,6 +548,30 @@ export function createMailStore(dbPath: string): MailStore {
 		LIMIT ${MAX_POLL_BATCH}
 	`);
 
+	// Per #323: includes queued messages (new arrivals) PLUS claimed messages
+	// with claimed_at < $claimed_before. The second clause catches convergence
+	// mail (plan_critic_verdict, worker_done, etc.) that an agent claimed but
+	// went `waiting` without acking — verify-then-ack discipline (#314) leaves
+	// those visible-but-stuck. Strict `<` avoids waking on in-flight claims that
+	// happened during the same tick the agent went waiting.
+	const getPendingForWaitingAgentStmt = db.prepare<
+		MessageRow,
+		{ $to_agent: string; $claimed_before: string }
+	>(`
+		SELECT * FROM messages
+		WHERE to_agent = $to_agent
+		  AND (
+		    (state = 'queued' AND (next_retry_at IS NULL OR next_retry_at <= datetime('now')))
+		    OR (
+		      state = 'claimed'
+		      AND claimed_at IS NOT NULL
+		      AND datetime(claimed_at) < datetime($claimed_before)
+		    )
+		  )
+		ORDER BY created_at ASC
+		LIMIT ${MAX_POLL_BATCH}
+	`);
+
 	const getByThreadStmt = db.prepare<MessageRow, { $thread_id: string }>(`
 		SELECT * FROM messages WHERE thread_id = $thread_id ORDER BY created_at ASC
 		LIMIT ${MAX_POLL_BATCH}
@@ -866,6 +911,14 @@ export function createMailStore(dbPath: string): MailStore {
 				return rows.map(rowToMessage);
 			}
 			const rows = getUnreadStmt.all({ $to_agent: agentName });
+			return rows.map(rowToMessage);
+		},
+
+		getPendingForWaitingAgent(agentName: string, claimedBefore: string): MailMessage[] {
+			const rows = getPendingForWaitingAgentStmt.all({
+				$to_agent: agentName,
+				$claimed_before: claimedBefore,
+			});
 			return rows.map(rowToMessage);
 		},
 

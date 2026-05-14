@@ -1476,20 +1476,27 @@ export async function runDaemonTick(options: DaemonOptions): Promise<void> {
 				}
 			}
 
-			// Nudge waiting agents with unread mail to wake them up.
+			// Nudge waiting agents with pending mail to wake them up.
 			// Only runs if shouldCompleteAgent returned false (agent still needed).
+			// Per #323: include both queued mail AND claimed-but-unprocessed mail
+			// (claimed_at < lastActivity). The latter catches convergence-mail
+			// (verify-then-ack discipline, #314) that the agent claimed but never
+			// ack'd before going waiting — otherwise the agent deadlocks.
 			if (mailStore && session.state === "waiting" && tmuxAlive && session.tmuxSession !== "") {
 				try {
-					const unread = mailStore.getUnread(session.agentName);
-					if (unread.length > 0) {
-						const subjects = unread
+					const pending = mailStore.getPendingForWaitingAgent(
+						session.agentName,
+						session.lastActivity,
+					);
+					if (pending.length > 0) {
+						const subjects = pending
 							.slice(0, 3)
 							.map((m) => m.subject)
 							.join("; ");
 						await nudge(
 							root,
 							session.agentName,
-							`[WATCHDOG] ${unread.length} unread message(s) while waiting: ${subjects}`,
+							`[WATCHDOG] ${pending.length} unread message(s) while waiting: ${subjects}`,
 							true,
 						);
 						store.updateLastActivity(session.agentName);
@@ -1503,7 +1510,7 @@ export async function runDaemonTick(options: DaemonOptions): Promise<void> {
 							level: "info",
 							data: {
 								type: "waiting_agent_mail_nudge",
-								unreadCount: unread.length,
+								unreadCount: pending.length,
 								subjects,
 							},
 						});

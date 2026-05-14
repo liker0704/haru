@@ -211,8 +211,13 @@ async function checkAndResumeWaitingAgents(mission: Mission, opts: MissionTickOp
 		if (tmuxNames.has(session.tmuxSession)) continue;
 		if (!existsSync(session.worktreePath)) continue;
 
-		const unreadCount = opts.mailStore?.getUnread(session.agentName).length ?? 0;
-		if (unreadCount === 0) continue;
+		// Per #323: count both queued AND claimed-but-unprocessed mail.
+		// Convergence-mail (verify-then-ack, #314) can be left claimed when an
+		// agent goes waiting; those messages must still trigger auto-resume.
+		const pendingCount =
+			opts.mailStore?.getPendingForWaitingAgent(session.agentName, session.lastActivity).length ??
+			0;
+		if (pendingCount === 0) continue;
 
 		const attempts = resumeAttempts.get(session.agentName) ?? 0;
 		if (attempts >= MAX_RESUME_ATTEMPTS) {
@@ -224,7 +229,7 @@ async function checkAndResumeWaitingAgents(mission: Mission, opts: MissionTickOp
 					from: "engine",
 					to: coordName,
 					subject: `Cannot resume waiting agent: ${session.agentName}`,
-					body: `Agent ${session.agentName} has ${unreadCount} unread mail items but resume has failed ${attempts} times. Inspect worktree and tmux state manually.`,
+					body: `Agent ${session.agentName} has ${pendingCount} unread mail items but resume has failed ${attempts} times. Inspect worktree and tmux state manually.`,
 					type: "mission_finding",
 					priority: "high",
 					threadId: null,
@@ -249,7 +254,7 @@ async function checkAndResumeWaitingAgents(mission: Mission, opts: MissionTickOp
 				data: JSON.stringify({
 					missionId: mission.id,
 					agentName: session.agentName,
-					unreadCount,
+					unreadCount: pendingCount,
 					attempts: attempts + 1,
 				}),
 			});

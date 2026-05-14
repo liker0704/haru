@@ -1500,6 +1500,131 @@ describe("daemon mulch failure recording", () => {
 		expect(reloaded[0]?.lastActivity).not.toBe(oldActivity);
 	});
 
+	// === Regression test for #323 ===
+	//
+	// A waiting agent has a CLAIMED convergence-mail message in its inbox (e.g. a
+	// plan_critic_verdict it never ack'd due to verify-then-ack discipline, #314).
+	// Before the fix, the waiting-agent nudge scanned only state='queued' mail and
+	// silently deadlocked the mission. After the fix, getPendingForWaitingAgent
+	// returns the claimed-before-cutoff message and the agent is nudged + flipped
+	// back to working.
+	test("waiting agent with claimed convergence-mail is nudged and resumed (#323)", async () => {
+		// Agent's lastActivity is set to a future time so any freshly-claimed message
+		// will have claimed_at < lastActivity, mimicking the real-world ordering
+		// where the agent transitions to waiting AFTER claim.
+		const future = new Date(Date.now() + 60_000).toISOString();
+		const session = makeSession({
+			agentName: "plan-review-lead-323",
+			tmuxSession: "haru-plan-review-lead-323",
+			state: "waiting",
+			lastActivity: future,
+		});
+		writeSessionsToStore(tempRoot, [session]);
+
+		const mailStore = createMailStore(join(tempRoot, ".overstory", "mail.db"));
+		try {
+			mailStore.insert({
+				id: "msg-i9scn2nw0fvp",
+				from: "plan-critic-security",
+				to: "plan-review-lead-323",
+				subject: "Verdict: APPROVE_WITH_NOTES",
+				body: "second-opinion verdict",
+				type: "plan_critic_verdict",
+				priority: "high",
+				threadId: null,
+				payload: null,
+			});
+			// Simulate verify-then-ack: agent claimed this message but never ack'd it.
+			const claimed = mailStore.claim("plan-review-lead-323");
+			expect(claimed).toHaveLength(1);
+			expect(claimed[0]?.state).toBe("claimed");
+		} finally {
+			mailStore.close();
+		}
+
+		const tmuxMock = tmuxWithLivenessAndInput({
+			"haru-plan-review-lead-323": true,
+		});
+		const nudgeMock = nudgeTracker();
+
+		// Pane content with a non-ready prompt — keeps the TUI reconciliation path
+		// from firing so we exercise the dedicated waiting-agent nudge path.
+		await runDaemonTick({
+			root: tempRoot,
+			...THRESHOLDS,
+			_tmux: tmuxMock,
+			_triage: triageAlways("extend"),
+			_nudge: nudgeMock.nudge,
+			_capturePaneContent: async () => "(no ready prompt visible)",
+		});
+
+		// Waiting-agent nudge path should have fired exactly once.
+		const watchdogNudges = nudgeMock.calls.filter((c) => c.message.startsWith("[WATCHDOG]"));
+		expect(watchdogNudges).toHaveLength(1);
+		expect(watchdogNudges[0]?.agentName).toBe("plan-review-lead-323");
+		expect(watchdogNudges[0]?.message).toContain("while waiting");
+		expect(watchdogNudges[0]?.message).toContain("Verdict: APPROVE_WITH_NOTES");
+
+		const reloaded = readSessionsFromStore(tempRoot);
+		expect(reloaded[0]?.state).toBe("working");
+	});
+
+	// === Negative regression test for #323 ===
+	//
+	// A waiting agent with mail claimed AFTER its last activity is treated as
+	// in-flight (the agent is actively processing it). The nudge path must NOT
+	// fire — otherwise we'd duplicate-wake agents that are mid-work.
+	test("waiting agent with claimed in-flight mail (claimed_at >= lastActivity) is NOT nudged (#323)", async () => {
+		// lastActivity is in the distant past — every freshly-claimed message will
+		// have claimed_at > lastActivity → treated as in-flight → excluded.
+		const past = new Date(Date.now() - 600_000).toISOString();
+		const session = makeSession({
+			agentName: "plan-review-lead-323-neg",
+			tmuxSession: "haru-plan-review-lead-323-neg",
+			state: "waiting",
+			lastActivity: past,
+		});
+		writeSessionsToStore(tempRoot, [session]);
+
+		const mailStore = createMailStore(join(tempRoot, ".overstory", "mail.db"));
+		try {
+			mailStore.insert({
+				id: "msg-in-flight-323",
+				from: "plan-critic",
+				to: "plan-review-lead-323-neg",
+				subject: "In-flight verdict",
+				body: "body",
+				type: "plan_critic_verdict",
+				priority: "normal",
+				threadId: null,
+				payload: null,
+			});
+			mailStore.claim("plan-review-lead-323-neg");
+		} finally {
+			mailStore.close();
+		}
+
+		const tmuxMock = tmuxWithLivenessAndInput({
+			"haru-plan-review-lead-323-neg": true,
+		});
+		const nudgeMock = nudgeTracker();
+
+		await runDaemonTick({
+			root: tempRoot,
+			...THRESHOLDS,
+			_tmux: tmuxMock,
+			_triage: triageAlways("extend"),
+			_nudge: nudgeMock.nudge,
+			_capturePaneContent: async () => "(no ready prompt visible)",
+		});
+
+		const watchdogNudges = nudgeMock.calls.filter((c) => c.message.startsWith("[WATCHDOG]"));
+		expect(watchdogNudges).toHaveLength(0);
+
+		const reloaded = readSessionsFromStore(tempRoot);
+		expect(reloaded[0]?.state).toBe("waiting");
+	});
+
 	test("ready zombie session with prior session_end and rate-limit history is resumed", async () => {
 		const oldActivity = new Date(Date.now() - 600_000).toISOString();
 		const session = makeSession({

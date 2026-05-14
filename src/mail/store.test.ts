@@ -203,6 +203,152 @@ describe("createMailStore", () => {
 		});
 	});
 
+	describe("getPendingForWaitingAgent", () => {
+		test("returns queued messages regardless of cutoff (#323)", () => {
+			store.insert({
+				id: "",
+				from: "agent-a",
+				to: "orchestrator",
+				subject: "queued-msg",
+				body: "body",
+				type: "plan_critic_verdict",
+				priority: "normal",
+				threadId: null,
+			});
+
+			// Cutoff far in the past — queued messages are still returned.
+			const pending = store.getPendingForWaitingAgent("orchestrator", "1970-01-01T00:00:00.000Z");
+			expect(pending).toHaveLength(1);
+			expect(pending[0]?.subject).toBe("queued-msg");
+		});
+
+		test("includes claimed messages whose claimed_at < cutoff (#323 regression)", () => {
+			// Insert a convergence-type message and claim it.
+			store.insert({
+				id: "msg-claimed-before-waiting",
+				from: "plan-critic",
+				to: "plan-review-lead",
+				subject: "verdict-A",
+				body: "approve",
+				type: "plan_critic_verdict",
+				priority: "normal",
+				threadId: null,
+			});
+			const claimed = store.claim("plan-review-lead");
+			expect(claimed).toHaveLength(1);
+
+			// Cutoff = far future → claimed_at < cutoff is true → message is returned.
+			const pending = store.getPendingForWaitingAgent(
+				"plan-review-lead",
+				"2999-01-01T00:00:00.000Z",
+			);
+			expect(pending).toHaveLength(1);
+			expect(pending[0]?.id).toBe("msg-claimed-before-waiting");
+			expect(pending[0]?.state).toBe("claimed");
+		});
+
+		test("excludes claimed messages whose claimed_at >= cutoff (in-flight)", () => {
+			store.insert({
+				id: "msg-in-flight",
+				from: "plan-critic",
+				to: "plan-review-lead",
+				subject: "verdict-B",
+				body: "approve",
+				type: "plan_critic_verdict",
+				priority: "normal",
+				threadId: null,
+			});
+			store.claim("plan-review-lead");
+
+			// Cutoff in the distant past → all claimed_at values are >= cutoff → excluded.
+			const pending = store.getPendingForWaitingAgent(
+				"plan-review-lead",
+				"1970-01-01T00:00:00.000Z",
+			);
+			expect(pending).toHaveLength(0);
+		});
+
+		test("excludes acked messages", () => {
+			const msg = store.insert({
+				id: "",
+				from: "agent-a",
+				to: "orchestrator",
+				subject: "already-acked",
+				body: "body",
+				type: "status",
+				priority: "normal",
+				threadId: null,
+			});
+			store.claim("orchestrator");
+			store.ack(msg.id);
+
+			const pending = store.getPendingForWaitingAgent("orchestrator", "2999-01-01T00:00:00.000Z");
+			expect(pending).toHaveLength(0);
+		});
+
+		test("returns messages for the target agent only", () => {
+			store.insert({
+				id: "",
+				from: "agent-a",
+				to: "agent-b",
+				subject: "to-b",
+				body: "body",
+				type: "status",
+				priority: "normal",
+				threadId: null,
+			});
+			store.insert({
+				id: "",
+				from: "agent-a",
+				to: "agent-c",
+				subject: "to-c",
+				body: "body",
+				type: "status",
+				priority: "normal",
+				threadId: null,
+			});
+
+			const pendingB = store.getPendingForWaitingAgent("agent-b", "2999-01-01T00:00:00.000Z");
+			expect(pendingB).toHaveLength(1);
+			expect(pendingB[0]?.subject).toBe("to-b");
+		});
+
+		test("combined: returns queued + claimed-before-cutoff in one call", () => {
+			// 1. Claim a convergence message (msg-A).
+			store.insert({
+				id: "msg-A",
+				from: "plan-critic",
+				to: "plan-review-lead",
+				subject: "verdict-A",
+				body: "approve",
+				type: "plan_critic_verdict",
+				priority: "normal",
+				threadId: null,
+			});
+			store.claim("plan-review-lead");
+
+			// 2. After agent transitions to waiting, a new message (msg-B) arrives as queued.
+			store.insert({
+				id: "msg-B",
+				from: "plan-critic-2",
+				to: "plan-review-lead",
+				subject: "verdict-B",
+				body: "block",
+				type: "plan_critic_verdict",
+				priority: "normal",
+				threadId: null,
+			});
+
+			const pending = store.getPendingForWaitingAgent(
+				"plan-review-lead",
+				"2999-01-01T00:00:00.000Z",
+			);
+			expect(pending).toHaveLength(2);
+			const ids = pending.map((m) => m.id).sort();
+			expect(ids).toEqual(["msg-A", "msg-B"]);
+		});
+	});
+
 	describe("markRead", () => {
 		test("marks a message as read", () => {
 			const msg = store.insert({
