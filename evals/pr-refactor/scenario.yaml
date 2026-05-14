@@ -1,0 +1,13 @@
+description: "Stage E E-4: pr-comment refactor_request triggers mission supersession"
+timeout_ms: 900000
+
+config_overrides:
+  pr:
+    commentTriageAuthors:
+      - bob
+
+startup_actions:
+  - command: mkdir -p /tmp/haru-eval-pr-refactor-state
+    description: "Create eval state directory for mock gh script"
+  - command: ha mission answer --decision approve --reason "Refactor approved by operator"
+    description: "Simulate operator approval for mission supersession (decisions.md S5.19)"

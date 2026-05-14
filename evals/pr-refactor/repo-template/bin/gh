@@ -1,0 +1,67 @@
+#!/bin/bash
+set -e
+
+STATE_DIR="${HARU_EVAL_STATE_DIR:-/tmp/haru-eval-pr-refactor-state}"
+mkdir -p "$STATE_DIR"
+
+# Audit log
+echo "$@" >> "$STATE_DIR/gh-call-log"
+
+COMMENT_ID="r001"
+COMMENT_AUTHOR="bob"
+COMMENT_BODY="Please refactor the authentication module to use the new OAuth2 provider"
+FAKE_PR_URL="https://github.com/eval-org/eval-repo/pull/999"
+
+json_field() {
+	local prev=""
+	for arg in "$@"; do
+		if [ "$prev" = "--json" ]; then
+			echo "$arg"
+			return
+		fi
+		case "$arg" in
+			--json=*) echo "${arg#--json=}"; return ;;
+		esac
+		prev="$arg"
+	done
+}
+
+case "$1 $2" in
+	"pr view")
+		field=$(json_field "$@")
+		case "$field" in
+			comments)
+				COUNT_FILE="$STATE_DIR/comments_call_count"
+				count=0
+				[ -f "$COUNT_FILE" ] && count=$(cat "$COUNT_FILE")
+				count=$((count + 1))
+				printf '%d' "$count" > "$COUNT_FILE"
+				if [ "$count" -eq 1 ]; then
+					printf '{"comments":[{"id":"%s","author":{"login":"%s"},"body":"%s","createdAt":"2026-01-01T00:00:00Z"}]}\n' \
+						"$COMMENT_ID" "$COMMENT_AUTHOR" "$COMMENT_BODY"
+				else
+					printf '{"comments":[]}\n'
+				fi
+				;;
+			reviewDecision)
+				printf '{"reviewDecision":null}\n'
+				;;
+			*)
+				printf '{"comments":[]}\n'
+				;;
+		esac
+		;;
+	"pr close")
+		printf 'Closed pull request #42\n'
+		;;
+	"pr create")
+		printf '%s\n' "$FAKE_PR_URL"
+		;;
+	"pr checks")
+		printf 'All checks pass\n'
+		;;
+	*)
+		echo "gh: unhandled: $*" >&2
+		exit 1
+		;;
+esac

@@ -1,0 +1,13 @@
+description: "Stage E E-3/E-13: pr-comment triage trivial_fix path and coordinator resume"
+timeout_ms: 600000
+
+config_overrides:
+  pr:
+    commentTriageAuthors:
+      - alice
+    triage:
+      minConfidence: 0.85
+
+startup_actions:
+  - command: mkdir -p /tmp/haru-eval-pr-comment-fix-state
+    description: "Create eval state directory for mock gh script"
