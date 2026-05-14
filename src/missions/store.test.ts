@@ -1145,6 +1145,65 @@ describe("migration v13: mission_pr_comments table", () => {
 	});
 });
 
+describe("migration v15: mission_pr_comments indexes", () => {
+	test("T-w1-11: both indexes exist after migration", () => {
+		const probe = new Database(dbPath);
+		const rows = probe
+			.prepare(
+				"SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='mission_pr_comments' ORDER BY name",
+			)
+			.all() as Array<{ name: string }>;
+		probe.close();
+
+		const names = rows.map((r) => r.name);
+		expect(names).toContain("idx_mpc_mission_status_detected");
+		expect(names).toContain("idx_mpc_mission_author_status_detected");
+	});
+
+	test("T-w1-12: countTriageSpawnsSince uses the (mission_id, status, detected_at) index", () => {
+		const probe = new Database(dbPath);
+		const plan = probe
+			.prepare(
+				`EXPLAIN QUERY PLAN SELECT COUNT(*) FROM mission_pr_comments
+				 WHERE mission_id = ? AND status = 'in_progress' AND detected_at > ?`,
+			)
+			.all() as Array<{ detail: string }>;
+		probe.close();
+		const detail = plan.map((p) => p.detail).join(" | ");
+		expect(detail).toContain("idx_mpc_mission_status_detected");
+	});
+
+	test("T-w1-13: countTriagePerAuthorSince uses the (mission_id, author, status, detected_at) index", () => {
+		const probe = new Database(dbPath);
+		const plan = probe
+			.prepare(
+				`EXPLAIN QUERY PLAN SELECT COUNT(*) FROM mission_pr_comments
+				 WHERE mission_id = ? AND author = ? AND status = 'in_progress' AND detected_at > ?`,
+			)
+			.all() as Array<{ detail: string }>;
+		probe.close();
+		const detail = plan.map((p) => p.detail).join(" | ");
+		expect(detail).toContain("idx_mpc_mission_author_status_detected");
+	});
+
+	test("T-w1-14: migration is idempotent — second open does not throw and indexes remain", () => {
+		// Re-open the store; ensureMigrations should be a no-op at version 15.
+		const second = createMissionStore(dbPath);
+		try {
+			const probe = new Database(dbPath);
+			const rows = probe
+				.prepare(
+					"SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='mission_pr_comments'",
+				)
+				.all() as Array<{ name: string }>;
+			probe.close();
+			expect(rows.length).toBeGreaterThanOrEqual(2);
+		} finally {
+			second.close();
+		}
+	});
+});
+
 describe("MissionStore PR state accessors", () => {
 	function baseState(overrides: Partial<MissionPrStateRow> = {}): MissionPrStateRow {
 		return {
@@ -1249,14 +1308,43 @@ describe("MissionStore PR comment accessors", () => {
 		};
 	}
 
-	test("T-w1-8: recordPrComment is INSERT OR IGNORE by comment_id (first write wins)", () => {
+	test("T-w1-8: recordPrComment UPSERTs body/author; preserves triage state on conflict", () => {
 		store.create(makeMission());
-		ext(store).recordPrComment(baseComment({ commentId: "c1", body: "first" }));
-		ext(store).recordPrComment(baseComment({ commentId: "c1", body: "second" }));
+		// First insert with initial body + post-triage state
+		ext(store).recordPrComment(
+			baseComment({
+				commentId: "c1",
+				body: "A",
+				author: "octocat",
+				action: "reply_only",
+				status: "responded",
+				detectedAt: "2026-05-13T01:00:00Z",
+				fixCycles: 2,
+			}),
+		);
+		// Edit: same comment_id, new body + author, but action/status reset (as a poll would do)
+		ext(store).recordPrComment(
+			baseComment({
+				commentId: "c1",
+				body: "B",
+				author: "octocat-edited",
+				action: null,
+				status: "open",
+				detectedAt: "2026-05-13T05:00:00Z",
+				fixCycles: 0,
+				resolvedAt: null,
+			}),
+		);
 
 		const rows = ext(store).listPrComments("mission-001");
 		expect(rows).toHaveLength(1);
-		expect(rows[0]?.body).toBe("first");
+		const r = rows[0];
+		expect(r?.body).toBe("B"); // body updated
+		expect(r?.author).toBe("octocat-edited"); // author updated
+		expect(r?.action).toBe("reply_only"); // preserved
+		expect(r?.status).toBe("responded"); // preserved
+		expect(r?.detectedAt).toBe("2026-05-13T01:00:00Z"); // preserved (first-seen)
+		expect(r?.fixCycles).toBe(2); // preserved
 	});
 
 	test("listPrComments returns all rows for the mission", () => {

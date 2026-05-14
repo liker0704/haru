@@ -871,9 +871,27 @@ const MISSION_MIGRATIONS: Migration[] = [
 					"SELECT sql FROM sqlite_master WHERE type='table' AND name='missions'",
 				)
 				.get();
-			return row
-				? row.sql.includes("'superseded'") && row.sql.includes("'pr-phase'")
-				: false;
+			return row ? row.sql.includes("'superseded'") && row.sql.includes("'pr-phase'") : false;
+		},
+	},
+	{
+		version: 15,
+		description: "Indexes on mission_pr_comments for triage hot-path queries (#306, indexes-only)",
+		up: (db) => {
+			db.exec(
+				"CREATE INDEX IF NOT EXISTS idx_mpc_mission_status_detected ON mission_pr_comments(mission_id, status, detected_at)",
+			);
+			db.exec(
+				"CREATE INDEX IF NOT EXISTS idx_mpc_mission_author_status_detected ON mission_pr_comments(mission_id, author, status, detected_at)",
+			);
+		},
+		detect: (db) => {
+			const rows = db
+				.prepare<{ name: string }, []>(
+					"SELECT name FROM sqlite_master WHERE type='index' AND name IN ('idx_mpc_mission_status_detected', 'idx_mpc_mission_author_status_detected')",
+				)
+				.all();
+			return rows.length === 2;
 		},
 	},
 ];
@@ -1756,9 +1774,12 @@ export function createMissionStore(dbPath: string): MissionStore {
 					$resolved_at: string | null;
 				}
 			>(
-				`INSERT OR IGNORE INTO mission_pr_comments
+				`INSERT INTO mission_pr_comments
 				 (mission_id, pr_number, comment_id, author, body, action, status, fix_cycles, detected_at, resolved_at)
-				 VALUES ($mission_id, $pr_number, $comment_id, $author, $body, $action, $status, $fix_cycles, $detected_at, $resolved_at)`,
+				 VALUES ($mission_id, $pr_number, $comment_id, $author, $body, $action, $status, $fix_cycles, $detected_at, $resolved_at)
+				 ON CONFLICT(comment_id) DO UPDATE SET
+				   body = excluded.body,
+				   author = excluded.author`,
 			);
 			return (row: MissionPrCommentRow): void => {
 				stmt.run({
