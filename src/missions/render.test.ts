@@ -21,7 +21,7 @@
 
 import { describe, expect, test } from "bun:test";
 import type { Mission } from "../types.ts";
-import { renderMissionNarrative } from "./render.ts";
+import { nodeHintLines, renderMissionNarrative } from "./render.ts";
 
 // === Shared fixtures ===
 
@@ -134,5 +134,51 @@ describe("renderMissionNarrative", () => {
 		const result1 = renderMissionNarrative(mission, "/path/one");
 		const result2 = renderMissionNarrative(mission, "/path/two");
 		expect(result1).toBe(result2);
+	});
+});
+
+// === nodeHintLines ===
+//
+// Pure function: given an engine node ID and a Mission, return an array of
+// operator-facing hint lines (or [] when no hint applies).
+
+describe("nodeHintLines", () => {
+	test("returns empty array when currentNodeId is null", () => {
+		expect(nodeHintLines(null, makeMission())).toEqual([]);
+	});
+
+	test("returns empty array when currentNodeId is undefined", () => {
+		expect(nodeHintLines(undefined, makeMission())).toEqual([]);
+	});
+
+	test("returns empty array for unknown nodes", () => {
+		expect(nodeHintLines("understand:active", makeMission())).toEqual([]);
+		expect(nodeHintLines("execute-phase:something", makeMission())).toEqual([]);
+	});
+
+	test("hints spec approve/reject at intake-phase:human-spec-review when pending", () => {
+		const lines = nodeHintLines(
+			"intake-phase:human-spec-review",
+			makeMission({ pendingUserInput: true, pendingInputKind: "question" }),
+		);
+		expect(lines.length).toBeGreaterThan(0);
+		const joined = lines.join("\n");
+		expect(joined).toContain("product-spec.md");
+		expect(joined).toContain("ha mission spec approve");
+		expect(joined).toContain("ha mission spec reject");
+	});
+
+	test("does NOT hint at human-spec-review when not pending user input", () => {
+		const lines = nodeHintLines(
+			"intake-phase:human-spec-review",
+			makeMission({ pendingUserInput: false }),
+		);
+		expect(lines).toEqual([]);
+	});
+
+	test("hints handoff at plan-phase:await-handoff", () => {
+		const lines = nodeHintLines("plan-phase:await-handoff", makeMission());
+		expect(lines.length).toBeGreaterThan(0);
+		expect(lines.join("\n")).toContain("ha mission handoff");
 	});
 });

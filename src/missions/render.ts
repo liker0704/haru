@@ -172,6 +172,14 @@ export async function missionStatus(
 					);
 				}
 			}
+
+			const hintLines = nodeHintLines(engineStatus.currentNodeId, mission);
+			if (hintLines.length > 0) {
+				process.stdout.write("\n");
+				for (const line of hintLines) {
+					process.stdout.write(`  ${line}\n`);
+				}
+			}
 		}
 	} finally {
 		missionStore.close();
@@ -504,4 +512,44 @@ function renderGraphPositionWithNode(
 		}
 	}
 	return base;
+}
+
+/**
+ * Operator hints keyed by mission engine node IDs.
+ *
+ * When a mission is parked at a known gate, `ha mission status` shows a
+ * "what do I do next?" hint pointing at the right CLI command. Add new
+ * entries as additional human gates are introduced.
+ *
+ * The optional `Mission` argument lets a hint vary based on mission state
+ * (e.g., gate the human-spec-review hint to supervised missions).
+ */
+type NodeHintFn = (mission: Mission) => string[];
+
+const NODE_HINTS: Record<string, NodeHintFn> = {
+	"intake-phase:human-spec-review": (mission) => {
+		if (!mission.pendingUserInput) return [];
+		return [
+			"Hint: Review the product-spec.md and run:",
+			"      ha mission spec approve      # if the spec captures intent correctly",
+			'      ha mission spec reject       # if it needs revision (add --reason "<text>")',
+		];
+	},
+	"plan-phase:await-handoff": () => [
+		"Hint: Plan is ready. Run `ha mission handoff` to advance into execute.",
+	],
+};
+
+/**
+ * Returns operator hint lines for the given engine node, or [] if no hint
+ * applies. Exported for tests; the rendering caller adds its own indentation.
+ */
+export function nodeHintLines(
+	currentNodeId: string | null | undefined,
+	mission: Mission,
+): string[] {
+	if (!currentNodeId) return [];
+	const fn = NODE_HINTS[currentNodeId];
+	if (!fn) return [];
+	return fn(mission);
 }
