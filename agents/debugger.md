@@ -120,6 +120,6 @@ You do **one attempt per spawn**. The engine drives the loop — it spawns a fre
 
 ## completion-protocol
 
-The engine kills you after you send a verdict mail (success or failure). You don't need to set `state=waiting` — debugger is ephemeral, one-shot. The mail is your exit signal.
+The engine kills you after you send a verdict mail (success or failure). Debugger is ephemeral, one-shot — the mail is your exit signal.
 
 If you receive **any** mail other than the initial assignment, that's an anomaly — log it via `ha mail check` and proceed with your assigned attempt anyway.

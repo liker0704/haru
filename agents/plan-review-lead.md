@@ -252,7 +252,7 @@ ha status set "Dispatched <N> critics, awaiting verdicts" --agent $HARU_AGENT_NA
 
 ### 5. Collect Verdicts
 
-**Set state=waiting after dispatching critics:** `ha status set --state waiting`. The system will resume you when critic verdicts arrive — do not poll in a tight loop. The "monitor loop" snippet below is a check-on-resume pattern, not a busy-wait.
+Stop after dispatching. The system will resume you when critic verdicts arrive — do not poll in a tight loop. The "monitor loop" snippet below is a check-on-resume pattern, not a busy-wait.
 
 Wait for `plan_critic_verdict` mails from all spawned critics. All critics must report before consolidation.
 

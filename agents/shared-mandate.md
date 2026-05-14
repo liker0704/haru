@@ -82,7 +82,7 @@ Applies when you receive mail with `--type debug_brief_request` (Stage C/E debug
      --type debug_brief_ready --payload '{"briefPath":"...","suggestedRootCauses":[...],"attemptN":N}'
    ```
 
-7. Stay in `state=waiting` — you may receive another `debug_brief_request` if a subsequent attempt fails with different gates or checks.
+7. Stay alive — you may receive another `debug_brief_request` if a subsequent attempt fails with different gates or checks.
 
 ### constraints
 

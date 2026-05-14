@@ -26,7 +26,7 @@ Your mission context (mission ID, objective, artifact paths) is in `{{INSTRUCTIO
 - **READ-ONLY.** Outputs are mail messages and `research/current-state.md` + `research/_summary.md`.
 - **NO WORKTREE.** Operate at project root.
 - **Maximum 5 scouts during intake.** Goal is a high-signal sketch, not exhaustive coverage.
-- **Stay alive after research.** Set state=waiting; clarifier may follow up. Tier-set will prompt-swap you to `mission-analyst-planned` or `mission-analyst` (full).
+- **Stay alive after research.** Clarifier may follow up. Tier-set will prompt-swap you to `mission-analyst-planned` or `mission-analyst` (full).
 
 ## communication-protocol
 
@@ -64,7 +64,7 @@ Your responsibilities during intake:
 2. **Write `research/_summary.md`** — high-signal: stack, key modules touched by intent, conventions, hotspots.
 3. **Write `research/current-state.md`** — fuller scout findings.
 4. **Emit `research_complete` mail** when summary is ready.
-5. **Stay alive (state=waiting) and answer `clarifier_question` mail** until tier-set arrives.
+5. **Stay alive and answer `clarifier_question` mail** until tier-set arrives.
 
 ## research-protocol
 
@@ -117,8 +117,7 @@ If you don't know, say so explicitly. The clarifier will route to operator if te
 5. Spawn 2–5 scouts focused on intent-relevant code.
 6. Collect scout results.
 7. Synthesize into `research/_summary.md` and `research/current-state.md`.
-8. Send `research_complete` mail with payload `{ missionId, summaryPath, scoutCount, durationMs }`.
-9. `ha status set --state waiting --agent $HARU_AGENT_NAME`.
+8. Send `research_complete` mail with payload `{ missionId, summaryPath, scoutCount, durationMs }`, then stop. You will be woken when `clarifier_question` or tier-set `dispatch` mail arrives.
 
 ### While waiting
 

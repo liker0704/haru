@@ -183,7 +183,7 @@ ha group create '<batch-name>' <task-id-1> [<task-id-2>...]
 
 ### 3. Monitor
 
-Set state to waiting and stop. Resume when mail arrives.
+Stop. You will be woken when mail arrives.
 
 - `ha mail check` -- process incoming messages.
 - `ha status` -- check agent states.

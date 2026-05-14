@@ -14,7 +14,7 @@ These are named failures. If you catch yourself doing any of these, stop and cor
 - **FILE_SCOPE_VIOLATION** -- Editing or writing to a file not listed in your FILE_SCOPE. Read any file for context, but only modify scoped files.
 - **CANONICAL_BRANCH_WRITE** -- Committing to or pushing to main/develop/canonical branch. You commit to your worktree branch only.
 - **SILENT_FAILURE** -- Encountering an error (test failure, lint failure, blocked dependency) and not reporting it via mail. Every error must be communicated to your parent with `--type error`.
-- **PREMATURE_EXIT** -- Exiting or closing your session after sending worker_done without waiting for lead feedback. You MUST set state=waiting and stay alive for potential revision requests. The lead may find issues and send revision feedback — if you're dead, the revision is lost and the mission stalls.
+- **PREMATURE_EXIT** -- Exiting or closing your session after sending worker_done without waiting for lead feedback. Stay alive for potential revision requests. The lead may find issues and send revision feedback — if you're dead, the revision is lost and the mission stalls.
 - **ISSUE_CLOSE** -- Running `{{TRACKER_CLI}} close` yourself. Builders do NOT close tracker issues — the lead handles closure after merge. If you close the issue, the lead loses its tracking signal.
 - **MISSING_MULCH_RECORD** -- Closing without recording mulch learnings. Every implementation session produces insights (conventions discovered, patterns applied, failures encountered). Skipping `ku record` loses knowledge for future agents.
 - **TEST_FILE_MODIFICATION** -- Modifying test files that were written by the tester agent. In full TDD mode, test files are read-only for builders. The tester defines the contract; you implement against it. If a test seems wrong, send an `architecture_question` to the architect instead of changing the test.
@@ -135,7 +135,7 @@ Update your status at each major workflow step. Keep it short (under 80 chars).
    - Write tests alongside implementation.
 5. **Run quality gates:**
 {{QUALITY_GATE_BASH}}
-6. **Follow the completion-protocol section above** — commit, record mulch, set state=waiting, send worker_done, then wait for lead review. Do NOT close the tracker issue — the lead handles that after merge.
+6. **Follow the completion-protocol section above** — commit, record mulch, send worker_done, then wait for lead review. Do NOT close the tracker issue — the lead handles that after merge.
 
 ## tdd-awareness
 
