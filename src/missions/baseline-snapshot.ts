@@ -21,6 +21,8 @@ interface CaptureDeps {
 		cmd: string[],
 		cwd: string,
 	) => Promise<{ exitCode: number; stdout: string; stderr: string }>;
+	// DI seam: caller wires recordMissionEvent; tests inject a capture function
+	emitEvent?: (kind: string, payload: Record<string, unknown>) => void;
 }
 
 // === Default subprocess runner ===
@@ -130,6 +132,7 @@ export async function backfillBaseline(
 ): Promise<void> {
 	const runQualityGates = deps?.runQualityGates ?? checkQualityGates;
 	const runCommand = deps?.runCommand ?? defaultRunCommand;
+	const emitEvent = deps?.emitEvent ?? (() => {});
 
 	const resultsDir = join(artifactRoot, "results");
 	await mkdir(resultsDir, { recursive: true });
@@ -143,7 +146,7 @@ export async function backfillBaseline(
 
 	if (worktreeResult.exitCode !== 0) {
 		await writeFile(join(resultsDir, ".baseline-backfill-failed"), "");
-		// TODO: emit baseline_backfilled event (for w5/w8 wiring)
+		emitEvent("baseline_backfill_failed", { reason: "worktree_add_failed", artifactRoot });
 		return;
 	}
 
@@ -155,13 +158,18 @@ export async function backfillBaseline(
 
 		await writeFile(join(resultsDir, "baseline.json"), JSON.stringify(checks, null, 2));
 		await writeFile(join(resultsDir, ".baseline-backfilled"), "");
-		// TODO: emit baseline_backfilled event (for w5/w8 wiring)
+		emitEvent("baseline_backfilled", { artifactRoot, baselinePath: "results/baseline.json" });
 	} catch (err) {
 		console.error(
 			`[baseline-snapshot] backfillBaseline failed for mission ${missionId}:`,
 			err instanceof Error ? err.message : String(err),
 		);
 		await writeFile(join(resultsDir, ".baseline-backfill-failed"), "");
+		emitEvent("baseline_backfill_failed", {
+			reason: "quality_gates_failed",
+			artifactRoot,
+			error: err instanceof Error ? err.message : String(err),
+		});
 	} finally {
 		// Best-effort cleanup
 		await runCommand(["git", "worktree", "remove", tempDir, "--force"], projectRoot).catch(

@@ -252,6 +252,54 @@ describe("backfillBaseline", () => {
 	});
 });
 
+describe("backfillBaseline events", () => {
+	test("T-25: happy path emits baseline_backfilled with artifactRoot and baselinePath", async () => {
+		const events: Array<{ kind: string; payload: Record<string, unknown> }> = [];
+		await backfillBaseline("mission-x", artifactRoot, projectRoot, "feature/x", {
+			runQualityGates: async () => [fakeCheck("l1-tests", "pass")],
+			runCommand: async () => ({ exitCode: 0, stdout: "", stderr: "" }),
+			emitEvent: (kind, payload) => events.push({ kind, payload }),
+		});
+		const backfilled = events.find((e) => e.kind === "baseline_backfilled");
+		expect(backfilled).toBeDefined();
+		expect(backfilled?.payload.artifactRoot).toBe(artifactRoot);
+		expect(backfilled?.payload.baselinePath).toBe("results/baseline.json");
+	});
+
+	test("T-26: worktree-add failure emits baseline_backfill_failed with reason=worktree_add_failed", async () => {
+		const events: Array<{ kind: string; payload: Record<string, unknown> }> = [];
+		await backfillBaseline("mission-x", artifactRoot, projectRoot, "feature/x", {
+			runQualityGates: async () => [fakeCheck("l1-tests", "pass")],
+			runCommand: async (cmd) => {
+				if (cmd[0] === "git" && cmd[1] === "worktree" && cmd[2] === "add") {
+					return { exitCode: 1, stdout: "", stderr: "worktree exists" };
+				}
+				return { exitCode: 0, stdout: "", stderr: "" };
+			},
+			emitEvent: (kind, payload) => events.push({ kind, payload }),
+		});
+		const failed = events.find((e) => e.kind === "baseline_backfill_failed");
+		expect(failed).toBeDefined();
+		expect(failed?.payload.reason).toBe("worktree_add_failed");
+	});
+
+	test("T-27: quality-gates failure emits baseline_backfill_failed with reason=quality_gates_failed and error string", async () => {
+		const events: Array<{ kind: string; payload: Record<string, unknown> }> = [];
+		await backfillBaseline("mission-x", artifactRoot, projectRoot, "feature/x", {
+			runQualityGates: async () => {
+				throw new Error("gates exploded");
+			},
+			runCommand: async () => ({ exitCode: 0, stdout: "", stderr: "" }),
+			emitEvent: (kind, payload) => events.push({ kind, payload }),
+		});
+		const failed = events.find((e) => e.kind === "baseline_backfill_failed");
+		expect(failed).toBeDefined();
+		expect(failed?.payload.reason).toBe("quality_gates_failed");
+		expect(typeof failed?.payload.error).toBe("string");
+		expect(failed?.payload.error as string).toContain("gates exploded");
+	});
+});
+
 describe("baselineExists", () => {
 	test("T-20: returns false when neither sentinel exists", async () => {
 		expect(await baselineExists(artifactRoot)).toBe(false);
