@@ -112,6 +112,10 @@ export function createMissionCommand(): Command {
 			"--branch <existing-branch>",
 			"Reuse an existing branch as the feature branch (use with --continue-from to reuse the prior mission's branch; default: derive new name)",
 		)
+		.option(
+			"--feature-branch <name>",
+			"Explicit override for the per-mission integration branch name (default: mission/<slug>)",
+		)
 		.action(
 			async (
 				intentArgs: string[],
@@ -125,6 +129,7 @@ export function createMissionCommand(): Command {
 					json?: boolean;
 					continueFrom?: string;
 					branch?: string;
+					featureBranch?: string;
 				},
 			) => {
 				const cwd = process.cwd();
@@ -195,6 +200,7 @@ export function createMissionCommand(): Command {
 					requireIntent,
 					continueFromMissionId: opts.continueFrom,
 					existingBranch: opts.branch,
+					featureBranch: opts.featureBranch,
 				});
 			},
 		);

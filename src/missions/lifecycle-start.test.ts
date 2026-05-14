@@ -111,6 +111,114 @@ describe("missionStart", () => {
 	});
 });
 
+describe("missionStart feature branch (issue #321)", () => {
+	test("defaults feature_branch to mission/<slug> and materializes branch in git", async () => {
+		// Set up a real git repo at projectRoot so materializeFeatureBranch
+		// can create a branch.
+		const { createTempGitRepo, runGitInDir } = await import("../test-helpers.ts");
+		const repoDir = await createTempGitRepo();
+		const repoOverstoryDir = join(repoDir, ".overstory");
+		await Bun.write(join(repoOverstoryDir, ".keep"), "");
+		await Bun.write(
+			join(repoOverstoryDir, "agent-manifest.json"),
+			JSON.stringify(buildAgentManifest(), null, "\t"),
+		);
+		await Bun.write(
+			join(repoDir, ".overstory", "config.yaml"),
+			["version: 1", "watchdog:", "  tier0Enabled: false", "mission:", "  maxConcurrent: 1"].join(
+				"\n",
+			),
+		);
+		// Add an origin/main ref so `git branch mission/<slug> origin/main` resolves.
+		await runGitInDir(repoDir, ["update-ref", "refs/remotes/origin/main", "HEAD"]);
+
+		const deps = {
+			startMissionCoordinator: makeRoleStub("c"),
+			startMissionAnalyst: makeRoleStub("a"),
+			stopMissionRole: async () => ({}) as never,
+		} as MissionCommandDeps;
+
+		await missionStart(
+			repoOverstoryDir,
+			repoDir,
+			{ slug: "issue-321-default", objective: "test", json: true },
+			deps,
+		);
+
+		const store = createMissionStore(join(repoOverstoryDir, "sessions.db"));
+		let featureBranch: string | null | undefined;
+		try {
+			const m = store.list().find((mm) => mm.slug === "issue-321-default");
+			featureBranch = m?.featureBranch;
+		} finally {
+			store.close();
+		}
+		expect(featureBranch).toBe("mission/issue-321-default");
+
+		// Verify the branch actually exists in git
+		const branches = await runGitInDir(repoDir, ["branch", "--list", "mission/issue-321-default"]);
+		expect(branches.trim()).toContain("mission/issue-321-default");
+
+		await rm(repoDir, { recursive: true, force: true });
+	});
+
+	test("--feature-branch <name> overrides the default mission/<slug> name", async () => {
+		const deps = {
+			startMissionCoordinator: makeRoleStub("c"),
+			startMissionAnalyst: makeRoleStub("a"),
+			stopMissionRole: async () => ({}) as never,
+		} as MissionCommandDeps;
+
+		await missionStart(
+			overstoryDir,
+			projectRoot,
+			{
+				slug: "issue-321-override",
+				objective: "test override",
+				featureBranch: "custom/integration",
+				json: true,
+			},
+			deps,
+		);
+
+		const store = createMissionStore(join(overstoryDir, "sessions.db"));
+		try {
+			const m = store.list().find((mm) => mm.slug === "issue-321-override");
+			expect(m?.featureBranch).toBe("custom/integration");
+		} finally {
+			store.close();
+		}
+	});
+
+	test("--branch (existingBranch / continue-from) takes priority over default mission/<slug>", async () => {
+		const deps = {
+			startMissionCoordinator: makeRoleStub("c"),
+			startMissionAnalyst: makeRoleStub("a"),
+			stopMissionRole: async () => ({}) as never,
+		} as MissionCommandDeps;
+
+		await missionStart(
+			overstoryDir,
+			projectRoot,
+			{
+				slug: "issue-321-continue",
+				objective: "continue-from path",
+				existingBranch: "mission/predecessor",
+				json: true,
+			},
+			deps,
+		);
+
+		const store = createMissionStore(join(overstoryDir, "sessions.db"));
+		try {
+			const m = store.list().find((mm) => mm.slug === "issue-321-continue");
+			expect(m?.featureBranch).toBe("mission/predecessor");
+		} finally {
+			store.close();
+		}
+	});
+});
+
 describe("missionStart --spec power-user paths", () => {
 	async function startWithSpec(opts: {
 		specFile: string;

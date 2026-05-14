@@ -182,6 +182,19 @@ describe("createMissionCommand", () => {
 		expect(description).toMatch(/continue-from|existing|reuse|branch/);
 	});
 
+	test("issue #321: start subcommand exposes --feature-branch <name> flag", () => {
+		const cmd = createMissionCommand();
+		const start = cmd.commands.find((command) => command.name() === "start");
+		const featureBranchOpt = start?.options.find((option) => option.long === "--feature-branch");
+		expect(featureBranchOpt).toBeDefined();
+		// Takes a value (branch name) — not a boolean flag.
+		expect(featureBranchOpt?.required || featureBranchOpt?.optional).toBe(true);
+		const description = (featureBranchOpt?.description ?? "").toLowerCase();
+		expect(description.length).toBeGreaterThan(0);
+		// Description should mention the default or the override semantics.
+		expect(description).toMatch(/mission\/|default|override|branch/);
+	});
+
 	test("resolveCurrentMissionId recovers from MissionStore when current-mission.txt is missing", async () => {
 		const missionStore = createMissionStore(join(overstoryDir, "sessions.db"));
 		try {

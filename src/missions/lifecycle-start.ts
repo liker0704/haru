@@ -13,14 +13,13 @@ import { createRunStore } from "../sessions/store.ts";
 import type { InsertMission } from "../types.ts";
 import { createWatchdogControl } from "../watchdog/control.ts";
 import { listSessions } from "../worktree/tmux.ts";
+import { captureBaseline } from "./baseline-snapshot.ts";
 import {
 	buildMissionRoleBeacon,
 	ensureMissionArtifacts,
 	materializeMissionRolePrompt,
 } from "./context.ts";
 import { shouldUseEngine, transitionMissionViaEngine } from "./engine-wiring.ts";
-import { captureBaseline } from "./baseline-snapshot.ts";
-import { applyContinueFrom } from "./predecessor.ts";
 import { recordMissionEvent } from "./events.ts";
 import { resolveCurrentMissionId, toSummary } from "./lifecycle-helpers.ts";
 import type { MissionCommandDeps } from "./lifecycle-types.ts";
@@ -30,6 +29,7 @@ import {
 	sendMissionControlMail,
 	sendMissionDispatchMail,
 } from "./messaging.ts";
+import { applyContinueFrom } from "./predecessor.ts";
 import { startMissionAnalyst, startMissionCoordinator, stopMissionRole } from "./roles.ts";
 import { removeActiveMission, writeMissionRuntimePointers } from "./runtime-context.ts";
 import { generateSlugFromIntent } from "./slug.ts";
@@ -69,28 +69,25 @@ async function validateRequiredCapabilities(overstoryDir: string): Promise<CapCh
 }
 
 /**
- * Stage C: resolve mission feature branch — the integration target where
- * workstream merges land. Mirrors `src/commands/merge.ts:153-169` resolution
- * order: `.overstory/session-branch.txt` content (operator's working branch)
- * if present, otherwise project's canonical branch from config.
+ * Issue #321: materialize a per-mission integration branch in git so that
+ * workstream merges accumulate on `mission/<slug>` and pr-phase:create can
+ * open a PR from `mission/<slug>` → `main`. Idempotent: existing branches
+ * are left untouched (git's "branch already exists" error is swallowed).
  *
- * Returns null if neither is resolvable (extremely unlikely; the engine's
- * Stage C holdout evaluator gracefully degrades on null via `holdout_skip`).
+ * Does NOT create a worktree — that is per-agent worktree responsibility.
+ * Failures are non-fatal: the mission row already has feature_branch set,
+ * and the branch can be created on first push if missing.
  */
-async function resolveFeatureBranch(
-	overstoryDir: string,
-	config: Awaited<ReturnType<typeof loadConfig>>,
-): Promise<string | null> {
-	try {
-		const sessionBranchFile = Bun.file(join(overstoryDir, "session-branch.txt"));
-		if (await sessionBranchFile.exists()) {
-			const content = (await sessionBranchFile.text()).trim();
-			if (content) return content;
-		}
-	} catch {
-		// fall through to canonical
-	}
-	return config.project.canonicalBranch ?? null;
+async function materializeFeatureBranch(projectRoot: string, branchName: string): Promise<void> {
+	// `git branch <name> origin/main` fails fast if <name> already exists;
+	// we treat that as success (idempotent). Other failures are swallowed
+	// because the mission can still proceed and a later merge step will
+	// surface a real branch error.
+	const proc = Bun.spawn(["git", "-C", projectRoot, "branch", branchName, "origin/main"], {
+		stdout: "pipe",
+		stderr: "pipe",
+	});
+	await proc.exited;
 }
 
 interface StartOpts {
@@ -110,6 +107,8 @@ interface StartOpts {
 	continueFromMissionId?: string;
 	/** Stage E: reuse an existing branch rather than deriving a new feature branch name. */
 	existingBranch?: string;
+	/** Issue #321: explicit override for the per-mission integration branch name. Defaults to `mission/<slug>`. */
+	featureBranch?: string;
 }
 
 export async function missionStart(
@@ -214,12 +213,12 @@ export async function missionStart(
 			runStore.close();
 		}
 
-		// Stage C: resolve mission feature branch — where ws merges land, and
-		// where Stage C debug-loop runs L1 quality gates. Source mirrors
-		// `src/commands/merge.ts:153-169`: session-branch.txt ?? canonicalBranch.
-		// Stage E: --branch override (e.g. reuse prior mission's branch for continue-from).
-		const featureBranch =
-			opts.existingBranch ?? (await resolveFeatureBranch(overstoryDir, config));
+		// Issue #321: per-mission integration branch. Priority order:
+		//   1. `--feature-branch <name>` explicit override (StartOpts.featureBranch)
+		//   2. `--branch <name>` continue-from reuse (StartOpts.existingBranch)
+		//   3. default: `mission/<slug>` (so workstream merges accumulate here
+		//      and pr-phase:create opens a PR from `mission/<slug>` → `main`).
+		const featureBranch = opts.featureBranch ?? opts.existingBranch ?? `mission/${slug}`;
 
 		const insertMission: InsertMission = {
 			id: missionId,
@@ -235,6 +234,15 @@ export async function missionStart(
 		const createdMission = missionStore.create(insertMission);
 		missionCreated = true;
 		missionStore.start(missionId);
+
+		// Issue #321: materialize the integration branch in git. Idempotent;
+		// non-fatal on failure (the row already records the branch name, and
+		// downstream merges will surface real git errors then).
+		try {
+			await materializeFeatureBranch(projectRoot, featureBranch);
+		} catch {
+			// Swallow: branch materialization is best-effort.
+		}
 
 		// Stage A `--spec` power-user paths short-circuit intake-phase:
 		//   --spec <file>           → copy spec; skip clarifier+analyst-intake;
