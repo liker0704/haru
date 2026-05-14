@@ -24,7 +24,12 @@ import { createMailStore } from "../mail/store.ts";
 import { createSessionStore } from "../sessions/store.ts";
 import { cleanupTempDir } from "../test-helpers.ts";
 import type { AgentSession, HealthCheck, OverstoryConfig, StoredEvent } from "../types.ts";
-import { _resetSourceFreshnessForTests, buildCompletionMessage, runDaemonTick } from "./daemon.ts";
+import {
+	_resetSourceFreshnessForTests,
+	_resetStateDirForTests,
+	buildCompletionMessage,
+	runDaemonTick,
+} from "./daemon.ts";
 
 // === Test constants ===
 
@@ -3652,6 +3657,85 @@ describe("daemon source freshness", () => {
 			expect(data.runbook).toBe("ha watch stop && ha watch start");
 		} finally {
 			eventStore.close();
+		}
+	});
+});
+
+// ── Heartbeat tick tests ──────────────────────────────────────────────────────
+
+describe("heartbeat at tick start", () => {
+	let root: string;
+
+	beforeEach(async () => {
+		root = await mkdtemp(join(tmpdir(), "haru-daemon-hb-test-"));
+		await mkdir(join(root, ".overstory"), { recursive: true });
+		_resetSourceFreshnessForTests();
+		_resetStateDirForTests();
+	});
+
+	afterEach(async () => {
+		await cleanupTempDir(root);
+	});
+
+	test("writes heartbeat file at tick start", async () => {
+		const before = Date.now();
+		await runDaemonTick({
+			root,
+			...THRESHOLDS,
+			_tmux: { isSessionAlive: async () => false, killSession: async () => {} },
+			_triage: triageAlways("extend"),
+			_nudge: nudgeTracker().nudge,
+		});
+		const hbPath = join(root, ".overstory", "state", "watchdog.heartbeat");
+		expect(existsSync(hbPath)).toBe(true);
+		const { statSync } = await import("node:fs");
+		const stat = statSync(hbPath);
+		expect(stat.mtimeMs).toBeGreaterThanOrEqual(before - 1_000);
+	});
+
+	test("creates state/ directory if missing before writing heartbeat", async () => {
+		// Ensure state/ does not exist
+		const stateDir = join(root, ".overstory", "state");
+		const { rmSync } = await import("node:fs");
+		try {
+			rmSync(stateDir, { recursive: true, force: true });
+		} catch {}
+
+		await runDaemonTick({
+			root,
+			...THRESHOLDS,
+			_tmux: { isSessionAlive: async () => false, killSession: async () => {} },
+			_triage: triageAlways("extend"),
+			_nudge: nudgeTracker().nudge,
+		});
+		expect(existsSync(stateDir)).toBe(true);
+	});
+
+	test("tolerates heartbeat write failure — tick completes without throwing", async () => {
+		// Stub Bun.write to reject for the heartbeat path
+		const originalWrite = Bun.write.bind(Bun);
+		const hbPath = join(root, ".overstory", "state", "watchdog.heartbeat");
+		// biome-ignore lint/suspicious/noExplicitAny: test-only stub
+		(Bun as any).write = (path: unknown, data: unknown) => {
+			if (path === hbPath) return Promise.reject(new Error("disk full"));
+			return originalWrite(
+				path as Parameters<typeof Bun.write>[0],
+				data as Parameters<typeof Bun.write>[1],
+			);
+		};
+		try {
+			await expect(
+				runDaemonTick({
+					root,
+					...THRESHOLDS,
+					_tmux: { isSessionAlive: async () => false, killSession: async () => {} },
+					_triage: triageAlways("extend"),
+					_nudge: nudgeTracker().nudge,
+				}),
+			).resolves.toBeUndefined(); // must not throw
+		} finally {
+			// biome-ignore lint/suspicious/noExplicitAny: test-only stub
+			(Bun as any).write = originalWrite;
 		}
 	});
 });

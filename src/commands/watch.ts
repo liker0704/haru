@@ -6,6 +6,7 @@
  * Interval configurable, default 30000ms.
  */
 
+import { closeSync, mkdirSync, openSync, unlinkSync, writeFileSync, writeSync } from "node:fs";
 import { join } from "node:path";
 import { Command } from "commander";
 import { detectHaruDir, loadConfig } from "../config.ts";
@@ -62,13 +63,6 @@ async function readPidFile(pidFilePath: string): Promise<number | null> {
 }
 
 /**
- * Write a PID to the watchdog PID file.
- */
-async function writePidFile(pidFilePath: string, pid: number): Promise<void> {
-	await Bun.write(pidFilePath, `${pid}\n`);
-}
-
-/**
  * Remove the watchdog PID file.
  */
 async function removePidFile(pidFilePath: string): Promise<void> {
@@ -81,28 +75,105 @@ async function removePidFile(pidFilePath: string): Promise<void> {
 }
 
 /**
- * Resolve the path to the haru binary for re-launching.
- * Uses `which haru` first, then falls back to process.argv.
+ * Daemon self-claim of the PID file using O_CREAT | O_EXCL atomicity.
+ * On success: PID file is owned by this process and heartbeat is written.
+ * On EEXIST: checks the incumbent; exits 0 if healthy, SIGKILLs if wedged.
+ * If the second attempt also fails: writes to stderr and exits 1.
  */
-async function resolveOverstoryBin(): Promise<string> {
-	try {
-		const proc = Bun.spawn(["which", "ov"], {
-			stdout: "pipe",
-			stderr: "pipe",
-		});
-		const exitCode = await proc.exited;
-		if (exitCode === 0) {
-			const binPath = (await new Response(proc.stdout).text()).trim();
-			if (binPath.length > 0) {
-				return binPath;
+async function claimPidFile(
+	pidFilePath: string,
+	heartbeatPath: string,
+	stateDir: string,
+	intervalMs: number,
+): Promise<void> {
+	for (let attempt = 0; attempt < 2; attempt++) {
+		try {
+			const fd = openSync(pidFilePath, "wx");
+			writeSync(fd, String(process.pid));
+			closeSync(fd);
+			// Bootstrap heartbeat write (da-r2-07): close the window where an observer
+			// could see "PID alive + heartbeat missing" before the first async tick.
+			mkdirSync(stateDir, { recursive: true });
+			writeFileSync(heartbeatPath, String(Date.now()));
+			return;
+		} catch (err) {
+			if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
+			const existing = await readPidFile(pidFilePath);
+			if (existing === null) {
+				// File vanished between open and read — retry
+				continue;
 			}
+			const alive = isProcessRunning(existing);
+			if (!alive) {
+				unlinkSync(pidFilePath);
+				continue;
+			}
+			// Check heartbeat freshness
+			const heartbeatFile = Bun.file(heartbeatPath);
+			let fresh = false;
+			if (await heartbeatFile.exists()) {
+				const stat = await heartbeatFile.stat();
+				fresh = stat.mtimeMs >= Date.now() - 2 * intervalMs;
+			}
+			if (fresh) {
+				// Another healthy daemon owns the file — this process is redundant
+				process.exit(0);
+			}
+			// Wedged daemon: SIGTERM + poll + SIGKILL fallback + unlink + retry
+			try {
+				process.kill(existing, "SIGTERM");
+			} catch {}
+			for (let i = 0; i < 10; i++) {
+				await Bun.sleep(200);
+				if (!isProcessRunning(existing)) break;
+			}
+			if (isProcessRunning(existing)) {
+				try {
+					process.kill(existing, "SIGKILL");
+				} catch {}
+			}
+			try {
+				unlinkSync(pidFilePath);
+			} catch {}
 		}
-	} catch {
-		// which not available or haru not on PATH
+	}
+	process.stderr.write("watchdog: failed to claim PID file after retry\n");
+	process.exit(1);
+}
+
+/**
+ * Resolve the path to the haru binary for re-launching.
+ * Uses `which ov` first, then falls back to process.argv.
+ * Exported so control.ts can reuse it without a shared helper module.
+ */
+export async function resolveOverstoryBin(): Promise<string> {
+	// When invoked directly as the CLI entry point source file (e.g.
+	// `bun run src/index.ts`), preserve the source path so the daemon child
+	// also runs from the same source rather than a potentially stale installed binary.
+	const scriptPath = process.argv[1];
+	if (scriptPath?.endsWith("index.ts")) {
+		return scriptPath;
+	}
+
+	for (const name of ["ov", "ha"]) {
+		try {
+			const proc = Bun.spawn(["which", name], {
+				stdout: "pipe",
+				stderr: "pipe",
+			});
+			const exitCode = await proc.exited;
+			if (exitCode === 0) {
+				const binPath = (await new Response(proc.stdout).text()).trim();
+				if (binPath.length > 0) {
+					return binPath;
+				}
+			}
+		} catch {
+			// which not available or binary not on PATH — try next
+		}
 	}
 
 	// Fallback: use the script that's currently running (process.argv[1])
-	const scriptPath = process.argv[1];
 	if (scriptPath) {
 		return scriptPath;
 	}
@@ -127,27 +198,44 @@ async function runWatch(opts: {
 
 	const staleThresholdMs = config.watchdog.staleThresholdMs;
 	const zombieThresholdMs = config.watchdog.zombieThresholdMs;
-	const pidFilePath = join(config.project.root, detectHaruDir(config.project.root), "watchdog.pid");
+	const haruDir = join(config.project.root, detectHaruDir(config.project.root));
+	const stateDir = join(haruDir, "state");
+	const heartbeatPath = join(stateDir, "watchdog.heartbeat");
+	const pidFilePath = join(haruDir, "watchdog.pid");
 
 	const useJson = opts.json ?? false;
 
 	if (opts.background) {
-		// Check if a watchdog is already running
+		// Fast-fail if a running daemon is alive. Only skip the error when the
+		// heartbeat file exists AND is stale — that signals a wedged daemon that
+		// the spawned daemon's claimPidFile should evict. No heartbeat or a fresh
+		// heartbeat both mean "assume healthy, don't spawn another".
 		const existingPid = await readPidFile(pidFilePath);
 		if (existingPid !== null && isProcessRunning(existingPid)) {
-			if (useJson) {
-				jsonOutput("watch", { running: true, pid: existingPid, error: "Watchdog already running" });
-			} else {
-				printError(
-					`Watchdog already running (PID: ${existingPid}). Kill it first or remove ${pidFilePath}`,
-				);
+			const heartbeatFile = Bun.file(heartbeatPath);
+			let isWedged = false;
+			if (await heartbeatFile.exists()) {
+				const stat = await heartbeatFile.stat();
+				isWedged = stat.mtimeMs < Date.now() - 2 * intervalMs;
 			}
-			process.exitCode = 1;
-			return;
-		}
-
-		// Clean up stale PID file if process is no longer running
-		if (existingPid !== null) {
+			if (!isWedged) {
+				if (useJson) {
+					jsonOutput("watch", {
+						running: true,
+						pid: existingPid,
+						error: "Watchdog already running",
+					});
+				} else {
+					printError(
+						`Watchdog already running (PID: ${existingPid}). Kill it first or remove ${pidFilePath}`,
+					);
+				}
+				process.exitCode = 1;
+				return;
+			}
+			// Alive but heartbeat stale (wedged): proceed — daemon self-claim will handle it
+		} else if (existingPid !== null) {
+			// Dead process: clean up stale PID file
 			await removePidFile(pidFilePath);
 		}
 
@@ -160,22 +248,22 @@ async function runWatch(opts: {
 		// Resolve the haru binary path
 		const overstoryBin = await resolveOverstoryBin();
 
-		// Spawn a detached background process running `haru watch` (without --background)
+		// Spawn a detached foreground daemon process
+		// stderr: "inherit" so the daemon's stderr (including claim-failure messages)
+		// flows to the fd opened by control.ts:start() against state/watchdog.stderr.log
 		const child = Bun.spawn(["bun", "run", overstoryBin, ...childArgs], {
 			cwd,
 			detached: true,
 			stdout: "ignore",
-			stderr: "ignore",
+			stderr: "inherit",
 			stdin: "ignore",
 		});
 
-		// Unref the child so the parent can exit without waiting for it
+		// Unref the child so the outer process can exit without waiting for it
 		child.unref();
 
 		const childPid = child.pid;
-
-		// Write PID file for later cleanup
-		await writePidFile(pidFilePath, childPid);
+		// Daemon self-claims the PID file via O_CREAT|O_EXCL — outer no longer writes it
 
 		if (useJson) {
 			jsonOutput("watch", { pid: childPid, intervalMs, pidFile: pidFilePath });
@@ -194,8 +282,8 @@ async function runWatch(opts: {
 		printHint("Press Ctrl+C to stop.");
 	}
 
-	// Write PID file so `--background` check and external tools can find us
-	await writePidFile(pidFilePath, process.pid);
+	// Self-claim PID file with O_CREAT|O_EXCL atomicity; writes bootstrap heartbeat
+	await claimPidFile(pidFilePath, heartbeatPath, stateDir, intervalMs);
 
 	const { stop } = startDaemon({
 		root: config.project.root,

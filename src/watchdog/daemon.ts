@@ -20,7 +20,7 @@
  * truth. See health.ts for the full ZFC documentation.
  */
 
-import { existsSync, renameSync, statSync, unlinkSync } from "node:fs";
+import { existsSync, mkdirSync, renameSync, statSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { evaluateAdaptivePolicy } from "../adaptive/policy.ts";
 import { collectParallelismContext } from "../adaptive/signals.ts";
@@ -144,6 +144,15 @@ export function _resetSourceFreshnessForTests(): void {
 	startupCaptured = false;
 	startupSha = "";
 	lastWarnedSha = null;
+}
+
+// === Heartbeat state dir init ===
+
+let stateDirInitialized = false;
+
+/** Test helper: reset module-level state-dir init flag. */
+export function _resetStateDirForTests(): void {
+	stateDirInitialized = false;
 }
 
 /**
@@ -831,6 +840,16 @@ export async function runDaemonTick(options: DaemonOptions): Promise<void> {
 	const rateLimitConfig = options.config?.rateLimit;
 
 	const overstoryDir = join(root, detectHaruDir(root));
+
+	// Heartbeat: ensure state/ exists once per daemon process, then fire-and-forget write
+	if (!stateDirInitialized) {
+		mkdirSync(join(overstoryDir, "state"), { recursive: true });
+		stateDirInitialized = true;
+	}
+	void Bun.write(join(overstoryDir, "state", "watchdog.heartbeat"), String(Date.now())).catch(
+		() => {},
+	);
+
 	const { store } = openSessionStore(overstoryDir);
 
 	// Open MailStore for decision gate detection (fire-and-forget: non-fatal if unavailable)

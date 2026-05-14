@@ -11,7 +11,7 @@ import { accent, printError, printHint, printSuccess, printWarning } from "../lo
 import { openSessionStore } from "../sessions/compat.ts";
 import { createRunStore } from "../sessions/store.ts";
 import type { InsertMission } from "../types.ts";
-import { createWatchdogControl } from "../watchdog/control.ts";
+import { createWatchdogControl, getLastStartError } from "../watchdog/control.ts";
 import { listSessions } from "../worktree/tmux.ts";
 import { captureBaseline } from "./baseline-snapshot.ts";
 import {
@@ -349,6 +349,9 @@ export async function missionStart(
 				const watchdogResult = await watchdog.start();
 				if (watchdogResult && !opts.json) {
 					printHint("Watchdog started");
+				} else if (!opts.json) {
+					const err = await getLastStartError(projectRoot).catch(() => null);
+					if (err) printWarning(`Watchdog failed to start: ${err.split("\n")[0]}`);
 				}
 			}
 			// Guard: note graph execution engine availability (advisory only)
@@ -361,7 +364,12 @@ export async function missionStart(
 				});
 			}
 		} catch {
-			if (!opts.json) printWarning("Watchdog failed to start");
+			if (!opts.json) {
+				const err = await getLastStartError(projectRoot).catch(() => null);
+				printWarning(
+					err ? `Watchdog failed to start: ${err.split("\n")[0]}` : "Watchdog failed to start",
+				);
+			}
 		}
 
 		if (opts.json) {
@@ -700,10 +708,18 @@ export async function missionResumeAll(
 					const watchdogResult = await watchdog.start();
 					if (watchdogResult && !json) {
 						printHint("Watchdog started");
+					} else if (!json) {
+						const err = await getLastStartError(projectRoot).catch(() => null);
+						if (err) printWarning(`Watchdog failed to start: ${err.split("\n")[0]}`);
 					}
 				}
 			} catch {
-				if (!json) printWarning("Watchdog failed to start");
+				if (!json) {
+					const err = await getLastStartError(projectRoot).catch(() => null);
+					printWarning(
+						err ? `Watchdog failed to start: ${err.split("\n")[0]}` : "Watchdog failed to start",
+					);
+				}
 			}
 
 			if (json) {
