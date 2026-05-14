@@ -23,6 +23,7 @@ import { executePhaseCell } from "./cells/execute-phase.ts";
 import { intakePhaseCell } from "./cells/intake-phase.ts";
 import { planPhaseCell } from "./cells/plan-phase.ts";
 import { planReviewCell } from "./cells/plan-review.ts";
+import { prPhaseCell } from "./cells/pr-phase.ts";
 import type {
 	PhaseCellConfig,
 	PhaseCellDefinition,
@@ -71,29 +72,103 @@ export const CELL_REGISTRY: Record<string, ReviewCellDefinition> = {
 	"architecture-review": architectureReviewCell,
 };
 
-/** Phase cell registry (intake, understand, plan, execute, done). Used by startLifecycleEngine(). */
+/** Phase cell registry (intake, understand, plan, execute, pr, done). Used by startLifecycleEngine(). */
 export const PHASE_CELL_REGISTRY: Record<string, PhaseCellDefinition> = {
 	"intake-phase": intakePhaseCell,
 	"understand-phase": understandPhaseCell,
 	"plan-phase": planPhaseCell,
 	"execute-phase": executePhaseCell,
+	"pr-phase": prPhaseCell,
 	"done-phase": donePhaseCell,
 };
 
 // === Tier-phase mapping ===
 
 /**
- * Which lifecycle phases are active for each mission tier.
+ * Frozen tier→phase chains. Used by callers that do not have an OverstoryConfig
+ * to consult. Prefer `getTierPhases(tier, config)` when a config is available —
+ * it honors `config.pr.enabled` and the direct-tier opt-in.
  *
- * `intake` always runs first (Stage A) — it materializes `product-spec.md`
- * and calls `ha mission tier set` which transitions the mission into the
- * tier-specific phase chain below.
+ * @deprecated For new code, use `getTierPhases(tier, config)` instead.
  */
 export const TIER_PHASES: Record<MissionTier, readonly string[]> = {
 	direct: ["intake", "execute", "done"],
-	planned: ["intake", "understand", "plan", "execute", "done"],
-	full: ["intake", "understand", "align", "decide", "plan", "execute", "done"],
+	planned: ["intake", "understand", "plan", "execute", "pr", "done"],
+	full: ["intake", "understand", "align", "decide", "plan", "execute", "pr", "done"],
 };
+
+/**
+ * Tier-aware phase chain that consults `config.pr` for opt-in/opt-out behavior.
+ *
+ * Direct tier opts OUT by default (per da-01: prevents direct missions from
+ * stalling on `gh_auth_missing` when GitHub is not configured). To enable
+ * pr-phase for direct tier, the operator must set ALL of:
+ *   - `config.pr.enabled !== false` (default true)
+ *   - `config.pr.operatorGithubLogin` (truthy)
+ *   - `config.pr.directTierIncludesPr === true`
+ *
+ * Planned/full tiers opt IN by default. Disabled only when
+ * `config.pr.enabled === false`.
+ *
+ * `"pr"` is inserted between `"execute"` and `"done"` when included.
+ */
+export function getTierPhases(tier: MissionTier, config: OverstoryConfig): readonly string[] {
+	const baseDirect = ["intake", "execute", "done"];
+	const basePlanned = ["intake", "understand", "plan", "execute", "done"];
+	const baseFull = ["intake", "understand", "align", "decide", "plan", "execute", "done"];
+
+	const prEnabled = config.pr?.enabled !== false;
+	const prRequiresLogin = !!config.pr?.operatorGithubLogin;
+	const includeDirect = prEnabled && prRequiresLogin && config.pr?.directTierIncludesPr === true;
+	const includePlannedFull = prEnabled;
+
+	const insertPr = (arr: readonly string[]): string[] => arr.slice(0, -1).concat(["pr", "done"]);
+
+	switch (tier) {
+		case "direct":
+			return includeDirect ? insertPr(baseDirect) : baseDirect;
+		case "planned":
+			return includePlannedFull ? insertPr(basePlanned) : basePlanned;
+		case "full":
+			return includePlannedFull ? insertPr(baseFull) : baseFull;
+	}
+}
+
+/**
+ * Build a `PhaseCellConfig` for the given mission, optionally populating the
+ * `pr` block from `OverstoryConfig.pr` (arch-05).
+ */
+export function buildPhaseCellConfig(mission: Mission, config?: OverstoryConfig): PhaseCellConfig {
+	const tier: MissionTier = mission.tier ?? "full";
+	const cellConfig: PhaseCellConfig = {
+		missionId: mission.id,
+		artifactRoot: mission.artifactRoot ?? "",
+		projectRoot: config?.project?.root ?? "",
+		tier,
+	};
+	if (config?.pr) {
+		cellConfig.pr = {
+			enabled: config.pr.enabled,
+			directTierIncludesPr: config.pr.directTierIncludesPr,
+			operatorGithubLogin: config.pr.operatorGithubLogin,
+			commentTriageAuthors: config.pr.commentTriageAuthors,
+			ciTimeoutMs: config.pr.ciTimeoutMs,
+			commentsTimeoutMs: config.pr.commentsTimeoutMs,
+			approvalTimeoutMs: config.pr.approvalTimeoutMs,
+			mergeStrategy: config.pr.mergeStrategy,
+			showCost: config.pr.showCost,
+			autoCloseSuperseded: config.pr.autoCloseSuperseded,
+			maxTriageSpawnsPerMission: config.pr.maxTriageSpawnsPerMission,
+			maxTriagePerAuthorPerHour: config.pr.maxTriagePerAuthorPerHour,
+			maxCoordinatorResumesPerPr: config.pr.maxCoordinatorResumesPerPr,
+			requireOperatorPermission: config.pr.requireOperatorPermission,
+			triage: config.pr.triage,
+			ghBudget: config.pr.ghBudget,
+			classifyCiRed: config.pr.classifyCiRed,
+		};
+	}
+	return cellConfig;
+}
 
 // === Bridge functions ===
 
@@ -289,16 +364,17 @@ export function buildLifecycleHandlers(
  * Direct tier gets executeDirectPhaseCell instead of standard executePhaseCell.
  * tier=null missions should never reach this — callers must guard.
  */
-export function buildLifecycleGraph(mission: Mission): MissionGraph {
+export function buildLifecycleGraph(
+	mission: Mission,
+	overstoryConfig?: OverstoryConfig,
+): MissionGraph {
 	const tier: MissionTier = mission.tier ?? "full";
-	const allowedPhases = new Set(TIER_PHASES[tier]);
+	const tierPhaseListForFilter = overstoryConfig
+		? getTierPhases(tier, overstoryConfig)
+		: TIER_PHASES[tier];
+	const allowedPhases = new Set(tierPhaseListForFilter);
 
-	const config: PhaseCellConfig = {
-		missionId: mission.id,
-		artifactRoot: mission.artifactRoot ?? "",
-		projectRoot: "",
-		tier,
-	};
+	const cellConfig = buildPhaseCellConfig(mission, overstoryConfig);
 
 	// Filter nodes to only include phases in this tier
 	const nodes = DEFAULT_MISSION_GRAPH.nodes
@@ -316,7 +392,7 @@ export function buildLifecycleGraph(mission: Mission): MissionGraph {
 					: PHASE_CELL_REGISTRY[`${node.phase}-phase`];
 			if (!cell) return node;
 
-			return { ...node, subgraph: cell.buildSubgraph(config) };
+			return { ...node, subgraph: cell.buildSubgraph(cellConfig) };
 		});
 
 	// Collect valid node IDs for edge filtering
@@ -329,7 +405,7 @@ export function buildLifecycleGraph(mission: Mission): MissionGraph {
 	// DEFAULT_MISSION_GRAPH has edges like understand→align→decide→plan→execute.
 	// When tiers skip phases (e.g., planned skips align/decide), the edges are lost.
 	// We need direct edges: understand:active → plan:active for planned tier.
-	const tierPhaseList = TIER_PHASES[tier];
+	const tierPhaseList = tierPhaseListForFilter;
 	for (let i = 0; i < tierPhaseList.length - 1; i++) {
 		const fromPhase = tierPhaseList[i];
 		const toPhase = tierPhaseList[i + 1];
