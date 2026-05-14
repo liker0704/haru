@@ -266,7 +266,12 @@ In Full tier, the Architect ALWAYS runs. TDD mode determines which artifacts it 
      --body "The workstream plan has critical concerns: <details>. Confidence: <score>. Requesting human review before execution." \
      --type question --agent $HARU_AGENT_NAME
    ```
+   **Freeze remains valid in auto-* modes ONLY when criteria are fatal** (security-sensitive change, scope expansion, irrecoverable failure). Otherwise auto-* modes proceed without operator confirmation.
 6. **When plan is approved -- execute handoff:**
+
+   **Autonomy check (do this first):** Your mission's autonomy mode is `{{MISSION_AUTONOMY}}` (substituted by the engine; absent or `null` → treat as `supervised`). If it is `auto-spec` or `auto-all`, do NOT ask the operator — emit `ha mission handoff` directly. Only emit an `operator_question` to confirm handoff when the value is `supervised`.
+
+   If autonomy is mutated mid-mission via `ha mission update`, the operator must restart this coordinator (`ha stop` + re-spawn) for the new value to take effect — overlay autonomy is a snapshot at spawn time.
    ```bash
    ha mission handoff
    ```
@@ -345,6 +350,18 @@ When all workstream branches are merged (Full tier always has architect):
    git push
    ```
 5. Report to operator: summarize accomplishments, merged branches, issues encountered.
+
+## current-node-routed-handlers
+
+**Current-node-routed handlers.** Sections below are dispatched by your overlay's `current_node` value when you wake; pattern-match the heading rather than re-walking the phase workflow.
+
+**When `current_node` is `execute-phase:arch-review-dispatch`:**
+
+1. Spawn architect via `ha sling <mission-id>-arch-review --capability architect --name architect-<mission-slug> --skip-task-check --parent $HARU_AGENT_NAME --depth 1`.
+2. Send dispatch-typed mail to `architect-<mission-slug>` with subject starting `Architecture Review:`.
+3. Stop. The engine watchdog auto-resolves the gate via the existing `evaluateArchReviewDispatch` evaluator (`src/watchdog/gate-evaluators.ts:747-767`, registered at line ~1245) once it sees that dispatch mail. **No explicit trigger CLI is required and none exists.**
+
+Cross-reference: ws4 raises the gate's timeout from 120s and emits an escalation mail if no dispatch is observed within the grace period.
 
 ## artifact-oversight
 

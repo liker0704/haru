@@ -6,6 +6,7 @@ import { AgentError } from "../errors.ts";
 import { cleanupTempDir } from "../test-helpers.ts";
 import type { OverlayConfig, QualityGate } from "../types.ts";
 import {
+	buildTemplateReplacements,
 	formatQualityGatesBash,
 	formatQualityGatesCapabilities,
 	formatQualityGatesInline,
@@ -1036,5 +1037,32 @@ describe("projectContext in overlay", () => {
 		const contextIdx = output.indexOf("## Project Context");
 		expect(expertiseIdx).toBeGreaterThan(-1);
 		expect(contextIdx).toBeGreaterThan(expertiseIdx);
+	});
+});
+
+describe("buildTemplateReplacements MISSION_AUTONOMY", () => {
+	test("defaults to supervised when missionAutonomy is undefined", () => {
+		const result = buildTemplateReplacements({});
+		expect(result["{{MISSION_AUTONOMY}}"]).toBe("supervised");
+	});
+
+	test("defaults to supervised when missionAutonomy is null", () => {
+		const result = buildTemplateReplacements({ missionAutonomy: null });
+		expect(result["{{MISSION_AUTONOMY}}"]).toBe("supervised");
+	});
+
+	test("returns auto-spec when missionAutonomy is auto-spec", () => {
+		const result = buildTemplateReplacements({ missionAutonomy: "auto-spec" });
+		expect(result["{{MISSION_AUTONOMY}}"]).toBe("auto-spec");
+	});
+
+	test("returns auto-all when missionAutonomy is auto-all", () => {
+		const result = buildTemplateReplacements({ missionAutonomy: "auto-all" });
+		expect(result["{{MISSION_AUTONOMY}}"]).toBe("auto-all");
+	});
+
+	test("returns supervised when missionAutonomy is supervised", () => {
+		const result = buildTemplateReplacements({ missionAutonomy: "supervised" });
+		expect(result["{{MISSION_AUTONOMY}}"]).toBe("supervised");
 	});
 });
