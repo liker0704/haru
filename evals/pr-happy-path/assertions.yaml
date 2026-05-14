@@ -1,0 +1,13 @@
+assertions:
+  - kind: no_zombies
+    label: "No zombie agents after PR merge"
+    expected: true
+
+  - kind: max_stall_rate
+    label: "No stalls during PR happy path"
+    expected: 0.0
+
+  - kind: custom
+    label: "MRP exists and merged_at non-null"
+    expected: true
+    hookPath: evals/pr-happy-path/assertions/mrp_exists.ts

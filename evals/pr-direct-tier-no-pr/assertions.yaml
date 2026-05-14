@@ -1,0 +1,13 @@
+assertions:
+  - kind: no_zombies
+    label: "No zombie agents in direct tier run"
+    expected: true
+
+  - kind: max_stall_rate
+    label: "No stalls during direct tier run"
+    expected: 0.0
+
+  - kind: custom
+    label: "Zero gh calls and no pr-phase events"
+    expected: true
+    hookPath: evals/pr-direct-tier-no-pr/assertions/no_pr_phase.ts
