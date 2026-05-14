@@ -51,6 +51,7 @@ import {
 	sendKeys,
 	waitForTuiReady,
 } from "../worktree/tmux.ts";
+import { writeSpecCompanionMeta } from "./spec.ts";
 
 /**
  * Calculate how many milliseconds to sleep before spawning a new agent,
@@ -157,6 +158,8 @@ export interface SlingOptions {
 	profile?: string;
 	/** TDD mode override for Flash Quality pipeline. */
 	tddMode?: string;
+	/** Mission workstream id; persisted into spec-meta.json companion file. */
+	workstreamId?: string;
 }
 
 export interface AutoDispatchOptions {
@@ -693,6 +696,19 @@ export async function slingCommand(taskId: string, opts: SlingOptions): Promise<
 		}
 	}
 
+	// Persist workstreamId into spec-meta companion when both flags are present.
+	// Falls back to HARU_WORKSTREAM_ID so nested lead→builder spawns inherit transparently.
+	const workstreamId = opts.workstreamId ?? process.env.HARU_WORKSTREAM_ID;
+	if (workstreamId && absoluteSpecPath !== null) {
+		await writeSpecCompanionMeta(config.project.root, taskId, absoluteSpecPath, {
+			workstreamId,
+			briefPath: absoluteSpecPath,
+			generatedBy: opts.name ?? "sling",
+		});
+	} else if (workstreamId) {
+		process.stderr.write("workstreamId not persisted: --spec required for spec-meta companion\n");
+	}
+
 	// Resolve TDD mode: explicit flag > workstream config > undefined
 	let resolvedTddMode: TddMode | undefined;
 	if (opts.tddMode !== undefined) {
@@ -1062,6 +1078,7 @@ export async function slingCommand(taskId: string, opts: SlingOptions): Promise<
 			tddMode: resolvedTddMode,
 			architecturePath: resolvedArchitecturePath,
 			testPlanPath: resolvedTestPlanPath,
+			workstreamId,
 		});
 
 		// 14. Output result

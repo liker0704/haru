@@ -337,6 +337,10 @@ program
 	.option("--base-branch <branch>", "Base branch for worktree creation (default: current HEAD)")
 	.option("--tdd-mode <mode>", "TDD mode override: full | light | skip | refactor")
 	.option("--profile <name>", "Canopy profile to apply to agent overlay")
+	.option(
+		"--workstream-id <id>",
+		"Mission workstream id; persisted into spec-meta.json companion file",
+	)
 	.option("--json", "Output result as JSON")
 	.action(async (taskId, opts) => {
 		await slingCommand(taskId, opts);

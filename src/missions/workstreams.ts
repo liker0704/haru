@@ -618,5 +618,9 @@ export function slingArgsFromHandoff(
 		args.push("--tdd-mode", handoff.tddMode);
 	}
 
+	if (handoff.workstreamId) {
+		args.push("--workstream-id", handoff.workstreamId);
+	}
+
 	return args;
 }

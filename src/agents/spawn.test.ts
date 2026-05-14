@@ -19,7 +19,7 @@ import type { SessionStore } from "../sessions/store.ts";
 import type { RunStore } from "../sessions/types.ts";
 import type { AgentManifest, AgentSession } from "../types.ts";
 import type { SpawnDeps, SpawnOptions, TmuxOps } from "./spawn.ts";
-import { createSpawnService } from "./spawn.ts";
+import { buildHaruAgentEnvForTest, createSpawnService } from "./spawn.ts";
 import type { AgentDefinition } from "./types.ts";
 
 // === Test fixtures ===
@@ -410,6 +410,50 @@ describe("createSpawnService", () => {
 			expect(result.agentName).toBe("builder-test-123");
 			expect(result.tmuxSession).toContain("haru-");
 			expect(result.pid).toBeGreaterThan(0);
+		});
+	});
+
+	describe("HARU_WORKSTREAM_ID env propagation", () => {
+		test("env includes HARU_WORKSTREAM_ID when workstreamId is set", () => {
+			const env = buildHaruAgentEnvForTest(
+				{},
+				"builder-test",
+				"lead-parent",
+				"/tmp/wt",
+				"task-123",
+				"ws-42",
+			);
+			expect(env.HARU_WORKSTREAM_ID).toBe("ws-42");
+			expect(env.HARU_AGENT_NAME).toBe("builder-test");
+			expect(env.HARU_PARENT_AGENT).toBe("lead-parent");
+			expect(env.HARU_WORKTREE_PATH).toBe("/tmp/wt");
+			expect(env.HARU_TASK_ID).toBe("task-123");
+		});
+
+		test("env omits HARU_WORKSTREAM_ID when workstreamId is undefined", () => {
+			const env = buildHaruAgentEnvForTest(
+				{},
+				"builder-test",
+				null,
+				"/tmp/wt",
+				"task-123",
+				undefined,
+			);
+			expect("HARU_WORKSTREAM_ID" in env).toBe(false);
+		});
+
+		test("base env is merged and HARU_* keys override base", () => {
+			const env = buildHaruAgentEnvForTest(
+				{ SOME_VAR: "hello", HARU_AGENT_NAME: "old-name" },
+				"new-name",
+				null,
+				"/wt",
+				"task-1",
+				"ws-1",
+			);
+			expect(env.SOME_VAR).toBe("hello");
+			expect(env.HARU_AGENT_NAME).toBe("new-name");
+			expect(env.HARU_WORKSTREAM_ID).toBe("ws-1");
 		});
 	});
 
