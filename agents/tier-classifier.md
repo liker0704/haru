@@ -122,7 +122,12 @@ ku record tier-classifier \
   --outcome-status success
 ```
 
-Use single-line JSON in `--description` (no embedded newlines). Confidence:
+Use single-line JSON in `--description` (no embedded newlines). All field
+names are **camelCase** — see `docs/architecture/tier-classification-schema.md`
+for the canonical schema (including the optional `validation` field written
+after mission completion).
+
+Confidence:
 - `high` — clear signals match exactly one tier rule
 - `medium` — signals near a boundary
 - `low` — fell back to escalation due to ambiguity

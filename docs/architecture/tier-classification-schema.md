@@ -38,7 +38,12 @@ The `--description` payload is a single-line JSON object with this shape:
   },
   "tier": "planned",
   "rationale": "Multi-file refactor without API/auth/billing impact; 2 cross-component edges suggest planned tier.",
-  "confidence": "high"
+  "confidence": "high",
+  "validation": {
+    "outcome": "success",
+    "finalTier": "planned",
+    "notes": "Mission completed at planned tier; no escalation required."
+  }
 }
 ```
 
@@ -60,6 +65,18 @@ The `--description` payload is a single-line JSON object with this shape:
 | `tier` | enum | `direct` / `planned` / `full` |
 | `rationale` | string | Free-form explanation referencing signals |
 | `confidence` | enum | `low` / `medium` / `high` |
+| `validation` | object? | Optional post-mission outcome. Written after `ha mission complete` to record whether the original tier was correct. Omitted at classification time. |
+| `validation.outcome` | enum | `success` (tier was correct) / `failure` (tier required escalation or downgrade) |
+| `validation.finalTier` | enum? | Actual tier the mission ran at after any mid-flight changes (`direct` / `planned` / `full`) |
+| `validation.notes` | string? | Free-form explanation when outcome is `failure` (e.g., "under-classified — discovered API break in workstream X") |
+
+## Casing convention
+
+Field names use **camelCase** throughout (matches TypeScript repo conventions
+and the existing `agents/tier-classifier.md` agent prompt that emits these
+records). This supersedes the earlier `1-kind-balloon.md` plan which sketched
+snake_case names; the implementation landed in camelCase and the on-disk kura
+records use camelCase — see issue #239 for the reconciliation decision.
 
 ## Heuristics (seed rules — refined over time)
 
