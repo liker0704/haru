@@ -376,9 +376,7 @@ describe("runMissionTick", () => {
 			expect(resumeCalls[0]?.agentName).toBe("coordinator-resume");
 
 			const events = eventStore.getByAgent("engine");
-			const resumeEvent = events.find(
-				(e) => (e.eventType as string) === "engine_agent_resumed_on_mail",
-			);
+			const resumeEvent = events.find((e) => e.eventType === "engine_agent_resumed_on_mail");
 			expect(resumeEvent).toBeDefined();
 
 			mailStore.close?.();
@@ -670,7 +668,7 @@ describe("runMissionTick", () => {
 			expect(callCount).toBe(3);
 			const resumeEvents = eventStore
 				.getByAgent("engine")
-				.filter((e) => (e.eventType as string) === "engine_agent_resumed_on_mail");
+				.filter((e) => e.eventType === "engine_agent_resumed_on_mail");
 			expect(resumeEvents).toHaveLength(1);
 
 			// Re-enter waiting state and add new mail

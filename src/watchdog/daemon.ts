@@ -34,6 +34,7 @@ import {
 	type TailerHandle,
 	type TailerOptions,
 } from "../events/tailer.ts";
+import type { EventType } from "../events/types.ts";
 import { pollHeadroom } from "../headroom/adapter.ts";
 import { createHeadroomStore } from "../headroom/store.ts";
 import { evaluateThrottlePolicy } from "../headroom/throttle.ts";
@@ -132,9 +133,9 @@ async function checkSourceFreshness(opts: {
 	recordEvent(opts.eventStore, {
 		runId: null,
 		agentName: "watchdog",
-		eventType: "custom",
+		eventType: "daemon_source_drift",
 		level: "warn",
-		data: { type: "daemon_source_drift", startupSha, currentSha, message, runbook },
+		data: { startupSha, currentSha, message, runbook },
 	});
 }
 
@@ -213,7 +214,7 @@ function recordEvent(
 	event: {
 		runId: string | null;
 		agentName: string;
-		eventType: "custom" | "mail_sent";
+		eventType: EventType;
 		level: "debug" | "info" | "warn" | "error";
 		data: Record<string, unknown>;
 	},

@@ -27,7 +27,8 @@ export type EventType =
 	| "engine_nudge_ceiling_reached"
 	| "engine_mission_auto_completed"
 	| "engine_pending_unsafe_replay"
-	| "engine_agent_resumed_on_mail";
+	| "engine_agent_resumed_on_mail"
+	| "daemon_source_drift";
 
 /** Severity levels for events. */
 export type EventLevel = "debug" | "info" | "warn" | "error";

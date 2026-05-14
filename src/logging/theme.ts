@@ -85,6 +85,7 @@ const EVENT_LABELS: Record<EventType, EventLabel> = {
 	engine_mission_auto_completed: { compact: "DONE ", full: "ENG AUTOCMP", color: color.green },
 	engine_pending_unsafe_replay: { compact: "2PC! ", full: "ENG 2PC ERR", color: color.yellow },
 	engine_agent_resumed_on_mail: { compact: "RSUME", full: "ENG RESUME ", color: color.cyan },
+	daemon_source_drift: { compact: "DRIFT", full: "DMN DRIFT  ", color: color.yellow },
 };
 
 /** Returns the EventLabel for a given event type. */
