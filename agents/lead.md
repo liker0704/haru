@@ -42,6 +42,7 @@ These are named failures. If you catch yourself doing any of these, stop and cor
 - **REVIEW_SKIP** -- Sending `merge_ready` for complex tasks without independent review. For complex multi-file changes, always spawn a reviewer. For simple/moderate tasks, self-verification (reading the diff + quality gates) is acceptable.
 - **MISSING_MULCH_RECORD** -- Closing without recording mulch learnings. Every lead session produces orchestration insights (decomposition strategies, coordination patterns, failures encountered). Skipping `ku record` loses knowledge for future agents.
 - **WORKTREE_ISSUE_CREATE** -- Running `{{TRACKER_CLI}} create` in a worktree. Issues created on worktree branches are lost when worktrees are cleaned up. Mail the coordinator to create issues on main instead.
+- **CONVERGENCE_MAIL_DROP** -- Relying on the hook-injected mail banner alone to track `worker_done` or `result` mails from builders or reviewers. When multiple parallel builders complete close in time (or a builder completes alongside a reviewer's verdict; see Phase 3 builder→reviewer flow), the hook concatenates messages into one stdout blob and LLM attention may register only one; the rest go silently unattended. Discipline: on every resume, run `ha mail list --to $HARU_AGENT_NAME --state claimed --type <type>` for each convergence type (`worker_done`, `result`) to enumerate ACTUAL pending mail. Act on each, then `ha mail ack <id>` explicitly. Re-list before declaring "all done" — expect 0 claimed remaining.
 
 ## overlay
 
@@ -243,6 +244,15 @@ Write specs from scout findings and dispatch builders.
 
 Review is a quality investment. For complex, multi-file changes, spawn a reviewer for independent verification. For simple, well-scoped tasks where quality gates pass, the lead may verify by reading the diff itself.
 
+**Verify-then-Ack discipline:** `worker_done` and `result` are convergence-typed mail. The hook-injected banner surfaces them but does NOT ack — they stay `state='claimed'` until you ack explicitly. When parallel builders complete close in time (or a builder completes alongside a reviewer's verdict), the LLM attention window can miss one in the concatenated banner. On every resume, enumerate from the DB before acting:
+
+```bash
+ha mail list --to $HARU_AGENT_NAME --state claimed --type worker_done
+ha mail list --to $HARU_AGENT_NAME --state claimed --type result
+```
+
+Track count against expected builders + reviewers. Re-list before declaring "all in" — expect 0 claimed remaining.
+
 10. **Monitor builders:**
     - `ha mail check` -- process incoming messages from workers.
     - `ha status` -- check agent states.
@@ -257,7 +267,10 @@ Review is a quality investment. For complex, multi-file changes, spawn a reviewe
     1. Read the builder's diff: `git diff main..<builder-branch>`
     2. Check the diff matches the spec
     3. Run quality gates: {{QUALITY_GATE_INLINE}}
-    4. If everything passes, send merge_ready directly
+    4. If everything passes, send merge_ready directly, then ack the `worker_done`:
+       ```bash
+       ha mail ack <worker-done-id> --agent $HARU_AGENT_NAME
+       ```
 
     **Reviewer verification (complex tasks):**
     Spawn a reviewer agent as before. Required when:
@@ -283,6 +296,10 @@ Review is a quality investment. For complex, multi-file changes, spawn a reviewe
         --body "Review-verified. Branch: <builder-branch>. Files modified: <list>." \
         --type merge_ready
       ha stop <builder-name>
+
+      # ack the convergence mails explicitly after acting on them
+      ha mail ack <worker-done-id> --agent $HARU_AGENT_NAME
+      ha mail ack <reviewer-result-id> --agent $HARU_AGENT_NAME  # if a reviewer was spawned
       ```
       The coordinator merges branches sequentially via the FIFO queue, so earlier completions get merged sooner while remaining builders continue working.
     - **FAIL:** The reviewer sends a `result` mail with "FAIL" and actionable feedback. Forward the feedback to the builder — the builder is in `waiting` state and will auto-resume:
@@ -291,6 +308,9 @@ Review is a quality investment. For complex, multi-file changes, spawn a reviewe
         --subject "Revision needed: <issues>" \
         --body "<reviewer feedback with specific files, lines, and issues>" \
         --type status
+
+      # ack the reviewer's FAIL result after forwarding feedback
+      ha mail ack <reviewer-result-id> --agent $HARU_AGENT_NAME
       ```
       The builder auto-resumes from waiting state, processes feedback, and sends another `worker_done`. Spawn a new reviewer to validate the revision. Repeat until PASS. Cap revision cycles at 3 -- if a builder fails review 3 times, escalate to the coordinator with `--type error`.
 14. **Close your task** once all builders have passed review and all `merge_ready` signals have been sent:
