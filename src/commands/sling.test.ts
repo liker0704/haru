@@ -32,6 +32,7 @@ import {
 	getSharedWritableDirs,
 	inferDomainsFromFiles,
 	isRunningAsRoot,
+	maybeStartWatchdog,
 	parentHasScouts,
 	shouldShowScoutWarning,
 	slingCommand,
@@ -1972,4 +1973,89 @@ describe("slingCommand circuit breaker gate", () => {
 			mailStore.close();
 		}
 	}, 30000);
+});
+
+/**
+ * Tests for the watchdog auto-spawn block added in #325. `ha sling` mirrors
+ * the lifecycle-start.ts auto-spawn so every sling keeps the Tier 0 daemon
+ * alive. Behaviour is gated on `config.watchdog.tier0Enabled`.
+ *
+ * We test the extracted `maybeStartWatchdog` helper directly with a mocked
+ * `createWatchdogControl` factory — this is the same factory injected by
+ * `slingCommand`, so asserting on the helper covers the slingCommand path
+ * without standing up a full agent spawn.
+ */
+describe("maybeStartWatchdog (sling auto-spawn)", () => {
+	interface FakeControl {
+		start: () => Promise<{ pid: number } | null>;
+		startCalls: number;
+	}
+
+	function makeFakeControl(result: { pid: number } | null = { pid: 1234 }): {
+		control: FakeControl;
+		factory: (projectRoot: string) => {
+			start: () => Promise<{ pid: number } | null>;
+			stop: () => Promise<boolean>;
+			isRunning: () => Promise<boolean>;
+		};
+		factoryCalls: string[];
+	} {
+		const factoryCalls: string[] = [];
+		const control: FakeControl = {
+			startCalls: 0,
+			start: async () => {
+				control.startCalls += 1;
+				return result;
+			},
+		};
+		const factory = (projectRoot: string) => {
+			factoryCalls.push(projectRoot);
+			return {
+				start: control.start,
+				stop: async () => false,
+				isRunning: async () => false,
+			};
+		};
+		return { control, factory, factoryCalls };
+	}
+
+	test("calls createWatchdogControl().start() when tier0Enabled is true", async () => {
+		const { control, factory, factoryCalls } = makeFakeControl();
+
+		await maybeStartWatchdog("/fake/project", true, true, factory);
+
+		expect(control.startCalls).toBe(1);
+		expect(factoryCalls).toEqual(["/fake/project"]);
+	});
+
+	test("does NOT call createWatchdogControl when tier0Enabled is false", async () => {
+		const { control, factory, factoryCalls } = makeFakeControl();
+
+		await maybeStartWatchdog("/fake/project", false, true, factory);
+
+		expect(control.startCalls).toBe(0);
+		expect(factoryCalls).toEqual([]);
+	});
+
+	test("swallows start() errors so a wedged watchdog never blocks sling", async () => {
+		const factory = () => ({
+			start: async () => {
+				throw new Error("watchdog boom");
+			},
+			stop: async () => false,
+			isRunning: async () => false,
+		});
+
+		// Should not throw. Errors are caught and surfaced as warnings (json=true
+		// here so we suppress stderr noise during the test run).
+		await expect(maybeStartWatchdog("/fake/project", true, true, factory)).resolves.toBeUndefined();
+	});
+
+	test("handles null start() result (already healthy daemon) without throwing", async () => {
+		const { control, factory } = makeFakeControl(null);
+
+		await maybeStartWatchdog("/fake/project", true, true, factory);
+
+		expect(control.startCalls).toBe(1);
+	});
 });

@@ -25,7 +25,7 @@ import { checkHeadroomForSpawn, type SpawnGuardPolicy } from "../headroom/guard.
 import { createHeadroomStore } from "../headroom/store.ts";
 import { inferDomain } from "../insights/analyzer.ts";
 import { jsonOutput } from "../json.ts";
-import { printSuccess } from "../logging/color.ts";
+import { printHint, printSuccess, printWarning } from "../logging/color.ts";
 import { createMailClient } from "../mail/client.ts";
 import { createMailStore } from "../mail/store.ts";
 import { resolveActiveMissionContext } from "../missions/runtime-context.ts";
@@ -41,6 +41,11 @@ import { openSessionStore } from "../sessions/compat.ts";
 import { createRunStore } from "../sessions/store.ts";
 import type { TrackerIssue } from "../tracker/factory.ts";
 import { createTrackerClient, resolveBackend } from "../tracker/factory.ts";
+import {
+	createWatchdogControl as defaultCreateWatchdogControl,
+	getLastStartError,
+	type WatchdogControl,
+} from "../watchdog/control.ts";
 import {
 	capturePaneContent,
 	checkSessionState,
@@ -578,12 +583,66 @@ export async function getCurrentBranch(repoRoot: string): Promise<string | null>
 }
 
 /**
+ * Optional dependency injection seam for slingCommand. Used by tests to mock
+ * the watchdog control surface without spawning a real daemon.
+ */
+export interface SlingDeps {
+	createWatchdogControl?: (projectRoot: string) => WatchdogControl;
+}
+
+/**
+ * Auto-start the Tier 0 watchdog daemon when `config.watchdog.tier0Enabled` is
+ * true. Mirrors the block in src/missions/lifecycle-start.ts so every `ha sling`
+ * call ensures the daemon is running (rate-limit detection, health monitoring).
+ *
+ * No depth guard — we auto-spawn on every sling, including nested lead→builder
+ * spawns. The watchdog itself short-circuits when a healthy daemon already
+ * holds the PID file, so repeated calls are cheap.
+ *
+ * Errors are swallowed and surfaced as warnings (unless json=true) so a wedged
+ * watchdog never blocks a successful sling.
+ *
+ * Exported for testability — slingCommand calls this after a successful spawn.
+ */
+export async function maybeStartWatchdog(
+	projectRoot: string,
+	tier0Enabled: boolean,
+	json: boolean,
+	createControl: (projectRoot: string) => WatchdogControl = defaultCreateWatchdogControl,
+): Promise<void> {
+	try {
+		if (tier0Enabled) {
+			const watchdog = createControl(projectRoot);
+			const watchdogResult = await watchdog.start();
+			if (watchdogResult && !json) {
+				printHint("Watchdog started");
+			} else if (!json) {
+				const err = await getLastStartError(projectRoot).catch(() => null);
+				if (err) printWarning(`Watchdog failed to start: ${err.split("\n")[0]}`);
+			}
+		}
+	} catch {
+		if (!json) {
+			const err = await getLastStartError(projectRoot).catch(() => null);
+			printWarning(
+				err ? `Watchdog failed to start: ${err.split("\n")[0]}` : "Watchdog failed to start",
+			);
+		}
+	}
+}
+
+/**
  * Entry point for `ha sling <task-id> [flags]`.
  *
  * @param taskId - The task ID to assign to the agent
  * @param opts - Command options
+ * @param deps - Optional DI hooks (test-only)
  */
-export async function slingCommand(taskId: string, opts: SlingOptions): Promise<void> {
+export async function slingCommand(
+	taskId: string,
+	opts: SlingOptions,
+	deps: SlingDeps = {},
+): Promise<void> {
 	if (!taskId) {
 		throw new ValidationError("Task ID is required: ha sling <task-id>", {
 			field: "taskId",
@@ -1080,6 +1139,15 @@ export async function slingCommand(taskId: string, opts: SlingOptions): Promise<
 			testPlanPath: resolvedTestPlanPath,
 			workstreamId,
 		});
+
+		// Auto-start watchdog so every sling keeps the Tier 0 daemon alive
+		// (mirrors lifecycle-start.ts). No depth guard — see maybeStartWatchdog.
+		await maybeStartWatchdog(
+			config.project.root,
+			config.watchdog.tier0Enabled,
+			opts.json ?? false,
+			deps.createWatchdogControl,
+		);
 
 		// 14. Output result
 		if (opts.json ?? false) {
