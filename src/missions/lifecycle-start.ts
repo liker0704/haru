@@ -19,6 +19,8 @@ import {
 	materializeMissionRolePrompt,
 } from "./context.ts";
 import { shouldUseEngine, transitionMissionViaEngine } from "./engine-wiring.ts";
+import { captureBaseline } from "./baseline-snapshot.ts";
+import { applyContinueFrom } from "./predecessor.ts";
 import { recordMissionEvent } from "./events.ts";
 import { resolveCurrentMissionId, toSummary } from "./lifecycle-helpers.ts";
 import type { MissionCommandDeps } from "./lifecycle-types.ts";
@@ -104,6 +106,10 @@ interface StartOpts {
 	tier?: import("../types.ts").MissionTier;
 	/** When true, missing intent in non-TTY context is an error rather than placeholder. */
 	requireIntent?: boolean;
+	/** Stage E: continue from a prior mission (marks it superseded, links as predecessor). */
+	continueFromMissionId?: string;
+	/** Stage E: reuse an existing branch rather than deriving a new feature branch name. */
+	existingBranch?: string;
 }
 
 export async function missionStart(
@@ -211,7 +217,9 @@ export async function missionStart(
 		// Stage C: resolve mission feature branch — where ws merges land, and
 		// where Stage C debug-loop runs L1 quality gates. Source mirrors
 		// `src/commands/merge.ts:153-169`: session-branch.txt ?? canonicalBranch.
-		const featureBranch = await resolveFeatureBranch(overstoryDir, config);
+		// Stage E: --branch override (e.g. reuse prior mission's branch for continue-from).
+		const featureBranch =
+			opts.existingBranch ?? (await resolveFeatureBranch(overstoryDir, config));
 
 		const insertMission: InsertMission = {
 			id: missionId,
@@ -260,6 +268,28 @@ export async function missionStart(
 		await mkdir(artifactRoot, { recursive: true });
 
 		await ensureMissionArtifacts(mission);
+
+		// Stage E: capture baseline snapshot (fire-and-forget; errors are non-fatal)
+		const captureBaselineFn = deps.captureBaseline ?? captureBaseline;
+		captureBaselineFn(mission.id, artifactRoot, projectRoot).catch((err) => {
+			recordMissionEvent({
+				overstoryDir,
+				mission,
+				agentName: "operator",
+				data: { kind: "baseline_capture_failed", detail: String(err) },
+			});
+		});
+
+		// Stage E: link to predecessor mission when --continue-from is set
+		if (opts.continueFromMissionId) {
+			const applyFn = deps.applyContinueFrom ?? applyContinueFrom;
+			await applyFn(opts.continueFromMissionId, mission.id, artifactRoot, {
+				missionStore,
+				runGh: undefined,
+				config: { pr: config.pr },
+			});
+		}
+
 		await writeMissionRuntimePointers(overstoryDir, mission.id, runId);
 
 		// Copy pre-written spec into the mission artifact root when --spec is set.

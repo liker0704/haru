@@ -7,7 +7,7 @@
  */
 
 import { join } from "node:path";
-import { Command } from "commander";
+import { Command, Option } from "commander";
 import { detectHaruDir, loadConfig } from "../config.ts";
 import { missionRefreshBriefsCommand } from "../missions/brief-refresh.ts";
 import { missionBundle } from "../missions/bundle.ts";
@@ -102,6 +102,16 @@ export function createMissionCommand(): Command {
 		.option("--attach", "Attach to coordinator tmux session after start")
 		.option("--no-attach", "Do not attach to coordinator tmux session")
 		.option("--json", "Output as JSON")
+		.addOption(
+			new Option(
+				"--continue-from <prior-mission-id>",
+				"Continue from a prior completed/PR-phase mission (marks it superseded and links it as predecessor; conflicts with --spec)",
+			).conflicts("spec"),
+		)
+		.option(
+			"--branch <existing-branch>",
+			"Reuse an existing branch as the feature branch (use with --continue-from to reuse the prior mission's branch; default: derive new name)",
+		)
 		.action(
 			async (
 				intentArgs: string[],
@@ -113,6 +123,8 @@ export function createMissionCommand(): Command {
 					tier?: string;
 					attach?: boolean;
 					json?: boolean;
+					continueFrom?: string;
+					branch?: string;
 				},
 			) => {
 				const cwd = process.cwd();
@@ -158,6 +170,14 @@ export function createMissionCommand(): Command {
 					);
 				}
 
+				// --branch without --continue-from is unusual; warn the operator.
+				if (opts.branch && !opts.continueFrom) {
+					console.warn(
+						"Warning: --branch without --continue-from is unusual. " +
+							"The specified branch will be used as the feature branch.",
+					);
+				}
+
 				// In a non-TTY context (CI, scripts) with no intent and no spec,
 				// fail fast rather than silently creating an empty mission.
 				const isTTY = process.stdout.isTTY === true;
@@ -173,6 +193,8 @@ export function createMissionCommand(): Command {
 					attach,
 					json: opts.json,
 					requireIntent,
+					continueFromMissionId: opts.continueFrom,
+					existingBranch: opts.branch,
 				});
 			},
 		);

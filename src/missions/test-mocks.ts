@@ -166,6 +166,7 @@ export function createMockMissionStore(): MissionStore & { currentNode: string |
 			hasEmittedWsProducerWrite: false,
 			tier: null,
 			autonomy: "supervised",
+			parentMissionId: null,
 		}),
 		getBySlug: () => null,
 		getByRunId: () => null,
@@ -198,6 +199,7 @@ export function createMockMissionStore(): MissionStore & { currentNode: string |
 			hasEmittedWsProducerWrite: false,
 			tier: m.tier ?? null,
 			autonomy: m.autonomy ?? "supervised",
+			parentMissionId: null,
 		}),
 		list: () => [],
 		delete: noop,
@@ -260,6 +262,9 @@ export function createMockMissionStore(): MissionStore & { currentNode: string |
 		updatePrCommentAction: noop,
 		markPrCommentResolved: noop,
 
+		setParentMissionId: noop,
+		setSuperseded: noop,
+
 		close: noop,
 	};
 }
@@ -294,6 +299,7 @@ export function makeMission(overrides?: Partial<Mission>): Mission {
 		hasEmittedWsProducerWrite: false,
 		tier: null,
 		autonomy: "supervised",
+		parentMissionId: null,
 		...overrides,
 	};
 }

@@ -67,6 +67,8 @@ interface MissionRow {
 	has_emitted_ws_producer_write: number;
 	autonomy: string;
 	feature_branch: string | null;
+	parent_mission_id: string | null;
+	learnings_extracted_at: string | null;
 }
 
 const CREATE_TABLE = `
@@ -76,7 +78,7 @@ CREATE TABLE IF NOT EXISTS missions (
   objective TEXT NOT NULL,
   run_id TEXT,
   state TEXT NOT NULL DEFAULT 'active'
-    CHECK(state IN ('active','frozen','completed','failed','stopped','suspended')),
+    CHECK(state IN ('active','frozen','completed','failed','stopped','suspended','superseded','pr-phase')),
   phase TEXT NOT NULL DEFAULT 'intake'
     CHECK(phase IN ('intake','understand','align','decide','plan','execute','done')),
   first_freeze_at TEXT,
@@ -103,7 +105,9 @@ CREATE TABLE IF NOT EXISTS missions (
   has_emitted_ws_producer_write INTEGER NOT NULL DEFAULT 0,
   autonomy TEXT NOT NULL DEFAULT 'supervised'
     CHECK(autonomy IN ('supervised','auto-spec','auto-all')),
-  feature_branch TEXT
+  feature_branch TEXT,
+  parent_mission_id TEXT REFERENCES missions(id),
+  learnings_extracted_at TEXT
 )`;
 
 const CREATE_INDEXES = `
@@ -803,6 +807,75 @@ const MISSION_MIGRATIONS: Migration[] = [
 			return prState !== null && prComments !== null;
 		},
 	},
+	{
+		version: 14,
+		description:
+			"Widen missions.state CHECK to include 'superseded' and 'pr-phase' (Stage E continue-from flow)",
+		up: (db) => {
+			const schemaRow = db
+				.prepare<{ sql: string }, []>(
+					"SELECT sql FROM sqlite_master WHERE type='table' AND name='missions'",
+				)
+				.get();
+			if (
+				!schemaRow ||
+				(schemaRow.sql.includes("'superseded'") && schemaRow.sql.includes("'pr-phase'"))
+			) {
+				return;
+			}
+			// Rebuild the table with the widened state CHECK.
+			// Column list must match what exists after v13 (includes parent_mission_id + learnings_extracted_at).
+			rebuildTable({
+				db,
+				table: "missions",
+				createSql: CREATE_TABLE.replace("CREATE TABLE IF NOT EXISTS", "CREATE TABLE"),
+				columns: [
+					"id",
+					"slug",
+					"objective",
+					"run_id",
+					"state",
+					"phase",
+					"first_freeze_at",
+					"frozen_at",
+					"pending_user_input",
+					"pending_input_kind",
+					"pending_input_thread_id",
+					"reopen_count",
+					"artifact_root",
+					"paused_workstream_ids",
+					"analyst_session_id",
+					"execution_director_session_id",
+					"coordinator_session_id",
+					"architect_session_id",
+					"paused_lead_names",
+					"pause_reason",
+					"current_node",
+					"started_at",
+					"completed_at",
+					"created_at",
+					"updated_at",
+					"learnings_extracted",
+					"tier",
+					"has_emitted_ws_producer_write",
+					"autonomy",
+					"feature_branch",
+					"parent_mission_id",
+					"learnings_extracted_at",
+				],
+			});
+		},
+		detect: (db) => {
+			const row = db
+				.prepare<{ sql: string }, []>(
+					"SELECT sql FROM sqlite_master WHERE type='table' AND name='missions'",
+				)
+				.get();
+			return row
+				? row.sql.includes("'superseded'") && row.sql.includes("'pr-phase'")
+				: false;
+		},
+	},
 ];
 
 /** Convert a database row (snake_case) to a Mission object (camelCase). */
@@ -837,6 +910,7 @@ function rowToMission(row: MissionRow): Mission {
 		hasEmittedWsProducerWrite: (row.has_emitted_ws_producer_write ?? 0) === 1,
 		autonomy: (row.autonomy as MissionAutonomy | null) ?? "supervised",
 		featureBranch: row.feature_branch ?? null,
+		parentMissionId: row.parent_mission_id ?? null,
 	};
 }
 
@@ -1717,6 +1791,24 @@ export function createMissionStore(dbPath: string): MissionStore {
 			);
 			return (commentId: string): void => {
 				stmt.run({ $resolvedAt: new Date().toISOString(), $commentId: commentId });
+			};
+		})(),
+
+		setParentMissionId: (() => {
+			const stmt = db.prepare<void, { $id: string; $pmid: string; $updated_at: string }>(
+				"UPDATE missions SET parent_mission_id = $pmid, updated_at = $updated_at WHERE id = $id",
+			);
+			return (missionId: string, parentMissionId: string): void => {
+				stmt.run({ $id: missionId, $pmid: parentMissionId, $updated_at: new Date().toISOString() });
+			};
+		})(),
+
+		setSuperseded: (() => {
+			const stmt = db.prepare<void, { $id: string; $updated_at: string }>(
+				"UPDATE missions SET state = 'superseded', current_node = 'done:superseded', phase = 'done', updated_at = $updated_at WHERE id = $id",
+			);
+			return (missionId: string): void => {
+				stmt.run({ $id: missionId, $updated_at: new Date().toISOString() });
 			};
 		})(),
 

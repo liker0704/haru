@@ -126,7 +126,14 @@ export type HandlerRegistry = Record<string, (ctx: HandlerContext) => Promise<Ha
 
 // === Mission (Long-Running Objective Tracking) ===
 
-export type MissionState = "active" | "frozen" | "completed" | "failed" | "stopped" | "suspended";
+export type MissionState =
+	| "active"
+	| "frozen"
+	| "completed"
+	| "failed"
+	| "stopped"
+	| "suspended"
+	| "superseded";
 export const MISSION_STATES: readonly MissionState[] = [
 	"active",
 	"frozen",
@@ -134,6 +141,7 @@ export const MISSION_STATES: readonly MissionState[] = [
 	"failed",
 	"stopped",
 	"suspended",
+	"superseded",
 ] as const;
 
 export type MissionPhase =
@@ -212,6 +220,8 @@ export interface Mission {
 	 * preserving pre-Stage-C behavior (graceful degradation, no SQL backfill needed).
 	 */
 	featureBranch?: string | null;
+	/** ID of the predecessor mission this mission continues from, or null. Set by applyContinueFrom. */
+	parentMissionId?: string | null;
 }
 
 export type InsertMission = Pick<Mission, "id" | "slug" | "objective"> & {
@@ -593,6 +603,11 @@ export interface MissionStore {
 	recordPrComment(row: MissionPrCommentRow): void;
 	updatePrCommentAction(commentId: string, action: string, status: string): void;
 	markPrCommentResolved(commentId: string): void;
+
+	/** Set the predecessor mission ID on a mission (links child → parent). */
+	setParentMissionId(missionId: string, parentMissionId: string): void;
+	/** Atomically mark a mission as superseded: state='superseded', current_node='done:superseded', phase='done'. */
+	setSuperseded(missionId: string): void;
 
 	close(): void;
 }

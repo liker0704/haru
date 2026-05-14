@@ -4,6 +4,7 @@
 
 import type { nudgeAgent } from "../commands/nudge.ts";
 import type { stopCommand } from "../commands/stop.ts";
+import type { ApplyContinueFromDeps } from "./predecessor.ts";
 import type {
 	startExecutionDirector,
 	startMissionAnalyst,
@@ -19,4 +20,11 @@ export interface MissionCommandDeps {
 	stopAgentCommand?: typeof stopCommand;
 	ensureCanonicalWorkstreamTasks?: typeof import("./workstreams.ts").ensureCanonicalWorkstreamTasks;
 	nudgeAgent?: typeof nudgeAgent;
+	captureBaseline?: (missionId: string, artifactRoot: string, projectRoot: string) => Promise<void>;
+	applyContinueFrom?: (
+		oldMissionId: string,
+		newMissionId: string,
+		newArtifactRoot: string,
+		deps: ApplyContinueFromDeps,
+	) => Promise<void>;
 }
