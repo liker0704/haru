@@ -57,8 +57,7 @@ Every mission now starts with `intake-phase`. It runs in this order:
 4. **tier-classifier** — reads spec + research, picks a tier, persists a
    `kura tier-classifier` observational record, sets `ha mission tier set <tier>`.
 
-Bypass intake by starting with a pre-written spec: `ha mission start --spec spec.md
---tier planned`.
+**Prefer text intent over `--spec` — see "Start a mission" below.**
 
 ### PR phase (planned / full tiers)
 
@@ -130,12 +129,34 @@ ha mission start "Stabilize the auth mission — fix JWT refresh under concurren
 
 Modern form — pass the **intent as a positional argument**, no flags needed.
 `--slug` and `--objective` are auto-derived from the intent during intake.
-Optional flags:
+
+**Always prefer text intent over a pre-written spec.** The intake-phase
+clarifier needs free-text intent to do its job:
+
+- It can ask follow-up questions if the intent is vague.
+- It can detect missing acceptance criteria, ambiguous scope, conflicting
+  constraints — and either ask you or freeze the mission for input.
+- The analyst's research is informed by the *style* of intent (one-line bug
+  fix vs. multi-paragraph feature request), not just the words.
+
+Even for "obvious" tasks, write 2–5 sentences describing what + why. Skipping
+intake by feeding a pre-baked spec is reserved for two narrow cases:
+
+1. You already ran a mission that produced a `product-spec.md` and are restarting
+   the same scope (e.g., after a `clean` or recovery).
+2. The spec was authored by a human + reviewer outside haru (rare).
+
+In both cases use `--spec <path>` consciously:
 
 ```bash
-ha mission start "fix auth bug" --autonomy auto-spec     # skip spec approval
-ha mission start "fix auth bug" --autonomy auto-all      # fully unattended
-ha mission start --spec spec.md --tier planned           # skip intake, use pre-written spec
+ha mission start --spec ./product-spec.md --tier planned   # power user only
+```
+
+Optional autonomy flags:
+
+```bash
+ha mission start "fix auth bug — JWT refresh races under concurrent load" --autonomy auto-spec
+ha mission start "fix 6 issues: #313 #314 #315 #280 #258 #305 — read each" --autonomy auto-all
 ```
 
 What this does immediately:
