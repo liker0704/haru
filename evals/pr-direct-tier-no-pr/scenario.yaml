@@ -1,4 +1,7 @@
 description: "Stage E pr-direct-tier-no-pr: direct tier mission skips pr-phase entirely, zero gh calls"
+# Behavioral-contract scenario. Mock-gh interception requires runner env-passthrough support
+# (not yet implemented — see src/eval/runner.ts:90). Until then, this scenario serves as a
+# contract; assertions evaluate the shape, not full end-to-end gh interception.
 timeout_ms: 300000
 
 config_overrides:
