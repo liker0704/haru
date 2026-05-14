@@ -1,0 +1,18 @@
+assertions:
+  - kind: no_zombies
+    label: "No zombie agents after triage completes"
+    expected: true
+
+  - kind: max_stall_rate
+    label: "Triage flow does not stall the watchdog"
+    expected: 0.0
+
+  - kind: custom
+    label: "Triage agent spawned exactly once for comment c001"
+    expected: true
+    hookPath: evals/pr-comment-fix/assertions/triage_invoked.ts
+
+  - kind: custom
+    label: "Coordinator resumed after triage resolved comment"
+    expected: true
+    hookPath: evals/pr-comment-fix/assertions/coordinator_resumed.ts
