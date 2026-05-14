@@ -1831,5 +1831,19 @@
 		"status": "active",
 		"createdAt": "2026-05-13T20:44:06.699Z",
 		"completedAt": null
+	},
+	{
+		"id": "group-53e0d535",
+		"name": "fix-6-open-bugs-architect-review",
+		"memberIssueIds": [
+			"haru-05ed",
+			"haru-61a0",
+			"haru-a86e",
+			"haru-41c9",
+			"haru-4416"
+		],
+		"status": "active",
+		"createdAt": "2026-05-14T12:59:50.030Z",
+		"completedAt": null
 	}
 ]
