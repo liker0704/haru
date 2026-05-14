@@ -4,7 +4,7 @@ import { DEFAULT_QUALITY_GATES } from "../config.ts";
 import { AgentError } from "../errors.ts";
 import { formatTddOverlay } from "../missions/tdd.ts";
 import { capabilityToAudience } from "../mulch/audience.ts";
-import type { OverlayConfig, QualityGate } from "../types.ts";
+import type { MissionAutonomy, OverlayConfig, QualityGate } from "../types.ts";
 
 /**
  * Resolve the path to the overlay template file.
@@ -158,6 +158,7 @@ export function buildTemplateReplacements(opts: {
 	qualityGates?: QualityGate[];
 	agentName?: string;
 	taskId?: string;
+	missionAutonomy?: MissionAutonomy | null;
 }): Record<string, string> {
 	return {
 		"{{TRACKER_CLI}}": opts.trackerCli ?? "sd",
@@ -168,6 +169,7 @@ export function buildTemplateReplacements(opts: {
 		"{{QUALITY_GATE_STEPS}}": formatQualityGatesSteps(opts.qualityGates),
 		"{{AGENT_NAME}}": opts.agentName ?? "",
 		"{{TASK_ID}}": opts.taskId ?? "",
+		"{{MISSION_AUTONOMY}}": opts.missionAutonomy ?? "supervised",
 	};
 }
 

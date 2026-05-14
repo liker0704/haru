@@ -136,3 +136,65 @@ describe("mission context helpers", () => {
 		expect(beacon).toContain("mission-analyst");
 	});
 });
+
+describe("materializeMissionRolePrompt MISSION_AUTONOMY substitution", () => {
+	let tempDir: string;
+
+	beforeEach(async () => {
+		tempDir = await mkdtemp(join(tmpdir(), "haru-mission-autonomy-"));
+		await mkdir(join(tempDir, "agent-defs"), { recursive: true });
+	});
+
+	afterEach(async () => {
+		await cleanupTempDir(tempDir);
+	});
+
+	async function renderWithAutonomy(autonomy: Mission["autonomy"]): Promise<string> {
+		await Bun.write(
+			join(tempDir, "agent-defs", "coordinator-mission.md"),
+			"Autonomy mode is {{MISSION_AUTONOMY}} here.\n",
+		);
+		const m = {
+			id: "mission-auto-test",
+			slug: "auto-test",
+			objective: "Test autonomy substitution",
+			runId: "run-auto-001",
+			state: "active" as const,
+			phase: "plan" as const,
+			autonomy,
+			artifactRoot: join(tempDir, "missions", "mission-auto-test"),
+		};
+		const materialized = await materializeMissionRolePrompt({
+			overstoryDir: tempDir,
+			agentName: "coordinator",
+			capability: "coordinator-mission",
+			roleLabel: "Mission Coordinator",
+			mission: m,
+		});
+		return Bun.file(materialized.promptPath).text();
+	}
+
+	test("substitutes supervised for autonomy=supervised", async () => {
+		const prompt = await renderWithAutonomy("supervised");
+		expect(prompt).toContain("Autonomy mode is supervised here.");
+		expect(prompt).not.toContain("{{MISSION_AUTONOMY}}");
+	});
+
+	test("substitutes auto-spec for autonomy=auto-spec", async () => {
+		const prompt = await renderWithAutonomy("auto-spec");
+		expect(prompt).toContain("Autonomy mode is auto-spec here.");
+		expect(prompt).not.toContain("{{MISSION_AUTONOMY}}");
+	});
+
+	test("substitutes auto-all for autonomy=auto-all", async () => {
+		const prompt = await renderWithAutonomy("auto-all");
+		expect(prompt).toContain("Autonomy mode is auto-all here.");
+		expect(prompt).not.toContain("{{MISSION_AUTONOMY}}");
+	});
+
+	test("substitutes supervised when autonomy is null (null cast)", async () => {
+		const prompt = await renderWithAutonomy(null as unknown as Mission["autonomy"]);
+		expect(prompt).toContain("Autonomy mode is supervised here.");
+		expect(prompt).not.toContain("{{MISSION_AUTONOMY}}");
+	});
+});

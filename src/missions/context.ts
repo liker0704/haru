@@ -200,7 +200,7 @@ export async function materializeMissionRolePrompt(opts: {
 	roleLabel: string;
 	mission: Pick<
 		Mission,
-		"id" | "slug" | "objective" | "artifactRoot" | "runId" | "phase" | "state"
+		"id" | "slug" | "objective" | "artifactRoot" | "runId" | "phase" | "state" | "autonomy"
 	>;
 	siblingNames?: Record<string, string>;
 }): Promise<MaterializedMissionRolePrompt> {
@@ -273,6 +273,7 @@ export async function materializeMissionRolePrompt(opts: {
 			trackerName: resolvedBackend,
 			qualityGates: config.project?.qualityGates,
 			agentName,
+			missionAutonomy: mission.autonomy,
 		});
 		for (const [key, value] of Object.entries(replacements)) {
 			while (renderedPrompt.includes(key)) {
