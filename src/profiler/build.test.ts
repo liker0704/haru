@@ -297,7 +297,7 @@ describe("buildProfilerTrace", () => {
 		const toolSpans = trace?.flatSpans.filter((s) => s.kind === "tool") ?? [];
 		expect(toolSpans.length).toBe(2);
 		for (const ts of toolSpans) {
-			expect(ts.parentSpanId).toBe(sessionSpan?.spanId);
+			expect(ts.parentSpanId).toBe(sessionSpan?.spanId ?? null);
 		}
 	});
 

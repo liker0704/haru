@@ -348,7 +348,7 @@ const SESSION_MIGRATIONS: Migration[] = [
 					"SELECT sql FROM sqlite_master WHERE type='table' AND name='sessions'",
 				)
 				.get();
-			return result?.sql.includes("'waiting'");
+			return result?.sql.includes("'waiting'") ?? false;
 		},
 	},
 ];

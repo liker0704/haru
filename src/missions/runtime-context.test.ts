@@ -286,7 +286,7 @@ describe("resolveActiveMissionContext", () => {
 		// Should not throw even with multiple active missions
 		const ctx = await resolveActiveMissionContext(tempDir);
 		expect(ctx).not.toBeNull();
-		expect(["mission-aaa", "mission-bbb"]).toContain(ctx?.missionId);
+		expect(["mission-aaa", "mission-bbb"]).toContain(ctx?.missionId ?? "");
 	});
 
 	test("returns pointed mission when pointer matches an active db mission", async () => {

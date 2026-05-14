@@ -276,7 +276,7 @@ describe("embedTexts", () => {
 					return Promise.resolve(makeOpenAIResponse([[1, 2]]));
 				}
 				return Promise.resolve(new Response("err", { status: 500 }));
-			});
+			}) as unknown as typeof fetch;
 
 			const store = makeStore(10); // 10% — below default 20% threshold
 			const fallbacks: Array<{ from: string; to: string }> = [];
@@ -303,7 +303,7 @@ describe("embedTexts", () => {
 					return Promise.resolve(makeOpenAIResponse([[1, 2]]));
 				}
 				return Promise.resolve(new Response("err", { status: 500 }));
-			});
+			}) as unknown as typeof fetch;
 
 			const store = makeStore(80); // 80% — well above threshold
 			await embedTexts(["hello"], ["openai", "ollama"], "model", {
@@ -320,7 +320,7 @@ describe("embedTexts", () => {
 			globalThis.fetch = mock(() => {
 				openaiCalled = true;
 				return Promise.resolve(makeOpenAIResponse([[1, 2]]));
-			});
+			}) as unknown as typeof fetch;
 
 			// No headroomStore — even with low headroom on the store, OpenAI should be called
 			await embedTexts(["hello"], ["openai"], "model");

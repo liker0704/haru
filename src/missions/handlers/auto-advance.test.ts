@@ -6,13 +6,13 @@ describe("autoAdvanceHandlers", () => {
 		const handler = autoAdvanceHandlers["align-auto-advance"];
 		expect(handler).toBeDefined();
 		const result = await handler?.({} as never);
-		expect(result.trigger).toBe("phase_advance");
+		expect(result?.trigger).toBe("phase_advance");
 	});
 
 	test("decide-auto-advance returns phase_advance trigger", async () => {
 		const handler = autoAdvanceHandlers["decide-auto-advance"];
 		expect(handler).toBeDefined();
 		const result = await handler?.({} as never);
-		expect(result.trigger).toBe("phase_advance");
+		expect(result?.trigger).toBe("phase_advance");
 	});
 });

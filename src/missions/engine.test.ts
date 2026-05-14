@@ -294,6 +294,9 @@ function createMockMissionStore(): MissionStore & { currentNode: string | null }
 		tryClaimTriageSlot: () => true,
 		markPrCommentResolved: noop,
 
+		setParentMissionId: noop,
+		setSuperseded: noop,
+
 		close: noop,
 	};
 }

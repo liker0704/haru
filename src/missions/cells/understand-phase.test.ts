@@ -57,6 +57,6 @@ describe("understandPhaseCell.buildHandlers", () => {
 		const handler = handlers["ensure-coordinator"];
 		expect(handler).toBeDefined();
 		const result = await handler?.({ getMission: () => null, checkpoint: null } as never);
-		expect(result.trigger).toBe("coordinator_ready");
+		expect(result?.trigger).toBe("coordinator_ready");
 	});
 });

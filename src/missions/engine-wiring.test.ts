@@ -572,7 +572,7 @@ describe("tier-aware graph construction", () => {
 		if (executeActive?.kind !== "lifecycle") throw new Error("Expected lifecycle node");
 		expect(executeActive.subgraph).toBeDefined();
 
-		const subNodes = executeActive.subgraph?.nodes;
+		const subNodes = executeActive.subgraph?.nodes ?? [];
 		const subNodeIds = subNodes.map((n: { id: string }) => n.id);
 
 		expect(subNodeIds).toContain("execute-phase:dispatch-leads");
