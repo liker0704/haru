@@ -405,7 +405,7 @@ function rowToMessage(row: MessageRow): MailMessage {
 }
 
 /** Default lease timeout for claimed messages (seconds). */
-const DEFAULT_LEASE_TIMEOUT_SEC = 120;
+export const DEFAULT_LEASE_TIMEOUT_SEC = 120;
 /** Default max retry attempts before dead-lettering. */
 const DEFAULT_MAX_ATTEMPTS = 3;
 /** Default backoff base in seconds (doubles per attempt). */
@@ -432,6 +432,7 @@ const CONVERGENCE_TYPES_FOR_LEASE: readonly string[] = [
 	"worker_done",
 	"merge_ready",
 	"result",
+	"plan_review_consolidated",
 ] as const;
 
 for (const t of CONVERGENCE_TYPES_FOR_LEASE) assertSafeForDdl(t);

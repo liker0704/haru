@@ -222,7 +222,7 @@ describe("createMailClient", () => {
 			});
 
 			const { output: result } = client.checkInject("orchestrator");
-			expect(result).toContain("From: builder-1");
+			expect(result).toContain("From:      builder-1");
 		});
 
 		test("includes subject in formatted output", () => {
@@ -234,7 +234,7 @@ describe("createMailClient", () => {
 			});
 
 			const { output: result } = client.checkInject("orchestrator");
-			expect(result).toContain("Subject: Important Update");
+			expect(result).toContain("Subject:   Important Update");
 		});
 
 		test("includes message body in formatted output", () => {
@@ -283,9 +283,9 @@ describe("createMailClient", () => {
 
 			const { output: result } = client.checkInject("orchestrator");
 			expect(result).toContain("3 new messages");
-			expect(result).toContain("From: agent-a");
-			expect(result).toContain("From: agent-b");
-			expect(result).toContain("From: agent-c");
+			expect(result).toContain("From:      agent-a");
+			expect(result).toContain("From:      agent-b");
+			expect(result).toContain("From:      agent-c");
 		});
 
 		test("shows priority tag for high priority", () => {
@@ -817,6 +817,10 @@ describe("createMailClient", () => {
 			expect(isConvergenceType("result")).toBe(true);
 		});
 
+		test("returns true for plan_review_consolidated (#314)", () => {
+			expect(isConvergenceType("plan_review_consolidated")).toBe(true);
+		});
+
 		test("returns false for status", () => {
 			expect(isConvergenceType("status")).toBe(false);
 		});
@@ -831,6 +835,136 @@ describe("createMailClient", () => {
 
 		test("returns false for dispatch", () => {
 			expect(isConvergenceType("dispatch")).toBe(false);
+		});
+	});
+
+	describe("formatForInjection banner format (#315)", () => {
+		test("N=1: renders Message 1 of 1 separator and END marker, no PROCESS ALL", () => {
+			client.send({
+				from: "agent-a",
+				to: "orchestrator",
+				subject: "Solo message",
+				body: "Just one",
+			});
+
+			const { output: result } = client.checkInject("orchestrator");
+			expect(result).toContain("═══ Message 1 of 1 ═══");
+			expect(result).toContain("═══ END (1 message above) ═══");
+			expect(result).not.toContain("PROCESS ALL OF THEM");
+		});
+
+		test("N=1: top line reads 'You have 1 new message.' without PROCESS ALL clause", () => {
+			client.send({ from: "agent-a", to: "orchestrator", subject: "s", body: "b" });
+
+			const { output: result } = client.checkInject("orchestrator");
+			expect(result).toContain("You have 1 new message.");
+			expect(result).not.toContain("PROCESS ALL");
+		});
+
+		test("N>1 mixed senders/types: numbered separators, PROCESS ALL line, no duplicate sub-hint", () => {
+			client.send({
+				from: "agent-a",
+				to: "orchestrator",
+				subject: "s1",
+				body: "b1",
+				type: "status",
+			});
+			client.send({
+				from: "agent-b",
+				to: "orchestrator",
+				subject: "s2",
+				body: "b2",
+				type: "question",
+			});
+
+			const { output: result } = client.checkInject("orchestrator");
+			expect(result).toContain("PROCESS ALL OF THEM");
+			expect(result).toContain("═══ Message 1 of 2 ═══");
+			expect(result).toContain("═══ Message 2 of 2 ═══");
+			expect(result).toContain("═══ END (2 messages above) ═══");
+			expect(result).not.toContain("NOTE:");
+		});
+
+		test("N>1 with at-least-one repeated (from, type): duplicate-detection sub-hint present", () => {
+			client.send({
+				from: "lead",
+				to: "orchestrator",
+				subject: "v1",
+				body: "body1",
+				type: "worker_done",
+			});
+			client.send({
+				from: "lead",
+				to: "orchestrator",
+				subject: "v2",
+				body: "body2",
+				type: "worker_done",
+			});
+
+			const { output: result } = client.checkInject("orchestrator");
+			expect(result).toContain("NOTE:");
+			expect(result).toContain("lead");
+			expect(result).toContain("worker_done");
+		});
+
+		test("N>1 with two different repeated pairs: both are mentioned in sub-hints", () => {
+			client.send({ from: "a", to: "orchestrator", subject: "s", body: "b", type: "status" });
+			client.send({ from: "a", to: "orchestrator", subject: "s2", body: "b2", type: "status" });
+			client.send({ from: "b", to: "orchestrator", subject: "s3", body: "b3", type: "question" });
+			client.send({ from: "b", to: "orchestrator", subject: "s4", body: "b4", type: "question" });
+
+			const { output: result } = client.checkInject("orchestrator");
+			// Both pairs should be mentioned (one NOTE line each)
+			const noteLines = result.split("\n").filter((l) => l.startsWith("NOTE:"));
+			expect(noteLines.length).toBe(2);
+		});
+
+		test("banner includes Type, Received, and Mail ID fields", () => {
+			const id = client.send({ from: "agent-a", to: "orchestrator", subject: "s", body: "b" });
+
+			const { output: result } = client.checkInject("orchestrator");
+			expect(result).toContain("Type:      status");
+			expect(result).toContain("Received:");
+			expect(result).toContain(`Mail ID:   ${id}`);
+		});
+
+		test("banner includes Ack command with message id", () => {
+			const id = client.send({ from: "agent-a", to: "orchestrator", subject: "s", body: "b" });
+
+			const { output: result } = client.checkInject("orchestrator");
+			expect(result).toContain(`ha mail ack ${id} --agent $HARU_AGENT_NAME`);
+		});
+
+		test("priority tag renders after type field, not in From line", () => {
+			client.send({
+				from: "agent-a",
+				to: "orchestrator",
+				subject: "s",
+				body: "b",
+				priority: "urgent",
+			});
+
+			const { output: result } = client.checkInject("orchestrator");
+			expect(result).toContain("Type:      status [URGENT]");
+			expect(result).toContain("From:      agent-a");
+			// From line should not have priority tag
+			const fromLine = result.split("\n").find((l) => l.startsWith("From:"));
+			expect(fromLine).not.toContain("[URGENT]");
+		});
+
+		test("payload rendered inline for plan_review_consolidated (protocol type)", () => {
+			client.send({
+				from: "plan-review-lead",
+				to: "orchestrator",
+				subject: "Consolidated",
+				body: "All verdicts in",
+				type: "plan_review_consolidated",
+				payload: JSON.stringify({ verdict: "APPROVE", rounds: 1 }),
+			});
+
+			const { output: result } = client.checkInject("orchestrator");
+			expect(result).toContain("Payload:");
+			expect(result).toContain("APPROVE");
 		});
 	});
 

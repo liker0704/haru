@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { MailError } from "../errors.ts";
 import { cleanupTempDir } from "../test-helpers.ts";
 import { MAIL_MESSAGE_TYPES, type MailMessage } from "../types.ts";
-import { createMailStore, type MailStore } from "./store.ts";
+import { createMailStore, DEFAULT_LEASE_TIMEOUT_SEC, type MailStore } from "./store.ts";
 
 describe("createMailStore", () => {
 	let tempDir: string;
@@ -1410,6 +1410,39 @@ CREATE INDEX idx_thread ON messages(thread_id);
 			const acked = store.getAll({ state: "acked" });
 			expect(acked).toHaveLength(1);
 			expect(acked[0]?.id).toBe("msg-state-filter-2");
+		});
+	});
+
+	describe("plan_review_consolidated lease semantics (#314)", () => {
+		test("plan_review_consolidated claims are not re-queued after lease expiry", () => {
+			store.insert({
+				id: "msg-prc-lease",
+				from: "plan-review-lead",
+				to: "orchestrator",
+				subject: "Consolidated verdict",
+				body: "3/3 verdicts collected",
+				type: "plan_review_consolidated",
+				priority: "normal",
+				threadId: null,
+			});
+
+			const claimed = store.claim("orchestrator");
+			expect(claimed).toHaveLength(1);
+			expect(claimed[0]?.id).toBe("msg-prc-lease");
+
+			// Backdate claimed_at past the default lease to simulate expiry
+			const db = new Database(join(tempDir, "mail.db"));
+			db.exec(
+				`UPDATE messages SET claimed_at = datetime('now', '-${DEFAULT_LEASE_TIMEOUT_SEC + 10} seconds') WHERE id = 'msg-prc-lease'`,
+			);
+			db.close();
+
+			// Convergence type must NOT be re-queued even when lease is expired
+			const reClaimed = store.claim("orchestrator");
+			expect(reClaimed.map((m) => m.id)).not.toContain("msg-prc-lease");
+
+			const msg = store.getById("msg-prc-lease");
+			expect(msg?.state).toBe("claimed");
 		});
 	});
 

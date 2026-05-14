@@ -175,6 +175,7 @@ const CONVERGENCE_MAIL_TYPES = new Set<string>([
 	"worker_done",
 	"merge_ready",
 	"result",
+	"plan_review_consolidated",
 ]);
 
 /** True if the given message type drives convergence and must be ack'd explicitly (per #284). */
@@ -193,22 +194,57 @@ export function formatForInjection(messages: MailMessage[]): string {
 		return "";
 	}
 
-	const lines: string[] = [
-		`You have ${messages.length} new message${messages.length === 1 ? "" : "s"}:`,
-		"",
-	];
+	const n = messages.length;
+	const lines: string[] = [];
 
-	for (const msg of messages) {
+	if (n === 1) {
+		lines.push("You have 1 new message.");
+	} else {
+		lines.push(
+			`You have ${n} new messages. PROCESS ALL OF THEM — even if From/Subject look similar.`,
+		);
+
+		// Sub-hint: when at least one (from, type) pair occurs 2+ times in the batch
+		const pairCounts = new Map<string, number>();
+		for (const msg of messages) {
+			const key = `${msg.from}::${msg.type}`;
+			pairCounts.set(key, (pairCounts.get(key) ?? 0) + 1);
+		}
+		for (const [key, count] of pairCounts) {
+			if (count >= 2) {
+				const sep = key.indexOf("::");
+				const from = key.slice(0, sep);
+				const type = key.slice(sep + 2);
+				lines.push(
+					`NOTE: messages from ${from} with type ${type} may be revisions — process the latest one as authoritative.`,
+				);
+			}
+		}
+	}
+
+	lines.push("");
+
+	for (const [i, msg] of messages.entries()) {
 		const priorityTag = msg.priority !== "normal" ? ` [${msg.priority.toUpperCase()}]` : "";
-		lines.push(`--- From: ${msg.from}${priorityTag} (${msg.type}) ---`);
-		lines.push(`Subject: ${msg.subject}`);
+
+		lines.push(`═══ Message ${i + 1} of ${n} ═══`);
+		lines.push(`From:      ${msg.from}`);
+		lines.push(`Type:      ${msg.type}${priorityTag}`);
+		lines.push(`Subject:   ${msg.subject}`);
+		lines.push(`Received:  ${msg.createdAt}`);
+		lines.push(`Mail ID:   ${msg.id}`);
+		lines.push("");
 		lines.push(msg.body);
+		lines.push("");
 		if (msg.payload !== null && PROTOCOL_TYPES.has(msg.type)) {
 			lines.push(`Payload: ${msg.payload}`);
 		}
-		lines.push(`[Reply with: ha mail reply ${msg.id} --body "..."]`);
+		lines.push(`Reply: ha mail reply ${msg.id} --body "..."`);
+		lines.push(`Ack:   ha mail ack ${msg.id} --agent $HARU_AGENT_NAME`);
 		lines.push("");
 	}
+
+	lines.push(`═══ END (${n} message${n === 1 ? "" : "s"} above) ═══`);
 
 	return lines.join("\n");
 }
