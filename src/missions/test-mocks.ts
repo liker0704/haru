@@ -260,6 +260,7 @@ export function createMockMissionStore(): MissionStore & { currentNode: string |
 		countTriagePerAuthorSince: () => 0,
 		recordPrComment: noop,
 		updatePrCommentAction: noop,
+		tryClaimTriageSlot: () => true,
 		markPrCommentResolved: noop,
 
 		setParentMissionId: noop,

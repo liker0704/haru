@@ -1015,6 +1015,7 @@ type PrExt = {
 	countTriagePerAuthorSince(missionId: string, author: string, since: string): number;
 	recordPrComment(row: MissionPrCommentRow): void;
 	updatePrCommentAction(commentId: string, action: string, status: string): void;
+	tryClaimTriageSlot(missionId: string, commentId: string, prStart: string, cap: number): boolean;
 	markPrCommentResolved(commentId: string): void;
 };
 const ext = (s: MissionStore): MissionStore & PrExt => s as MissionStore & PrExt;
@@ -1409,6 +1410,61 @@ describe("MissionStore PR comment accessors", () => {
 		expect(ext(store).countTriagePerAuthorSince("mission-001", "B", "1970-01-01T00:00:00Z")).toBe(
 			1,
 		);
+	});
+
+	test("T-w3-305-store: tryClaimTriageSlot respects per-mission cap atomically", () => {
+		store.create(makeMission());
+		const since = "1970-01-01T00:00:00Z";
+
+		for (let i = 0; i < 5; i++) {
+			ext(store).recordPrComment(
+				baseComment({
+					commentId: `c${i}`,
+					detectedAt: `2026-05-13T01:00:0${i}Z`,
+				}),
+			);
+		}
+
+		expect(ext(store).tryClaimTriageSlot("mission-001", "c0", since, 3)).toBe(true);
+		expect(ext(store).tryClaimTriageSlot("mission-001", "c1", since, 3)).toBe(true);
+		expect(ext(store).tryClaimTriageSlot("mission-001", "c2", since, 3)).toBe(true);
+
+		expect(ext(store).tryClaimTriageSlot("mission-001", "c3", since, 3)).toBe(false);
+		expect(ext(store).tryClaimTriageSlot("mission-001", "c4", since, 3)).toBe(false);
+
+		const rows = ext(store).listPrComments("mission-001");
+		const claimed = rows.filter((r) => r.status === "in_progress" && r.action === "pending");
+		expect(claimed).toHaveLength(3);
+		const ids = claimed.map((r) => r.commentId).sort();
+		expect(ids).toEqual(["c0", "c1", "c2"]);
+	});
+
+	test("T-w3-305-store: repeated claim of same comment_id is idempotent (does not consume an extra slot)", () => {
+		store.create(makeMission());
+		const since = "1970-01-01T00:00:00Z";
+
+		ext(store).recordPrComment(baseComment({ commentId: "c1" }));
+		ext(store).recordPrComment(baseComment({ commentId: "c2" }));
+
+		expect(ext(store).tryClaimTriageSlot("mission-001", "c1", since, 2)).toBe(true);
+		expect(ext(store).tryClaimTriageSlot("mission-001", "c1", since, 2)).toBe(true);
+		expect(ext(store).tryClaimTriageSlot("mission-001", "c2", since, 2)).toBe(true);
+	});
+
+	test("T-w3-305-store: since timestamp filter scopes the count", () => {
+		store.create(makeMission());
+
+		ext(store).recordPrComment(
+			baseComment({ commentId: "old", detectedAt: "2026-01-01T00:00:00Z" }),
+		);
+		ext(store).updatePrCommentAction("old", "pending", "in_progress");
+
+		ext(store).recordPrComment(
+			baseComment({ commentId: "new", detectedAt: "2026-05-13T01:00:00Z" }),
+		);
+
+		const since = "2026-05-13T00:00:00Z";
+		expect(ext(store).tryClaimTriageSlot("mission-001", "new", since, 1)).toBe(true);
 	});
 });
 

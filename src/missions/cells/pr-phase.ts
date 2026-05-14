@@ -350,17 +350,10 @@ function buildHandlers(deps: PhaseCellDeps, config?: PhaseCellConfig): HandlerRe
 				return { trigger: "reply_only" };
 			}
 
-			// TODO(blocked on ws-store-schema #305 helper): replace count+update with atomic
-			// tryClaimTriageSlot(missionId, commentId, prStart, cap) once MissionStore exposes it.
-			// Per-mission cap check
+			// Per-mission cap check (atomic CAS to close race from #305)
 			const maxPerMission = prCfg?.maxTriageSpawnsPerMission ?? 50;
 			const prState = deps.missionStore.getPrState(ctx.missionId);
 			const prStart = prState?.createdAt ?? new Date(0).toISOString();
-			const spawnCount = deps.missionStore.countTriageSpawnsSince(ctx.missionId, prStart);
-			if (spawnCount >= maxPerMission) {
-				const payload = { kind: "per_mission", limit: maxPerMission };
-				return { trigger: "pr_triage_flood", ...{ payload } };
-			}
 
 			const maxPerAuthor = prCfg?.maxTriagePerAuthorPerHour ?? 5;
 			const oneHourAgo = new Date(Date.now() - 3_600_000).toISOString();
@@ -374,8 +367,18 @@ function buildHandlers(deps: PhaseCellDeps, config?: PhaseCellConfig): HandlerRe
 				return { trigger: "pr_triage_flood", ...{ payload } };
 			}
 
-			// Spawn triage agent
-			deps.missionStore.updatePrCommentAction(commentId, "pending", "in_progress");
+			// Atomic claim — replaces the prior count+update read-then-write race (#305).
+			const claimed = deps.missionStore.tryClaimTriageSlot(
+				ctx.missionId,
+				commentId,
+				prStart,
+				maxPerMission,
+			);
+			if (!claimed) {
+				const payload = { kind: "per_mission", limit: maxPerMission };
+				return { trigger: "pr_triage_flood", ...{ payload } };
+			}
+
 			const spawnFn = deps.spawn ?? Bun.spawn;
 			const triageProc = spawnFn(
 				["ha", "sling", `triage-${commentId}`, "--capability", "triage", "--comment-id", commentId],

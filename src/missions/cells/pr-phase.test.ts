@@ -68,13 +68,14 @@ function makeBaseDeps(overrides?: Partial<PhaseCellDeps>): PhaseCellDeps {
 
 function makeCtx(opts: {
 	mission?: Mission | null;
+	missionId?: string;
 	checkpoint?: unknown;
 	nodeId?: string;
 	saveCheckpoint?: (data: unknown) => Promise<void>;
 	sendMail?: (to: string, subject: string, body: string, type: string) => Promise<void>;
 }): HandlerContext {
 	return {
-		missionId: "m1",
+		missionId: opts.missionId ?? "m1",
 		nodeId: opts.nodeId ?? "pr-phase:preflight",
 		checkpoint: opts.checkpoint ?? null,
 		saveCheckpoint: opts.saveCheckpoint ?? (async () => {}),
@@ -428,6 +429,11 @@ describe("prPhaseCell dispatch-triage handler", () => {
 		if (opts.onUpdateAction) {
 			store.updatePrCommentAction = opts.onUpdateAction;
 		}
+		store.tryClaimTriageSlot = (_missionId, commentId, _prStart, cap) => {
+			const claimed = (opts.spawnsSince ?? 0) < cap;
+			if (claimed && opts.onUpdateAction) opts.onUpdateAction(commentId, "pending", "in_progress");
+			return claimed;
+		};
 		return store as unknown as MissionStore;
 	}
 
@@ -1093,6 +1099,7 @@ describe("prPhaseCell #304 — detached spawn structural verification", () => {
 		const missionStore = createMockMissionStore();
 		missionStore.countTriageSpawnsSince = () => 0;
 		missionStore.countTriagePerAuthorSince = () => 0;
+		missionStore.tryClaimTriageSlot = () => true;
 
 		const handlers = prPhaseCell.buildHandlers(
 			makeBaseDeps({
@@ -1173,11 +1180,90 @@ describe("prPhaseCell #304 — detached spawn structural verification", () => {
 // #305 — Per-mission spawn-cap race: skipped pending ws-store-schema
 // =============================================================================
 
-// TODO(blocked on ws-store-schema #305 helper): unskip once MissionStore exposes
-// tryClaimTriageSlot(missionId, commentId, prStart, cap): boolean.
-test.skip("T-w3-305: concurrent dispatch fuzz — 10 parallel events cap=3 → exactly 3 spawns (blocked on ws-store-schema tryClaimTriageSlot)", async () => {
-	// Stub tryClaimTriageSlot on the mock to return true exactly 3 times
-	// and false thereafter (simulating the real atomic SQL).
-	// Run 10 parallel new_comment events.
-	// Assert exactly 3 spawn invocations regardless of arrival order.
+test("T-w3-305: 10 sequential dispatch events with cap=3 yield exactly 3 spawns (race closure)", async () => {
+	const { createMissionStore } = await import("../store.ts");
+	const realStore = createMissionStore(":memory:");
+	try {
+		const missionId = "m305";
+		realStore.create({ id: missionId, slug: "m305", objective: "o" });
+		realStore.upsertPrState({
+			missionId,
+			prNumber: 99,
+			prUrl: "https://github.com/r/pull/99",
+			branch: "fix/m305",
+			createdAt: "1970-01-01T00:00:00Z",
+			lastCiStatus: null,
+			lastReviewDecision: null,
+			approvedHeadSha: null,
+			mergedAt: null,
+		});
+		for (let i = 0; i < 10; i++) {
+			realStore.recordPrComment({
+				missionId,
+				prNumber: 99,
+				commentId: `c${i}`,
+				author: "op",
+				body: "please fix",
+				action: null,
+				status: "open",
+				fixCycles: 0,
+				detectedAt: `2026-05-13T01:00:0${i}Z`,
+				resolvedAt: null,
+			});
+		}
+
+		let spawnCount = 0;
+		const fakeSpawn = ((..._args: unknown[]) => {
+			spawnCount++;
+			return { unref: () => {}, exited: Promise.resolve(0), stdout: null, stderr: null };
+		}) as unknown as typeof Bun.spawn;
+
+		const handlers = prPhaseCell.buildHandlers(
+			makeBaseDeps({
+				missionStore: realStore as unknown as PhaseCellDeps["missionStore"],
+				spawn: fakeSpawn,
+			}),
+			makeConfig({
+				pr: {
+					enabled: true,
+					ciTimeoutMs: 14_400_000,
+					commentsTimeoutMs: 604_800_000,
+					approvalTimeoutMs: 172_800_000,
+					mergeStrategy: "squash",
+					maxTriageSpawnsPerMission: 3,
+					maxTriagePerAuthorPerHour: 5,
+					maxCoordinatorResumesPerPr: 3,
+					commentTriageAuthors: ["op", "reviewer1"],
+					operatorGithubLogin: "op",
+					triage: { minConfidence: 0.7 },
+					classifyCiRed: { flakeThresholdMs: 30_000, maxFlakeRetries: 3 },
+				},
+			}),
+		);
+		const dispatch = handlers["dispatch-triage"];
+		if (!dispatch) throw new Error("dispatch-triage handler missing");
+
+		const triggers: string[] = [];
+		for (let i = 0; i < 10; i++) {
+			const result = await dispatch(
+				makeCtx({
+					missionId,
+					nodeId: "pr-phase:dispatch-triage",
+					mission: { ...(makeMission() as Mission), id: missionId } as Mission,
+					checkpoint: {
+						comment: { commentId: `c${i}`, author: "op", body: "fix" },
+					},
+				}),
+			);
+			triggers.push(result.trigger);
+		}
+
+		const newCommentCount = triggers.filter((t) => t === "new_comment").length;
+		const floodCount = triggers.filter((t) => t === "pr_triage_flood").length;
+		expect(newCommentCount).toBe(3);
+		expect(floodCount).toBe(7);
+		expect(spawnCount).toBe(3);
+	} finally {
+		realStore.close();
+	}
 });

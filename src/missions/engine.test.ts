@@ -291,6 +291,7 @@ function createMockMissionStore(): MissionStore & { currentNode: string | null }
 		countTriagePerAuthorSince: () => 0,
 		recordPrComment: noop,
 		updatePrCommentAction: noop,
+		tryClaimTriageSlot: () => true,
 		markPrCommentResolved: noop,
 
 		close: noop,

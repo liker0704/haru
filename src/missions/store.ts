@@ -1806,6 +1806,38 @@ export function createMissionStore(dbPath: string): MissionStore {
 			};
 		})(),
 
+		tryClaimTriageSlot: (() => {
+			const countStmt = db.prepare<
+				{ count: number },
+				{ $missionId: string; $since: string; $commentId: string }
+			>(
+				`SELECT COUNT(*) as count FROM mission_pr_comments
+				 WHERE mission_id = $missionId
+				   AND status = 'in_progress'
+				   AND detected_at > $since
+				   AND comment_id != $commentId`,
+			);
+			const updateStmt = db.prepare<void, { $commentId: string }>(
+				`UPDATE mission_pr_comments
+				 SET action = 'pending', status = 'in_progress'
+				 WHERE comment_id = $commentId`,
+			);
+			return (missionId: string, commentId: string, prStart: string, cap: number): boolean => {
+				const tx = db.transaction(() => {
+					const row = countStmt.get({
+						$missionId: missionId,
+						$since: prStart,
+						$commentId: commentId,
+					});
+					const count = row?.count ?? 0;
+					if (count >= cap) return false;
+					updateStmt.run({ $commentId: commentId });
+					return true;
+				});
+				return tx();
+			};
+		})(),
+
 		markPrCommentResolved: (() => {
 			const stmt = db.prepare<void, { $resolvedAt: string; $commentId: string }>(
 				"UPDATE mission_pr_comments SET resolved_at = $resolvedAt, status = 'responded' WHERE comment_id = $commentId",
