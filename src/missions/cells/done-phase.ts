@@ -25,7 +25,8 @@
  */
 
 import { join } from "node:path";
-import type { MissionGraph } from "../../types.ts";
+import type { SessionStore } from "../../sessions/store.ts";
+import type { AgentSession, Mission, MissionGraph } from "../../types.ts";
 import type { HandlerRegistry } from "../types.ts";
 import { makeDebugLoopHandlers } from "./debug-loop-handlers.ts";
 import type { PhaseCellConfig, PhaseCellDefinition, PhaseCellDeps } from "./types.ts";
@@ -247,6 +248,28 @@ function buildHandlers(deps: PhaseCellDeps): HandlerRegistry {
 					await cleanupDebugWorktrees(deps.projectRoot, overstoryDir, mission.slug);
 				}
 			}
+			// Issue #322: terminate intake-phase + other mission-owned agents (and
+			// prune their worktrees) when the engine auto-completes the mission.
+			// `lifecycle-terminate.ts` only fires when an operator runs
+			// `ha mission complete/stop`; the engine's auto-completion path
+			// (watchdog/mission-tick.ts terminal handler) bypasses it, leaving
+			// `product-clarifier-<slug>`, `tier-classifier-<slug>`, and the
+			// mission's coordinator/analyst alive with their worktrees on disk.
+			if (mission && deps.projectRoot && deps.overstoryDir && deps.sessionStore) {
+				await terminateMissionOwnedAgents({
+					mission,
+					sessionStore: deps.sessionStore,
+					projectRoot: deps.projectRoot,
+					overstoryDir: deps.overstoryDir,
+				});
+			}
+			if (mission && deps.projectRoot && deps.overstoryDir && mission.slug) {
+				await cleanupMissionWorktrees({
+					projectRoot: deps.projectRoot,
+					overstoryDir: deps.overstoryDir,
+					slug: mission.slug,
+				});
+			}
 			return { trigger: "cleanup_done" };
 		},
 	};
@@ -278,6 +301,129 @@ async function cleanupDebugWorktrees(
 	} catch (err) {
 		process.stderr.write(
 			`[done-phase:cleanup] worktree cleanup failed: ${err instanceof Error ? err.message : err}\n`,
+		);
+	}
+}
+
+/**
+ * Issue #322: identify sessions owned by this mission and terminate any that
+ * are still alive. Mission ownership is established via three signals:
+ *   1. Session belongs to `mission.runId` (the canonical link).
+ *   2. Session's agentName matches a slug-scoped pattern
+ *      (e.g. `product-clarifier-<slug>`, `coordinator-<slug>`).
+ *   3. Session's worktreePath is under `<overstoryDir>/worktrees/<slug>/`.
+ *
+ * Best-effort: each per-session failure is logged but never blocks completion.
+ */
+async function terminateMissionOwnedAgents(opts: {
+	mission: Mission;
+	sessionStore: SessionStore;
+	projectRoot: string;
+	overstoryDir: string;
+}): Promise<void> {
+	const { mission, sessionStore, projectRoot, overstoryDir } = opts;
+	const slug = mission.slug;
+	const runId = mission.runId;
+	const missionWorktreeDir = slug ? join(overstoryDir, "worktrees", slug) : null;
+
+	const candidates = new Map<string, AgentSession>();
+	if (runId) {
+		for (const s of sessionStore.getByRun(runId)) candidates.set(s.agentName, s);
+	}
+	if (slug) {
+		// Backstop for sessions whose runId was never set or got cleared. Avoids
+		// false positives by requiring the slug to appear as a `-<slug>` suffix
+		// OR the worktree path to live under the mission's worktree dir.
+		const slugSuffix = `-${slug}`;
+		for (const s of sessionStore.getAll()) {
+			if (candidates.has(s.agentName)) continue;
+			const matchesName = s.agentName === slug || s.agentName.endsWith(slugSuffix);
+			const matchesPath = missionWorktreeDir
+				? s.worktreePath.startsWith(`${missionWorktreeDir}/`) ||
+					s.worktreePath === missionWorktreeDir
+				: false;
+			if (matchesName || matchesPath) candidates.set(s.agentName, s);
+		}
+	}
+
+	if (candidates.size === 0) return;
+
+	// Lazy-load runtime primitives so unit tests can run without tmux installed.
+	const { isProcessAlive, isSessionAlive, killProcessTree, killSession, removeAgentEnvFile } =
+		await import("../../worktree/tmux.ts");
+
+	for (const session of candidates.values()) {
+		if (session.state === "completed") continue;
+		try {
+			const isHeadless = session.tmuxSession === "" && session.pid !== null;
+			if (isHeadless && session.pid !== null) {
+				if (isProcessAlive(session.pid)) {
+					await killProcessTree(session.pid);
+				}
+			} else if (session.tmuxSession.length > 0) {
+				if (await isSessionAlive(session.tmuxSession)) {
+					await killSession(session.tmuxSession);
+				}
+			}
+			if (session.worktreePath) {
+				try {
+					removeAgentEnvFile(session.worktreePath);
+				} catch {
+					// best-effort
+				}
+			}
+			sessionStore.updateState(session.agentName, "completed");
+			sessionStore.updateLastActivity(session.agentName);
+		} catch (err) {
+			process.stderr.write(
+				`[done-phase:cleanup] failed to stop agent ${session.agentName}: ${
+					err instanceof Error ? err.message : err
+				}\n`,
+			);
+		}
+	}
+
+	// Avoid an unused-import lint complaint when projectRoot is not consumed
+	// by the runtime primitives above (they operate purely on tmux/pid).
+	void projectRoot;
+}
+
+/**
+ * Issue #322: prune every git worktree whose path lives under
+ * `<overstoryDir>/worktrees/<slug>/`. Uses `git worktree list --porcelain`
+ * to enumerate the live registry (so orphans pruned out-of-band are skipped),
+ * then force-removes each match.
+ *
+ * Best-effort: per-worktree failures are logged but never block completion.
+ */
+async function cleanupMissionWorktrees(opts: {
+	projectRoot: string;
+	overstoryDir: string;
+	slug: string;
+}): Promise<void> {
+	const { projectRoot, overstoryDir, slug } = opts;
+	const missionWorktreeDir = join(overstoryDir, "worktrees", slug);
+	const prefix = `${missionWorktreeDir}/`;
+	try {
+		const { listWorktrees, removeWorktree } = await import("../../worktree/manager.ts");
+		const entries = await listWorktrees(projectRoot).catch(() => []);
+		for (const entry of entries) {
+			if (!entry.path.startsWith(prefix) && entry.path !== missionWorktreeDir) continue;
+			try {
+				await removeWorktree(projectRoot, entry.path, { force: true, forceBranch: true });
+			} catch (err) {
+				process.stderr.write(
+					`[done-phase:cleanup] failed to remove worktree ${entry.path}: ${
+						err instanceof Error ? err.message : err
+					}\n`,
+				);
+			}
+		}
+	} catch (err) {
+		process.stderr.write(
+			`[done-phase:cleanup] mission worktree cleanup failed: ${
+				err instanceof Error ? err.message : err
+			}\n`,
 		);
 	}
 }

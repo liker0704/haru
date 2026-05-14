@@ -1,9 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { existsSync } from "node:fs";
 import { mkdir, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { cleanupTempDir } from "../../test-helpers.ts";
-import type { Mission } from "../../types.ts";
+import { createSessionStore } from "../../sessions/store.ts";
+import { cleanupTempDir, createTempGitRepo, getDefaultBranch } from "../../test-helpers.ts";
+import type { AgentSession, Mission } from "../../types.ts";
+import { createWorktree } from "../../worktree/manager.ts";
 import { createGraphEngine } from "../engine.ts";
 import { validateGraph } from "../graph.ts";
 import { createMockCheckpointStore } from "../test-mocks.ts";
@@ -743,5 +746,233 @@ describe("donePhaseCell summary handler", () => {
 		// Strip the non-deterministic Generated: line before comparing
 		const strip = (s: string) => s.replace(/^- Generated:.*$/m, "");
 		expect(strip(content1)).toBe(strip(content2));
+	});
+});
+
+// === Issue #322: cleanup terminates mission-owned agents + worktrees ===
+
+function makeMissionOwnedSession(overrides: Partial<AgentSession>): AgentSession {
+	return {
+		id: "sess",
+		agentName: "agent",
+		capability: "scout",
+		runtime: "claude",
+		worktreePath: "/tmp/wt",
+		branchName: "haru/agent/task",
+		taskId: "task",
+		tmuxSession: "",
+		state: "waiting",
+		pid: null,
+		parentAgent: null,
+		depth: 0,
+		runId: null,
+		startedAt: "2026-01-01T00:00:00.000Z",
+		lastActivity: "2026-01-01T00:00:00.000Z",
+		escalationLevel: 0,
+		stalledSince: null,
+		rateLimitedSince: null,
+		rateLimitResumesAt: null,
+		runtimeSessionId: null,
+		transcriptPath: null,
+		originalRuntime: null,
+		statusLine: null,
+		...overrides,
+	};
+}
+
+describe("donePhaseCell cleanup handler (issue #322)", () => {
+	test("stops mission-owned intake agents and removes their worktrees", async () => {
+		const projectRoot = await createTempGitRepo();
+		const overstoryDir = join(projectRoot, ".overstory");
+		const slug = "demo-mission";
+		await mkdir(join(overstoryDir, "worktrees", slug), { recursive: true });
+
+		const baseBranch = await getDefaultBranch(projectRoot);
+
+		// Create real worktrees + branches for the three intake-phase agents that
+		// the bug report observed leaking (product-clarifier, tier-classifier,
+		// coordinator). Each one gets a row in the session store with no live
+		// tmux/pid so the cleanup path falls straight to the state update.
+		const wt1 = await createWorktree({
+			repoRoot: projectRoot,
+			baseDir: join(overstoryDir, "worktrees"),
+			agentName: `product-clarifier-${slug}`,
+			baseBranch,
+			taskId: "t1",
+			missionSlug: slug,
+		});
+		const wt2 = await createWorktree({
+			repoRoot: projectRoot,
+			baseDir: join(overstoryDir, "worktrees"),
+			agentName: `tier-classifier-${slug}`,
+			baseBranch,
+			taskId: "t2",
+			missionSlug: slug,
+		});
+		const wt3 = await createWorktree({
+			repoRoot: projectRoot,
+			baseDir: join(overstoryDir, "worktrees"),
+			agentName: `coordinator-${slug}`,
+			baseBranch,
+			taskId: "t3",
+			missionSlug: slug,
+		});
+
+		const sessionStore = createSessionStore(":memory:");
+		try {
+			sessionStore.upsert(
+				makeMissionOwnedSession({
+					id: "s-clar",
+					agentName: `product-clarifier-${slug}`,
+					capability: "product-clarifier",
+					worktreePath: wt1.path,
+					branchName: wt1.branch,
+					taskId: "t1",
+					runId: "run-322",
+					state: "waiting",
+				}),
+			);
+			sessionStore.upsert(
+				makeMissionOwnedSession({
+					id: "s-tier",
+					agentName: `tier-classifier-${slug}`,
+					capability: "tier-classifier",
+					worktreePath: wt2.path,
+					branchName: wt2.branch,
+					taskId: "t2",
+					runId: "run-322",
+					state: "waiting",
+				}),
+			);
+			sessionStore.upsert(
+				makeMissionOwnedSession({
+					id: "s-coord",
+					agentName: `coordinator-${slug}`,
+					capability: "coordinator-mission-planned",
+					worktreePath: wt3.path,
+					branchName: wt3.branch,
+					taskId: "t3",
+					runId: "run-322",
+					state: "waiting",
+				}),
+			);
+
+			// An unrelated agent from another mission must NOT be touched.
+			sessionStore.upsert(
+				makeMissionOwnedSession({
+					id: "s-other",
+					agentName: "builder-unrelated",
+					capability: "builder",
+					worktreePath: "/tmp/unrelated",
+					branchName: "haru/other/x",
+					taskId: "tx",
+					runId: "run-other",
+					state: "waiting",
+				}),
+			);
+
+			const deps: PhaseCellDeps = {
+				mailSend: async () => {},
+				checkpointStore: {} as PhaseCellDeps["checkpointStore"],
+				missionStore: {
+					checkpoints: {
+						saveCheckpoint: () => {},
+						getCheckpoint: () => null,
+					},
+				} as unknown as PhaseCellDeps["missionStore"],
+				sessionStore,
+				overstoryDir,
+				projectRoot,
+			};
+
+			const ctx: HandlerContext = {
+				missionId: "m1",
+				nodeId: "done-phase:cleanup",
+				checkpoint: null,
+				saveCheckpoint: async () => {},
+				sendMail: async () => {},
+				getMission: () =>
+					({
+						id: "m1",
+						slug,
+						runId: "run-322",
+						state: "active",
+						phase: "done",
+					}) as unknown as Mission,
+			} as HandlerContext;
+
+			const handlers = donePhaseCell.buildHandlers(deps);
+			// biome-ignore lint/style/noNonNullAssertion: cleanup handler is registered
+			const result = await handlers.cleanup!(ctx);
+
+			expect(result.trigger).toBe("cleanup_done");
+
+			// All three mission-owned sessions are now marked completed.
+			expect(sessionStore.getByName(`product-clarifier-${slug}`)?.state).toBe("completed");
+			expect(sessionStore.getByName(`tier-classifier-${slug}`)?.state).toBe("completed");
+			expect(sessionStore.getByName(`coordinator-${slug}`)?.state).toBe("completed");
+
+			// The unrelated agent is untouched.
+			expect(sessionStore.getByName("builder-unrelated")?.state).toBe("waiting");
+
+			// All three mission worktrees are removed from disk.
+			expect(existsSync(wt1.path)).toBe(false);
+			expect(existsSync(wt2.path)).toBe(false);
+			expect(existsSync(wt3.path)).toBe(false);
+		} finally {
+			sessionStore.close();
+			await cleanupTempDir(projectRoot);
+		}
+	});
+
+	test("no-op when mission has no slug and no runId", async () => {
+		const sessionStore = createSessionStore(":memory:");
+		try {
+			sessionStore.upsert(
+				makeMissionOwnedSession({
+					id: "s-x",
+					agentName: "some-agent",
+					worktreePath: "/tmp/some-agent",
+					state: "waiting",
+				}),
+			);
+
+			const deps: PhaseCellDeps = {
+				mailSend: async () => {},
+				checkpointStore: {} as PhaseCellDeps["checkpointStore"],
+				missionStore: {
+					checkpoints: { saveCheckpoint: () => {}, getCheckpoint: () => null },
+				} as unknown as PhaseCellDeps["missionStore"],
+				sessionStore,
+				overstoryDir: "/tmp/does-not-matter",
+				projectRoot: "/tmp/does-not-matter",
+			};
+
+			const ctx: HandlerContext = {
+				missionId: "m1",
+				nodeId: "done-phase:cleanup",
+				checkpoint: null,
+				saveCheckpoint: async () => {},
+				sendMail: async () => {},
+				getMission: () =>
+					({
+						id: "m1",
+						slug: null,
+						runId: null,
+						state: "active",
+						phase: "done",
+					}) as unknown as Mission,
+			} as HandlerContext;
+
+			const handlers = donePhaseCell.buildHandlers(deps);
+			// biome-ignore lint/style/noNonNullAssertion: cleanup handler is registered
+			const result = await handlers.cleanup!(ctx);
+			expect(result.trigger).toBe("cleanup_done");
+
+			// No slug + no runId → no candidates → untouched.
+			expect(sessionStore.getByName("some-agent")?.state).toBe("waiting");
+		} finally {
+			sessionStore.close();
+		}
 	});
 });
