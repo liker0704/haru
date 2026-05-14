@@ -39,9 +39,42 @@ and which roles are spawned.
 
 | Tier | Phases | Roles Spawned | When To Use |
 |------|--------|---------------|-------------|
-| **direct** | execute → done | Coordinator + Leads (no analyst, no ED) | Task is already clear. Skip understanding and planning. Coordinator dispatches leads directly. |
-| **planned** | understand → plan → execute → done | Coordinator + Analyst | Moderate complexity. System explores and plans before executing. |
-| **full** | understand → align → decide → plan → execute → done | Coordinator + Analyst + Execution Director + (optional) Architect | Complex or ambiguous. Full phase discipline with alignment and decision steps. |
+| **direct** | intake → execute → done (+ optional pr) | Coordinator + Leads (no analyst, no ED by default) | Task is already clear. Intake phase still runs (product-clarifier + tier-classifier) to materialize a spec. |
+| **planned** | intake → understand → plan → execute → pr → done | Coordinator + Analyst + ED | Moderate complexity. System explores, plans, and produces a single PR for the whole mission. |
+| **full** | intake → understand → align → decide → plan → execute → pr → done | Coordinator + Analyst + ED + (optional) Architect | Complex or ambiguous. Full phase discipline with alignment and decision steps. |
+
+### Intake phase (always runs)
+
+Every mission now starts with `intake-phase`. It runs in this order:
+
+1. **mission-analyst-intake** — researches the codebase (spawns 2–5 scouts), materializes
+   `.overstory/missions/<id>/research/_summary.md`.
+2. **product-clarifier** — reads intent + research, asks operator up to 5 clarifying
+   questions (skipped when `--autonomy auto-spec` or `auto-all`), writes
+   `product-spec.md`.
+3. **human-spec-review** gate — operator approves the spec (`ha mission spec approve`).
+   Skipped automatically for `--autonomy auto-spec` / `auto-all`.
+4. **tier-classifier** — reads spec + research, picks a tier, persists a
+   `kura tier-classifier` observational record, sets `ha mission tier set <tier>`.
+
+Bypass intake by starting with a pre-written spec: `ha mission start --spec spec.md
+--tier planned`.
+
+### PR phase (planned / full tiers)
+
+For `planned`/`full` tiers (and opt-in `direct`), execute is followed by `pr-phase`
+which packages the mission into a single GitHub PR:
+
+1. `pr-phase:preflight` — checks `gh auth status` and `config.pr.enabled`.
+2. `pr-phase:create` — `gh pr create --head <mission.feature_branch> --base main`.
+3. `pr-phase:await-ci` / `await-comments` / `await-approval` — gates the PR
+   through CI green, reviewer comments, and approval.
+4. `pr-phase:merge` — auto-merge once gates pass.
+5. `pr-phase:done` — transition to `done-phase`.
+
+Disable pr-phase entirely with `config.pr.enabled: false`. See
+`docs/architecture/adr-pr-phase.md` for failure-mode details (triage spawns,
+coordinator-resume, debug-loop integration).
 
 ### Tier Selection Guidance
 
@@ -49,20 +82,41 @@ and which roles are spawned.
 - **planned**: needs exploration, standard mission flow with analyst
 - **full**: ambiguous, multi-subsystem, needs alignment, architectural decisions
 
-### Assess Mode
+### Tier Auto-Classification
 
-New missions start in assess mode (`tier=null`). The coordinator evaluates
-complexity and selects a tier:
+Tier is no longer "assessed" by the coordinator. The `tier-classifier` agent
+runs at the end of intake-phase, reads `product-spec.md` + research, applies
+heuristics (file count, breaking changes, auth/billing/security signals,
+ambiguity), and calls `ha mission tier set <tier>`. The classification is
+persisted as a kura observational record:
+
+```bash
+ku query tier-classifier --limit 5   # see recent classifications
+```
+
+Override manually if needed:
 
 ```bash
 ha mission tier show
-ha mission tier show --json
-ha mission tier set planned
+ha mission tier set planned          # escalation only — never downgrade
 ```
 
-Tiers can only escalate upward (`direct` → `planned` → `full`), never downward.
+Tiers escalate upward (`direct` → `planned` → `full`), never downward.
 Escalation kills active leads, clears gate states and checkpoints, and restarts
 from the appropriate phase.
+
+### Autonomy Modes
+
+Pass `--autonomy <mode>` at `ha mission start`. Default is `supervised`.
+
+| Mode | What it Skips | When To Use |
+|------|---------------|-------------|
+| `supervised` | nothing — operator confirms spec + handoff + plan revisions | Production work, real PRs |
+| `auto-spec`  | `human-spec-review` gate (clarifier writes spec, no operator approval) | Trusted intent, dev iteration |
+| `auto-all`   | spec gate + coordinator handoff confirmation | Fully unattended runs (CI, batch fixes) |
+
+Autonomy is a snapshot at coordinator spawn time. To change it mid-mission,
+`ha stop coordinator-<slug>` and re-spawn after `ha mission update --autonomy <mode>`.
 
 ---
 
@@ -71,18 +125,30 @@ from the appropriate phase.
 ### 1. Start a mission
 
 ```bash
-ha mission start --slug auth-refresh --objective "Stabilize the auth mission"
+ha mission start "Stabilize the auth mission — fix JWT refresh under concurrent load"
+```
+
+Modern form — pass the **intent as a positional argument**, no flags needed.
+`--slug` and `--objective` are auto-derived from the intent during intake.
+Optional flags:
+
+```bash
+ha mission start "fix auth bug" --autonomy auto-spec     # skip spec approval
+ha mission start "fix auth bug" --autonomy auto-all      # fully unattended
+ha mission start --spec spec.md --tier planned           # skip intake, use pre-written spec
 ```
 
 What this does immediately:
 
-- creates a mission-owned run
+- creates a mission-owned run + per-mission feature branch (see #321)
 - writes `.overstory/current-mission.txt` and `.overstory/current-run.txt`
 - creates `.overstory/missions/<mission-id>/...`
-- starts the long-lived `mission-analyst`
+- starts the `mission-analyst-intake` (long-lived; swaps to `mission-analyst-planned`
+  or `mission-analyst` after tier-classifier sets the tier)
 
 Execution does **not** start yet.
-`execution-director` starts only at `ha mission handoff`.
+`execution-director` starts only at `ha mission handoff` (auto-issued at end of
+plan-phase unless `--autonomy supervised`).
 
 ### 2. Answer pending mission questions
 
@@ -195,23 +261,24 @@ ha mission pause ws-auth --reason "Waiting on product clarification"
 
 ## Finish Or Abort
 
-Complete the mission:
+The mission completes itself when the engine reaches the terminal node of
+`done-phase`. The operator should **not** call `ha mission complete` to end a
+mission that's still running — that path is reserved for two situations:
+
+1. **Force-completion of a wedged mission** that genuinely cannot finish on its
+   own (e.g., infrastructure outage left phase state inconsistent). Investigate
+   first via `ha mission output`, `ha errors`, `ha trace`.
+2. **Test runs** where you want to short-circuit the pipeline.
 
 ```bash
-ha mission complete
+ha mission complete             # ONLY for genuinely-wedged missions
+ha mission stop                 # operator-initiated suspension (preserves state for resume)
 ```
 
-Or stop it intentionally:
+Both terminal paths export a mission result bundle. Force-regenerate later:
 
 ```bash
-ha mission stop
-```
-
-Both terminal paths export a mission result bundle.
-You can also force bundle regeneration later:
-
-```bash
-ha mission bundle --mission-id <mission-id> --force
+ha mission bundle --mission <mission-id> --force
 ```
 
 ## Review Commands
@@ -231,19 +298,46 @@ Add `--json` when you want machine-readable output.
 For most real missions, the operator-facing loop is:
 
 ```bash
-ha mission start --slug <slug> --objective "<objective>"
-ha mission status
-ha mission output
-ha mission answer --body "..."
-ha mission handoff
-ha status
-ha dashboard
+# 1. Start
+ha mission start "<intent>" [--autonomy supervised|auto-spec|auto-all]
+
+# 2. Watch the autonomous pipeline (intake → understand → plan → execute → pr → done)
+ha mission status              # snapshot
+ha mission output              # narrative
+ha status                      # active agents
+ha dashboard                   # live TUI
+ha mail check --agent operator # questions for you
+
+# 3. Answer questions ONLY when the mission asks
+ha mission answer --body "..."         # for spec / handoff / decision gates
+ha mission spec approve|reject         # intake-phase human-spec-review
+
+# 4. (rare) Operator-sanctioned interventions
+ha mission pause <workstream-id>
+ha mission resume <workstream-id>
 ha mission refresh-briefs --workstream <id>
-ha spec write <task-id> --agent <lead-name> --workstream-id <id> --brief-path <brief-path> < spec.md
-ha mission resume <id>
-ha mission complete
-ha review mission <mission-id-or-slug>
+ha spec write <task-id> --agent <lead-name> --workstream-id <id> < spec.md
+ha mission workstream-complete <workstream-id>   # last resort
+
+# 5. The mission completes itself — do NOT call `ha mission complete` yourself
+ha review mission <mission-id-or-slug>           # after engine completes it
+ha mission bundle --mission <id> --force         # regenerate result bundle later
 ```
+
+### What the engine does, so you don't have to
+
+| Activity | Owner | Operator's role |
+|----------|-------|-----------------|
+| Spec writing | product-clarifier | Approve via `ha mission spec approve` (or auto-skip with `--autonomy auto-spec`) |
+| Tier selection | tier-classifier | None — auto-set; override via `ha mission tier set` only if needed |
+| Plan + workstream decomposition | mission-analyst | None — confirm via answer at gate (or auto-skip with `--autonomy auto-all`) |
+| Plan review (multi-critic) | plan-review-lead | None — runs up to 3 rounds, then approves or escalates |
+| Workstream dispatch | execution-director | None |
+| Per-workstream build + review | lead / builder / reviewer | None |
+| Branch merging | execution-director via `ha merge` | **DO NOT MERGE MANUALLY** |
+| PR creation, CI watch, auto-merge | pr-phase cell | None — operator may comment on PR for code feedback |
+| Holdout validation + summary | done-phase | None |
+| Mission completion | engine (terminal node) | Read the result bundle |
 
 ## Graph Engine & Waiting State
 
@@ -298,9 +392,13 @@ flow. Gates are either `async` (resolved by mail/artifact detection) or `human`
   (optional architect-design) → review → await-handoff → complete
 - **execute-phase** (planned/full): ensure-ed → dispatch-ready →
   await-ws-completion → update-status → check-remaining → (loop or complete).
-  Includes optional architecture review path for TDD missions.
+  Includes optional architecture review path for TDD missions. Workstream
+  merges land on `mission.feature_branch` (per #321), not on `main`.
 - **execute-direct-phase** (direct tier only): dispatch-leads → await-leads-done
   → merge-all → (loop or complete). Simplified — no Execution Director.
+- **pr-phase** (planned/full, opt-in for direct): preflight → create →
+  await-ci → await-comments → await-approval → merge → done. Includes a
+  debug-loop that spawns `debugger` on CI failure (Stage E).
 - **done-phase**: summary → holdout → cleanup → complete
 
 For architecture-level graph engine internals, see
@@ -349,10 +447,46 @@ agents block until they get a response.
 
 ### What NOT to Do
 
-- Don't read other agents' mail (`--agent coordinator`, `--agent mission-analyst`)
-- Don't `ha mail list` to snoop on inter-agent communication
-- Don't nudge agents unless they're clearly stuck (15+ min no progress)
-- Don't interfere with execution — the mission is autonomous
+The operator's job is **monitoring and answering questions** — nothing else.
+The mission is autonomous; the coordinator owns the lifecycle. Doing the
+coordinator's work by hand corrupts state and skips quality gates.
+
+**Hard rules:**
+
+- **Do NOT manually merge workstream branches.** When a lead emits `merge_ready`,
+  the execution-director is the agent responsible for `ha merge --branch <name>`.
+  If you race it and merge yourself:
+  - You bypass the per-mission feature branch (#321) — your commits land on `main`
+    instead of `mission/<slug>`, and pr-phase has nothing to PR from.
+  - The coordinator and ED no longer see the branch in their merge queue → they
+    sit in `waiting` for a merge that already happened.
+  - You miss the deterministic merge ordering and conflict resolution that the
+    merge queue provides.
+- **Do NOT call `ha mission complete` to "finish" a mission you think is done.**
+  Completion is a terminal transition emitted by the engine when `done-phase`
+  reaches its terminal node. Manual `complete` truncates artifacts (review bundle,
+  holdout, summary) and skips post-mission cleanup.
+- **Do NOT `git push` to `main` from the canonical repo while a mission is active.**
+  The ED owns merge → push. Pushes from outside the merge queue race with workstream
+  merges and can lose commits.
+- **Do NOT manually re-spawn coordinator / analyst / ED if you think they died.**
+  The watchdog auto-resumes waiting agents on mail arrival. If they're truly dead,
+  use `ha mission resume` — it re-attaches to existing session, doesn't fork.
+- **Do NOT close GitHub issues that a mission is fixing.** The lead closes them
+  after merge. Closing yourself loses the lead's tracking signal.
+- Don't read other agents' mail (`--agent coordinator`, `--agent mission-analyst`).
+- Don't `ha mail list` to snoop on inter-agent communication.
+- Don't nudge agents unless they're clearly stuck (15+ min no progress).
+
+**If the mission appears stuck and you're tempted to intervene:**
+
+1. First check why — `ha mission output`, `ha errors`, `sqlite3 mail.db` for
+   recent traffic.
+2. If a gate hit its `maxTotalWaitMs` ceiling, the engine has already escalated.
+3. If you truly need to unstick: use `ha mission resume`, `ha mission pause`,
+   `ha mission refresh-briefs`, `ha mission workstream-complete` — the operator-
+   sanctioned escape hatches. They keep the engine consistent. Manual SQL,
+   manual merge, and manual `git push` corrupt state.
 
 ### Status Interpretation
 
@@ -370,17 +504,28 @@ agents block until they get a response.
 
 ### Linking GitHub Issues
 
-When the mission objective comes from a GitHub issue, reference it explicitly
-so the coordinator can fetch full context via `gh`:
+When the mission intent comes from one or more GitHub issues, reference them
+explicitly in the intent — the mission-analyst-intake will `gh issue view` each
+one during research:
 
 ```bash
-ha mission start --slug http-server \
-  --objective "Implement HTTP server foundation per GitHub issue #47. \
-Coordinator: run 'gh issue view 47' to read the full spec and acceptance criteria."
+ha mission start "Implement HTTP server foundation per #47. Read the issue \
+body for requirements, file scope, acceptance criteria."
 ```
 
-This ensures the coordinator reads the issue body (requirements, file scope,
-dependencies) instead of working from the slug alone.
+For batch bug-fix missions, list all issues in the intent so the analyst can
+cluster them into workstreams:
+
+```bash
+ha mission start "Fix 6 open bugs:
+- #313 autonomy doesn't skip understand-phase Q
+- #314 plan_review_consolidated convergence
+- #315 mail banner numbering
+- #280 daemon_source_drift event missing
+- #258 holdout snapshot-diff wiring
+- #305 pr-phase triage CAS race
+Read each issue first. Group by file proximity." --autonomy auto-all
+```
 
 ## Monitoring Operator Mail
 
