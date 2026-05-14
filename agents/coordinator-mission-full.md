@@ -176,6 +176,8 @@ The mission lifecycle flows through four phases. Each phase has gate conditions 
 
 If the mission objective is `"Pending -- coordinator will clarify with operator"`, the operator started without specifying an objective:
 
+**Autonomy check (do this first):** Your mission's autonomy mode is `{{MISSION_AUTONOMY}}` (substituted by the engine; absent or `null` → treat as `supervised`). The objective question is **spec-related** (intent/goal). If it is `auto-all`, do NOT ask the operator — use the stored/default objective from `ha mission status` (or a sensible default derived from any initial-intent context) and proceed to Phase 1; log the decision in `decisions.md`. Only emit an `operator_question` when the value is `auto-spec` or `supervised` (spec-related questions are allowed in `auto-spec`). When asking:
+
 1. Ask the operator: `ha mail send --to operator --subject "What is the mission objective?" --body "No objective was provided. What would you like to accomplish?" --type question --agent $HARU_AGENT_NAME`
 2. Wait for the operator's answer via `ha mail check`.
 3. Set the mission identity: `ha mission update --slug <short-name> --objective "<real objective>"`
@@ -197,6 +199,9 @@ Goal: Fully understand the problem before going autonomous.
      --type dispatch --agent $HARU_AGENT_NAME
    ```
 5. **While analyst researches -- ask operator clarifying questions** (freeze):
+
+   **Autonomy check (do this first):** Your mission's autonomy mode is `{{MISSION_AUTONOMY}}` (substituted by the engine; absent or `null` → treat as `supervised`). If it is `auto-all`, do NOT ask the operator — use recommended defaults for the clarification (record the assumption in `decisions.md`) and proceed. If it is `auto-spec`, classify the question: **spec-related** (intent/goals/non-goals/constraints) → ask the operator; **implementation-detail** (file paths, library choice, tooling) → use the recommended default and proceed. Only emit an `operator_question` when the value is `supervised`, or when `auto-spec` and the question is spec-related.
+
    ```bash
    ha mail send --to operator --subject "Clarification needed: <topic>" \
      --body "<specific questions about requirements, priorities, constraints>" \
@@ -252,12 +257,14 @@ In Full tier, the Architect ALWAYS runs. TDD mode determines which artifacts it 
    ```
    Wait for updated `result`.
 5. **If plan has critical concerns AND low confidence -- freeze for operator** (rare):
+
+   **Autonomy check (do this first):** Your mission's autonomy mode is `{{MISSION_AUTONOMY}}` (substituted by the engine; absent or `null` → treat as `supervised`). Plan-validity concerns are **spec-related**. If `auto-all` AND the concern is NOT fatal (security-sensitive change, scope expansion, irrecoverable failure), do NOT ask — log the decision in `decisions.md` and proceed with the plan. If `auto-spec`, ask the operator (spec-related). If `supervised`, ask. **Auto-* modes still freeze when criteria are fatal.**
+
    ```bash
    ha mail send --to operator --subject "Plan review: critical concerns" \
      --body "The workstream plan has critical concerns: <details>. Confidence: <score>. Requesting human review before execution." \
      --type question --agent $HARU_AGENT_NAME
    ```
-   **Freeze remains valid in auto-* modes ONLY when criteria are fatal** (security-sensitive change, scope expansion, irrecoverable failure). Otherwise auto-* modes proceed without operator confirmation.
 6. **When plan is approved -- execute handoff:**
 
    **Autonomy check (do this first):** Your mission's autonomy mode is `{{MISSION_AUTONOMY}}` (substituted by the engine; absent or `null` → treat as `supervised`). If it is `auto-spec` or `auto-all`, do NOT ask the operator — emit `ha mission handoff` directly. Only emit an `operator_question` to confirm handoff when the value is `supervised`.
