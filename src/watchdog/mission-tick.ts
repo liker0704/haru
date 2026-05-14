@@ -806,30 +806,61 @@ async function processMission(mission: Mission, opts: MissionTickOpts): Promise<
 					const coordName =
 						coordSession?.agentName ??
 						(mission.slug ? `coordinator-${mission.slug}` : "coordinator");
-					const escalationBody = [
-						`Gate "${currentNodeId}" has not progressed after ${gateState.max_nudges} nudges to "${evalResult.nudgeTarget}".`,
-						"",
-						`Last nudge message: ${evalResult.nudgeMessage}`,
-						"",
-						"The engine has stopped auto-nudging. Please intervene:",
-						"- Verify the expected result mail has been sent",
-						"- Check whether the target agent is stuck or confused",
-						"- Advance the phase manually if the work is actually complete",
-					].join("\n");
 
-					try {
-						opts.mailStore?.insert({
-							id: "",
-							from: "engine",
-							to: coordName,
-							subject: `Gate ceiling reached: ${currentNodeId}`,
-							body: escalationBody,
-							type: "question",
-							priority: "urgent",
-							threadId: null,
-						});
-					} catch {
-						// Non-fatal: escalation mail delivery failure
+					const isArchReviewStall = evalResult.payload?.kind === "arch-review-stall";
+
+					if (isArchReviewStall) {
+						const archReviewBody = [
+							`Gate "${currentNodeId}" is stalled: no architect dispatch mail was observed after ${gateState.max_nudges} nudges.`,
+							"",
+							"To resolve, do one of the following:",
+							"(a) Check that coordinator-mission.md handler for arch-review-dispatch is being followed by the coordinator agent.",
+							`(b) Manually dispatch the architect: ha mail send --to architect-${mission.slug ?? "<slug>"} --type dispatch --subject 'Architecture Review: post-merge reconciliation'`,
+						].join("\n");
+
+						try {
+							// NOTE: mailStore.insert bypasses parseMissionFindingPayload. Other production
+							// emitters (intake-phase.ts, done-phase.ts) emit mission_finding without
+							// payload; this emit follows that pattern.
+							opts.mailStore?.insert({
+								id: "",
+								from: "engine",
+								to: coordName,
+								subject: `Stuck: ${currentNodeId} (no architect dispatch observed)`,
+								body: archReviewBody,
+								type: "mission_finding",
+								priority: "urgent",
+								threadId: null,
+							});
+						} catch {
+							// Non-fatal: escalation mail delivery failure
+						}
+					} else {
+						const escalationBody = [
+							`Gate "${currentNodeId}" has not progressed after ${gateState.max_nudges} nudges to "${evalResult.nudgeTarget}".`,
+							"",
+							`Last nudge message: ${evalResult.nudgeMessage}`,
+							"",
+							"The engine has stopped auto-nudging. Please intervene:",
+							"- Verify the expected result mail has been sent",
+							"- Check whether the target agent is stuck or confused",
+							"- Advance the phase manually if the work is actually complete",
+						].join("\n");
+
+						try {
+							opts.mailStore?.insert({
+								id: "",
+								from: "engine",
+								to: coordName,
+								subject: `Gate ceiling reached: ${currentNodeId}`,
+								body: escalationBody,
+								type: "question",
+								priority: "urgent",
+								threadId: null,
+							});
+						} catch {
+							// Non-fatal: escalation mail delivery failure
+						}
 					}
 
 					if (opts.eventStore) {
