@@ -6,6 +6,9 @@
  * and optionally a nudge target/message if the condition is not met.
  */
 
+import { statSync as statSyncFn } from "node:fs";
+import { join as joinPath } from "node:path";
+import { detectHaruDir } from "../config.ts";
 import type { MailStore } from "../mail/store.ts";
 import { baselineExists, compareSnapshotDiff } from "../missions/baseline-snapshot.ts";
 import { type GhBudget, getGhBudget } from "../missions/gh-budget.ts";
@@ -988,6 +991,57 @@ export function evaluateAwaitTierSet(mission: Mission): GateEvalResult {
 	};
 }
 
+/** Window during which project-context.json is treated as fresh enough to
+ * satisfy the await-context gate. Mirrors CONTEXT_CACHE_FRESH_MS in
+ * intake-phase.ts (see #236). */
+const CONTEXT_CACHE_FRESH_MS = 60 * 60 * 1000;
+
+/**
+ * Wait for `.overstory/project-context.json` to be written or refreshed by the
+ * background `ha context generate` process spawned from
+ * intake-phase.ensure-context-generate (#236).
+ *
+ * Gate is met when the cache file exists and its mtime is within
+ * CONTEXT_CACHE_FRESH_MS of `now` — meaning either the file was already fresh
+ * (handler should have short-circuited) or the background regen completed
+ * since the gate was entered. The handler's freshness check uses the same
+ * window, so this evaluator does not need its own staleness allowance.
+ *
+ * Optional deps allow tests to inject `now`/`statMtime` and avoid touching
+ * the real filesystem. Production defaults call `Date.now()` and `statSyncFn`.
+ */
+export function evaluateAwaitContext(
+	projectRoot: string | undefined,
+	_deps?: { now?: () => number; statMtime?: (path: string) => number | null },
+): GateEvalResult {
+	// Missing projectRoot — degenerate case (e.g. tests, recovery). Treat as
+	// "context_ready" so the graph can advance rather than stalling.
+	if (!projectRoot) {
+		return { met: true, trigger: "context_ready" };
+	}
+	const now = _deps?.now ?? (() => Date.now());
+	const statMtime =
+		_deps?.statMtime ??
+		((path: string): number | null => {
+			try {
+				return statSyncFn(path).mtimeMs;
+			} catch {
+				return null;
+			}
+		});
+	const overstoryDir = joinPath(projectRoot, detectHaruDir(projectRoot));
+	const cachePath = joinPath(overstoryDir, "project-context.json");
+	const mtimeMs = statMtime(cachePath);
+	if (mtimeMs !== null && now() - mtimeMs < CONTEXT_CACHE_FRESH_MS) {
+		return { met: true, trigger: "context_ready" };
+	}
+	// Background regen still in flight (or never started). No nudge target —
+	// there is no agent to wake; the spawned subprocess will write the file
+	// when ready. Watchdog will surface stuck state via the gateTimeout (600s)
+	// configured on the await-context node in intake-phase.ts.
+	return { met: false };
+}
+
 /**
  * Stage C: post-merge holdout gate with snapshot-diff semantics (w11).
  *
@@ -1265,6 +1319,8 @@ export async function evaluateGate(
 			return evaluateAwaitSpecReady(mission, stores.mailStore, gateEnteredAt);
 		case "await-tier-set":
 			return evaluateAwaitTierSet(mission);
+		case "await-context":
+			return evaluateAwaitContext(projectRoot);
 		case "human-spec-review":
 			// Supervised mode: resolved by `ha mission spec approve|reject` which
 			// emits `spec_approved` / `spec_rejected` mail. Auto-spec/auto-all

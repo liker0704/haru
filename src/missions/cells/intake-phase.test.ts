@@ -1,4 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { mkdir, mkdtemp, rm, utimes, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { makeMission } from "../test-mocks.ts";
 import type { HandlerContext } from "../types.ts";
 import { intakePhaseCell } from "./intake-phase.ts";
@@ -40,6 +43,7 @@ describe("intake-phase subgraph", () => {
 		});
 		const nodeIds = graph.nodes.map((n) => n.id);
 		expect(nodeIds).toContain("intake-phase:ensure-context-generate");
+		expect(nodeIds).toContain("intake-phase:await-context");
 		expect(nodeIds).toContain("intake-phase:dispatch-analyst-intake");
 		expect(nodeIds).toContain("intake-phase:await-research-complete");
 		expect(nodeIds).toContain("intake-phase:dispatch-clarifier");
@@ -49,6 +53,42 @@ describe("intake-phase subgraph", () => {
 		expect(nodeIds).toContain("intake-phase:dispatch-tier-classifier");
 		expect(nodeIds).toContain("intake-phase:await-tier-set");
 		expect(nodeIds).toContain("intake-phase:complete");
+	});
+
+	test("await-context is async with 600s (10min) timeout (#236)", () => {
+		const graph = intakePhaseCell.buildSubgraph({
+			missionId: "m1",
+			artifactRoot: "/tmp/m1",
+			projectRoot: "/tmp",
+		});
+		const node = graph.nodes.find((n) => n.id === "intake-phase:await-context");
+		expect(node?.gate).toBe("async");
+		expect(node?.gateTimeout).toBe(600);
+	});
+
+	test("ensure-context-generate has both context_ready and context_generating edges (#236)", () => {
+		const graph = intakePhaseCell.buildSubgraph({
+			missionId: "m1",
+			artifactRoot: "/tmp/m1",
+			projectRoot: "/tmp",
+		});
+		const fromEnsure = graph.edges.filter((e) => e.from === "intake-phase:ensure-context-generate");
+		const readyEdge = fromEnsure.find((e) => e.trigger === "context_ready");
+		const generatingEdge = fromEnsure.find((e) => e.trigger === "context_generating");
+		expect(readyEdge?.to).toBe("intake-phase:dispatch-analyst-intake");
+		expect(generatingEdge?.to).toBe("intake-phase:await-context");
+	});
+
+	test("await-context → dispatch-analyst-intake on context_ready (#236)", () => {
+		const graph = intakePhaseCell.buildSubgraph({
+			missionId: "m1",
+			artifactRoot: "/tmp/m1",
+			projectRoot: "/tmp",
+		});
+		const edge = graph.edges.find(
+			(e) => e.from === "intake-phase:await-context" && e.trigger === "context_ready",
+		);
+		expect(edge?.to).toBe("intake-phase:dispatch-analyst-intake");
 	});
 
 	test("await-research-complete is async with 1500s (5min × 5 scouts cap) timeout", () => {
@@ -234,12 +274,160 @@ describe("intake-phase spec-rejected handler", () => {
 });
 
 describe("intake-phase ensure-context-generate handler", () => {
-	const handlers = intakePhaseCell.buildHandlers(makeDeps());
-
-	test("always emits context_ready (regen logic deferred)", async () => {
+	test("emits context_ready when projectRoot/overstoryDir missing (degenerate input)", async () => {
+		const handlers = intakePhaseCell.buildHandlers(makeDeps());
 		// biome-ignore lint/style/noNonNullAssertion: registry known
 		const result = await handlers["ensure-context-generate"]!(makeCtx({}));
 		expect(result.trigger).toBe("context_ready");
+	});
+
+	test("#236: emits context_ready immediately when cache file is fresh (<1h old)", async () => {
+		const tmp = await mkdtemp(join(tmpdir(), "intake-fresh-"));
+		const overstoryDir = join(tmp, ".overstory");
+		await mkdir(overstoryDir, { recursive: true });
+		const cachePath = join(overstoryDir, "project-context.json");
+		await writeFile(cachePath, "{}");
+		try {
+			let spawned = false;
+			const deps = makeDeps({
+				projectRoot: tmp,
+				overstoryDir,
+				spawn: ((_cmd: unknown, _opts: unknown) => {
+					spawned = true;
+					return { unref: () => {}, exited: Promise.resolve(0) };
+				}) as unknown as typeof Bun.spawn,
+			});
+			const handlers = intakePhaseCell.buildHandlers(deps);
+			// biome-ignore lint/style/noNonNullAssertion: registry known
+			const result = await handlers["ensure-context-generate"]!(makeCtx({}));
+			expect(result.trigger).toBe("context_ready");
+			expect(spawned).toBe(false);
+		} finally {
+			await rm(tmp, { recursive: true, force: true });
+		}
+	});
+
+	test("#236: emits context_generating and spawns background regen when cache is stale", async () => {
+		const tmp = await mkdtemp(join(tmpdir(), "intake-stale-"));
+		const overstoryDir = join(tmp, ".overstory");
+		await mkdir(overstoryDir, { recursive: true });
+		const cachePath = join(overstoryDir, "project-context.json");
+		await writeFile(cachePath, "{}");
+		// Backdate the cache to 2h ago so it falls outside the 1h fresh window.
+		const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+		await utimes(cachePath, twoHoursAgo, twoHoursAgo);
+		try {
+			const spawnCalls: Array<{ cmd: unknown; opts: unknown }> = [];
+			const deps = makeDeps({
+				projectRoot: tmp,
+				overstoryDir,
+				spawn: ((cmd: unknown, opts: unknown) => {
+					spawnCalls.push({ cmd, opts });
+					return { unref: () => {}, exited: Promise.resolve(0) };
+				}) as unknown as typeof Bun.spawn,
+			});
+			const handlers = intakePhaseCell.buildHandlers(deps);
+			// biome-ignore lint/style/noNonNullAssertion: registry known
+			const result = await handlers["ensure-context-generate"]!(makeCtx({}));
+			expect(result.trigger).toBe("context_generating");
+			expect(spawnCalls).toHaveLength(1);
+			// biome-ignore lint/style/noNonNullAssertion: length checked above
+			const cmd = spawnCalls[0]!.cmd as string[];
+			expect(cmd[0]).toBe("ha");
+			expect(cmd[1]).toBe("context");
+			expect(cmd[2]).toBe("generate");
+			// biome-ignore lint/style/noNonNullAssertion: length checked above
+			const opts = spawnCalls[0]!.opts as { detached?: boolean };
+			expect(opts.detached).toBe(true);
+		} finally {
+			await rm(tmp, { recursive: true, force: true });
+		}
+	});
+
+	test("#236: emits context_generating when no cache file exists", async () => {
+		const tmp = await mkdtemp(join(tmpdir(), "intake-missing-"));
+		const overstoryDir = join(tmp, ".overstory");
+		await mkdir(overstoryDir, { recursive: true });
+		try {
+			const deps = makeDeps({
+				projectRoot: tmp,
+				overstoryDir,
+				spawn: ((_cmd: unknown, _opts: unknown) => ({
+					unref: () => {},
+					exited: Promise.resolve(0),
+				})) as unknown as typeof Bun.spawn,
+			});
+			const handlers = intakePhaseCell.buildHandlers(deps);
+			// biome-ignore lint/style/noNonNullAssertion: registry known
+			const result = await handlers["ensure-context-generate"]!(makeCtx({}));
+			expect(result.trigger).toBe("context_generating");
+		} finally {
+			await rm(tmp, { recursive: true, force: true });
+		}
+	});
+
+	test("#236: emits context_ready when spawn fails synchronously (best-effort fallback)", async () => {
+		const tmp = await mkdtemp(join(tmpdir(), "intake-spawnfail-"));
+		const overstoryDir = join(tmp, ".overstory");
+		await mkdir(overstoryDir, { recursive: true });
+		try {
+			const deps = makeDeps({
+				projectRoot: tmp,
+				overstoryDir,
+				spawn: ((_cmd: unknown, _opts: unknown) => {
+					throw new Error("ENOENT: ha not found");
+				}) as unknown as typeof Bun.spawn,
+			});
+			const handlers = intakePhaseCell.buildHandlers(deps);
+			// biome-ignore lint/style/noNonNullAssertion: registry known
+			const result = await handlers["ensure-context-generate"]!(makeCtx({}));
+			// Better stale context than a stalled mission — fall back to ready.
+			expect(result.trigger).toBe("context_ready");
+		} finally {
+			await rm(tmp, { recursive: true, force: true });
+		}
+	});
+
+	test("#236: handler returns within <500ms even when cache is stale (no inline analyzeProject)", async () => {
+		const tmp = await mkdtemp(join(tmpdir(), "intake-timing-"));
+		const overstoryDir = join(tmp, ".overstory");
+		await mkdir(overstoryDir, { recursive: true });
+		// Build a non-trivial project so the OLD inline analyzeProject path
+		// would have taken multiple seconds to walk the tree.
+		for (let i = 0; i < 30; i++) {
+			await mkdir(join(tmp, `src/module${i}`), { recursive: true });
+			for (let j = 0; j < 10; j++) {
+				await writeFile(
+					join(tmp, `src/module${i}/file${j}.ts`),
+					`export const x${j} = ${j};\nimport { foo } from "node:path";\n`,
+				);
+			}
+		}
+		await writeFile(join(tmp, "package.json"), JSON.stringify({ name: "t", version: "1.0.0" }));
+		await writeFile(join(tmp, "tsconfig.json"), JSON.stringify({ compilerOptions: {} }));
+		try {
+			// Simulate a slow analyzeProject by making `spawn` itself wait — the
+			// handler must NOT await the spawned process; it must return as soon
+			// as the (detached) spawn call returns.
+			const deps = makeDeps({
+				projectRoot: tmp,
+				overstoryDir,
+				spawn: ((_cmd: unknown, _opts: unknown) => ({
+					unref: () => {},
+					// `exited` resolves after a long delay — handler must NOT await it.
+					exited: new Promise<number>((resolve) => setTimeout(() => resolve(0), 30_000)),
+				})) as unknown as typeof Bun.spawn,
+			});
+			const handlers = intakePhaseCell.buildHandlers(deps);
+			const start = Date.now();
+			// biome-ignore lint/style/noNonNullAssertion: registry known
+			const result = await handlers["ensure-context-generate"]!(makeCtx({}));
+			const elapsed = Date.now() - start;
+			expect(result.trigger).toBe("context_generating");
+			expect(elapsed).toBeLessThan(500);
+		} finally {
+			await rm(tmp, { recursive: true, force: true });
+		}
 	});
 });
 

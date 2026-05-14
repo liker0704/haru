@@ -7,7 +7,8 @@
  * `execute-phase` (direct).
  *
  * Subgraph nodes:
- *   ensure-context-generate (handler) → context_ready
+ *   ensure-context-generate (handler) → context_ready | context_generating
+ *   await-context (async, 600s) → context_ready
  *   dispatch-analyst-intake (handler) → analyst_dispatched | dispatch_failed
  *   await-research-complete (async, 1500s) → research_ready
  *   dispatch-clarifier (handler) → clarifier_dispatched | dispatch_failed
@@ -18,6 +19,14 @@
  *   await-tier-set (async, 300s) → tier_set
  *   escalate (handler) → escalated
  *   complete (terminal)
+ *
+ * The `ensure-context-generate` handler is non-blocking (#236): if the cached
+ * project-context.json is recent (< 1h old by mtime), it returns `context_ready`
+ * immediately; otherwise it spawns `ha context generate` in a detached
+ * background process and returns `context_generating`, routing the graph to
+ * the `await-context` async gate which polls for the regenerated cache file.
+ * This keeps the watchdog tick fast (<500ms) even on 10k+ file monorepos
+ * where analyzeProject can otherwise take 30s+ and starve other missions.
  *
  * Dispatch handlers shell out via `spawnEphemeralAgent` for ephemeral agents
  * (clarifier, tier-classifier) and call `ensureMissionAnalyst` for the
@@ -35,6 +44,15 @@ const CELL_TYPE = "intake-phase";
 /** Hard cap for spec rejection retry loop before escalation to operator. */
 const MAX_SPEC_REJECTIONS = 3;
 
+/**
+ * Window during which an existing project-context.json is treated as fresh
+ * enough to skip regeneration. 1h matches the typical mission intake cadence:
+ * structural project shape rarely changes within an hour, and analyzeProject
+ * on 10k+ file monorepos can take 30s+ — too long to run inline on a watchdog
+ * tick. See #236.
+ */
+const CONTEXT_CACHE_FRESH_MS = 60 * 60 * 1000;
+
 function buildSubgraph(_config: PhaseCellConfig): MissionGraph {
 	return {
 		version: 1,
@@ -44,6 +62,16 @@ function buildSubgraph(_config: PhaseCellConfig): MissionGraph {
 				id: `${CELL_TYPE}:ensure-context-generate`,
 				cellType: CELL_TYPE,
 				handler: "ensure-context-generate",
+			},
+			{
+				// #236: async gate polled by evaluateAwaitContext — waits for
+				// background `ha context generate` (spawned by the handler when
+				// the cache is stale) to materialize project-context.json.
+				kind: "cell",
+				id: `${CELL_TYPE}:await-context`,
+				cellType: CELL_TYPE,
+				gate: "async",
+				gateTimeout: 600,
 			},
 			{
 				kind: "cell",
@@ -113,6 +141,18 @@ function buildSubgraph(_config: PhaseCellConfig): MissionGraph {
 		edges: [
 			{
 				from: `${CELL_TYPE}:ensure-context-generate`,
+				to: `${CELL_TYPE}:dispatch-analyst-intake`,
+				trigger: "context_ready",
+			},
+			// #236: stale-cache path — handler spawns background regen and routes
+			// to the async gate, which polls for the regenerated file.
+			{
+				from: `${CELL_TYPE}:ensure-context-generate`,
+				to: `${CELL_TYPE}:await-context`,
+				trigger: "context_generating",
+			},
+			{
+				from: `${CELL_TYPE}:await-context`,
 				to: `${CELL_TYPE}:dispatch-analyst-intake`,
 				trigger: "context_ready",
 			},
@@ -208,36 +248,56 @@ interface IntakeCheckpoint {
 function buildHandlers(deps: PhaseCellDeps): HandlerRegistry {
 	return {
 		"ensure-context-generate": async (_ctx) => {
-			// Plan #231 (locked-in): compare cached project-context against the
-			// current state of the repo and regenerate on mismatch. The existing
-			// context system uses a structural hash (dir layout + package.json +
-			// tsconfig.json) rather than raw `git rev-parse HEAD`, but the
-			// purpose is identical: invalidate the cache when the project shape
-			// changed so analyst-intake gets fresh signal.
+			// #236: non-blocking. analyzeProject can take 5-30s on 10k+ file
+			// monorepos and was previously called inline, starving the watchdog
+			// tick. New flow: if the cache file is fresh (< 1h old by mtime),
+			// fast-path `context_ready`; otherwise spawn `ha context generate`
+			// in a detached background process and return `context_generating`
+			// → routes to the `await-context` async gate, which polls for the
+			// regenerated cache file.
 			if (!deps.projectRoot || !deps.overstoryDir) {
 				return { trigger: "context_ready" };
 			}
 			try {
 				const { join } = await import("node:path");
-				const { readCachedContext, writeCachedContext, isCacheValid, computeStructuralHash } =
-					await import("../../context/cache.ts");
-				const { analyzeProject } = await import("../../context/analyze.ts");
+				const { statSync, existsSync } = await import("node:fs");
 				const cachePath = join(deps.overstoryDir, "project-context.json");
-				const cached = readCachedContext(cachePath);
-				const currentHash = await computeStructuralHash(deps.projectRoot);
-				if (cached && isCacheValid(cached, currentHash)) {
+				if (existsSync(cachePath)) {
+					try {
+						const ageMs = Date.now() - statSync(cachePath).mtimeMs;
+						if (ageMs < CONTEXT_CACHE_FRESH_MS) {
+							return { trigger: "context_ready" };
+						}
+					} catch {
+						// stat failed — treat as stale and fall through to regen
+					}
+				}
+				// Stale or missing — spawn background regen and route to async gate.
+				const spawn = deps.spawn ?? Bun.spawn;
+				try {
+					const proc = spawn(["ha", "context", "generate", "--project", deps.projectRoot], {
+						cwd: deps.projectRoot,
+						stdout: "ignore",
+						stderr: "ignore",
+						detached: true,
+					});
+					proc.unref();
+				} catch (err) {
+					// Best-effort — if spawn fails synchronously, fall back to
+					// context_ready so the analyst can still proceed against
+					// whatever cache (if any) is present. Better stale context
+					// than a stalled mission.
+					process.stderr.write(
+						`[intake-phase] ensure-context-generate spawn failed: ${String(err)}\n`,
+					);
 					return { trigger: "context_ready" };
 				}
-				// Stale or missing — regenerate before the analyst spawns.
-				const fresh = await analyzeProject(deps.projectRoot, {});
-				await writeCachedContext(cachePath, fresh);
+				return { trigger: "context_generating" };
 			} catch (err) {
-				// Best-effort — never block the graph on context-generation failure.
-				// The analyst can still spawn and operate against whatever cached
-				// context (if any) is present.
+				// Defensive — any unexpected failure short-circuits to ready.
 				process.stderr.write(`[intake-phase] ensure-context-generate failed: ${String(err)}\n`);
+				return { trigger: "context_ready" };
 			}
-			return { trigger: "context_ready" };
 		},
 
 		"dispatch-analyst-intake": async (ctx) => {
