@@ -255,6 +255,7 @@ function createMockMissionStore(): MissionStore {
 		countTriagePerAuthorSince: () => 0,
 		recordPrComment: noop,
 		updatePrCommentAction: noop,
+		tryClaimTriageSlot: () => true,
 		markPrCommentResolved: noop,
 
 		close: noop,

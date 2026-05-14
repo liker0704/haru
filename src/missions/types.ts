@@ -602,6 +602,8 @@ export interface MissionStore {
 	/** Insert-or-ignore by comment_id. */
 	recordPrComment(row: MissionPrCommentRow): void;
 	updatePrCommentAction(commentId: string, action: string, status: string): void;
+	/** Atomically claim a triage spawn slot. Returns true if claimed, false if the per-mission cap would be exceeded (#305). */
+	tryClaimTriageSlot(missionId: string, commentId: string, prStart: string, cap: number): boolean;
 	markPrCommentResolved(commentId: string): void;
 
 	/** Set the predecessor mission ID on a mission (links child → parent). */
