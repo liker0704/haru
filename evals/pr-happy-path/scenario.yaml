@@ -1,0 +1,14 @@
+description: "Stage E pr-happy-path: PR created, CI passes, reviewer approves, PR merged"
+timeout_ms: 600000
+
+config_overrides:
+  pr:
+    operatorGithubLogin: operator
+    ciTimeoutMs: 120000
+    mergeStrategy: squash
+
+startup_actions:
+  - command: mkdir -p /tmp/haru-eval-pr-happy-path
+    description: "Create eval state dir; PATH=repo-template/bin:$PATH and HARU_EVAL_STATE_DIR must be set before coordinator start"
+  - command: sd create --title "PR happy path eval task" --type task
+    description: "Create task to trigger pr-tier mission"

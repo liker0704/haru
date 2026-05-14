@@ -1,0 +1,15 @@
+assertions:
+  - kind: no_zombies
+    label: "No zombie agents after CI failure recovery"
+    expected: true
+
+  - kind: max_stall_rate
+    label: "No stalls during CI failure retry cycle"
+    expected: 0.0
+
+  - kind: event_count
+    label: "dispatch-debugger triggered after CI failure"
+    expected: 1
+    selector:
+      eventType: mission
+      dataMatch: dispatch-debugger

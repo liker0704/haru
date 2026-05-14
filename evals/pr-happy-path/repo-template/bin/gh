@@ -1,0 +1,36 @@
+#!/bin/bash
+STATE_DIR="${HARU_EVAL_STATE_DIR:-/tmp/haru-eval-pr-happy-path}"
+mkdir -p "$STATE_DIR"
+echo "$@" >> "$STATE_DIR/gh-call-log"
+
+case "$1 $2" in
+  "auth status")
+    echo "Logged in to github.com as operator (oauth_token)"
+    exit 0
+    ;;
+  "pr create")
+    echo "https://github.com/example/repo/pull/42"
+    exit 0
+    ;;
+  "pr checks")
+    echo '[{"name":"ci","status":"COMPLETED","conclusion":"SUCCESS","startedAt":"2024-01-01T00:00:00Z","completedAt":"2024-01-01T00:01:00Z","detailsUrl":"https://github.com/example/repo/actions/runs/1"}]'
+    exit 0
+    ;;
+  "pr view")
+    if echo "$*" | grep -q "reviewDecision"; then
+      echo '{"reviewDecision":"APPROVED"}'
+    elif echo "$*" | grep -q "headRefOid"; then
+      echo '{"headRefOid":"abc123def456abc1234567890abcdef012345678"}'
+    else
+      echo '{"state":"OPEN","number":42}'
+    fi
+    exit 0
+    ;;
+  "pr merge")
+    exit 0
+    ;;
+  *)
+    echo "gh: unhandled command: $1 $2" >&2
+    exit 1
+    ;;
+esac

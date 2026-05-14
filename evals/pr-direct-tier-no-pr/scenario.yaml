@@ -1,0 +1,12 @@
+description: "Stage E pr-direct-tier-no-pr: direct tier mission skips pr-phase entirely, zero gh calls"
+timeout_ms: 300000
+
+config_overrides:
+  pr:
+    operatorGithubLogin: operator
+
+startup_actions:
+  - command: mkdir -p /tmp/haru-eval-pr-direct
+    description: "Create eval state dir for gh-call-log; PATH=repo-template/bin:$PATH and HARU_EVAL_STATE_DIR must be set before coordinator start"
+  - command: ha mission start --tier direct --title "Direct tier no-PR eval"
+    description: "Start a direct tier mission; direct tier phases are intake/execute/done (no pr)"

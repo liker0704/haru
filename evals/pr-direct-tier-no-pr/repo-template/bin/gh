@@ -1,0 +1,7 @@
+#!/bin/bash
+# Direct-tier scenario: gh should never be called.
+# Log every invocation so the no_pr_phase.ts hook can assert zero calls.
+STATE_DIR="${HARU_EVAL_STATE_DIR:-/tmp/haru-eval-pr-direct}"
+mkdir -p "$STATE_DIR"
+echo "$@" >> "$STATE_DIR/gh-call-log"
+exit 0
