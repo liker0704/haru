@@ -1323,3 +1323,62 @@ describe("MissionStore PR comment accessors", () => {
 		);
 	});
 });
+
+// === w8: parent-mission accessors + 'superseded' state + parentMissionId projection ===
+
+/**
+ * Local extension shape for the two new accessors W8 (with W1) adds to MissionStore.
+ * The cast keeps this test compiling against the un-widened MissionStore interface
+ * during the RED phase. The builder will widen MissionStore in src/missions/types.ts.
+ */
+type ParentMissionExt = {
+	setParentMissionId(missionId: string, parentMissionId: string): void;
+	setSuperseded(missionId: string): void;
+};
+const pmExt = (s: MissionStore): MissionStore & ParentMissionExt =>
+	s as MissionStore & ParentMissionExt;
+
+describe("MissionStore parent-mission accessors (w8)", () => {
+	test("setParentMissionId persists parent_mission_id; rowToMission projects to parentMissionId", () => {
+		store.create(makeMission({ id: "mission-parent", slug: "parent" }));
+		store.create(makeMission({ id: "mission-child", slug: "child" }));
+
+		pmExt(store).setParentMissionId("mission-child", "mission-parent");
+
+		const child = store.getById("mission-child") as unknown as {
+			parentMissionId: string | null;
+		} | null;
+		expect(child).not.toBeNull();
+		expect(child?.parentMissionId).toBe("mission-parent");
+	});
+
+	test("Mission.parentMissionId is null by default (when never set)", () => {
+		store.create(makeMission({ id: "mission-orphan", slug: "orphan" }));
+		const m = store.getById("mission-orphan") as unknown as {
+			parentMissionId: string | null;
+		} | null;
+		expect(m?.parentMissionId).toBeNull();
+	});
+
+	test("setSuperseded atomically sets state='superseded' AND current_node='done:superseded'", () => {
+		store.create(makeMission({ id: "mission-to-supersede", slug: "to-supersede" }));
+		store.start("mission-to-supersede");
+
+		pmExt(store).setSuperseded("mission-to-supersede");
+
+		const m = store.getById("mission-to-supersede");
+		// Cast: 'superseded' is added to MissionState union by w1 (paired with this w8 work).
+		expect(m?.state).toBe("superseded" as never);
+		expect(m?.currentNode).toBe("done:superseded");
+	});
+
+	test("MissionState union and CHECK constraint accept 'superseded' for updateState (regression for w1+w8 schema)", () => {
+		store.create(makeMission({ id: "mission-state-check", slug: "state-check" }));
+		// updateState should accept 'superseded' without throwing on the SQLite CHECK
+		// constraint. Cast keeps the test compiling before w1 widens the union.
+		expect(() => store.updateState("mission-state-check", "superseded" as never)).not.toThrow();
+
+		const m = store.getById("mission-state-check");
+		expect(m?.state).toBe("superseded" as never);
+	});
+});

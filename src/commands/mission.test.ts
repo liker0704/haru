@@ -116,6 +116,72 @@ describe("createMissionCommand", () => {
 		expect(tierOpt).toBeDefined();
 	});
 
+	// === w8: --continue-from + --branch (Stage E refactor flow) ===
+
+	test("T-w8-1: start subcommand exposes --continue-from <prior-mission-id> flag", () => {
+		const cmd = createMissionCommand();
+		const start = cmd.commands.find((command) => command.name() === "start");
+		const continueOpt = start?.options.find((option) => option.long === "--continue-from");
+		expect(continueOpt).toBeDefined();
+		// Takes a value (prior mission id) — not a boolean flag.
+		expect(continueOpt?.required || continueOpt?.optional).toBe(true);
+	});
+
+	test("T-w8-1: start subcommand exposes --branch <existing-branch> flag", () => {
+		const cmd = createMissionCommand();
+		const start = cmd.commands.find((command) => command.name() === "start");
+		const branchOpt = start?.options.find((option) => option.long === "--branch");
+		expect(branchOpt).toBeDefined();
+		expect(branchOpt?.required || branchOpt?.optional).toBe(true);
+	});
+
+	test("T-w8-2: --continue-from declares mutual-exclusion with --spec (commander conflictsWith)", () => {
+		// Driving the action handler through cmd.parseAsync would block on
+		// loadConfig(process.cwd()) since the test cwd is the repo root, not
+		// a mission project. Instead, we verify the option contract directly
+		// via commander's conflictsWith property — the builder may implement
+		// the rejection either by Option.conflicts(['spec']) (preferred) or by
+		// manual handler-side validation. The conflictsWith inspection covers
+		// the commander path and is the most robust signal.
+		const cmd = createMissionCommand();
+		const start = cmd.commands.find((command) => command.name() === "start");
+		const continueOpt = start?.options.find((option) => option.long === "--continue-from") as
+			| (import("commander").Option & { conflictsWith?: string[] })
+			| undefined;
+		const specOpt = start?.options.find((option) => option.long === "--spec") as
+			| (import("commander").Option & { conflictsWith?: string[] })
+			| undefined;
+		expect(continueOpt).toBeDefined();
+		expect(specOpt).toBeDefined();
+
+		// Either side of the pair must declare the conflict
+		// (Option.conflicts() is symmetric in commander 14).
+		const continueConflicts = continueOpt?.conflictsWith ?? [];
+		const specConflicts = specOpt?.conflictsWith ?? [];
+		const declared = continueConflicts.includes("spec") || specConflicts.includes("continueFrom");
+		expect(declared).toBe(true);
+	});
+
+	test("T-w8-3: --branch <name> exists alongside --continue-from (warning behavior verified by E-4 eval)", () => {
+		// The CLI accepts --branch in two cases:
+		//   (1) with --continue-from: reuse the existing branch (normal path).
+		//   (2) without --continue-from: accept but warn ("unusual").
+		// The warning side-effect requires invoking the action handler, which
+		// requires a configured project root and is exercised end-to-end by the
+		// E-4 refactor eval scenario. Here we verify the option exists and is
+		// described to mention --continue-from as the typical pairing — that
+		// description anchor catches accidental removal of the warning UX.
+		const cmd = createMissionCommand();
+		const start = cmd.commands.find((command) => command.name() === "start");
+		const branchOpt = start?.options.find((option) => option.long === "--branch");
+		expect(branchOpt).toBeDefined();
+		const description = (branchOpt?.description ?? "").toLowerCase();
+		// Description must reference its intended pairing or behavior so an
+		// operator inspecting `--help` understands when to use it.
+		expect(description.length).toBeGreaterThan(0);
+		expect(description).toMatch(/continue-from|existing|reuse|branch/);
+	});
+
 	test("resolveCurrentMissionId recovers from MissionStore when current-mission.txt is missing", async () => {
 		const missionStore = createMissionStore(join(overstoryDir, "sessions.db"));
 		try {

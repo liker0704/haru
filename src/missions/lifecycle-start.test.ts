@@ -348,3 +348,180 @@ describe("validateRequiredCapabilities", () => {
 		expect(parsed.error).toContain("Cannot read");
 	});
 });
+
+// === w8: --continue-from + captureBaseline integration ===
+
+/**
+ * Tests for the lifecycle-start hooks added by w8:
+ *   1. captureBaseline (from w11) MUST be called after ensureMissionArtifacts.
+ *   2. applyContinueFrom (from w8) MUST be called exactly once when
+ *      LifecycleStartOpts.continueFromMissionId is set.
+ *   3. captureBaseline failure MUST be swallowed (warning only) and not
+ *      abort mission start.
+ *
+ * Both hooks must be injectable via deps for testability — the builder will
+ * widen MissionCommandDeps with `captureBaseline?` and `applyContinueFrom?`
+ * fields. The casts below use `as unknown as MissionCommandDeps` so the file
+ * compiles against the un-widened deps interface during RED phase.
+ */
+describe("missionStart w8 hooks (continue-from + captureBaseline)", () => {
+	let w8Dir: string;
+	let w8OverstoryDir: string;
+	let w8ProjectRoot: string;
+
+	beforeEach(async () => {
+		w8Dir = await mkdtemp(join(tmpdir(), "ov-lifecycle-start-w8-test-"));
+		w8OverstoryDir = join(w8Dir, ".overstory");
+		w8ProjectRoot = w8Dir;
+		await Bun.write(join(w8OverstoryDir, ".keep"), "");
+		await Bun.write(
+			join(w8OverstoryDir, "agent-manifest.json"),
+			JSON.stringify(buildAgentManifest(), null, "\t"),
+		);
+		await Bun.write(
+			join(w8ProjectRoot, ".overstory", "config.yaml"),
+			["version: 1", "watchdog:", "  tier0Enabled: false", "mission:", "  maxConcurrent: 1"].join(
+				"\n",
+			),
+		);
+	});
+
+	afterEach(async () => {
+		await rm(w8Dir, { recursive: true, force: true });
+	});
+
+	test("T-w8-13: lifecycle-start calls captureBaseline(missionId, artifactRoot, projectRoot) after ensureMissionArtifacts", async () => {
+		const captureCalls: Array<[string, string, string]> = [];
+		const captureBaseline = async (
+			missionId: string,
+			artifactRoot: string,
+			projectRoot: string,
+		): Promise<void> => {
+			captureCalls.push([missionId, artifactRoot, projectRoot]);
+		};
+
+		const deps = {
+			startMissionCoordinator: makeRoleStub("c"),
+			startMissionAnalyst: makeRoleStub("a"),
+			stopMissionRole: async () => ({}) as never,
+			captureBaseline,
+		} as unknown as MissionCommandDeps;
+
+		await missionStart(
+			w8OverstoryDir,
+			w8ProjectRoot,
+			{ slug: "captures-baseline", objective: "test", json: true },
+			deps,
+		);
+
+		expect(captureCalls).toHaveLength(1);
+		const firstCall = captureCalls[0];
+		expect(firstCall).toBeDefined();
+		const [missionId, artifactRoot, projectRoot] = firstCall as [string, string, string];
+		expect(missionId).toMatch(/^mission-/);
+		expect(artifactRoot).toContain("missions");
+		expect(artifactRoot).toContain(missionId);
+		expect(projectRoot).toBe(w8ProjectRoot);
+	});
+
+	test("T-w8-14: captureBaseline throwing → start completes successfully (warning only, no abort)", async () => {
+		let captureCalled = false;
+		const captureBaseline = async (
+			_missionId: string,
+			_artifactRoot: string,
+			_projectRoot: string,
+		): Promise<void> => {
+			captureCalled = true;
+			throw new Error("simulated baseline capture failure");
+		};
+
+		const deps = {
+			startMissionCoordinator: makeRoleStub("c"),
+			startMissionAnalyst: makeRoleStub("a"),
+			stopMissionRole: async () => ({}) as never,
+			captureBaseline,
+		} as unknown as MissionCommandDeps;
+
+		process.exitCode = 0;
+		await missionStart(
+			w8OverstoryDir,
+			w8ProjectRoot,
+			{ slug: "baseline-fails", objective: "test", json: true },
+			deps,
+		);
+
+		// Both invariants must hold:
+		//   1. captureBaseline was actually invoked (proving the hook is wired) —
+		//      without this, the rest of the assertions could pass for the wrong reason.
+		//   2. Mission start completed successfully despite the throw.
+		expect(captureCalled).toBe(true);
+		expect(process.exitCode).not.toBe(1);
+		const store = createMissionStore(join(w8OverstoryDir, "sessions.db"));
+		try {
+			const m = store.list().find((mm) => mm.slug === "baseline-fails");
+			expect(m).toBeDefined();
+		} finally {
+			store.close();
+		}
+	});
+
+	test("T-w8-12: lifecycle-start with continueFromMissionId set → calls applyContinueFrom exactly once", async () => {
+		// Seed an old mission to point continue-from at.
+		const store = createMissionStore(join(w8OverstoryDir, "sessions.db"));
+		try {
+			store.create({
+				id: "mission-old-x",
+				slug: "old-x",
+				objective: "old objective",
+			});
+			store.start("mission-old-x");
+			// Coerce into pr-phase via raw current-node update.
+			store.updateCurrentNode("mission-old-x", "pr-phase:done");
+			store.updateState("mission-old-x", "pr-phase" as never);
+		} finally {
+			store.close();
+		}
+
+		const applyCalls: Array<{
+			oldMissionId: string;
+			newMissionId: string;
+			newArtifactRoot: string;
+		}> = [];
+		const applyContinueFromStub = async (
+			oldMissionId: string,
+			newMissionId: string,
+			newArtifactRoot: string,
+		): Promise<void> => {
+			applyCalls.push({ oldMissionId, newMissionId, newArtifactRoot });
+		};
+
+		const deps = {
+			startMissionCoordinator: makeRoleStub("c"),
+			startMissionAnalyst: makeRoleStub("a"),
+			stopMissionRole: async () => ({}) as never,
+			applyContinueFrom: applyContinueFromStub,
+			// captureBaseline must also be injectable; provide a no-op so
+			// it doesn't shell out to anything real.
+			captureBaseline: async () => {},
+		} as unknown as MissionCommandDeps;
+
+		await missionStart(
+			w8OverstoryDir,
+			w8ProjectRoot,
+			{
+				slug: "continue-from-test",
+				objective: "test continue-from",
+				json: true,
+				// `continueFromMissionId` is the new field on StartOpts added by w8.
+				continueFromMissionId: "mission-old-x",
+			} as unknown as Parameters<typeof missionStart>[2],
+			deps,
+		);
+
+		expect(applyCalls).toHaveLength(1);
+		expect(applyCalls[0]?.oldMissionId).toBe("mission-old-x");
+		expect(applyCalls[0]?.newMissionId).toMatch(/^mission-/);
+		expect(applyCalls[0]?.newMissionId).not.toBe("mission-old-x");
+		expect(applyCalls[0]?.newArtifactRoot).toContain("missions");
+	});
+});
