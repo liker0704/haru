@@ -893,7 +893,6 @@ Originally predicted:
 Actually delivered (mission-related agent prompts):
 
 - `agents/coordinator-mission.md`
-- `agents/coordinator-mission-assess.md`
 - `agents/coordinator-mission-direct.md`
 - `agents/coordinator-mission-planned.md`
 - `agents/coordinator-mission-full.md`

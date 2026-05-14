@@ -31,12 +31,14 @@ base-agent                          (root — universal principles)
 │
 ├── Orchestrators (mission lifecycle)
 │   ├── coordinator-mission         (mission coordinator base)
-│   │   ├── coordinator-mission-assess     (assess phase)
 │   │   ├── coordinator-mission-direct     (direct execution variant)
 │   │   ├── coordinator-mission-planned    (plan-then-execute variant)
 │   │   └── coordinator-mission-full       (full lifecycle variant)
 │   ├── mission-analyst             (mission analysis worker)
+│   ├── mission-analyst-intake      (intake-phase research variant)
 │   ├── mission-analyst-planned     (planned-mission analysis variant)
+│   ├── product-clarifier           (intake-phase mediator clarifier)
+│   ├── tier-classifier             (intake-phase tier classifier)
 │   └── execution-director          (execution-phase director)
 │
 ├── Architects

@@ -142,9 +142,8 @@ Each tier has a specialized coordinator agent definition:
 - `coordinator-mission-direct.md` — minimal overhead, single-agent execution
 - `coordinator-mission-planned.md` — standard multi-agent pipeline
 - `coordinator-mission-full.md` — full lifecycle with alignment and decision phases
-- `coordinator-mission-assess.md` — initial assessment coordinator that determines which tier to use
 
-Tier selection: `ha mission tier set <direct|planned|full>` transitions the mission after assessment. `"assess"` is a coordinator variant for initial assessment, not a mission tier itself.
+Tier selection no longer uses a one-shot assess coordinator. New missions enter the `intake-phase` subgraph, which runs `mission-analyst-intake` → `product-clarifier` → `human-spec-review` gate → `tier-classifier`. The `tier-classifier` agent calls `ha mission tier set <direct|planned|full>` once the spec is approved. See `docs/haru-mission-usage.md` for the operator-facing reference.
 
 ### 3.3 Persistence And State
 

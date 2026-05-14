@@ -358,11 +358,27 @@ A mission-aware coordinator that manages all mission phases from understand thro
 
 ---
 
-#### Coordinator Mission Assess
+#### Mission Analyst Intake
 
-Evaluates a new mission's complexity and selects the appropriate tier (`direct`, `planned`, or `full`). Runs once at mission start.
+Researches the codebase during the intake phase. Spawns 2–5 scouts and materializes `.overstory/missions/<id>/research/_summary.md` before the clarifier runs.
 
-**When to use:** Automatically used during assess mode when a new mission is created.
+**When to use:** Automatically spawned at mission start as the first step of `intake-phase`.
+
+---
+
+#### Product Clarifier
+
+Reads the operator's intent and the intake research, asks up to 5 clarifying questions, and writes `product-spec.md`. The mediator clarifier in the intake-phase flow.
+
+**When to use:** Automatically spawned after `mission-analyst-intake` during `intake-phase`. Skipped when `--autonomy auto-spec` or `auto-all` is set.
+
+---
+
+#### Tier Classifier
+
+Reads the approved `product-spec.md` plus intake research, picks a tier (`direct`, `planned`, or `full`), and calls `ha mission tier set <tier>`. Records the classification as a `kura tier-classifier` observational record.
+
+**When to use:** Automatically spawned at the end of `intake-phase` after `human-spec-review` resolves. Replaces the previous one-shot assess coordinator that selected the tier inline.
 
 ---
 
@@ -444,9 +460,11 @@ All 28 agent specializations registered in `buildAgentManifest()` (`src/commands
 | tester | Sonnet | Read, Write, Edit, Glob, Grep, Bash | No | — |
 | coordinator | Opus | Read, Glob, Grep, Bash | Yes | read-only, no-worktree |
 | coordinator-mission | Opus | Read, Glob, Grep, Bash | Yes | read-only, no-worktree |
-| coordinator-mission-assess | Opus | Read, Glob, Grep, Bash | No | read-only, no-worktree |
 | coordinator-mission-direct | Opus | Read, Glob, Grep, Bash | Yes | read-only, no-worktree |
 | coordinator-mission-planned | Opus | Read, Glob, Grep, Bash | Yes | read-only, no-worktree |
+| mission-analyst-intake | Opus | Read, Glob, Grep, Bash | Yes | read-only, no-worktree |
+| product-clarifier | Haiku | Read, Glob, Grep, Bash | No | read-only, no-worktree |
+| tier-classifier | Haiku | Read, Glob, Grep, Bash | No | read-only, no-worktree |
 | mission-analyst | Opus | Read, Glob, Grep, Bash | Yes | read-only, no-worktree |
 | mission-analyst-planned | Opus | Read, Glob, Grep, Bash | Yes | read-only, no-worktree |
 | execution-director | Opus | Read, Glob, Grep, Bash | Yes | read-only, no-worktree |
@@ -490,7 +508,7 @@ Use `ha mission` when you want the system to clarify the objective, build a plan
 | **planned** | understand → plan → execute → done | Needs exploration before coding. Standard flow. |
 | **full** | understand → align → decide → plan → execute → done | Ambiguous, multi-subsystem, or architecturally significant. |
 
-New missions start in **assess mode** (`tier=null`). The coordinator evaluates complexity and selects a tier with `ha mission tier set <tier>`. Tiers only escalate upward — you cannot downgrade a running mission.
+New missions start in the **intake phase** (`tier=null`). The `intake-phase` subgraph runs `mission-analyst-intake` (research) → `product-clarifier` (writes `product-spec.md`) → `human-spec-review` (operator approves; auto-skipped under `--autonomy auto-spec`/`auto-all`) → `tier-classifier` (picks the tier and calls `ha mission tier set <tier>`). Tiers only escalate upward — you cannot downgrade a running mission. See `docs/haru-mission-usage.md` for the source-of-truth intake-phase reference.
 
 ### Flow Walkthrough
 
@@ -498,7 +516,7 @@ New missions start in **assess mode** (`tier=null`). The coordinator evaluates c
 ha mission start --slug <slug> --objective "<objective>"
     │
     ▼
-Assess mode — coordinator selects tier
+intake phase — analyst-intake → product-clarifier → human-spec-review → tier-classifier
     │
     ▼
 understand phase — analyst explores, produces brief

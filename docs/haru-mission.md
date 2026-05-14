@@ -49,8 +49,11 @@ much phase discipline a mission uses. The `TIER_PHASES` mapping determines which
 phases are active for each tier. The `direct` tier skips understanding and
 planning entirely, starting at `execute`. The `planned` tier uses the standard
 four-phase flow. The `full` tier adds `align` and `decide` phases for maximum
-rigor. New missions start in assess mode (`tier=null`) until the coordinator
-selects a tier.
+rigor. New missions start in the `intake-phase` subgraph (`tier=null`):
+`mission-analyst-intake` researches the codebase, `product-clarifier` writes
+`product-spec.md`, the operator approves via `human-spec-review`, and
+`tier-classifier` picks the tier. See `docs/haru-mission-usage.md` for the
+full intake-phase reference.
 
 > **Note:** `align` and `decide` in the `full` tier are auto-advance phases
 > with no dedicated cell file (see `src/missions/graph.ts:46`). They progress
