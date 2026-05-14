@@ -613,6 +613,24 @@
 			],
 			"canSpawn": false,
 			"constraints": []
+		},
+		"pr-comment-triage": {
+			"file": "pr-comment-triage.md",
+			"model": "haiku",
+			"tools": [
+				"Read"
+			],
+			"capabilities": [
+				"pr-comment-triage"
+			],
+			"canSpawn": false,
+			"constraints": [
+				"read-only",
+				"ephemeral",
+				"single-pass",
+				"no-write",
+				"no-bash"
+			]
 		}
 	},
 	"capabilityIndex": {
@@ -792,6 +810,9 @@
 		],
 		"diagnose": [
 			"debugger"
+		],
+		"pr-comment-triage": [
+			"pr-comment-triage"
 		]
 	}
 }
