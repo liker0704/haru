@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -97,9 +98,13 @@ describe("watchCommand", () => {
 	});
 
 	test("background mode: already running detection", async () => {
-		// Write a PID file with a running process (use our own PID)
-		const pidFilePath = join(tempDir, ".overstory", "watchdog.pid");
-		await Bun.write(pidFilePath, `${process.pid}\n`);
+		// Write a PID file with a running process (use our own PID) AND a fresh heartbeat.
+		// Under the correct semantics: alive + fresh heartbeat → "already running" error.
+		const overstoryDir = join(tempDir, ".overstory");
+		const stateDir = join(overstoryDir, "state");
+		mkdirSync(stateDir, { recursive: true });
+		await Bun.write(join(overstoryDir, "watchdog.pid"), `${process.pid}\n`);
+		writeFileSync(join(stateDir, "watchdog.heartbeat"), String(Date.now()));
 
 		// Try to start in background mode — should fail with "already running"
 		await watchCommand(["--background"]);
@@ -108,6 +113,24 @@ describe("watchCommand", () => {
 		expect(err).toContain("already running");
 		expect(err).toContain(`${process.pid}`);
 		expect(process.exitCode).toBe(1);
+	});
+
+	test("background mode: alive + no heartbeat proceeds (wedged recovery)", async () => {
+		// Write only a PID file without a heartbeat — alive but wedged pre-fix daemon.
+		// Under the correct semantics this must NOT produce "already running".
+		// It should proceed to spawn (which will eventually fail in test env, that's OK).
+		const overstoryDir = join(tempDir, ".overstory");
+		await Bun.write(join(overstoryDir, "watchdog.pid"), `${process.pid}\n`);
+
+		try {
+			await watchCommand(["--background"]);
+		} catch {
+			// Spawn may fail in test environment — that's expected
+		}
+
+		const err = stderr();
+		expect(err).not.toContain("already running");
+		// exitCode may be 1 from a failed spawn, but not from the "already running" guard
 	});
 
 	test("background mode: stale PID cleanup", async () => {

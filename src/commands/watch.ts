@@ -206,19 +206,19 @@ async function runWatch(opts: {
 	const useJson = opts.json ?? false;
 
 	if (opts.background) {
-		// Fast-fail if a running daemon is alive. Only skip the error when the
-		// heartbeat file exists AND is stale — that signals a wedged daemon that
-		// the spawned daemon's claimPidFile should evict. No heartbeat or a fresh
-		// heartbeat both mean "assume healthy, don't spawn another".
+		// Fast-fail only when a daemon is confirmed healthy (alive + fresh heartbeat).
+		// No heartbeat or stale heartbeat means wedged — let claimPidFile recover it.
+		// Bootstrap sync write in claimPidFile guarantees healthy daemons always have
+		// a heartbeat immediately after claim, so missing heartbeat = pre-fix wedged case.
 		const existingPid = await readPidFile(pidFilePath);
 		if (existingPid !== null && isProcessRunning(existingPid)) {
 			const heartbeatFile = Bun.file(heartbeatPath);
-			let isWedged = false;
+			let isHealthy = false;
 			if (await heartbeatFile.exists()) {
 				const stat = await heartbeatFile.stat();
-				isWedged = stat.mtimeMs < Date.now() - 2 * intervalMs;
+				isHealthy = stat.mtimeMs >= Date.now() - 2 * intervalMs;
 			}
-			if (!isWedged) {
+			if (isHealthy) {
 				if (useJson) {
 					jsonOutput("watch", {
 						running: true,
@@ -233,7 +233,7 @@ async function runWatch(opts: {
 				process.exitCode = 1;
 				return;
 			}
-			// Alive but heartbeat stale (wedged): proceed — daemon self-claim will handle it
+			// Alive but no/stale heartbeat (wedged): proceed — daemon self-claim will handle it
 		} else if (existingPid !== null) {
 			// Dead process: clean up stale PID file
 			await removePidFile(pidFilePath);
