@@ -1243,9 +1243,15 @@ export function evaluateAwaitDebugFix(
 			trigger: verdict.type === "debug_fix_committed" ? "fix_committed" : "fix_failed",
 		};
 	}
+	// Issue #337: nudge the actual spawned agent name. The dispatch-debugger
+	// handler spawns `debugger-<slug>-attempt-<N>` (see debug-loop-handlers.ts),
+	// so a slug-only nudge target results in `delivered:false` because no agent
+	// is registered under that bare name. Read attemptN from the same
+	// checkpoint that evaluateAwaitDebugBriefReady uses.
+	const attemptN = missionStore ? readDebugAttempts(missionStore, mission.id) : 0;
 	return {
 		met: false,
-		nudgeTarget: `debugger-${mission.slug}`,
+		nudgeTarget: `debugger-${mission.slug}-attempt-${attemptN}`,
 		nudgeMessage: "Apply minimal fix per debug-brief; commit and send debug_fix_committed.",
 	};
 }

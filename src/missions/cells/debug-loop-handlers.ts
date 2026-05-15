@@ -168,6 +168,14 @@ export function makeDebugLoopHandlers(opts: DebugLoopOpts, deps: DebugLoopDeps):
 			const artifactRoot = mission.artifactRoot ?? "";
 			const debugAttemptsDir = join(artifactRoot, "debug", "attempts");
 			const debugBriefPath = join(artifactRoot, "debug", "debug-brief.md");
+			// Issue #337: pass `--skip-task-check` because the debug attempt id
+			// is not registered with the tracker, and `--base-branch` (not
+			// `--branch`) is the correct sling option — passing the wrong flag
+			// causes Commander to reject the invocation, the detached spawn
+			// dies, and the debugger never materializes (matching the symptom
+			// "recipient never spawned"). Sling derives its own branch name
+			// from the agent name; the pre-created `debugBranch` worktree
+			// remains usable as an inspection artifact.
 			const slingProc = Bun.spawn(
 				[
 					"ha",
@@ -177,8 +185,9 @@ export function makeDebugLoopHandlers(opts: DebugLoopOpts, deps: DebugLoopDeps):
 					"debugger",
 					"--name",
 					debuggerName,
-					"--branch",
-					debugBranch,
+					"--base-branch",
+					featureBranch,
+					"--skip-task-check",
 					"--files",
 					`${debugAttemptsDir}/**`,
 					"--files",

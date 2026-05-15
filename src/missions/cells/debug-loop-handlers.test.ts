@@ -501,6 +501,162 @@ describe("makeDebugLoopHandlers worktree probe", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// dispatch-debugger sling spawn args (issue #337 regression)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("makeDebugLoopHandlers sling spawn args (issue #337)", () => {
+	let tempDir: string;
+	let agentBaseDir: string;
+	let origSpawn: typeof Bun.spawn;
+
+	beforeEach(async () => {
+		tempDir = await mkdtemp(join(tmpdir(), "haru-dlh-sling-args-"));
+		agentBaseDir = join(tempDir, "agent-defs");
+		await mkdir(agentBaseDir, { recursive: true });
+		origSpawn = Bun.spawn;
+		await Bun.write(
+			join(tempDir, "agent-manifest.json"),
+			JSON.stringify({
+				version: "1.0",
+				agents: {
+					debugger: {
+						file: "debugger.md",
+						model: "sonnet",
+						tools: ["Read", "Edit"],
+						capabilities: ["debugger"],
+						canSpawn: false,
+						constraints: [],
+					},
+				},
+			}),
+		);
+		await Bun.write(join(agentBaseDir, "debugger.md"), "# debugger\n");
+	});
+
+	afterEach(async () => {
+		// biome-ignore lint/suspicious/noExplicitAny: restoring Bun.spawn after test
+		(Bun as any).spawn = origSpawn;
+		await cleanupTempDir(tempDir);
+	});
+
+	test("ha sling invocation uses --base-branch (not --branch) and --skip-task-check with attempt-suffixed name", async () => {
+		const spawnArgs: string[][] = [];
+		const encoder = new TextEncoder();
+		const expectedWorktreePath = join(tempDir, "worktrees", "debug", "test-mission-attempt-1");
+
+		// biome-ignore lint/suspicious/noExplicitAny: Bun.spawn overloads require any cast
+		(Bun as any).spawn = (cmd: string[], opts?: unknown): ReturnType<typeof Bun.spawn> => {
+			spawnArgs.push([...cmd]);
+			if (cmd[0] === "git" && cmd[1] === "worktree" && cmd[2] === "list") {
+				const output = `worktree ${expectedWorktreePath}\nHEAD abc\nbranch refs/heads/feature/x\n`;
+				return {
+					stdout: new ReadableStream({
+						start(c) {
+							c.enqueue(encoder.encode(output));
+							c.close();
+						},
+					}),
+					stderr: new ReadableStream({
+						start(c) {
+							c.close();
+						},
+					}),
+					exited: Promise.resolve(0),
+					unref: () => {},
+				} as unknown as ReturnType<typeof Bun.spawn>;
+			}
+			if (cmd[0] === "git" && cmd[1] === "rev-parse") {
+				return {
+					stdout: new ReadableStream({
+						start(c) {
+							c.enqueue(encoder.encode("abc\n"));
+							c.close();
+						},
+					}),
+					stderr: new ReadableStream({
+						start(c) {
+							c.close();
+						},
+					}),
+					exited: Promise.resolve(0),
+					unref: () => {},
+				} as unknown as ReturnType<typeof Bun.spawn>;
+			}
+			if (cmd[0] === "ha" && cmd[1] === "sling") {
+				return {
+					stdout: new ReadableStream({
+						start(c) {
+							c.close();
+						},
+					}),
+					stderr: new ReadableStream({
+						start(c) {
+							c.close();
+						},
+					}),
+					exited: new Promise<number>(() => {}),
+					unref: () => {},
+				} as unknown as ReturnType<typeof Bun.spawn>;
+			}
+			return origSpawn(cmd as [string, ...string[]], opts as Parameters<typeof Bun.spawn>[1]);
+		};
+
+		const saved: Array<{ missionId: string; nodeId: string; data: unknown }> = [];
+		const deps: DebugLoopDeps = {
+			mailSend: async () => {},
+			checkpointStore: {} as PhaseCellDeps["checkpointStore"],
+			missionStore: {
+				checkpoints: {
+					saveCheckpoint: (missionId: string, nodeId: string, data: unknown) => {
+						saved.push({ missionId, nodeId, data });
+					},
+					getCheckpoint: () => null,
+				},
+			} as unknown as PhaseCellDeps["missionStore"],
+			overstoryDir: tempDir,
+			projectRoot: "/tmp/sling-args-test",
+		};
+
+		const handlers = makeDebugLoopHandlers(
+			{ cellType: "done-phase", failureSource: "holdout" },
+			deps,
+		);
+		// biome-ignore lint/style/noNonNullAssertion: registry known
+		const result = await handlers["dispatch-debugger"]!(makeCtx());
+
+		expect(result.trigger).toBe("debugger_dispatched");
+
+		const slingCall = spawnArgs.find((a) => a[0] === "ha" && a[1] === "sling");
+		expect(slingCall).toBeDefined();
+		if (!slingCall) throw new Error("sling not invoked");
+
+		// Regression: bad `--branch` flag must not be present (Commander rejects it).
+		expect(slingCall).not.toContain("--branch");
+
+		// The valid `--base-branch` flag must be passed with the feature branch.
+		const baseBranchIdx = slingCall.indexOf("--base-branch");
+		expect(baseBranchIdx).toBeGreaterThan(-1);
+		expect(slingCall[baseBranchIdx + 1]).toBe("feature/x");
+
+		// `--skip-task-check` must be set (debug attempt task is not in tracker).
+		expect(slingCall).toContain("--skip-task-check");
+
+		// The `--name` must include the attempt suffix, matching the address that
+		// mail is sent to and the nudge target computed by evaluateAwaitDebugFix.
+		const nameIdx = slingCall.indexOf("--name");
+		expect(nameIdx).toBeGreaterThan(-1);
+		expect(slingCall[nameIdx + 1]).toBe("debugger-test-mission-attempt-1");
+
+		// Checkpoint records the same suffixed name so the gate evaluator's
+		// readDebugAttempts → `debugger-<slug>-attempt-<N>` derivation aligns.
+		const dispatchCp = saved.find((s) => s.nodeId === "done-phase:dispatch-debugger");
+		const cpData = dispatchCp?.data as { debuggerName?: string; debugAttempts?: number };
+		expect(cpData?.debuggerName).toBe("debugger-test-mission-attempt-1");
+		expect(cpData?.debugAttempts).toBe(1);
+	});
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // check-debug-attempts
 // ─────────────────────────────────────────────────────────────────────────────
 

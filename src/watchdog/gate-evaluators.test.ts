@@ -15,7 +15,9 @@ import {
 	evaluateAwaitApproval,
 	evaluateAwaitCI,
 	evaluateAwaitComments,
+	evaluateAwaitDebugBriefReady,
 	evaluateAwaitDebugComplete,
+	evaluateAwaitDebugFix,
 	evaluateAwaitPlan,
 	evaluateAwaitResearch,
 	evaluateAwaitResearchComplete,
@@ -1656,5 +1658,85 @@ describe("gh-budget singleton routing [T-w5-27]", () => {
 			"--json",
 			"name,status,conclusion,detailsUrl,startedAt,completedAt",
 		]);
+	});
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Issue #337: nudge target / spawn name suffix consistency
+// ─────────────────────────────────────────────────────────────────────────────
+
+function makeMissionStoreWithDispatchCheckpoint(opts: {
+	debugAttempts?: number;
+	dispatchedAt?: string;
+}) {
+	const data = {
+		debugAttempts: opts.debugAttempts ?? 0,
+		dispatchedAt: opts.dispatchedAt,
+	};
+	return {
+		checkpoints: {
+			getCheckpoint: (_missionId: string, nodeId: string) => {
+				if (nodeId === "done-phase:dispatch-debugger") {
+					return { data };
+				}
+				return null;
+			},
+			saveCheckpoint: () => {},
+		},
+	} as unknown as Parameters<typeof evaluateAwaitDebugFix>[2];
+}
+
+describe("evaluateAwaitDebugFix (issue #337)", () => {
+	it("no verdict mail → nudge target includes -attempt-<N> suffix matching the spawned debugger name", () => {
+		const mission = makeMission({ slug: "fix-3", id: "m1" });
+		const mailStore = createTestMailStore([]);
+		const missionStore = makeMissionStoreWithDispatchCheckpoint({ debugAttempts: 1 });
+		const result = evaluateAwaitDebugFix(mission, mailStore, missionStore);
+		expect(result.met).toBe(false);
+		// Previously emitted "debugger-fix-3" (no suffix) which was undeliverable
+		// because dispatch-debugger spawns "debugger-fix-3-attempt-1". Bug #337.
+		expect(result.nudgeTarget).toBe("debugger-fix-3-attempt-1");
+	});
+
+	it("nudge suffix follows the current attempt counter (attempt 2)", () => {
+		const mission = makeMission({ slug: "fix-3", id: "m1" });
+		const mailStore = createTestMailStore([]);
+		const missionStore = makeMissionStoreWithDispatchCheckpoint({ debugAttempts: 2 });
+		const result = evaluateAwaitDebugFix(mission, mailStore, missionStore);
+		expect(result.nudgeTarget).toBe("debugger-fix-3-attempt-2");
+	});
+
+	it("debug_fix_committed verdict to coordinator → met:true, no nudge", () => {
+		const mission = makeMission({ slug: "fix-3", id: "m1" });
+		const mailStore = createTestMailStore([
+			{
+				from: "debugger-fix-3-attempt-1",
+				to: "coordinator-fix-3",
+				type: "debug_fix_committed" as MailMessageType,
+				subject: "Fix committed",
+			},
+		]);
+		const missionStore = makeMissionStoreWithDispatchCheckpoint({ debugAttempts: 1 });
+		const result = evaluateAwaitDebugFix(mission, mailStore, missionStore);
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("fix_committed");
+	});
+});
+
+describe("evaluateAwaitDebugBriefReady (issue #337 consistency check)", () => {
+	it("inbox check and brief readiness use the attempt-suffixed debugger name", () => {
+		const mission = makeMission({ slug: "fix-3", id: "m1" });
+		const mailStore = createTestMailStore([
+			{
+				from: "mission-analyst-fix-3",
+				to: "debugger-fix-3-attempt-1",
+				type: "debug_brief_ready" as MailMessageType,
+				subject: "Debug brief ready",
+			},
+		]);
+		const missionStore = makeMissionStoreWithDispatchCheckpoint({ debugAttempts: 1 });
+		const result = evaluateAwaitDebugBriefReady(mission, mailStore, missionStore);
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("brief_ready");
 	});
 });
