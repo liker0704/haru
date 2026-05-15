@@ -413,3 +413,39 @@ up: (db) => {
   rebuildTable({ db, table: "messages", createSql: CREATE_TABLE, columns: [...] });
 },
 ```
+
+---
+
+## 11. Reference: sessions.db Migration List
+
+`src/sessions/store.ts` is the canonical example of co-resident migrations
+sharing a single `user_version` in `sessions.db`. Three arrays combine via
+`ensureMigrations()` in `createSessionStore()`: `SESSION_MIGRATIONS`,
+`RUNS_MIGRATIONS`, and `STATE_LOG_MIGRATION`. Because all three stores share
+one `PRAGMA user_version`, the idempotency contract from Section 5 applies in
+full: every migration `up()` function must be idempotent.
+
+### Version 12 — add tool_in_flight tracking columns
+
+Version 12 adds `tool_in_flight_name TEXT` and `tool_in_flight_started_at
+TEXT` to the `sessions` table via `ALTER TABLE ADD COLUMN`. Both additions are
+guarded by `hasColumn()` — the mandatory pattern for all `ALTER TABLE` changes
+in co-resident `sessions.db` stores.
+
+**Source:** `src/sessions/store.ts` lines 364--377, description `"add
+tool_in_flight tracking columns"`. The `detect` callback verifies that both
+columns are present (`cols.has("tool_in_flight_started_at") &&
+cols.has("tool_in_flight_name")`).
+
+The columns are written by the tool-start hook handler (`setToolInFlight` in
+`src/sessions/store.ts`, called from `src/commands/log.ts`) and cleared in two
+situations: on tool-end (same handler nulls both columns) and on any transition
+to `booting`, via the `CASE WHEN $state = 'booting' THEN NULL` expression in
+`updateStateStmt` (`src/sessions/store.ts` lines 605--611).
+
+The columns support the watchdog tool-hang rung. The hang threshold
+(`toolHangMs`) is a daemon-option parameter only, defaulting to 900&thinsp;000 ms
+(`src/watchdog/daemon.ts:1086`); it is not a `config.yaml` knob.
+
+See also: [runbooks/watchdog-recovery.md](runbooks/watchdog-recovery.md)
+section Tool-hang rung.

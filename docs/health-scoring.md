@@ -26,6 +26,11 @@ ha next-improvement    # Get the top recommendation
 ha health              # Verify the score improved
 ```
 
+Note: The watchdog tool-hang rung is not a health-score input -- it is a
+watchdog auto-recovery mechanism. See
+[runbooks/watchdog-recovery.md](runbooks/watchdog-recovery.md) section
+Tool-hang rung.
+
 ---
 
 ## 2. Signal Collection
