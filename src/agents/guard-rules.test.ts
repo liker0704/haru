@@ -370,4 +370,20 @@ describe("SAFE_BASH_PREFIXES", () => {
 		expect(isSafe("git log --oneline")).toBe(true);
 		expect(isSafe("git diff HEAD")).toBe(true);
 	});
+
+	test("includes 'bun test' for scoped test invocations", () => {
+		expect(SAFE_BASH_PREFIXES).toContain("bun test");
+	});
+
+	test("includes 'timeout 600 bun test' for the wrapped gate command", () => {
+		expect(SAFE_BASH_PREFIXES).toContain("timeout 600 bun test");
+	});
+
+	test("allows scoped bun test invocations via prefix match", () => {
+		const isSafe = (cmd: string) =>
+			SAFE_BASH_PREFIXES.some((prefix) => cmd.trimStart().startsWith(prefix));
+		expect(isSafe("bun test src/foo.test.ts")).toBe(true);
+		expect(isSafe("bun test src/config.test.ts src/agents/guard-rules.test.ts")).toBe(true);
+		expect(isSafe("timeout 600 bun test")).toBe(true);
+	});
 });

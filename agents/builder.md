@@ -134,6 +134,7 @@ Update your status at each major workflow step. Keep it short (under 80 chars).
    - Follow project conventions (check existing code for patterns).
    - Write tests alongside implementation.
 5. **Run quality gates:**
+   - **Run scoped tests first.** Before the full timeout-bounded suite below, run scoped tests for your FILE_SCOPE: `bun test src/<scope>.test.ts` for each test file you can identify in scope. The full suite is the final gate, not the iteration loop.
 {{QUALITY_GATE_BASH}}
 6. **Follow the completion-protocol section above** — commit, record mulch, send worker_done, then wait for lead review. Do NOT close the tracker issue — the lead handles that after merge.
 

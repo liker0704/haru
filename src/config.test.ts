@@ -1297,7 +1297,7 @@ describe("DEFAULT_CONFIG", () => {
 	test("includes default qualityGates", () => {
 		expect(DEFAULT_CONFIG.project.qualityGates).toBeDefined();
 		expect(DEFAULT_CONFIG.project.qualityGates?.length).toBe(3);
-		expect(DEFAULT_CONFIG.project.qualityGates?.[0]?.command).toBe("bun test");
+		expect(DEFAULT_CONFIG.project.qualityGates?.[0]?.command).toBe("timeout 600 bun test");
 		expect(DEFAULT_CONFIG.project.qualityGates?.[1]?.command).toBe("bun run lint");
 		expect(DEFAULT_CONFIG.project.qualityGates?.[2]?.command).toBe("bun run typecheck");
 	});
@@ -1314,6 +1314,12 @@ describe("DEFAULT_CONFIG", () => {
 		expect(DEFAULT_QUALITY_GATES[0]?.name).toBe("Tests");
 		expect(DEFAULT_QUALITY_GATES[1]?.name).toBe("Lint");
 		expect(DEFAULT_QUALITY_GATES[2]?.name).toBe("Typecheck");
+	});
+
+	test("Tests gate is wrapped with timeout to prevent indefinite hangs", () => {
+		const testsGate = DEFAULT_QUALITY_GATES[0];
+		expect(testsGate?.name).toBe("Tests");
+		expect(testsGate?.command).toMatch(/^timeout \d+ bun test/);
 	});
 });
 
