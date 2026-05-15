@@ -1866,5 +1866,15 @@
 		"status": "active",
 		"createdAt": "2026-05-15T08:47:12.468Z",
 		"completedAt": null
+	},
+	{
+		"id": "group-e50fedcf",
+		"name": "mission-1778830660536-execute-batch-2",
+		"memberIssueIds": [
+			"haru-de67"
+		],
+		"status": "active",
+		"createdAt": "2026-05-15T08:59:38.331Z",
+		"completedAt": null
 	}
 ]
