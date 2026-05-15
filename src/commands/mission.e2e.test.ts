@@ -788,6 +788,80 @@ describe("mission command e2e", () => {
 		missionStore.close();
 	});
 
+	test("handoff under autonomy=auto-all bypasses freeze ceremony (#326)", async () => {
+		const deps = makeRoleDeps(tempDir, overstoryDir);
+
+		await missionStart(
+			overstoryDir,
+			tempDir,
+			{
+				slug: "auto-all-handoff",
+				objective: "Test auto-all handoff",
+				autonomy: "auto-all",
+				json: true,
+			},
+			deps,
+		);
+
+		const missionStore = createMissionStore(join(overstoryDir, "sessions.db"));
+		const mission = missionStore.getActive();
+		if (!mission) throw new Error("expected mission");
+		expect(mission.autonomy).toBe("auto-all");
+
+		const paths = getMissionArtifactPaths(mission);
+		await Bun.write(
+			paths.workstreamsJson,
+			`${JSON.stringify({ version: 1, workstreams: [{ id: "ws-a", taskId: "task-a", objective: "x", fileScope: ["src/a.ts"], dependsOn: [], briefPath: "plan/ws-a.md", status: "planned" }] }, null, 2)}\n`,
+		);
+		await Bun.write(join(paths.planDir, "ws-a.md"), "# brief\n");
+		missionStore.updatePhase(mission.id, "plan");
+
+		// Handoff without freeze should SUCCEED under auto-all
+		process.exitCode = 0;
+		await missionHandoff(overstoryDir, tempDir, true, deps);
+		expect(process.exitCode).toBe(0);
+		expect(deps.started).toContain("execution-director");
+		expect(missionStore.getById(mission.id)?.phase).toBe("execute");
+
+		missionStore.close();
+	});
+
+	test("handoff under autonomy=auto-spec also bypasses freeze ceremony (#326)", async () => {
+		const deps = makeRoleDeps(tempDir, overstoryDir);
+
+		await missionStart(
+			overstoryDir,
+			tempDir,
+			{
+				slug: "auto-spec-handoff",
+				objective: "Test auto-spec handoff",
+				autonomy: "auto-spec",
+				json: true,
+			},
+			deps,
+		);
+
+		const missionStore = createMissionStore(join(overstoryDir, "sessions.db"));
+		const mission = missionStore.getActive();
+		if (!mission) throw new Error("expected mission");
+		expect(mission.autonomy).toBe("auto-spec");
+
+		const paths = getMissionArtifactPaths(mission);
+		await Bun.write(
+			paths.workstreamsJson,
+			`${JSON.stringify({ version: 1, workstreams: [{ id: "ws-b", taskId: "task-b", objective: "x", fileScope: ["src/b.ts"], dependsOn: [], briefPath: "plan/ws-b.md", status: "planned" }] }, null, 2)}\n`,
+		);
+		await Bun.write(join(paths.planDir, "ws-b.md"), "# brief\n");
+		missionStore.updatePhase(mission.id, "plan");
+
+		process.exitCode = 0;
+		await missionHandoff(overstoryDir, tempDir, true, deps);
+		expect(process.exitCode).toBe(0);
+		expect(deps.started).toContain("execution-director");
+
+		missionStore.close();
+	});
+
 	test("mission start without slug/objective uses placeholders, update sets real values", async () => {
 		const deps = makeRoleDeps(tempDir, overstoryDir);
 

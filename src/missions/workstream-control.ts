@@ -525,15 +525,27 @@ export async function missionHandoff(
 			return;
 		}
 		if (!mission.firstFreezeAt) {
-			const message =
-				"Mission must be frozen at least once before execution handoff (freeze ensures blocking ambiguity is resolved)";
-			if (json) {
-				jsonError("mission handoff", message);
+			if (mission.autonomy === "auto-spec" || mission.autonomy === "auto-all") {
+				recordMissionEvent({
+					overstoryDir,
+					mission,
+					agentName: "operator",
+					data: {
+						kind: "freeze_skipped",
+						detail: `Handoff freeze ceremony auto-skipped (autonomy=${mission.autonomy})`,
+					},
+				});
 			} else {
-				printError("Mission handoff failed", message);
+				const message =
+					"Mission must be frozen at least once before execution handoff (freeze ensures blocking ambiguity is resolved)";
+				if (json) {
+					jsonError("mission handoff", message);
+				} else {
+					printError("Mission handoff failed", message);
+				}
+				process.exitCode = 1;
+				return;
 			}
-			process.exitCode = 1;
-			return;
 		}
 		const artifactRoot = mission.artifactRoot;
 		const roles = resolveMissionRoleStates(overstoryDir, mission);
