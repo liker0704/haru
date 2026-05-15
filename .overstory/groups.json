@@ -1908,5 +1908,15 @@
 		"status": "active",
 		"createdAt": "2026-05-15T16:12:43.565Z",
 		"completedAt": null
+	},
+	{
+		"id": "group-c647f0e7",
+		"name": "assemble-mrp",
+		"memberIssueIds": [
+			"haru-cfad"
+		],
+		"status": "active",
+		"createdAt": "2026-05-15T19:58:56.335Z",
+		"completedAt": null
 	}
 ]
