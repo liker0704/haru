@@ -1856,5 +1856,15 @@
 		"status": "active",
 		"createdAt": "2026-05-14T19:58:25.940Z",
 		"completedAt": null
+	},
+	{
+		"id": "group-2ff8aefd",
+		"name": "mission-1778830660536-execute-batch-1",
+		"memberIssueIds": [
+			"haru-153f"
+		],
+		"status": "active",
+		"createdAt": "2026-05-15T08:47:12.468Z",
+		"completedAt": null
 	}
 ]
