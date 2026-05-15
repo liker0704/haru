@@ -566,7 +566,7 @@ describe("evaluateHealth tool-hang rung", () => {
 
 		expect(check.action).toBe("terminate");
 		expect(check.state).toBe("zombie");
-		expect(check.reconciliationNote).toContain("Tool in flight");
+		expect(check.reconciliationNote).toContain("tool_hang_terminate:");
 	});
 
 	test("T-28: ignores null toolInFlightStartedAt", () => {

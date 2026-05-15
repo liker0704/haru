@@ -125,7 +125,7 @@ function evaluateTimeBased(
 				processAlive: true,
 				state: "zombie",
 				action: "terminate",
-				reconciliationNote: `Tool in flight "${session.toolInFlightName ?? "unknown"}" has been running for ${Math.round(toolInFlightMs / 60_000)}m — terminating`,
+				reconciliationNote: `tool_hang_terminate: tool "${session.toolInFlightName ?? "unknown"}" in flight for ${Math.round(toolInFlightMs / 60_000)}m — exceeds toolHangMs (${Math.round(toolHangMs / 60_000)}m)`,
 			};
 		}
 	}
