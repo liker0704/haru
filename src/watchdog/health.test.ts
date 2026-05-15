@@ -551,6 +551,73 @@ describe("transitionState", () => {
 	});
 });
 
+// === Tool-hang rung (T-27 through T-30) ===
+
+describe("evaluateHealth tool-hang rung", () => {
+	const TOOL_HANG_THRESHOLDS = { ...THRESHOLDS, toolHangMs: 900_000 };
+
+	test("T-27: terminates when toolInFlightMs > toolHangMs", () => {
+		const session = makeSession({
+			state: "working",
+			pid: ALIVE_PID,
+			toolInFlightStartedAt: new Date(Date.now() - 16 * 60_000).toISOString(),
+		});
+		const check = evaluateHealth(session, true, TOOL_HANG_THRESHOLDS);
+
+		expect(check.action).toBe("terminate");
+		expect(check.state).toBe("zombie");
+		expect(check.reconciliationNote).toContain("tool_hang_terminate:");
+	});
+
+	test("T-28: ignores null toolInFlightStartedAt", () => {
+		const session = makeSession({
+			state: "working",
+			pid: ALIVE_PID,
+			toolInFlightStartedAt: null,
+			lastActivity: new Date(Date.now() - 5_000).toISOString(),
+		});
+		const check = evaluateHealth(session, true, TOOL_HANG_THRESHOLDS);
+
+		expect(check.action).toBe("none");
+	});
+
+	test("T-29: waiting state short-circuits before tool-hang rung", () => {
+		const session = makeSession({
+			state: "waiting",
+			pid: ALIVE_PID,
+			toolInFlightStartedAt: new Date(Date.now() - 16 * 60_000).toISOString(),
+		});
+		const check = evaluateHealth(session, true, TOOL_HANG_THRESHOLDS);
+
+		expect(check.action).toBe("none");
+		expect(check.state).toBe("waiting");
+	});
+
+	test("T-30: persistent capability exemption applies before tool-hang rung", () => {
+		const session = makeSession({
+			capability: "coordinator",
+			state: "working",
+			pid: ALIVE_PID,
+			toolInFlightStartedAt: new Date(Date.now() - 16 * 60_000).toISOString(),
+		});
+		const check = evaluateHealth(session, true, TOOL_HANG_THRESHOLDS);
+
+		expect(check.action).toBe("none");
+	});
+
+	test("no toolHangMs → rung never fires (POSITIVE_INFINITY default)", () => {
+		const session = makeSession({
+			state: "working",
+			pid: ALIVE_PID,
+			toolInFlightStartedAt: new Date(Date.now() - 16 * 60_000).toISOString(),
+			lastActivity: new Date(Date.now() - 5_000).toISOString(),
+		});
+		const check = evaluateHealth(session, true, THRESHOLDS);
+
+		expect(check.action).toBe("none");
+	});
+});
+
 // === Rate limit bypass ===
 
 describe("evaluateHealth rate limit bypass", () => {
