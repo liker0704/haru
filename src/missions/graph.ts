@@ -51,6 +51,7 @@ function buildDefaultGraph(): MissionGraph {
 		"decide",
 		"plan",
 		"execute",
+		"pr",
 	];
 	const autoAdvancePhases = new Set<MissionPhase>(["align", "decide"]);
 	for (const phase of workingPhases) {
@@ -171,9 +172,17 @@ function buildDefaultGraph(): MissionGraph {
 		state: "active",
 		label: "done (active)",
 	});
-	// execute:active --complete--> done:active (entry into done phase)
+	// execute:active --complete--> done:active (entry into done phase, used by
+	// direct tier and any tier where pr-phase is config-disabled)
 	edges.push({
 		from: nodeId("execute", "active"),
+		to: nodeId("done", "active"),
+		trigger: "complete",
+		weight: 10,
+	});
+	// pr:active --complete--> done:active (planned/full with pr-phase enabled)
+	edges.push({
+		from: nodeId("pr", "active"),
 		to: nodeId("done", "active"),
 		trigger: "complete",
 		weight: 10,

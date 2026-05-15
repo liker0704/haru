@@ -181,6 +181,8 @@ function buildHandlers(deps: PhaseCellDeps, config?: PhaseCellConfig): HandlerRe
 	return {
 		...debugLoop,
 
+		escalate: async () => ({ trigger: "escalated" }),
+
 		preflight: async (_ctx) => {
 			if (prCfg?.enabled === false) {
 				return { trigger: "pr_phase_disabled" };

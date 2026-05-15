@@ -96,6 +96,7 @@ const PHASE_SCORES: Record<MissionPhase, number> = {
 	decide: 40,
 	plan: 55,
 	execute: 75,
+	pr: 90,
 	done: 100,
 };
 

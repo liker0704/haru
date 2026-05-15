@@ -528,12 +528,12 @@ describe("tier-aware graph construction", () => {
 		const lifecycleNodes = graph.nodes.filter((n) => n.kind === "lifecycle");
 		const phases = new Set(lifecycleNodes.map((n) => n.phase));
 
-		expect(phases).toEqual(new Set(["intake", "understand", "plan", "execute", "done"]));
+		expect(phases).toEqual(new Set(["intake", "understand", "plan", "execute", "pr", "done"]));
 		expect(phases.has("align")).toBe(false);
 		expect(phases.has("decide")).toBe(false);
 	});
 
-	test('buildLifecycleGraph with tier="full" includes all 7 phases', () => {
+	test('buildLifecycleGraph with tier="full" includes all 8 phases', () => {
 		const mission = makeMission({ tier: "full" });
 		const graph = buildLifecycleGraph(mission);
 
@@ -541,7 +541,7 @@ describe("tier-aware graph construction", () => {
 		const phases = new Set(lifecycleNodes.map((n) => n.phase));
 
 		expect(phases).toEqual(
-			new Set(["intake", "understand", "align", "decide", "plan", "execute", "done"]),
+			new Set(["intake", "understand", "align", "decide", "plan", "execute", "pr", "done"]),
 		);
 	});
 
@@ -610,17 +610,14 @@ describe("buildLifecycleGraph (config-aware)", () => {
 		const mission = makeMission({ tier: "planned" });
 		const graph = buildLifecycleGraph(mission);
 		const phases = new Set(graph.nodes.filter((n) => n.kind === "lifecycle").map((n) => n.phase));
-		// pr is in TIER_PHASES.planned but is not a real MissionPhase, so no
-		// pr lifecycle node exists in DEFAULT_MISSION_GRAPH. The other phases
-		// should match the planned chain.
-		expect(phases).toEqual(new Set(["intake", "understand", "plan", "execute", "done"]));
+		expect(phases).toEqual(new Set(["intake", "understand", "plan", "execute", "pr", "done"]));
 	});
 
-	test("T-w4-8: with config: planned tier produces same lifecycle phases (pr not a MissionPhase yet)", () => {
+	test("T-w4-8: with config: planned tier includes pr lifecycle node", () => {
 		const mission = makeMission({ tier: "planned" });
 		const graph = buildLifecycleGraph(mission, makeConfig());
 		const phases = new Set(graph.nodes.filter((n) => n.kind === "lifecycle").map((n) => n.phase));
-		expect(phases).toEqual(new Set(["intake", "understand", "plan", "execute", "done"]));
+		expect(phases).toEqual(new Set(["intake", "understand", "plan", "execute", "pr", "done"]));
 	});
 
 	test("with pr.enabled=false: planned tier still produces valid graph", () => {
