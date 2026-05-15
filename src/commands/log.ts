@@ -95,7 +95,7 @@ function updateLastActivity(projectRoot: string, agentName: string, _event?: str
  *
  * Non-fatal: silently ignores errors to avoid breaking hook execution.
  */
-function handleSessionEnd(projectRoot: string, agentName: string): void {
+async function handleSessionEnd(projectRoot: string, agentName: string): Promise<void> {
 	try {
 		const overstoryDir = join(projectRoot, detectHaruDir(projectRoot));
 		const { store } = openSessionStore(overstoryDir);
@@ -111,15 +111,71 @@ function handleSessionEnd(projectRoot: string, agentName: string): void {
 			}
 
 			// Always transition to waiting. The watchdog decides completion.
+			let didTransitionToWaiting = false;
 			if (session.state !== "completed" && session.state !== "waiting") {
 				store.updateState(agentName, "waiting");
+				didTransitionToWaiting = true;
 			}
 			store.updateLastActivity(agentName);
+
+			// #324: auto-nudge if the inbox has unprocessed mail at the moment we go
+			// to waiting. Sub-agent results that arrived during the working phase sit
+			// in `claimed` state forever — no nudge fires for already-delivered mail.
+			// Watchdog auto-resume covers this eventually, but only if it ticks before
+			// maxTotalWaitMs. Firing the nudge inline closes the race at source.
+			if (didTransitionToWaiting) {
+				await checkInboxAndNudge(projectRoot, agentName);
+			}
 		} finally {
 			store.close();
 		}
 	} catch {
 		// Non-fatal: don't break logging if session update fails
+	}
+}
+
+/**
+ * After an agent transitions to `waiting`, check its inbox for unprocessed mail
+ * (queued or claimed-but-unacked) and fire an immediate tmux nudge if found.
+ *
+ * Why: sub-agent results that arrived during the parent's working phase sit in
+ * `claimed` state with no nudge to wake the parent. Without this check, the
+ * agent deadlocks until the watchdog ticks and notices via `getPendingForWaitingAgent`.
+ *
+ * Best-effort: catches all errors; the Stop hook must remain unbreakable.
+ */
+async function checkInboxAndNudge(projectRoot: string, agentName: string): Promise<void> {
+	try {
+		const mailDbPath = join(projectRoot, detectHaruDir(projectRoot), "mail.db");
+		// Skip when no mail.db exists yet — nothing to check, and opening would
+		// create an empty DB file as a side effect (breaks tests + wastes I/O).
+		if (!(await Bun.file(mailDbPath).exists())) {
+			return;
+		}
+		const mailStore = createMailStore(mailDbPath);
+		let pendingCount = 0;
+		try {
+			// Use cutoff = now + 1s so any in-flight claim that races with this
+			// transition is still counted as pre-waiting work.
+			const cutoff = new Date(Date.now() + 1000).toISOString();
+			pendingCount = mailStore.getPendingForWaitingAgent(agentName, cutoff).length;
+		} finally {
+			mailStore.close();
+		}
+		if (pendingCount > 0) {
+			const { nudgeAgent } = await import("./nudge.ts");
+			await nudgeAgent(
+				projectRoot,
+				agentName,
+				`[MAIL] ${pendingCount} messages awaiting; resuming.`,
+				true,
+			);
+		}
+	} catch (err) {
+		// Best-effort: Stop hook must remain unbreakable. Log warn and move on.
+		console.warn(
+			`[log] checkInboxAndNudge failed for "${agentName}": ${err instanceof Error ? err.message : String(err)}`,
+		);
 	}
 }
 
@@ -657,7 +713,7 @@ async function runLog(opts: {
 		case "session-end":
 			logger.info("session.end", { agentName: opts.agent });
 			// Transition agent state to waiting — watchdog decides completion
-			handleSessionEnd(config.project.root, opts.agent);
+			await handleSessionEnd(config.project.root, opts.agent);
 			// Look up agent session for identity update and metrics recording
 			{
 				const agentSession = getAgentSession(config.project.root, opts.agent);

@@ -803,6 +803,128 @@ describe("logCommand", () => {
 		expect(await markerFile.exists()).toBe(false);
 	});
 
+	test("session-end auto-nudges when inbox has unprocessed mail (#324)", async () => {
+		// Seed sessions.db with an agent in `working` state (will transition to waiting).
+		const dbPath = join(tempDir, ".overstory", "sessions.db");
+		const session: AgentSession = {
+			id: "session-inbox-race",
+			agentName: "analyst-inbox",
+			capability: "builder",
+			runtime: "claude",
+			worktreePath: tempDir,
+			branchName: "analyst-inbox-branch",
+			taskId: "bead-inbox-001",
+			tmuxSession: "haru-analyst-inbox",
+			state: "working",
+			pid: 55555,
+			parentAgent: null,
+			depth: 0,
+			runId: null,
+			startedAt: new Date().toISOString(),
+			lastActivity: new Date().toISOString(),
+			escalationLevel: 0,
+			stalledSince: null,
+			rateLimitedSince: null,
+			runtimeSessionId: null,
+			transcriptPath: null,
+			originalRuntime: null,
+			statusLine: null,
+		};
+		const sessionStore = createSessionStore(dbPath);
+		sessionStore.upsert(session);
+		sessionStore.close();
+
+		// Seed mail.db with 2 queued + 1 claimed message for analyst-inbox.
+		const mailDbPath = join(tempDir, ".overstory", "mail.db");
+		const mailStore = createMailStore(mailDbPath);
+		mailStore.insert({
+			id: "msg-queued-1",
+			from: "scout-a",
+			to: "analyst-inbox",
+			subject: "scout-a result",
+			body: "findings A",
+			type: "result",
+			priority: "normal",
+			threadId: null,
+		});
+		mailStore.insert({
+			id: "msg-queued-2",
+			from: "scout-b",
+			to: "analyst-inbox",
+			subject: "scout-b result",
+			body: "findings B",
+			type: "result",
+			priority: "normal",
+			threadId: null,
+		});
+		mailStore.insert({
+			id: "msg-claimed-stuck",
+			from: "scout-c",
+			to: "analyst-inbox",
+			subject: "scout-c result",
+			body: "findings C",
+			type: "result",
+			priority: "normal",
+			threadId: null,
+		});
+		// Claim msg-claimed-stuck so it lands in `claimed` state (mimicking the
+		// real-world race: parent claimed the sub-result during working phase,
+		// then went `waiting` without acking it).
+		const claimed = mailStore.claim("analyst-inbox");
+		expect(claimed.length).toBeGreaterThanOrEqual(1);
+		// Ack the two queued ones we don't want to leave claimed so they re-queue
+		// is not what we want — instead, re-insert them as fresh queued. Simpler:
+		// claim() may have grabbed all three; re-queue the two we want queued.
+		// However a simpler approach: don't pre-claim; insert all three, then claim
+		// only the one we want claimed via a targeted SQL update. Use the store's
+		// public surface instead.
+		mailStore.close();
+
+		// Re-open the DB and reset state for the two messages we wanted to keep
+		// queued (claim() above grabbed everything). Use direct SQLite to reset
+		// state — this mirrors how a fresh `queued` message would look.
+		const { Database } = await import("bun:sqlite");
+		const rawDb = new Database(mailDbPath);
+		try {
+			rawDb.exec(
+				"UPDATE messages SET state = 'queued', claimed_at = NULL WHERE id IN ('msg-queued-1', 'msg-queued-2')",
+			);
+		} finally {
+			rawDb.close();
+		}
+
+		// Sanity: getPendingForWaitingAgent should now see all 3.
+		const verifyStore = createMailStore(mailDbPath);
+		const farFuture = new Date(Date.now() + 60_000).toISOString();
+		const pending = verifyStore.getPendingForWaitingAgent("analyst-inbox", farFuture);
+		verifyStore.close();
+		expect(pending).toHaveLength(3);
+
+		// Run session-end — should transition to waiting AND fire one nudge.
+		await logCommand(["session-end", "--agent", "analyst-inbox"]);
+
+		// Verify exactly one nudge event was recorded with the expected body.
+		const eventsDbPath = join(tempDir, ".overstory", "events.db");
+		const eventStore = createEventStore(eventsDbPath);
+		const events = eventStore.getByAgent("analyst-inbox");
+		eventStore.close();
+
+		const nudgeEvents = events.filter((ev) => {
+			if (ev.eventType !== "custom" || ev.data === null) return false;
+			try {
+				const payload = JSON.parse(ev.data) as { type?: string; message?: string };
+				return payload.type === "nudge";
+			} catch {
+				return false;
+			}
+		});
+		expect(nudgeEvents).toHaveLength(1);
+		const nudgePayload = JSON.parse(nudgeEvents[0]?.data ?? "{}") as {
+			message?: string;
+		};
+		expect(nudgePayload.message).toContain("[MAIL] 3 messages");
+	});
+
 	test("session-end does not crash when sessions.db does not exist", async () => {
 		// No sessions.db file exists
 		// session-end should complete without throwing
