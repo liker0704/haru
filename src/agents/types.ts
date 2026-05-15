@@ -85,6 +85,8 @@ export interface AgentSession {
 	originalRuntime: string | null; // Pre-swap runtime (set by watchdog on rate-limit swap, cleared on resume)
 	statusLine: string | null; // Agent self-reported current activity (set via `ha status set`)
 	promptVersion?: string | null; // Canopy prompt version used at sling time (e.g. "builder@17")
+	toolInFlightStartedAt?: string | null; // ISO timestamp when the current tool call started (set by tool-start hook)
+	toolInFlightName?: string | null; // Name of the tool currently executing (set by tool-start hook)
 }
 
 // === Agent Identity ===

@@ -54,6 +54,8 @@ function makeSession(overrides: Partial<AgentSession> = {}): AgentSession {
 		transcriptPath: null,
 		originalRuntime: null,
 		statusLine: null,
+		toolInFlightStartedAt: null,
+		toolInFlightName: null,
 		...overrides,
 	};
 }
@@ -620,6 +622,194 @@ describe("edge cases", () => {
 
 		const result = store.getByName("test-agent");
 		expect(result?.taskId).toBe("");
+	});
+});
+
+// ============================================================
+// rebaseLastActivity
+// ============================================================
+
+describe("rebaseLastActivity", () => {
+	test("updates booting, working, waiting; does NOT touch stalled, zombie, completed", () => {
+		const oldTime = "2026-01-01T00:00:00.000Z";
+		const newTime = "2026-06-01T12:00:00.000Z";
+
+		store.upsert(
+			makeSession({ agentName: "boot", id: "s-1", state: "booting", lastActivity: oldTime }),
+		);
+		store.upsert(
+			makeSession({ agentName: "work", id: "s-2", state: "working", lastActivity: oldTime }),
+		);
+		store.upsert(
+			makeSession({ agentName: "wait", id: "s-3", state: "waiting", lastActivity: oldTime }),
+		);
+		store.upsert(
+			makeSession({ agentName: "stall", id: "s-4", state: "stalled", lastActivity: oldTime }),
+		);
+		store.upsert(
+			makeSession({ agentName: "zmb", id: "s-5", state: "zombie", lastActivity: oldTime }),
+		);
+		store.upsert(
+			makeSession({ agentName: "done", id: "s-6", state: "completed", lastActivity: oldTime }),
+		);
+
+		const count = store.rebaseLastActivity?.(newTime) ?? -1;
+		expect(count).toBe(3);
+
+		expect(store.getByName("boot")?.lastActivity).toBe(newTime);
+		expect(store.getByName("work")?.lastActivity).toBe(newTime);
+		expect(store.getByName("wait")?.lastActivity).toBe(newTime);
+
+		// Regression: stalled, zombie, completed must NOT be rebased
+		expect(store.getByName("stall")?.lastActivity).toBe(oldTime);
+		expect(store.getByName("zmb")?.lastActivity).toBe(oldTime);
+		expect(store.getByName("done")?.lastActivity).toBe(oldTime);
+	});
+
+	test("returns 0 when no booting/working/waiting sessions exist", () => {
+		store.upsert(makeSession({ agentName: "done", id: "s-1", state: "completed" }));
+		store.upsert(makeSession({ agentName: "zmb", id: "s-2", state: "zombie" }));
+		const count = store.rebaseLastActivity?.("2026-06-01T12:00:00.000Z") ?? -1;
+		expect(count).toBe(0);
+	});
+
+	test("returns 0 on empty store", () => {
+		const count = store.rebaseLastActivity?.("2026-06-01T12:00:00.000Z") ?? -1;
+		expect(count).toBe(0);
+	});
+});
+
+// ============================================================
+// tool_in_flight: migration v12 + setToolInFlight / clearToolInFlight
+// ============================================================
+
+describe("migration v12: tool_in_flight columns", () => {
+	test("idempotent: opening an already-migrated DB does not error", () => {
+		// The store was already created in beforeEach (which runs all migrations).
+		// Re-opening the same DB file should apply migrations again without error.
+		const store2 = createSessionStore(dbPath);
+		try {
+			expect(store2.getAll()).toBeArray();
+		} finally {
+			store2.close();
+		}
+	});
+
+	test("v11→v12 fresh apply: new columns exist with NULL defaults", async () => {
+		store.close();
+
+		// Build a v11 schema manually (waiting in CHECK, but no tool_in_flight columns).
+		const { Database: Db } = await import("bun:sqlite");
+		const legacyDb = new Db(dbPath);
+		legacyDb.exec("DROP TABLE IF EXISTS sessions");
+		legacyDb.exec(`
+			CREATE TABLE sessions (
+				id TEXT PRIMARY KEY,
+				agent_name TEXT NOT NULL UNIQUE,
+				capability TEXT NOT NULL,
+				worktree_path TEXT NOT NULL,
+				branch_name TEXT NOT NULL,
+				task_id TEXT NOT NULL,
+				tmux_session TEXT NOT NULL,
+				state TEXT NOT NULL DEFAULT 'booting'
+					CHECK(state IN ('booting','working','waiting','completed','stalled','zombie')),
+				pid INTEGER,
+				parent_agent TEXT,
+				depth INTEGER NOT NULL DEFAULT 0,
+				run_id TEXT,
+				started_at TEXT NOT NULL,
+				last_activity TEXT NOT NULL,
+				escalation_level INTEGER NOT NULL DEFAULT 0,
+				stalled_since TEXT,
+				transcript_path TEXT,
+				prompt_version TEXT,
+				rate_limited_since TEXT,
+				runtime TEXT DEFAULT 'claude',
+				runtime_session_id TEXT,
+				original_runtime TEXT,
+				status_line TEXT,
+				rate_limit_resumes_at TEXT
+			)
+		`);
+		legacyDb.exec(
+			`INSERT INTO sessions (id, agent_name, capability, worktree_path, branch_name, task_id,
+				tmux_session, state, depth, started_at, last_activity, escalation_level)
+			VALUES ('s-1', 'legacy-agent', 'builder', '/tmp', 'main', 't-1', 'haru-1',
+				'working', 0, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', 0)`,
+		);
+		legacyDb.close();
+
+		// createSessionStore should apply migration v12 and add the new columns.
+		const migratedStore = createSessionStore(dbPath);
+		try {
+			const session = migratedStore.getByName("legacy-agent");
+			expect(session).not.toBeNull();
+			expect(session?.toolInFlightStartedAt).toBeNull();
+			expect(session?.toolInFlightName).toBeNull();
+		} finally {
+			migratedStore.close();
+		}
+
+		store = createSessionStore(join(tempDir, "unused-v12.db"));
+	});
+});
+
+describe("setToolInFlight and clearToolInFlight", () => {
+	test("setToolInFlight round-trip: sets both columns via getByName", () => {
+		store.upsert(makeSession({ state: "working" }));
+		store.setToolInFlight?.("test-agent", "Read", "2026-05-15T10:00:00.000Z");
+
+		const result = store.getByName("test-agent");
+		expect(result?.toolInFlightName).toBe("Read");
+		expect(result?.toolInFlightStartedAt).toBe("2026-05-15T10:00:00.000Z");
+	});
+
+	test("clearToolInFlight nulls both columns", () => {
+		store.upsert(makeSession({ state: "working" }));
+		store.setToolInFlight?.("test-agent", "Edit", "2026-05-15T10:00:00.000Z");
+		store.clearToolInFlight?.("test-agent");
+
+		const result = store.getByName("test-agent");
+		expect(result?.toolInFlightName).toBeNull();
+		expect(result?.toolInFlightStartedAt).toBeNull();
+	});
+
+	test("upsert with booting state clears both tool_in_flight columns", () => {
+		// First, set a session with in-flight data while working.
+		store.upsert(makeSession({ state: "working" }));
+		store.setToolInFlight?.("test-agent", "Bash", "2026-05-15T10:00:00.000Z");
+
+		// Re-upsert with booting state (agent respawned) — must clear in-flight.
+		store.upsert(makeSession({ state: "booting", id: "session-002-test-agent" }));
+
+		const result = store.getByName("test-agent");
+		expect(result?.state).toBe("booting");
+		expect(result?.toolInFlightName).toBeNull();
+		expect(result?.toolInFlightStartedAt).toBeNull();
+	});
+
+	test("regression: updateState('working') preserves tool_in_flight columns", () => {
+		// Simulate tool-start hook: agent transitions to working AND sets in-flight.
+		store.upsert(makeSession({ state: "booting" }));
+		store.setToolInFlight?.("test-agent", "Bash", "2026-05-15T10:00:00.000Z");
+		store.updateState("test-agent", "working");
+
+		// 'working' must NOT clear the in-flight columns.
+		const result = store.getByName("test-agent");
+		expect(result?.state).toBe("working");
+		expect(result?.toolInFlightName).toBe("Bash");
+		expect(result?.toolInFlightStartedAt).toBe("2026-05-15T10:00:00.000Z");
+	});
+
+	test("updateState('booting') clears tool_in_flight columns", () => {
+		store.upsert(makeSession({ state: "working" }));
+		store.setToolInFlight?.("test-agent", "Write", "2026-05-15T10:00:00.000Z");
+		store.updateState("test-agent", "booting");
+
+		const result = store.getByName("test-agent");
+		expect(result?.state).toBe("booting");
+		expect(result?.toolInFlightName).toBeNull();
+		expect(result?.toolInFlightStartedAt).toBeNull();
 	});
 });
 
