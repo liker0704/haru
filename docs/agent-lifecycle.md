@@ -124,6 +124,32 @@ After step 11, the pipeline branches:
   `waitForTuiReady()`, sends beacon + adaptive follow-up Enters, optionally runs
   beacon verification.
 
+### Watchdog Auto-Spawn
+
+**Source:** `maybeStartWatchdog()` in [`src/commands/sling.ts`](../src/commands/sling.ts),
+mirrored by `src/missions/lifecycle-start.ts` for `ha mission start`.
+
+**Trigger:** every `ha sling` or `ha mission start` call, including nested lead →
+builder spawns. There is no depth guard — the function runs unconditionally on
+each spawn.
+
+**Mechanism:** `createWatchdogControl(projectRoot).start()` in
+[`src/watchdog/control.ts`](../src/watchdog/control.ts). When a healthy daemon
+already holds `.overstory/watchdog.pid`, the call short-circuits immediately
+(haru-#325, commit `bc1b3f03`), so repeated invocations are cheap.
+
+**Gate:** `config.watchdog.tier0Enabled`. When `false`, `maybeStartWatchdog()` is
+a no-op.
+
+**Failure mode:** errors are swallowed and surfaced as `printWarning("Watchdog
+failed to start: …")`. A wedged daemon never blocks a successful sling.
+
+**Guarantee:** every spawned agent is supervised by a running watchdog for the
+duration of its session.
+
+For manual recovery when the daemon is wedged, see
+[`docs/runbooks/watchdog-recovery.md`](./runbooks/watchdog-recovery.md).
+
 ---
 
 ## 3. Overlay Generation
@@ -330,7 +356,32 @@ the spawn pipeline when the TUI fails to become ready.
 
 ---
 
-## 8. Checkpoint Mechanism
+## 8. Autonomy Mode Gate-Skip Semantics (Trust Boundary)
+
+The `auto-spec` and `auto-all` autonomy modes both bypass two gates that are
+mandatory in supervised operation:
+
+1. **Human spec-approval gate.** `evaluateHumanSpecReview` at
+   [`src/watchdog/gate-evaluators.ts:959`](../src/watchdog/gate-evaluators.ts)
+   auto-returns `{ met: true, trigger: "approved" }` when
+   `mission.autonomy === "auto-spec"` or `"auto-all"`.
+
+2. **Handoff-freeze ceremony.** The check at
+   [`src/missions/workstream-control.ts:528`](../src/missions/workstream-control.ts)
+   skips the freeze requirement and records a `freeze_skipped` event for both
+   `auto-spec` and `auto-all`. The commit `6120844a` title understates this —
+   "fix(mission): skip handoff freeze ceremony on auto-all autonomy" — but the
+   code at HEAD applies to **both** `auto-spec` and `auto-all`. Trust the code,
+   not the commit title.
+
+Selecting either non-supervised mode is a **trust-boundary decision**: operators
+consent to skipping the human spec-review checkpoint, not merely a UX ceremony.
+This removes the human review step from the critical path; the system proceeds
+on the assumption that the spec is correct and unambiguous.
+
+---
+
+## 9. Checkpoint Mechanism
 
 **Source:** [`src/agents/checkpoint.ts`](../src/agents/checkpoint.ts)
 
@@ -359,7 +410,7 @@ the agent in its original worktree.
 
 ---
 
-## 9. Guard Rules Reference
+## 10. Guard Rules Reference
 
 **Source:** [`src/agents/guard-rules.ts`](../src/agents/guard-rules.ts)
 
@@ -381,7 +432,7 @@ The safe prefix check runs before the blocklist. `ha `, `sd `, `git status`,
 
 ---
 
-## 10. Adding a New Agent Type
+## 11. Adding a New Agent Type
 
 ### Step 1: Write the base definition
 
@@ -459,3 +510,14 @@ directories (via `mkdtemp`) rather than mocks. Verify:
 - The agent definition loads without manifest validation errors
 - `generateOverlay()` renders correctly for the new capability
 - `NON_IMPLEMENTATION_CAPABILITIES` membership produces read-only quality gates
+
+---
+
+## See also
+
+- [`docs/haru-mission-usage.md`](./haru-mission-usage.md) — operator-facing
+  coverage of intake-phase, pr-phase, autonomy modes, and per-mission
+  `feature_branch`. This document deliberately does NOT duplicate that
+  content; consult haru-mission-usage.md for operator workflow.
+- [`docs/runbooks/watchdog-recovery.md`](./runbooks/watchdog-recovery.md) —
+  manual recovery procedures for a wedged watchdog daemon.
