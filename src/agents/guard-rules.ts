@@ -99,4 +99,6 @@ export const SAFE_BASH_PREFIXES = [
 	"git show",
 	"git blame",
 	"git branch",
+	"bun test",
+	"timeout 600 bun test",
 ];

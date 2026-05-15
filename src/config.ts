@@ -50,7 +50,11 @@ export function clearProjectRootOverride(): void {
  */
 /** Default quality gates used when no qualityGates are configured in config.yaml. */
 export const DEFAULT_QUALITY_GATES: QualityGate[] = [
-	{ name: "Tests", command: "bun test", description: "all tests must pass" },
+	{
+		name: "Tests",
+		command: "timeout 600 bun test",
+		description: "all tests must pass (10-min ceiling)",
+	},
 	{ name: "Lint", command: "bun run lint", description: "zero errors" },
 	{ name: "Typecheck", command: "bun run typecheck", description: "no TypeScript errors" },
 ];
