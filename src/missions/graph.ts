@@ -51,6 +51,7 @@ function buildDefaultGraph(): MissionGraph {
 		"decide",
 		"plan",
 		"execute",
+		"pre-pr",
 		"pr",
 	];
 	const autoAdvancePhases = new Set<MissionPhase>(["align", "decide"]);
@@ -154,13 +155,13 @@ function buildDefaultGraph(): MissionGraph {
 			from: nodeId(from, "active"),
 			to: nodeId(to, "active"),
 			trigger,
-			weight: 10,
+			weight: 11, // bumped from 10 to outweigh the hardcoded execute->done complete edge
 		});
 		edges.push({
 			from: nodeId(from, "frozen"),
 			to: nodeId(to, "active"),
 			trigger,
-			weight: 10,
+			weight: 11,
 		});
 	}
 

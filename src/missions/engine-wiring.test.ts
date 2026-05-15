@@ -208,13 +208,19 @@ describe("PHASE_CELL_REGISTRY", () => {
 		expect(PHASE_CELL_REGISTRY["pr-phase"]?.cellType).toBe("pr-phase");
 	});
 
-	test("T-w4-1: contains all six phase cells", () => {
+	test("T-w4-1: contains pre-pr-phase entry", () => {
+		expect(PHASE_CELL_REGISTRY["pre-pr-phase"]).toBeDefined();
+		expect(PHASE_CELL_REGISTRY["pre-pr-phase"]?.cellType).toBe("pre-pr-phase");
+	});
+
+	test("T-w4-1: contains all seven phase cells", () => {
 		expect(Object.keys(PHASE_CELL_REGISTRY).sort()).toEqual([
 			"done-phase",
 			"execute-phase",
 			"intake-phase",
 			"plan-phase",
 			"pr-phase",
+			"pre-pr-phase",
 			"understand-phase",
 		]);
 	});
@@ -223,12 +229,12 @@ describe("PHASE_CELL_REGISTRY", () => {
 // === getTierPhases ===
 
 describe("getTierPhases", () => {
-	test("T-w4-2: planned tier with default config includes pr between execute and done", () => {
+	test("T-w4-2: planned tier with default config includes pre-pr and pr between execute and done", () => {
 		const phases = getTierPhases("planned", makeConfig());
-		expect(phases).toEqual(["intake", "understand", "plan", "execute", "pr", "done"]);
+		expect(phases).toEqual(["intake", "understand", "plan", "execute", "pre-pr", "pr", "done"]);
 	});
 
-	test("T-w4-3: full tier with default config includes pr between execute and done", () => {
+	test("T-w4-3: full tier with default config includes pre-pr and pr between execute and done", () => {
 		const phases = getTierPhases("full", makeConfig());
 		expect(phases).toEqual([
 			"intake",
@@ -237,6 +243,7 @@ describe("getTierPhases", () => {
 			"decide",
 			"plan",
 			"execute",
+			"pre-pr",
 			"pr",
 			"done",
 		]);
@@ -244,7 +251,7 @@ describe("getTierPhases", () => {
 
 	test("T-w4-4: direct tier with default config does NOT include pr (da-01 default)", () => {
 		const phases = getTierPhases("direct", makeConfig());
-		expect(phases).toEqual(["intake", "execute", "done"]);
+		expect(phases).toEqual(["intake", "execute", "pre-pr", "done"]);
 		expect(phases).not.toContain("pr");
 	});
 
@@ -253,7 +260,7 @@ describe("getTierPhases", () => {
 			pr: { enabled: true, operatorGithubLogin: "foo", directTierIncludesPr: true },
 		});
 		const phases = getTierPhases("direct", config);
-		expect(phases).toEqual(["intake", "execute", "pr", "done"]);
+		expect(phases).toEqual(["intake", "execute", "pre-pr", "pr", "done"]);
 	});
 
 	test("T-w4-7: direct tier does NOT include pr when operatorGithubLogin is missing", () => {
@@ -270,7 +277,7 @@ describe("getTierPhases", () => {
 
 	test("T-w4-6: planned tier with pr.enabled=false does NOT include pr", () => {
 		const phases = getTierPhases("planned", makeConfig({ pr: { enabled: false } }));
-		expect(phases).toEqual(["intake", "understand", "plan", "execute", "done"]);
+		expect(phases).toEqual(["intake", "understand", "plan", "execute", "pre-pr", "done"]);
 	});
 
 	test("T-w4-6: full tier with pr.enabled=false does NOT include pr", () => {
@@ -282,11 +289,19 @@ describe("getTierPhases", () => {
 // === TIER_PHASES static defaults ===
 
 describe("TIER_PHASES (frozen defaults)", () => {
-	test("T-w4-2: planned includes pr between execute and done", () => {
-		expect(TIER_PHASES.planned).toEqual(["intake", "understand", "plan", "execute", "pr", "done"]);
+	test("T-w4-2: planned includes pre-pr and pr between execute and done", () => {
+		expect(TIER_PHASES.planned).toEqual([
+			"intake",
+			"understand",
+			"plan",
+			"execute",
+			"pre-pr",
+			"pr",
+			"done",
+		]);
 	});
 
-	test("T-w4-3: full includes pr between execute and done", () => {
+	test("T-w4-3: full includes pre-pr and pr between execute and done", () => {
 		expect(TIER_PHASES.full).toEqual([
 			"intake",
 			"understand",
@@ -294,13 +309,14 @@ describe("TIER_PHASES (frozen defaults)", () => {
 			"decide",
 			"plan",
 			"execute",
+			"pre-pr",
 			"pr",
 			"done",
 		]);
 	});
 
-	test("T-w4-4: direct does NOT include pr", () => {
-		expect(TIER_PHASES.direct).toEqual(["intake", "execute", "done"]);
+	test("T-w4-4: direct includes pre-pr but NOT pr", () => {
+		expect(TIER_PHASES.direct).toEqual(["intake", "execute", "pre-pr", "done"]);
 		expect(TIER_PHASES.direct).not.toContain("pr");
 	});
 });
@@ -507,33 +523,35 @@ describe("getCellEngineStatus", () => {
 // === tier-aware graph construction ===
 
 describe("tier-aware graph construction", () => {
-	test('buildLifecycleGraph with tier="direct" produces intake+execute+done phases', () => {
+	test('buildLifecycleGraph with tier="direct" produces intake+execute+pre-pr+done phases', () => {
 		const mission = makeMission({ tier: "direct" });
 		const graph = buildLifecycleGraph(mission);
 
 		const lifecycleNodes = graph.nodes.filter((n) => n.kind === "lifecycle");
 		const phases = new Set(lifecycleNodes.map((n) => n.phase));
 
-		expect(phases).toEqual(new Set(["intake", "execute", "done"]));
+		expect(phases).toEqual(new Set(["intake", "execute", "pre-pr", "done"]));
 		expect(phases.has("understand")).toBe(false);
 		expect(phases.has("align")).toBe(false);
 		expect(phases.has("decide")).toBe(false);
 		expect(phases.has("plan")).toBe(false);
 	});
 
-	test('buildLifecycleGraph with tier="planned" includes intake, understand, plan, execute, done (skips align/decide)', () => {
+	test('buildLifecycleGraph with tier="planned" includes intake, understand, plan, execute, pre-pr, pr, done (skips align/decide)', () => {
 		const mission = makeMission({ tier: "planned" });
 		const graph = buildLifecycleGraph(mission);
 
 		const lifecycleNodes = graph.nodes.filter((n) => n.kind === "lifecycle");
 		const phases = new Set(lifecycleNodes.map((n) => n.phase));
 
-		expect(phases).toEqual(new Set(["intake", "understand", "plan", "execute", "pr", "done"]));
+		expect(phases).toEqual(
+			new Set(["intake", "understand", "plan", "execute", "pre-pr", "pr", "done"]),
+		);
 		expect(phases.has("align")).toBe(false);
 		expect(phases.has("decide")).toBe(false);
 	});
 
-	test('buildLifecycleGraph with tier="full" includes all 8 phases', () => {
+	test('buildLifecycleGraph with tier="full" includes all 9 phases', () => {
 		const mission = makeMission({ tier: "full" });
 		const graph = buildLifecycleGraph(mission);
 
@@ -541,7 +559,17 @@ describe("tier-aware graph construction", () => {
 		const phases = new Set(lifecycleNodes.map((n) => n.phase));
 
 		expect(phases).toEqual(
-			new Set(["intake", "understand", "align", "decide", "plan", "execute", "pr", "done"]),
+			new Set([
+				"intake",
+				"understand",
+				"align",
+				"decide",
+				"plan",
+				"execute",
+				"pre-pr",
+				"pr",
+				"done",
+			]),
 		);
 	});
 
@@ -606,18 +634,22 @@ describe("tier-aware graph construction", () => {
 // === buildLifecycleGraph with OverstoryConfig ===
 
 describe("buildLifecycleGraph (config-aware)", () => {
-	test("T-w4-8: backward-compatible: omitting config uses TIER_PHASES defaults", () => {
+	test("T-w4-8: backward-compatible: omitting config uses TIER_PHASES defaults (includes pre-pr)", () => {
 		const mission = makeMission({ tier: "planned" });
 		const graph = buildLifecycleGraph(mission);
 		const phases = new Set(graph.nodes.filter((n) => n.kind === "lifecycle").map((n) => n.phase));
-		expect(phases).toEqual(new Set(["intake", "understand", "plan", "execute", "pr", "done"]));
+		expect(phases).toEqual(
+			new Set(["intake", "understand", "plan", "execute", "pre-pr", "pr", "done"]),
+		);
 	});
 
-	test("T-w4-8: with config: planned tier includes pr lifecycle node", () => {
+	test("T-w4-8: with config: planned tier includes pre-pr and pr lifecycle nodes", () => {
 		const mission = makeMission({ tier: "planned" });
 		const graph = buildLifecycleGraph(mission, makeConfig());
 		const phases = new Set(graph.nodes.filter((n) => n.kind === "lifecycle").map((n) => n.phase));
-		expect(phases).toEqual(new Set(["intake", "understand", "plan", "execute", "pr", "done"]));
+		expect(phases).toEqual(
+			new Set(["intake", "understand", "plan", "execute", "pre-pr", "pr", "done"]),
+		);
 	});
 
 	test("with pr.enabled=false: planned tier still produces valid graph", () => {

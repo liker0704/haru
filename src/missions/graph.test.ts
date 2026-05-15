@@ -49,12 +49,46 @@ describe("DEFAULT_MISSION_GRAPH", () => {
 	});
 
 	test("has nodes for all working phases", () => {
-		const phases = ["understand", "align", "decide", "plan", "execute"];
+		const phases = ["understand", "align", "decide", "plan", "execute", "pre-pr"];
 		for (const phase of phases) {
 			expect(DEFAULT_MISSION_GRAPH.nodes.find((n) => n.id === `${phase}:active`)).toBeDefined();
 			expect(DEFAULT_MISSION_GRAPH.nodes.find((n) => n.id === `${phase}:frozen`)).toBeDefined();
 			expect(DEFAULT_MISSION_GRAPH.nodes.find((n) => n.id === `${phase}:suspended`)).toBeDefined();
 		}
+	});
+
+	test("has pre-pr:active, pre-pr:frozen, pre-pr:suspended nodes", () => {
+		expect(DEFAULT_MISSION_GRAPH.nodes.find((n) => n.id === "pre-pr:active")).toBeDefined();
+		expect(DEFAULT_MISSION_GRAPH.nodes.find((n) => n.id === "pre-pr:frozen")).toBeDefined();
+		expect(DEFAULT_MISSION_GRAPH.nodes.find((n) => n.id === "pre-pr:suspended")).toBeDefined();
+	});
+
+	test("execute:active --phase_advance--> pre-pr:active edge exists with weight 11", () => {
+		const edge = DEFAULT_MISSION_GRAPH.edges.find(
+			(e) =>
+				e.from === "execute:active" && e.to === "pre-pr:active" && e.trigger === "phase_advance",
+		);
+		expect(edge).toBeDefined();
+		expect(edge?.weight).toBe(11);
+	});
+
+	test("pre-pr:active --phase_advance--> pr:active edge exists", () => {
+		const edge = DEFAULT_MISSION_GRAPH.edges.find(
+			(e) => e.from === "pre-pr:active" && e.to === "pr:active" && e.trigger === "phase_advance",
+		);
+		expect(edge).toBeDefined();
+	});
+
+	test("pre-pr has freeze/unfreeze/suspend/resume/stop edges", () => {
+		const edges = DEFAULT_MISSION_GRAPH.edges;
+		const triggers = (from: string) => edges.filter((e) => e.from === from).map((e) => e.trigger);
+		expect(triggers("pre-pr:active")).toContain("freeze");
+		expect(triggers("pre-pr:active")).toContain("suspend");
+		expect(triggers("pre-pr:active")).toContain("stop");
+		expect(triggers("pre-pr:active")).toContain("fail");
+		expect(triggers("pre-pr:frozen")).toContain("answer");
+		expect(triggers("pre-pr:frozen")).toContain("suspend");
+		expect(triggers("pre-pr:suspended")).toContain("resume");
 	});
 
 	test("has terminal nodes", () => {

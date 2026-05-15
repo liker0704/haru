@@ -85,6 +85,10 @@ export interface PhaseCellDeps {
 		projectRoot: string,
 		role?: import("../roles.ts").AnalystRole,
 	) => Promise<void>;
+	/** DI for assembleMrp — used by pre-pr-phase write-mrp handler. */
+	assembleMrp?: (
+		missionId: string,
+	) => Promise<import("../../merge/mrp-renderer.ts").MergeReadinessPack>;
 }
 
 export interface PhaseCellDefinition {

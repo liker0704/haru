@@ -113,7 +113,7 @@ describe("renderMissionNarrative", () => {
 	});
 
 	test("works for each lifecycle phase", () => {
-		const phases = ["understand", "align", "decide", "plan", "execute", "done"] as const;
+		const phases = ["understand", "align", "decide", "plan", "execute", "pre-pr", "done"] as const;
 		for (const phase of phases) {
 			const result = renderMissionNarrative(makeMission({ phase }), "/does/not/matter");
 			expect(result).toContain(phase);

@@ -151,6 +151,7 @@ export type MissionPhase =
 	| "decide"
 	| "plan"
 	| "execute"
+	| "pre-pr"
 	| "pr"
 	| "done";
 export const MISSION_PHASES: readonly MissionPhase[] = [
@@ -160,6 +161,7 @@ export const MISSION_PHASES: readonly MissionPhase[] = [
 	"decide",
 	"plan",
 	"execute",
+	"pre-pr",
 	"pr",
 	"done",
 ] as const;

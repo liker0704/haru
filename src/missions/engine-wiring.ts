@@ -7,7 +7,11 @@
  * clauses that delegate here.
  */
 
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import type { OverstoryConfig } from "../config-types.ts";
+import { assembleMrp as runAssembleMrp } from "../merge/mrp-assembler.ts";
+import { createMetricsStore } from "../metrics/store.ts";
 import type { SessionStore } from "../sessions/store.ts";
 import type {
 	CheckpointStore,
@@ -24,6 +28,7 @@ import { intakePhaseCell } from "./cells/intake-phase.ts";
 import { planPhaseCell } from "./cells/plan-phase.ts";
 import { planReviewCell } from "./cells/plan-review.ts";
 import { prPhaseCell } from "./cells/pr-phase.ts";
+import { prePrPhaseCell } from "./cells/pre-pr-phase.ts";
 import type {
 	PhaseCellConfig,
 	PhaseCellDefinition,
@@ -72,12 +77,13 @@ export const CELL_REGISTRY: Record<string, ReviewCellDefinition> = {
 	"architecture-review": architectureReviewCell,
 };
 
-/** Phase cell registry (intake, understand, plan, execute, pr, done). Used by startLifecycleEngine(). */
+/** Phase cell registry (intake, understand, plan, execute, pre-pr, pr, done). Used by startLifecycleEngine(). */
 export const PHASE_CELL_REGISTRY: Record<string, PhaseCellDefinition> = {
 	"intake-phase": intakePhaseCell,
 	"understand-phase": understandPhaseCell,
 	"plan-phase": planPhaseCell,
 	"execute-phase": executePhaseCell,
+	"pre-pr-phase": prePrPhaseCell,
 	"pr-phase": prPhaseCell,
 	"done-phase": donePhaseCell,
 };
@@ -92,9 +98,9 @@ export const PHASE_CELL_REGISTRY: Record<string, PhaseCellDefinition> = {
  * @deprecated For new code, use `getTierPhases(tier, config)` instead.
  */
 export const TIER_PHASES: Record<MissionTier, readonly string[]> = {
-	direct: ["intake", "execute", "done"],
-	planned: ["intake", "understand", "plan", "execute", "pr", "done"],
-	full: ["intake", "understand", "align", "decide", "plan", "execute", "pr", "done"],
+	direct: ["intake", "execute", "pre-pr", "done"],
+	planned: ["intake", "understand", "plan", "execute", "pre-pr", "pr", "done"],
+	full: ["intake", "understand", "align", "decide", "plan", "execute", "pre-pr", "pr", "done"],
 };
 
 /**
@@ -113,9 +119,9 @@ export const TIER_PHASES: Record<MissionTier, readonly string[]> = {
  * `"pr"` is inserted between `"execute"` and `"done"` when included.
  */
 export function getTierPhases(tier: MissionTier, config: OverstoryConfig): readonly string[] {
-	const baseDirect = ["intake", "execute", "done"];
-	const basePlanned = ["intake", "understand", "plan", "execute", "done"];
-	const baseFull = ["intake", "understand", "align", "decide", "plan", "execute", "done"];
+	const baseDirect = ["intake", "execute", "pre-pr", "done"];
+	const basePlanned = ["intake", "understand", "plan", "execute", "pre-pr", "done"];
+	const baseFull = ["intake", "understand", "align", "decide", "plan", "execute", "pre-pr", "done"];
 
 	const prEnabled = config.pr?.enabled !== false;
 	const prRequiresLogin = !!config.pr?.operatorGithubLogin;
@@ -335,14 +341,34 @@ export function buildLifecycleHandlers(
 	deps: EngineDeps,
 	tier: MissionTier = "full",
 ): HandlerRegistry {
+	const overstoryDir = deps.overstoryDir;
+	const projectRoot = deps.projectRoot;
+	const missionStore = deps.missionStore;
 	const cellDeps = {
 		mailSend: deps.sendMail ?? (async () => {}),
 		checkpointStore: deps.checkpointStore,
-		missionStore: deps.missionStore,
+		missionStore,
 		sessionStore: deps.sessionStore,
 		mailStore: deps.mailStore,
-		overstoryDir: deps.overstoryDir,
-		projectRoot: deps.projectRoot,
+		overstoryDir,
+		projectRoot,
+		assembleMrp: async (missionId: string) => {
+			if (!overstoryDir) {
+				throw new Error("assembleMrp factory: overstoryDir not in scope");
+			}
+			// Lazy: open metrics.db on demand (mirrors dashboard/data.ts:80-88 pattern).
+			const metricsDbPath = join(overstoryDir, "metrics.db");
+			if (!existsSync(metricsDbPath)) {
+				throw new Error(`assembleMrp factory: metrics.db not found at ${metricsDbPath}`);
+			}
+			const metricsStore = createMetricsStore(metricsDbPath);
+			return runAssembleMrp(missionId, {
+				missionStore,
+				metricsStore,
+				resolveArtifactRoot: (m) => m.artifactRoot ?? "",
+				repoRoot: projectRoot ?? "",
+			});
+		},
 	};
 	const phaseHandlers: HandlerRegistry = {};
 	for (const [key, cell] of Object.entries(PHASE_CELL_REGISTRY)) {
@@ -416,7 +442,7 @@ export function buildLifecycleGraph(
 		const trigger = fromPhase === "plan" && toPhase === "execute" ? "handoff" : "phase_advance";
 		const exists = edges.some((e) => e.from === fromId && e.to === toId && e.trigger === trigger);
 		if (!exists && nodeIds.has(fromId) && nodeIds.has(toId)) {
-			edges.push({ from: fromId, to: toId, trigger, weight: 10 });
+			edges.push({ from: fromId, to: toId, trigger, weight: 11 }); // bumped from 10 to stay symmetric with graph.ts static edges
 		}
 	}
 
