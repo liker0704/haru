@@ -1,7 +1,7 @@
 # Doctor System
 
 This document is the contributor guide for Haru's `ha doctor` health check
-system. It covers the 11 check categories, the `DoctorCheckFn` interface, how
+system. It covers the 12 check categories, the `DoctorCheckFn` interface, how
 `--fix` closures work, CLI usage, integration with the health scoring system, and
 instructions for adding a new category.
 
@@ -40,6 +40,7 @@ ha doctor --json                  # JSON output for scripting
 | `src/doctor/version.ts` | `version` | Package version and sync |
 | `src/doctor/ecosystem.ts` | `ecosystem` | os-eco tool semver validity |
 | `src/doctor/providers.ts` | `providers` | Provider reachability and auth |
+| `src/doctor/watchdog.ts` | `watchdog` | Tier-0 daemon liveness (PID, heartbeat, singleton) |
 | `src/commands/doctor.ts` | — | CLI wiring, category registry, fix execution |
 
 ---
@@ -81,9 +82,10 @@ export type DoctorCheckFn = (
 
 ## 4. Check Categories
 
-Checks run in the fixed order declared in `src/commands/doctor.ts:28`:
+Checks run in the fixed order declared in `src/commands/doctor.ts:30`:
 `dependencies` → `config` → `structure` → `databases` → `consistency` →
-`agents` → `merge` → `logs` → `version` → `ecosystem` → `providers`.
+`agents` → `merge` → `logs` → `version` → `ecosystem` → `providers` →
+`watchdog`.
 
 ### 4.1 `dependencies`
 
@@ -296,6 +298,23 @@ Validates the multi-runtime provider configuration.
 **`--fix` support:** None. Provider configuration issues require config edits or
 environment variable changes.
 
+### 4.12 `watchdog`
+
+**Source:** `src/doctor/watchdog.ts`
+
+Verifies that the Tier-0 watchdog daemon is healthy. Three liveness checks:
+
+| Check | What it detects |
+|-------|----------------|
+| `watchdog-pid` | PID file at `.overstory/watchdog.pid` exists AND the recorded pid is alive (`kill -0`). Reports "Watchdog is not running (no PID file)" if absent or "Watchdog PID <n> is not alive (stale PID file)" if the recorded pid is gone. |
+| `watchdog-heartbeat` | `.overstory/state/watchdog.heartbeat` mtime is within `2 * tier0IntervalMs` of now (default 60 s window at the default `tier0IntervalMs = 30_000`). A stale or missing heartbeat is treated as a wedged daemon. |
+| `watchdog-singleton` | Only one `ha watch --background` process is running. Probed via `pgrep -f 'watch --background'`. Multiple PIDs => fail with the duplicate PID list. |
+
+All watchdog checks are non-fixable (`fixable: false`). Operators must restart
+the watchdog manually — see
+[`docs/runbooks/watchdog-recovery.md`](runbooks/watchdog-recovery.md) §
+"Recovery Procedures". `ha doctor --fix` is a no-op for this category.
+
 ---
 
 ## 5. CLI Usage
@@ -319,6 +338,7 @@ ha doctor --category logs
 ha doctor --category version
 ha doctor --category ecosystem
 ha doctor --category providers
+ha doctor --category watchdog
 
 # Auto-fix fixable issues, then show results
 ha doctor --fix
