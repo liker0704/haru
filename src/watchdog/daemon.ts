@@ -719,6 +719,8 @@ export interface DaemonOptions {
 	_exportPipeline?: ExportPipeline | null;
 	/** DI for merge queue. If not provided, created from merge-queue.db when adaptive is enabled. */
 	_mergeQueue?: MergeQueue | null;
+	/** DI for time injection in tests. Returns current epoch ms. Defaults to Date.now(). */
+	_now?: () => number;
 }
 
 /**
@@ -744,31 +746,86 @@ export interface DaemonOptions {
  */
 export function startDaemon(options: DaemonOptions & { intervalMs: number }): { stop: () => void } {
 	const { intervalMs } = options;
+	const getNow = options._now ?? (() => Date.now());
 
-	// Run the first tick immediately, then on interval
-	runDaemonTick(options).catch((err) => {
+	const overstoryDir = join(options.root, detectHaruDir(options.root));
+	const gapThresholdMs = Math.min(5 * intervalMs, Math.floor(options.staleThresholdMs / 2));
+
+	// Open EventStore once per daemon lifecycle for gap event emission.
+	// SessionStore is opened short-lived per detected gap (avoids long-lived lock contention
+	// with runDaemonTick's per-tick stores, especially important in tests with tiny intervals).
+	let gapEventStore: EventStore | null = null;
+	let ownGapEventStore = false;
+	if (options._eventStore !== undefined) {
+		gapEventStore = options._eventStore;
+	} else {
+		try {
+			gapEventStore = createEventStore(join(overstoryDir, "events.db"));
+			ownGapEventStore = true;
+		} catch {
+			// Non-fatal
+		}
+	}
+
+	// Tracks when the last setInterval callback fired (not when the tick completed).
+	// Updated at the START of each interval callback so host-suspend gaps are reliably detected:
+	// if a tick's .finally() ran after nowMs jumped, it would overwrite lastIntervalFire with
+	// the post-jump time, masking the gap entirely.
+	let lastIntervalFire = getNow();
+
+	function onTickError(err: unknown): void {
 		try {
 			const message = err instanceof Error ? err.message : String(err);
 			console.error(`[watchdog] Tick failed: ${message}`);
 		} catch {
 			// Guard: logging must not throw
 		}
-	});
+	}
+
+	// Run the first tick immediately, then on interval
+	runDaemonTick(options).catch(onTickError);
 
 	const interval = setInterval(() => {
-		runDaemonTick(options).catch((err) => {
+		const now = getNow();
+		const gapMs = now - lastIntervalFire;
+		// Update at the START so later async tick completions can't overwrite the gap baseline.
+		lastIntervalFire = now;
+
+		if (gapMs > gapThresholdMs) {
+			recordEvent(gapEventStore, {
+				runId: null,
+				agentName: "_watchdog",
+				eventType: "custom",
+				level: "warn",
+				data: { type: "daemon_stall_detected", gapMs, thresholdMs: gapThresholdMs },
+			});
+			// Short-lived session store for the rebase — opened and closed immediately
+			// to avoid holding a concurrent write lock while the tick also opens sessions.db.
 			try {
-				const message = err instanceof Error ? err.message : String(err);
-				console.error(`[watchdog] Tick failed: ${message}`);
+				const { store: rebaseStore } = openSessionStore(overstoryDir);
+				try {
+					rebaseStore.rebaseLastActivity?.(new Date(now).toISOString());
+				} finally {
+					rebaseStore.close();
+				}
 			} catch {
-				// Guard: logging must not throw
+				// Non-fatal: rebase failure must not break the daemon
 			}
-		});
+		}
+
+		runDaemonTick(options).catch(onTickError);
 	}, intervalMs);
 
 	return {
 		stop(): void {
 			clearInterval(interval);
+			if (ownGapEventStore && gapEventStore) {
+				try {
+					gapEventStore.close();
+				} catch {
+					// Non-fatal
+				}
+			}
 		},
 	};
 }

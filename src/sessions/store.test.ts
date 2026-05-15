@@ -624,6 +624,60 @@ describe("edge cases", () => {
 });
 
 // ============================================================
+// rebaseLastActivity
+// ============================================================
+
+describe("rebaseLastActivity", () => {
+	test("updates booting, working, waiting; does NOT touch stalled, zombie, completed", () => {
+		const oldTime = "2026-01-01T00:00:00.000Z";
+		const newTime = "2026-06-01T12:00:00.000Z";
+
+		store.upsert(
+			makeSession({ agentName: "boot", id: "s-1", state: "booting", lastActivity: oldTime }),
+		);
+		store.upsert(
+			makeSession({ agentName: "work", id: "s-2", state: "working", lastActivity: oldTime }),
+		);
+		store.upsert(
+			makeSession({ agentName: "wait", id: "s-3", state: "waiting", lastActivity: oldTime }),
+		);
+		store.upsert(
+			makeSession({ agentName: "stall", id: "s-4", state: "stalled", lastActivity: oldTime }),
+		);
+		store.upsert(
+			makeSession({ agentName: "zmb", id: "s-5", state: "zombie", lastActivity: oldTime }),
+		);
+		store.upsert(
+			makeSession({ agentName: "done", id: "s-6", state: "completed", lastActivity: oldTime }),
+		);
+
+		const count = store.rebaseLastActivity?.(newTime) ?? -1;
+		expect(count).toBe(3);
+
+		expect(store.getByName("boot")?.lastActivity).toBe(newTime);
+		expect(store.getByName("work")?.lastActivity).toBe(newTime);
+		expect(store.getByName("wait")?.lastActivity).toBe(newTime);
+
+		// Regression: stalled, zombie, completed must NOT be rebased
+		expect(store.getByName("stall")?.lastActivity).toBe(oldTime);
+		expect(store.getByName("zmb")?.lastActivity).toBe(oldTime);
+		expect(store.getByName("done")?.lastActivity).toBe(oldTime);
+	});
+
+	test("returns 0 when no booting/working/waiting sessions exist", () => {
+		store.upsert(makeSession({ agentName: "done", id: "s-1", state: "completed" }));
+		store.upsert(makeSession({ agentName: "zmb", id: "s-2", state: "zombie" }));
+		const count = store.rebaseLastActivity?.("2026-06-01T12:00:00.000Z") ?? -1;
+		expect(count).toBe(0);
+	});
+
+	test("returns 0 on empty store", () => {
+		const count = store.rebaseLastActivity?.("2026-06-01T12:00:00.000Z") ?? -1;
+		expect(count).toBe(0);
+	});
+});
+
+// ============================================================
 // SessionStore migration: coordinator_name in runs table
 // ============================================================
 

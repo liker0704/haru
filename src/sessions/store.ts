@@ -51,6 +51,8 @@ export interface SessionStore {
 	purge(opts: { all?: boolean; state?: AgentState; agent?: string }): number;
 	/** Get state transition log for agents in a run. */
 	getStateLog(runId: string): StateLogEntry[];
+	/** Rebase last_activity to `now` for booting/working/waiting sessions. Returns rows updated. */
+	rebaseLastActivity?: (now: string) => number;
 	/** Close the database connection. */
 	close(): void;
 }
@@ -647,6 +649,14 @@ export function createSessionStore(dbPath: string): SessionStore {
 		UPDATE sessions SET status_line = $status_line, last_activity = $last_activity WHERE agent_name = $agent_name
 	`);
 
+	const rebaseLastActivityCountStmt = db.prepare<{ cnt: number }, Record<string, never>>(
+		"SELECT COUNT(*) as cnt FROM sessions WHERE state IN ('booting', 'working', 'waiting')",
+	);
+
+	const rebaseLastActivityStmt = db.prepare<void, { $now: string }>(
+		"UPDATE sessions SET last_activity = $now WHERE state IN ('booting', 'working', 'waiting')",
+	);
+
 	return {
 		upsert(session: AgentSession): void {
 			upsertStmt.run({
@@ -837,6 +847,13 @@ export function createSessionStore(dbPath: string): SessionStore {
 				// Table may not exist yet (pre-migration)
 				return [];
 			}
+		},
+
+		rebaseLastActivity(now: string): number {
+			const countRow = rebaseLastActivityCountStmt.get({});
+			const count = countRow?.cnt ?? 0;
+			rebaseLastActivityStmt.run({ $now: now });
+			return count;
 		},
 
 		close(): void {

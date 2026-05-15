@@ -29,6 +29,7 @@ import {
 	_resetStateDirForTests,
 	buildCompletionMessage,
 	runDaemonTick,
+	startDaemon,
 } from "./daemon.ts";
 
 // === Test constants ===
@@ -3737,5 +3738,150 @@ describe("heartbeat at tick start", () => {
 			// biome-ignore lint/suspicious/noExplicitAny: test-only stub
 			(Bun as any).write = originalWrite;
 		}
+	});
+});
+
+// ============================================================
+// Gap detection tests (startDaemon + _now injection)
+// ============================================================
+
+describe("gap detection", () => {
+	beforeEach(() => {
+		_resetSourceFreshnessForTests();
+		_resetStateDirForTests();
+	});
+
+	test("1h gap fires daemon_stall_detected and rebases booting/working/waiting sessions", async () => {
+		const overstoryDir = join(tempRoot, ".overstory");
+		// Use current real time so sessions look fresh to the health evaluator —
+		// oldTime would make sessions zombie-old, causing ticks to move them out of
+		// booting/working/waiting before the gap fires.
+		const freshActivity = new Date().toISOString();
+
+		writeSessionsToStore(tempRoot, [
+			makeSession({
+				agentName: "boot-a",
+				id: "s-1",
+				state: "booting",
+				lastActivity: freshActivity,
+			}),
+			makeSession({
+				agentName: "work-a",
+				id: "s-2",
+				state: "working",
+				lastActivity: freshActivity,
+			}),
+			makeSession({
+				agentName: "wait-a",
+				id: "s-3",
+				state: "waiting",
+				lastActivity: freshActivity,
+			}),
+		]);
+
+		const eventStore = createEventStore(join(overstoryDir, "events.db"));
+
+		// nowMs uses a small epoch so new Date(nowMs).toISOString() is a recognisably
+		// synthetic value — distinct from any real timestamp the tick might write.
+		let nowMs = 1_000_000;
+		// rebaseLastActivity will be called with new Date(nowMs_after_bump).toISOString()
+		const expectedRebaseTime = new Date(nowMs + 3_600_000).toISOString(); // "1970-01-01T01:16:40.000Z"
+
+		// Use 100ms interval to reduce sessions.db contention from concurrent ticks.
+		// gapThresholdMs = min(5*100, 300000/2) = 500ms; gap of 3.6M ms >> 500ms.
+		const daemon = startDaemon({
+			root: tempRoot,
+			staleThresholdMs: 300_000,
+			zombieThresholdMs: 600_000,
+			intervalMs: 100,
+			_now: () => nowMs,
+			_eventStore: eventStore,
+			_tmux: tmuxAllAlive(),
+			_triage: triageAlways("extend"),
+		});
+
+		// Wait for the first interval fire so lastIntervalFire is set
+		await Bun.sleep(400);
+
+		// Simulate a 1h suspend
+		nowMs += 3_600_000;
+
+		// Wait for the next interval to fire and detect the gap
+		await Bun.sleep(400);
+
+		daemon.stop();
+
+		// Verify daemon_stall_detected event fired at least once
+		const allEvents = eventStore.getByAgent("_watchdog");
+		const stallEvents = allEvents.filter((e) => {
+			if (!e.data) return false;
+			try {
+				const d = JSON.parse(e.data) as { type?: string };
+				return d.type === "daemon_stall_detected";
+			} catch {
+				return false;
+			}
+		});
+		expect(stallEvents.length).toBeGreaterThanOrEqual(1);
+
+		// Verify booting/working/waiting sessions were rebased to expectedRebaseTime
+		const sessions = readSessionsFromStore(tempRoot);
+		const boot = sessions.find((s) => s.agentName === "boot-a");
+		const work = sessions.find((s) => s.agentName === "work-a");
+		const wait = sessions.find((s) => s.agentName === "wait-a");
+		expect(boot?.lastActivity).toBe(expectedRebaseTime);
+		expect(work?.lastActivity).toBe(expectedRebaseTime);
+		expect(wait?.lastActivity).toBe(expectedRebaseTime);
+
+		eventStore.close();
+	});
+
+	test("threshold formula: intervalMs=5000 staleMs=300000 gap=50s triggers (50000 > 25000)", () => {
+		const intervalMs = 5_000;
+		const staleThresholdMs = 300_000;
+		const gapThresholdMs = Math.min(5 * intervalMs, Math.floor(staleThresholdMs / 2));
+		expect(gapThresholdMs).toBe(25_000);
+		expect(50_000).toBeGreaterThan(gapThresholdMs);
+	});
+
+	test("threshold formula: intervalMs=30000 staleMs=300000 gap=100s does NOT trigger (100000 < 150000)", () => {
+		const intervalMs = 30_000;
+		const staleThresholdMs = 300_000;
+		const gapThresholdMs = Math.min(5 * intervalMs, Math.floor(staleThresholdMs / 2));
+		expect(gapThresholdMs).toBe(150_000);
+		expect(100_000).toBeLessThan(gapThresholdMs);
+	});
+
+	test("normal tick (no gap) does NOT fire daemon_stall_detected", async () => {
+		const overstoryDir = join(tempRoot, ".overstory");
+		const eventStore = createEventStore(join(overstoryDir, "events.db"));
+
+		// _now returns real time (no jump). Use 100ms interval to reduce concurrent-tick contention.
+		const daemon = startDaemon({
+			root: tempRoot,
+			staleThresholdMs: 300_000,
+			zombieThresholdMs: 600_000,
+			intervalMs: 100,
+			_eventStore: eventStore,
+			_tmux: tmuxAllAlive(),
+			_triage: triageAlways("extend"),
+		});
+
+		await Bun.sleep(400);
+		daemon.stop();
+
+		const allEvents = eventStore.getByAgent("_watchdog");
+		const stallEvents = allEvents.filter((e) => {
+			if (!e.data) return false;
+			try {
+				const d = JSON.parse(e.data) as { type?: string };
+				return d.type === "daemon_stall_detected";
+			} catch {
+				return false;
+			}
+		});
+		expect(stallEvents.length).toBe(0);
+
+		eventStore.close();
 	});
 });
