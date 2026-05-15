@@ -63,7 +63,7 @@ function evaluateTimeBased(
 	session: AgentSession,
 	base: Pick<HealthCheck, "agentName" | "timestamp" | "tmuxAlive" | "pidAlive" | "lastActivity">,
 	elapsedMs: number,
-	thresholds: { staleMs: number; zombieMs: number },
+	thresholds: { staleMs: number; zombieMs: number; toolHangMs?: number },
 	rateLimitState?: RateLimitState,
 ): HealthCheck {
 	// Rate-limited agents are waiting, not stalled — skip time-based escalation
@@ -111,6 +111,23 @@ function evaluateTimeBased(
 			action: "none",
 			reconciliationNote: "Agent is waiting for sub-agent results — skipping time-based escalation",
 		};
+	}
+
+	// Tool-hang rung: terminate if a single tool call has been running longer than toolHangMs.
+	// Default is POSITIVE_INFINITY so non-daemon callers never trigger this rung.
+	const toolHangMs = thresholds.toolHangMs ?? Number.POSITIVE_INFINITY;
+	const toolInFlightStartedAt = session.toolInFlightStartedAt ?? null;
+	if (toolInFlightStartedAt !== null) {
+		const toolInFlightMs = Date.now() - new Date(toolInFlightStartedAt).getTime();
+		if (toolInFlightMs > toolHangMs) {
+			return {
+				...base,
+				processAlive: true,
+				state: "zombie",
+				action: "terminate",
+				reconciliationNote: `Tool in flight "${session.toolInFlightName ?? "unknown"}" has been running for ${Math.round(toolInFlightMs / 60_000)}m — terminating`,
+			};
+		}
 	}
 
 	// lastActivity older than zombieMs → zombie
@@ -188,7 +205,7 @@ function evaluateTimeBased(
 export function evaluateHealth(
 	session: AgentSession,
 	tmuxAlive: boolean,
-	thresholds: { staleMs: number; zombieMs: number },
+	thresholds: { staleMs: number; zombieMs: number; toolHangMs?: number },
 	rateLimitState?: RateLimitState,
 ): HealthCheck {
 	const now = new Date();

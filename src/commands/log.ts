@@ -535,6 +535,19 @@ async function runLog(opts: {
 			} catch {
 				// Non-fatal: EventStore write should not break hook execution
 			}
+
+			// Track tool-in-flight for hang detection
+			try {
+				const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
+				const { store } = openSessionStore(overstoryDir);
+				try {
+					store.setToolInFlight?.(opts.agent, toolName, new Date().toISOString());
+				} finally {
+					store.close();
+				}
+			} catch {
+				// Non-fatal: tool-in-flight tracking should not break hook execution
+			}
 			break;
 		}
 		case "tool-end": {
@@ -572,6 +585,19 @@ async function runLog(opts: {
 				eventStore.close();
 			} catch {
 				// Non-fatal: EventStore write should not break hook execution
+			}
+
+			// Clear tool-in-flight tracking
+			try {
+				const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
+				const { store } = openSessionStore(overstoryDir);
+				try {
+					store.clearToolInFlight?.(opts.agent);
+				} finally {
+					store.close();
+				}
+			} catch {
+				// Non-fatal: tool-in-flight tracking should not break hook execution
 			}
 
 			// Throttled token snapshot recording (requires sessionId from --stdin; skipped for Pi agents)
