@@ -1886,5 +1886,17 @@
 		"status": "active",
 		"createdAt": "2026-05-15T09:55:29.928Z",
 		"completedAt": null
+	},
+	{
+		"id": "group-f1b48666",
+		"name": "docs-refresh-batch",
+		"memberIssueIds": [
+			"haru-c087",
+			"haru-82c8",
+			"haru-ba4e"
+		],
+		"status": "active",
+		"createdAt": "2026-05-15T14:18:52.059Z",
+		"completedAt": null
 	}
 ]
