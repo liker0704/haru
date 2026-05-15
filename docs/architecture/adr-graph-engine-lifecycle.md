@@ -185,7 +185,8 @@ The top-level lifecycle graph (`src/missions/graph.ts`) remains unchanged -- pha
 Top-level graph (existing, unchanged):
   understand:active  --phase_advance-->  align:active  --phase_advance-->
   decide:active  --phase_advance-->  plan:active  --handoff-->
-  execute:active  --phase_advance-->  done:active  --complete-->  done:completed
+  execute:active  --phase_advance-->  pr:active  --phase_advance-->  done:active  --complete-->  done:completed
+  (pr:active present in planned/full only; direct tier advances execute --> done directly)
 
 Each :active node gains a subgraph:
 
@@ -220,6 +221,24 @@ execute:active.subgraph:
 
 done:active.subgraph:
   [summary] --> [holdout] --> [cleanup] --> terminal
+
+pr:active.subgraph:  (planned/full only; direct tier routes execute --> done directly)
+  [preflight] --pr_phase_disabled|gh_auth_missing--> [paused]
+  [preflight] --preflight_passed--> [create] --pr_created|pr_already_exists--> [await-ci]
+  [create] --network|rate|protected|no_commits--> [paused]
+  [await-ci] --ci_passed--> [await-comments]
+  [await-ci] --ci_failed--> [classify-ci-red] --code_fail--> [dispatch-debugger]
+                            --flake_retry--> [await-ci]
+                            --infra_fail--> [escalate]
+  [dispatch-debugger] --> [request-analyst-brief] --> [await-debug-complete] --> [merge-debug-fix] --> [check-debug-attempts]
+  [check-debug-attempts] --retry--> [dispatch-debugger]    (max 3 attempts)
+  [check-debug-attempts] --exhausted--> [escalate]
+  [await-comments] --new_comment--> [dispatch-triage] --> [await-comments]
+  [await-comments] --approval_event--> [await-approval] --approved--> [merge]
+  [dispatch-triage] --approval_event--> [resume-coordinator] --> [await-comments]
+  [merge] --merged--> [done]
+  [merge] --pr_head_changed|pr_merge_conflict--> [escalate]
+  [escalate] --escalated--> [paused]
 ```
 
 The engine already supports subgraphs (`src/missions/engine.ts:152-175`): when `node.kind === "lifecycle" && node.subgraph` is truthy, it creates a child engine with `checkpointKeyPrefix` for isolation and runs it to completion before advancing the parent.
@@ -1092,6 +1111,48 @@ When the ceiling-breach branch *does* suspend a mission (no `onTimeout` edge), `
 ### 8. `transitionMissionViaEngine()` for DAG state transitions
 
 `transitionMissionViaEngine()` (`src/missions/engine-wiring.ts:339-384`, commit 282744a7) routes mission state transitions (stop, complete, suspend, resume, handoff) through the engine instead of mutating mission state directly. It loads the mission, resolves subgraph nodes back to their parent `phase:active` lifecycle node (since lifecycle triggers only have edges from parent nodes), builds a tier-appropriate lifecycle graph and handlers, and calls `engine.forceAdvance(trigger)`. Every state change therefore flows through the same DAG topology that drives normal phase progression, keeping checkpoints and transition history consistent.
+
+### 9. pr-phase subgraph (Stage E, #283)
+
+The pr-phase closes the loop between mission execution and merged code. Before Stage E, once execute-phase workstreams merged into the integration branch, opening the integration PR, watching CI, responding to review comments, and merging to `main` were operator-manual steps. Stage E moves that loop into the lifecycle graph so missions can finish autonomously when GitHub is configured, with the same nudge/escalate/recovery semantics the rest of the engine uses.
+
+**17-node summary:**
+
+| Node | Kind | Purpose |
+| --- | --- | --- |
+| `preflight` | handler | gh-auth check + `pr.enabled` gate; routes to `paused` if disabled or missing auth |
+| `create` | handler | `gh pr create` → records `prNumber`/`prUrl` in `mission_pr_state` |
+| `await-ci` | async gate | watches CI checks; timeout default 4h (`pr.ciTimeoutMs`) |
+| `classify-ci-red` | handler | classifies CI red as flake / code / infra; tracks `flakeRetryCount` with exponential backoff |
+| `dispatch-debugger` | handler | spawns debugger capability for code failures |
+| `request-analyst-brief` | async gate | waits for `mission-analyst` to write `debug-brief.md` (timeout 10 min) |
+| `await-debug-complete` | async gate | waits for debugger's fix branch (timeout 1h) |
+| `merge-debug-fix` | handler | merges debug branch back into feature branch |
+| `check-debug-attempts` | handler | enforces 3-attempt cap, escalates on exhaustion |
+| `await-comments` | async gate | watches PR for new comments; timeout default 7d (`pr.commentsTimeoutMs`) |
+| `dispatch-triage` | handler | spawns triage agent for allowlisted comment authors; enforces per-mission/per-author rate caps |
+| `resume-coordinator` | handler | resumes coordinator session when triage classifies comment as code-action |
+| `await-approval` | async gate | waits for review approval; timeout default 48h (`pr.approvalTimeoutMs`); pins `approvedHeadSha` |
+| `merge` | handler | SHA-pinned GraphQL `mergePullRequest`; respects `mergeStrategy` (squash/merge/rebase) |
+| `escalate` | handler | emits `escalated` trigger to terminal `paused` |
+| `done` | terminal | success path |
+| `paused` | terminal | non-success path (config-disabled, gh-auth-missing, exhausted, escalated) |
+
+**Async-gate timeouts:**
+
+| Gate | Timeout | Config key |
+| --- | --- | --- |
+| `await-ci` | 4h | `pr.ciTimeoutMs` |
+| `request-analyst-brief` | 10 min | literal |
+| `await-debug-complete` | 1h | literal |
+| `await-comments` | 7d | `pr.commentsTimeoutMs` |
+| `await-approval` | 48h | `pr.approvalTimeoutMs` |
+
+**Tier opt-in:** `getTierPhases(tier, config)` in `src/missions/engine-wiring.ts:115-135`. Direct tier opts OUT by default per da-01 ("direct missions are commonly local-only; defaulting pr-on would halt them on `gh_auth_missing`"); opt-in requires all three of `pr.enabled !== false`, `pr.operatorGithubLogin` truthy, and `pr.directTierIncludesPr === true`. Planned/full opt IN by default and are disabled only when `pr.enabled === false`.
+
+**Shared debug-loop factory:** The debug-loop arm (classify-ci-red → dispatch-debugger → request-analyst-brief → await-debug-complete → merge-debug-fix → check-debug-attempts) is generated by `makeDebugLoopHandlers({cellType, maxAttempts:3, failureSource:"ci"})` in `src/missions/cells/debug-loop-handlers.ts`; the same factory is reused by `done-phase` with `failureSource:"holdout"` for post-merge integration-gate recovery.
+
+**Sources:** `src/missions/cells/pr-phase.ts:1-527` (cell), `src/missions/cells/pr-phase-triggers.ts` (trigger union), Stage E parent issue #283, source-of-truth mission `.overstory/missions/mission-1778699081737-stage-e-v2/`.
 
 ---
 

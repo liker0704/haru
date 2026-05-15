@@ -108,7 +108,10 @@ Phase subgraph cells in `src/missions/cells/`:
 | architecture-review | `architecture-review.ts` | Same convergence pattern for architecture review |
 | execute | `execute-phase.ts` | Workstream dispatch loop, sequential deps, post-merge review |
 | execute-direct | `execute-direct-phase.ts` | Simplified execution for direct-tier missions |
+| pr-phase | `pr-phase.ts` | Preflight → create → await-ci → debug-loop / comments / approval → merge; terminal: done \| paused |
 | done | `done-phase.ts` | Summary, holdout validation, cleanup |
+
+The `pr-phase` subgraph (Stage E, #283) sits between `execute` and `done` for planned and full tier missions. It automates the full PR lifecycle: preflight auth check, `gh pr create`, CI watch with a debug-loop for code failures, comment triage, approval wait, and SHA-pinned merge. Direct tier opts OUT by default per da-01 (to prevent missions stalling on `gh_auth_missing` when GitHub is not configured); opt in requires all three of `pr.enabled !== false`, `pr.operatorGithubLogin` truthy, and `pr.directTierIncludesPr === true`. See the `### 9. pr-phase subgraph` subsection in [adr-graph-engine-lifecycle.md](./adr-graph-engine-lifecycle.md) for the full node inventory and design rationale.
 
 `shouldUseEngine()` defaults to enabled (`graphExecution !== false`). See [adr-graph-engine-lifecycle.md](./adr-graph-engine-lifecycle.md) for the full design rationale.
 
@@ -133,9 +136,11 @@ The `MissionTier` type (`src/missions/types.ts:277`) is `"direct" | "planned" | 
 
 | Tier | Phases |
 | --- | --- |
-| `direct` | execute, done |
-| `planned` | understand, plan, execute, done |
-| `full` | understand, align, decide, plan, execute, done |
+| `direct` | intake, execute, done |
+| `planned` | intake, understand, plan, execute, pr, done |
+| `full` | intake, understand, align, decide, plan, execute, pr, done |
+
+Direct tier opts OUT of `pr` by default per da-01 (Stage E); opt in by setting `pr.enabled !== false`, `pr.operatorGithubLogin`, and `pr.directTierIncludesPr === true`. Planned/full opt IN by default and are disabled only when `pr.enabled === false`.
 
 Each tier has a specialized coordinator agent definition:
 
