@@ -334,8 +334,10 @@ describe("intake-phase ensure-context-generate handler", () => {
 			// biome-ignore lint/style/noNonNullAssertion: length checked above
 			const cmd = spawnCalls[0]!.cmd as string[];
 			expect(cmd[0]).toBe("ha");
-			expect(cmd[1]).toBe("context");
-			expect(cmd[2]).toBe("generate");
+			expect(cmd[1]).toBe("--project");
+			expect(cmd[2]).toBe(tmp);
+			expect(cmd[3]).toBe("context");
+			expect(cmd[4]).toBe("generate");
 			// biome-ignore lint/style/noNonNullAssertion: length checked above
 			const opts = spawnCalls[0]!.opts as { detached?: boolean };
 			expect(opts.detached).toBe(true);

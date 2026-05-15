@@ -275,7 +275,7 @@ function buildHandlers(deps: PhaseCellDeps): HandlerRegistry {
 				// Stale or missing — spawn background regen and route to async gate.
 				const spawn = deps.spawn ?? Bun.spawn;
 				try {
-					const proc = spawn(["ha", "context", "generate", "--project", deps.projectRoot], {
+					const proc = spawn(["ha", "--project", deps.projectRoot, "context", "generate"], {
 						cwd: deps.projectRoot,
 						stdout: "ignore",
 						stderr: "ignore",
