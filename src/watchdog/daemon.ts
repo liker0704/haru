@@ -721,6 +721,8 @@ export interface DaemonOptions {
 	_mergeQueue?: MergeQueue | null;
 	/** DI for time injection in tests. Returns current epoch ms. Defaults to Date.now(). */
 	_now?: () => number;
+	/** Tool hang threshold in milliseconds (default 900_000 = 15 min). Passed explicitly to thresholds. */
+	toolHangThresholdMs?: number;
 }
 
 /**
@@ -876,6 +878,7 @@ export async function runDaemonTick(options: DaemonOptions): Promise<void> {
 		nudgeIntervalMs = 60_000,
 		tier1Enabled = false,
 		onHealthCheck,
+		toolHangThresholdMs,
 	} = options;
 	const tmux = {
 		isSessionAlive,
@@ -1080,6 +1083,7 @@ export async function runDaemonTick(options: DaemonOptions): Promise<void> {
 		const thresholds = {
 			staleMs: staleThresholdMs,
 			zombieMs: zombieThresholdMs,
+			toolHangMs: toolHangThresholdMs ?? 900_000,
 		};
 
 		const sessions = store.getAll();

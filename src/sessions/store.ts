@@ -53,6 +53,10 @@ export interface SessionStore {
 	getStateLog(runId: string): StateLogEntry[];
 	/** Rebase last_activity to `now` for booting/working/waiting sessions. Returns rows updated. */
 	rebaseLastActivity?: (now: string) => number;
+	/** Record tool start for a session (sets tool_in_flight_name and tool_in_flight_started_at). */
+	setToolInFlight?(agentName: string, toolName: string, isoNow: string): void;
+	/** Clear tool in flight for a session (sets both columns to NULL). */
+	clearToolInFlight?(agentName: string): void;
 	/** Close the database connection. */
 	close(): void;
 }
@@ -92,6 +96,8 @@ interface SessionRow {
 	original_runtime: string | null;
 	status_line: string | null;
 	prompt_version: string | null;
+	tool_in_flight_started_at: string | null;
+	tool_in_flight_name: string | null;
 }
 
 /** Row shape for runs table as stored in SQLite (snake_case columns). */
@@ -175,6 +181,8 @@ function rowToSession(row: SessionRow): AgentSession {
 		originalRuntime: row.original_runtime ?? null,
 		statusLine: row.status_line ?? null,
 		...(row.prompt_version !== null ? { promptVersion: row.prompt_version } : {}),
+		toolInFlightStartedAt: row.tool_in_flight_started_at ?? null,
+		toolInFlightName: row.tool_in_flight_name ?? null,
 	};
 }
 
@@ -353,6 +361,19 @@ const SESSION_MIGRATIONS: Migration[] = [
 			return result?.sql.includes("'waiting'") ?? false;
 		},
 	},
+	{
+		version: 12,
+		description: "add tool_in_flight tracking columns",
+		up: (db) => {
+			if (!hasColumn(db, "sessions", "tool_in_flight_started_at")) {
+				db.exec("ALTER TABLE sessions ADD COLUMN tool_in_flight_started_at TEXT");
+			}
+			if (!hasColumn(db, "sessions", "tool_in_flight_name")) {
+				db.exec("ALTER TABLE sessions ADD COLUMN tool_in_flight_name TEXT");
+			}
+		},
+		detect: (_db, cols) => cols.has("tool_in_flight_started_at") && cols.has("tool_in_flight_name"),
+	},
 ];
 
 /**
@@ -513,6 +534,8 @@ export function createSessionStore(dbPath: string): SessionStore {
 			$original_runtime: string | null;
 			$status_line: string | null;
 			$prompt_version: string | null;
+			$tool_in_flight_started_at: string | null;
+			$tool_in_flight_name: string | null;
 		}
 	>(`
 		INSERT INTO sessions
@@ -520,13 +543,13 @@ export function createSessionStore(dbPath: string): SessionStore {
 			 tmux_session, state, pid, parent_agent, depth, run_id,
 			 started_at, last_activity, escalation_level, stalled_since,
 			 rate_limited_since, runtime_session_id, transcript_path, original_runtime,
-			 status_line, prompt_version)
+			 status_line, prompt_version, tool_in_flight_started_at, tool_in_flight_name)
 		VALUES
 			($id, $agent_name, $capability, $runtime, $worktree_path, $branch_name, $task_id,
 			 $tmux_session, $state, $pid, $parent_agent, $depth, $run_id,
 			 $started_at, $last_activity, $escalation_level, $stalled_since,
 			 $rate_limited_since, $runtime_session_id, $transcript_path, $original_runtime,
-			 $status_line, $prompt_version)
+			 $status_line, $prompt_version, $tool_in_flight_started_at, $tool_in_flight_name)
 		ON CONFLICT(agent_name) DO UPDATE SET
 			id = excluded.id,
 			capability = excluded.capability,
@@ -549,7 +572,9 @@ export function createSessionStore(dbPath: string): SessionStore {
 			transcript_path = excluded.transcript_path,
 			original_runtime = excluded.original_runtime,
 			status_line = excluded.status_line,
-			prompt_version = excluded.prompt_version
+			prompt_version = excluded.prompt_version,
+			tool_in_flight_started_at = excluded.tool_in_flight_started_at,
+			tool_in_flight_name = excluded.tool_in_flight_name
 	`);
 
 	const getByNameStmt = db.prepare<SessionRow, { $agent_name: string }>(`
@@ -578,7 +603,11 @@ export function createSessionStore(dbPath: string): SessionStore {
 	`);
 
 	const updateStateStmt = db.prepare<void, { $agent_name: string; $state: string }>(`
-		UPDATE sessions SET state = $state WHERE agent_name = $agent_name
+		UPDATE sessions SET
+			state = $state,
+			tool_in_flight_started_at = CASE WHEN $state = 'booting' THEN NULL ELSE tool_in_flight_started_at END,
+			tool_in_flight_name = CASE WHEN $state = 'booting' THEN NULL ELSE tool_in_flight_name END
+		WHERE agent_name = $agent_name
 	`);
 
 	const updateLastActivityStmt = db.prepare<void, { $agent_name: string; $last_activity: string }>(`
@@ -657,8 +686,28 @@ export function createSessionStore(dbPath: string): SessionStore {
 		"UPDATE sessions SET last_activity = $now WHERE state IN ('booting', 'working', 'waiting')",
 	);
 
+	const setToolInFlightStmt = db.prepare<
+		void,
+		{ $agent_name: string; $tool_name: string; $started_at: string }
+	>(`
+		UPDATE sessions SET
+			tool_in_flight_name = $tool_name,
+			tool_in_flight_started_at = $started_at
+		WHERE agent_name = $agent_name
+	`);
+
+	const clearToolInFlightStmt = db.prepare<void, { $agent_name: string }>(`
+		UPDATE sessions SET
+			tool_in_flight_name = NULL,
+			tool_in_flight_started_at = NULL
+		WHERE agent_name = $agent_name
+	`);
+
 	return {
 		upsert(session: AgentSession): void {
+			// Clear tool_in_flight columns when transitioning to 'booting' (spawn resets in-flight state).
+			// Do NOT clear on 'working' — that races with the tool-start hook.
+			const clearInFlight = session.state === "booting";
 			upsertStmt.run({
 				$id: session.id,
 				$agent_name: session.agentName,
@@ -683,6 +732,8 @@ export function createSessionStore(dbPath: string): SessionStore {
 				$original_runtime: session.originalRuntime ?? null,
 				$status_line: session.statusLine ?? null,
 				$prompt_version: session.promptVersion ?? null,
+				$tool_in_flight_started_at: clearInFlight ? null : (session.toolInFlightStartedAt ?? null),
+				$tool_in_flight_name: clearInFlight ? null : (session.toolInFlightName ?? null),
 			});
 		},
 
@@ -854,6 +905,18 @@ export function createSessionStore(dbPath: string): SessionStore {
 			const count = countRow?.cnt ?? 0;
 			rebaseLastActivityStmt.run({ $now: now });
 			return count;
+		},
+
+		setToolInFlight(agentName: string, toolName: string, isoNow: string): void {
+			setToolInFlightStmt.run({
+				$agent_name: agentName,
+				$tool_name: toolName,
+				$started_at: isoNow,
+			});
+		},
+
+		clearToolInFlight(agentName: string): void {
+			clearToolInFlightStmt.run({ $agent_name: agentName });
 		},
 
 		close(): void {

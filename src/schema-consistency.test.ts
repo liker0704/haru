@@ -78,6 +78,8 @@ describe("SQL schema consistency", () => {
 				"status_line",
 				"task_id",
 				"tmux_session",
+				"tool_in_flight_name",
+				"tool_in_flight_started_at",
 				"transcript_path",
 				"worktree_path",
 			].sort();
