@@ -1941,5 +1941,15 @@
 		"status": "active",
 		"createdAt": "2026-05-16T01:38:11.547Z",
 		"completedAt": null
+	},
+	{
+		"id": "group-6686bcff",
+		"name": "implement-348-batch",
+		"memberIssueIds": [
+			"haru-fb78"
+		],
+		"status": "active",
+		"createdAt": "2026-05-16T02:51:29.545Z",
+		"completedAt": null
 	}
 ]
