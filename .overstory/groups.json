@@ -1961,5 +1961,15 @@
 		"status": "active",
 		"createdAt": "2026-05-16T06:31:02.349Z",
 		"completedAt": null
+	},
+	{
+		"id": "group-60231045",
+		"name": "stage-e-adr-batch",
+		"memberIssueIds": [
+			"haru-6e88"
+		],
+		"status": "active",
+		"createdAt": "2026-05-16T09:54:36.263Z",
+		"completedAt": null
 	}
 ]
