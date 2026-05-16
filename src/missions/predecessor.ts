@@ -46,13 +46,19 @@ export async function synthesizePredecessorSummary(
 		originalIntent = "Unknown — spec missing";
 	}
 
-	let shipped: string;
+	let mrpJson: string;
 	try {
-		const mrpContent = await deps.readFile(join(oldArtifactRoot, "merge-readiness-pack.json"));
-		shipped = mrpContent.trim() || "No MRP available";
-	} catch {
-		shipped = "No MRP available";
+		mrpJson = await deps.readFile(join(oldArtifactRoot, "merge-readiness-pack.json"));
+	} catch (err) {
+		throw new OverstoryError(
+			`Predecessor mission ${oldMissionId} is missing merge-readiness-pack.json at ${oldArtifactRoot}. ` +
+				`Stage E (epic #344) requires pre-pr-phase to write this artifact. ` +
+				`Check whether the predecessor mission completed pre-pr-phase successfully.`,
+			"PREDECESSOR_MRP_MISSING",
+			{ cause: err instanceof Error ? err : undefined },
+		);
 	}
+	const shipped = mrpJson.trim();
 
 	let reviewerSection: string;
 	if (triggeringComment) {
