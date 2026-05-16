@@ -1991,5 +1991,15 @@
 		"status": "active",
 		"createdAt": "2026-05-16T16:26:32.314Z",
 		"completedAt": null
+	},
+	{
+		"id": "group-d0fe324b",
+		"name": "e2e-daemon-restart-batch",
+		"memberIssueIds": [
+			"haru-8130"
+		],
+		"status": "active",
+		"createdAt": "2026-05-16T17:17:36.746Z",
+		"completedAt": null
 	}
 ]
