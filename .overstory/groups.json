@@ -1933,7 +1933,10 @@
 		"id": "group-3e5eaeea",
 		"name": "arch-review-phase-extraction-batch1",
 		"memberIssueIds": [
-			"haru-48d7"
+			"haru-48d7",
+			"haru-8adf",
+			"haru-cd7b",
+			"haru-6a5a"
 		],
 		"status": "active",
 		"createdAt": "2026-05-16T01:38:11.547Z",
