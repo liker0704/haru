@@ -21,6 +21,7 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
+import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { renderMrpMarkdown } from "../../merge/mrp-renderer.ts";
 import type { MissionGraph } from "../../types.ts";
@@ -122,11 +123,43 @@ interface PrePrCheckpoint {
 
 function buildHandlers(deps: PhaseCellDeps): HandlerRegistry {
 	return {
-		finalize: async (_ctx) => {
-			// v1: no-op. Real holdout integration lands in follow-up mission. The MRP
-			// assembler treats missing results/quality-gates.json and results/test-report.json
-			// as "skip" / zero — matching the v1 intent without producing misleading on-disk
-			// artifacts.
+		finalize: async (ctx) => {
+			const mission = ctx.getMission();
+			if (!mission?.artifactRoot) {
+				return { trigger: "finalize_failed" };
+			}
+			const resultsDir = join(mission.artifactRoot, "results");
+			const timestamp = new Date().toISOString();
+
+			// Ensure results dir exists
+			await mkdir(resultsDir, { recursive: true });
+
+			// Write placeholder quality-gates.json
+			const qualityGates = {
+				bun_test: "skip" as const,
+				biome: "skip" as const,
+				tsc: "skip" as const,
+				status: "skip" as const,
+				timestamp,
+				note: "Placeholder; real holdout migration deferred per epic #344 narrow #346.",
+			};
+			await Bun.write(
+				join(resultsDir, "quality-gates.json"),
+				JSON.stringify(qualityGates, null, 2),
+			);
+
+			// Write placeholder test-report.json
+			const testReport = {
+				total: 0,
+				passed: 0,
+				failed: 0,
+				skipped: 0,
+				new_tests: [],
+				timestamp,
+				note: "Placeholder; real test results aggregation deferred.",
+			};
+			await Bun.write(join(resultsDir, "test-report.json"), JSON.stringify(testReport, null, 2));
+
 			return { trigger: "finalize_done" };
 		},
 

@@ -149,10 +149,55 @@ describe("pre-pr-phase subgraph", () => {
 // === finalize handler ===
 
 describe("finalize handler", () => {
-	test("returns finalize_done (no-op path)", async () => {
+	test("returns finalize_done and writes placeholder artifacts", async () => {
+		const dir = await mkdtemp(join(tmpdir(), "pre-pr-finalize-"));
+		try {
+			const handlers = prePrPhaseCell.buildHandlers(makeDeps());
+			const result = await handlers["finalize"]!(
+				makeCtx({ mission: makeMission({ artifactRoot: dir }) }),
+			);
+			expect(result.trigger).toBe("finalize_done");
+
+			const gatesFile = Bun.file(join(dir, "results", "quality-gates.json"));
+			const gates = JSON.parse(await gatesFile.text()) as {
+				bun_test: string;
+				biome: string;
+				tsc: string;
+				status: string;
+				timestamp: string;
+			};
+			expect(gates.bun_test).toBe("skip");
+			expect(gates.biome).toBe("skip");
+			expect(gates.tsc).toBe("skip");
+			expect(gates.status).toBe("skip");
+			expect(typeof gates.timestamp).toBe("string");
+
+			const reportFile = Bun.file(join(dir, "results", "test-report.json"));
+			const report = JSON.parse(await reportFile.text()) as {
+				total: number;
+				passed: number;
+				failed: number;
+				skipped: number;
+				new_tests: unknown[];
+				timestamp: string;
+			};
+			expect(report.total).toBe(0);
+			expect(report.passed).toBe(0);
+			expect(report.failed).toBe(0);
+			expect(report.skipped).toBe(0);
+			expect(report.new_tests).toEqual([]);
+			expect(typeof report.timestamp).toBe("string");
+		} finally {
+			await rm(dir, { recursive: true });
+		}
+	});
+
+	test("returns finalize_failed when artifactRoot is missing", async () => {
 		const handlers = prePrPhaseCell.buildHandlers(makeDeps());
-		const result = await handlers["finalize"]!(makeCtx({ mission: makeMission() }));
-		expect(result.trigger).toBe("finalize_done");
+		const result = await handlers["finalize"]!(
+			makeCtx({ mission: makeMission({ artifactRoot: null }) }),
+		);
+		expect(result.trigger).toBe("finalize_failed");
 	});
 });
 
