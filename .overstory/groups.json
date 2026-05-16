@@ -1971,5 +1971,15 @@
 		"status": "active",
 		"createdAt": "2026-05-16T09:54:36.263Z",
 		"completedAt": null
+	},
+	{
+		"id": "group-6cfaf5a4",
+		"name": "e2e-docs",
+		"memberIssueIds": [
+			"haru-c8c3"
+		],
+		"status": "active",
+		"createdAt": "2026-05-16T14:16:44.970Z",
+		"completedAt": null
 	}
 ]
