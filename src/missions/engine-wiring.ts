@@ -473,6 +473,34 @@ export function buildLifecycleGraph(
 }
 
 /**
+ * Resolve the trigger that advances a mission one step toward done from its
+ * current lifecycle node. Returns `null` if no advancing edge exists (e.g.,
+ * mission already in done phase or current node is unknown).
+ *
+ * Used by `ha mission complete` to pick the right trigger based on the
+ * mission's current phase — there is no single "complete" trigger anymore;
+ * inter-phase advancement uses `phase_advance` (and `handoff` for plan→execute)
+ * edges synthesized by buildLifecycleGraph.
+ */
+export function resolveCompletionTrigger(mission: Mission): string | null {
+	if (!mission.currentNode) return null;
+	let startNodeId = mission.currentNode;
+	if (startNodeId.includes("-phase:")) {
+		const phasePart = startNodeId.split("-phase:")[0];
+		if (phasePart) {
+			startNodeId = `${phasePart}:active`;
+		}
+	}
+	const graph = buildLifecycleGraph(mission);
+	const outgoing = graph.edges
+		.filter((e) => e.from === startNodeId)
+		.filter((e) => e.trigger === "phase_advance" || e.trigger === "handoff")
+		.sort((a, b) => (b.weight ?? 0) - (a.weight ?? 0));
+	const next = outgoing[0];
+	return next ? next.trigger : null;
+}
+
+/**
  * Transition a mission's graph state via the engine using a named trigger.
  *
  * Loads the mission, creates a lifecycle engine starting from its currentNode,

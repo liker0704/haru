@@ -22,7 +22,7 @@ import {
 	killSession,
 	removeAgentEnvFile,
 } from "../worktree/tmux.ts";
-import { transitionMissionViaEngine } from "./engine-wiring.ts";
+import { resolveCompletionTrigger, transitionMissionViaEngine } from "./engine-wiring.ts";
 import { recordMissionEvent } from "./events.ts";
 import { resolveCurrentMissionId } from "./lifecycle-helpers.ts";
 import { suspendMission } from "./lifecycle-suspend.ts";
@@ -285,9 +285,17 @@ async function terminalizeMission(opts: {
 		const beforePhase = mission.phase;
 		const engineDeps = { checkpointStore: missionStore.checkpoints, missionStore };
 		if (targetState === "completed") {
-			const result = await transitionMissionViaEngine(mission.id, "complete", engineDeps);
-			if (result.status === "error") {
-				printWarning("Graph transition failed", result.error ?? "unknown");
+			// Graph-aware: there is no single `complete` edge from execute/pr → done
+			// anymore. Inspect the current node and fire the next-step trigger
+			// (phase_advance or handoff). When already on done:active (or no edge
+			// exists), skip the graph transition — the explicit completeMission()
+			// below still finalizes the mission record.
+			const completionTrigger = resolveCompletionTrigger(mission);
+			if (completionTrigger) {
+				const result = await transitionMissionViaEngine(mission.id, completionTrigger, engineDeps);
+				if (result.status === "error") {
+					printWarning("Graph transition failed", result.error ?? "unknown");
+				}
 			}
 			missionStore.transaction(() => {
 				if (mission.phase !== "done") {

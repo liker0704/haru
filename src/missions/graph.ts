@@ -156,7 +156,7 @@ function buildDefaultGraph(): MissionGraph {
 			from: nodeId(from, "active"),
 			to: nodeId(to, "active"),
 			trigger,
-			weight: 11, // bumped from 10 to outweigh the hardcoded execute->done complete edge
+			weight: 11,
 		});
 		edges.push({
 			from: nodeId(from, "frozen"),
@@ -166,7 +166,13 @@ function buildDefaultGraph(): MissionGraph {
 		});
 	}
 
-	// Done phase: active entry point (for done-phase subgraph)
+	// Done phase: active entry point (for done-phase subgraph).
+	// Entry into done:active from intermediate tier phases is provided by the
+	// synthetic phase_advance edges inserted by buildLifecycleGraph(). The static
+	// graph keeps a single pr→done phase_advance edge (the last working phase →
+	// done) so DEFAULT_MISSION_GRAPH stays reachable end-to-end; tier-aware
+	// graphs supply the equivalent edges (execute→pre-pr→done for direct,
+	// arch-review→pre-pr→pr→done for full, etc.) at build time.
 	nodes.push({
 		kind: "lifecycle",
 		id: nodeId("done", "active"),
@@ -174,20 +180,17 @@ function buildDefaultGraph(): MissionGraph {
 		state: "active",
 		label: "done (active)",
 	});
-	// execute:active --complete--> done:active (entry into done phase, used by
-	// direct tier and any tier where pr-phase is config-disabled)
-	edges.push({
-		from: nodeId("execute", "active"),
-		to: nodeId("done", "active"),
-		trigger: "complete",
-		weight: 10,
-	});
-	// pr:active --complete--> done:active (planned/full with pr-phase enabled)
 	edges.push({
 		from: nodeId("pr", "active"),
 		to: nodeId("done", "active"),
-		trigger: "complete",
-		weight: 10,
+		trigger: "phase_advance",
+		weight: 11,
+	});
+	edges.push({
+		from: nodeId("pr", "frozen"),
+		to: nodeId("done", "active"),
+		trigger: "phase_advance",
+		weight: 11,
 	});
 	// done:active freeze/unfreeze
 	edges.push({

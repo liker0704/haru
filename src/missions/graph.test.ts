@@ -224,10 +224,10 @@ describe("validateTransition", () => {
 		expect(result.edge?.trigger).toBe("handoff");
 	});
 
-	test("legal: execute:active → done:active (complete)", () => {
+	test("illegal: execute:active → done:active (no direct edge; goes via arch-review/pre-pr/pr)", () => {
 		const result = validateTransition(DEFAULT_MISSION_GRAPH, "execute", "active", "done", "active");
-		expect(result.valid).toBe(true);
-		expect(result.edge?.trigger).toBe("complete");
+		expect(result.valid).toBe(false);
+		expect(result.reason).toContain("No edge");
 	});
 
 	test("legal: done:active → done:completed (phase_complete)", () => {
