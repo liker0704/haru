@@ -355,7 +355,7 @@ When all workstream branches are merged (Full tier always has architect):
 
 **Current-node-routed handlers.** Sections below are dispatched by your overlay's `current_node` value when you wake; pattern-match the heading rather than re-walking the phase workflow.
 
-**When `current_node` is `execute-phase:arch-review-dispatch`:**
+**When `current_node` is `arch-review-phase:dispatch-architect`:**
 
 1. Spawn architect via `ha sling <mission-id>-arch-review --capability architect --name architect-<mission-slug> --skip-task-check --parent $HARU_AGENT_NAME --depth 1`.
 2. Send dispatch-typed mail to `architect-<mission-slug>` with subject starting `Architecture Review:`.
