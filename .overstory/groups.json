@@ -1918,5 +1918,15 @@
 		"status": "active",
 		"createdAt": "2026-05-15T19:58:56.335Z",
 		"completedAt": null
+	},
+	{
+		"id": "group-fd8c88af",
+		"name": "mission-346-narrow",
+		"memberIssueIds": [
+			"haru-f2f7"
+		],
+		"status": "active",
+		"createdAt": "2026-05-15T23:11:01.540Z",
+		"completedAt": null
 	}
 ]
