@@ -108,10 +108,26 @@ Phase subgraph cells in `src/missions/cells/`:
 | architecture-review | `architecture-review.ts` | Same convergence pattern for architecture review |
 | execute | `execute-phase.ts` | Workstream dispatch loop, sequential deps, post-merge review |
 | execute-direct | `execute-direct-phase.ts` | Simplified execution for direct-tier missions |
+| arch-review-phase | `arch-review-phase.ts` | dispatch-architect → await-arch-review → check-refactor → await-arch-final → complete (full tier only). |
+| pre-pr-phase | `pre-pr-phase.ts` | finalize → check-gates → write-mrp → complete (writes Merge Readiness Pack JSON). |
 | pr-phase | `pr-phase.ts` | Preflight → create → await-ci → debug-loop / comments / approval → merge; terminal: done \| paused |
 | done | `done-phase.ts` | Summary, holdout validation, cleanup |
 
 The `pr-phase` subgraph (Stage E, #283) sits between `execute` and `done` for planned and full tier missions. It automates the full PR lifecycle: preflight auth check, `gh pr create`, CI watch with a debug-loop for code failures, comment triage, approval wait, and SHA-pinned merge. Direct tier opts OUT by default per da-01 (to prevent missions stalling on `gh_auth_missing` when GitHub is not configured); opt in requires all three of `pr.enabled !== false`, `pr.operatorGithubLogin` truthy, and `pr.directTierIncludesPr === true`. See the `### 9. pr-phase subgraph` subsection in [adr-graph-engine-lifecycle.md](./adr-graph-engine-lifecycle.md) for the full node inventory and design rationale.
+
+#### pre-pr-phase
+
+The `pre-pr-phase` subgraph sits between `execute` (or `arch-review` for full tier) and `pr`. Its job is to finalize artifacts, evaluate quality gates, and write the Merge Readiness Pack (MRP) JSON before the PR is created.
+
+Key implementation references:
+
+- `src/missions/cells/pre-pr-phase.ts:232-239` — `write-mrp` handler that assembles and persists the pack.
+- `src/merge/mrp-assembler.ts` — `assembleMrp()` builds the `MergeReadinessPack` from mission artifacts.
+- `src/merge/mrp-renderer.ts` — `renderMrpMarkdown()` is invoked as a bug-probe inside pre-pr-phase (the markdown result is discarded; any render error surfaces before the PR is created).
+- Artifact path: `<artifactRoot>/merge-readiness-pack.json`.
+- `pr-phase:create` (`src/missions/cells/pr-phase.ts:225`) reads that JSON, renders it, and uses `gh pr create --body-file <tmp>` so the PR body is the rendered MRP markdown on the happy path; a short placeholder body is the fallback if pre-pr did not write an MRP.
+
+Tier inclusion: planned and full include `pre-pr` by default; direct also includes it in the canonical phase list, but the handler short-circuits without writing when there is no feature branch or no wired DI. See [adr-stage-e-lifecycle-refactor.md](./adr-stage-e-lifecycle-refactor.md) (Decision 2) for the authoritative design rationale.
 
 `shouldUseEngine()` defaults to enabled (`graphExecution !== false`). See [adr-graph-engine-lifecycle.md](./adr-graph-engine-lifecycle.md) for the full design rationale.
 
@@ -136,9 +152,9 @@ The `MissionTier` type (`src/missions/types.ts:277`) is `"direct" | "planned" | 
 
 | Tier | Phases |
 | --- | --- |
-| `direct` | intake, execute, done |
-| `planned` | intake, understand, plan, execute, pr, done |
-| `full` | intake, understand, align, decide, plan, execute, pr, done |
+| `direct` | intake, execute, pre-pr, done |
+| `planned` | intake, understand, plan, execute, pre-pr, pr, done |
+| `full` | intake, understand, align, decide, plan, execute, arch-review, pre-pr, pr, done |
 
 Direct tier opts OUT of `pr` by default per da-01 (Stage E); opt in by setting `pr.enabled !== false`, `pr.operatorGithubLogin`, and `pr.directTierIncludesPr === true`. Planned/full opt IN by default and are disabled only when `pr.enabled === false`.
 
