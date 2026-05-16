@@ -457,6 +457,17 @@ async function processMission(mission: Mission, opts: MissionTickOpts): Promise<
 		}
 	}
 
+	if (!startNodeOverride && currentMissionNode && !currentMissionNode.includes("-phase:")) {
+		// Lifecycle node — check if checkpoint is out of sync with currentNode.
+		// This happens after performAdvance updates currentNode but the mission-level
+		// checkpoint still points at the previous node (e.g. after execute:active →
+		// pre-pr:active advance, checkpoint still says execute:active).
+		const latestCkpt = missionStore.checkpoints.getLatestCheckpoint(mission.id);
+		if (latestCkpt && latestCkpt.nodeId !== currentMissionNode) {
+			startNodeOverride = currentMissionNode;
+		}
+	}
+
 	const engine = engineFactory(mission, engineDeps, {
 		...(startNodeOverride ? { startNodeId: startNodeOverride } : {}),
 		graph: tickGraph,

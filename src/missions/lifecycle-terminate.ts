@@ -295,6 +295,16 @@ async function terminalizeMission(opts: {
 				const result = await transitionMissionViaEngine(mission.id, completionTrigger, engineDeps);
 				if (result.status === "error") {
 					printWarning("Graph transition failed", result.error ?? "unknown");
+					return { bundlePath: null, reviewId: null, deferredSelfSession: selfTmuxSession };
+				}
+				// If advance moved to intermediate phase (not done), let engine tick run it
+				const advancedMission = missionStore.getById(mission.id);
+				if (advancedMission?.phase !== "done") {
+					printSuccess(
+						"Mission advanced to intermediate phase",
+						`Current phase: ${advancedMission?.phase}. Engine will progress through remaining phases on next ticks.`,
+					);
+					return { bundlePath: null, reviewId: null, deferredSelfSession: selfTmuxSession };
 				}
 			}
 			missionStore.transaction(() => {
