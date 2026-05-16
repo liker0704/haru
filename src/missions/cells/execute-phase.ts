@@ -7,8 +7,6 @@
  *   check-remaining --more_ws--> dispatch-ready (LOOP, reserved for future batch dispatch)
  *   check-remaining --waiting--> await-ws-completion (LOOP)
  *   check-remaining --all_done--> complete (terminal)
- *   check-remaining --all_done_tdd--> arch-review-dispatch → arch-review (async, full tier arch review)
- *   arch-review --approved--> check-refactor → await-refactor? → await-arch-final → complete
  */
 
 import type { MissionGraph } from "../../types.ts";
@@ -51,43 +49,6 @@ function buildSubgraph(_config: PhaseCellConfig): MissionGraph {
 				id: `${CELL_TYPE}:check-remaining`,
 				cellType: CELL_TYPE,
 				handler: "check-remaining",
-			},
-			{
-				kind: "cell",
-				id: `${CELL_TYPE}:arch-review-dispatch`,
-				cellType: CELL_TYPE,
-				gate: "async",
-				// 900s = coordinator wake (~2m) + ha sling architect (~1m) + dispatch mail (~10s)
-				// + watchdog tick interval headroom. Higher values just delay the escalation
-				// emission; the actual work is short.
-				gateTimeout: 900,
-			},
-			{
-				kind: "cell",
-				id: `${CELL_TYPE}:arch-review`,
-				cellType: CELL_TYPE,
-				gate: "async",
-				gateTimeout: 3600,
-			},
-			{
-				kind: "cell",
-				id: `${CELL_TYPE}:check-refactor`,
-				cellType: CELL_TYPE,
-				handler: "check-refactor",
-			},
-			{
-				kind: "cell",
-				id: `${CELL_TYPE}:await-refactor`,
-				cellType: CELL_TYPE,
-				gate: "async",
-				gateTimeout: 14400,
-			},
-			{
-				kind: "cell",
-				id: `${CELL_TYPE}:await-arch-final`,
-				cellType: CELL_TYPE,
-				gate: "async",
-				gateTimeout: 3600,
 			},
 			{
 				kind: "cell",
@@ -135,53 +96,11 @@ function buildSubgraph(_config: PhaseCellConfig): MissionGraph {
 				to: `${CELL_TYPE}:await-ws-completion`,
 				trigger: "waiting",
 			},
-			// All done (direct/planned tier — skip arch review)
+			// All done
 			{
 				from: `${CELL_TYPE}:check-remaining`,
 				to: `${CELL_TYPE}:complete`,
 				trigger: "all_done",
-			},
-			// All done (full tier — post-merge architecture review)
-			{
-				from: `${CELL_TYPE}:check-remaining`,
-				to: `${CELL_TYPE}:arch-review-dispatch`,
-				trigger: "all_done_tdd",
-			},
-			{
-				from: `${CELL_TYPE}:arch-review-dispatch`,
-				to: `${CELL_TYPE}:arch-review`,
-				trigger: "review_dispatched",
-			},
-			// Arch review outcomes
-			{
-				from: `${CELL_TYPE}:arch-review`,
-				to: `${CELL_TYPE}:check-refactor`,
-				trigger: "approved",
-			},
-			{
-				from: `${CELL_TYPE}:arch-review`,
-				to: `${CELL_TYPE}:await-arch-final`,
-				trigger: "stuck",
-			},
-			{
-				from: `${CELL_TYPE}:check-refactor`,
-				to: `${CELL_TYPE}:await-refactor`,
-				trigger: "refactor_needed",
-			},
-			{
-				from: `${CELL_TYPE}:check-refactor`,
-				to: `${CELL_TYPE}:await-arch-final`,
-				trigger: "no_refactor",
-			},
-			{
-				from: `${CELL_TYPE}:await-refactor`,
-				to: `${CELL_TYPE}:await-arch-final`,
-				trigger: "refactor_done",
-			},
-			{
-				from: `${CELL_TYPE}:await-arch-final`,
-				to: `${CELL_TYPE}:complete`,
-				trigger: "architecture_final",
 			},
 		],
 	};
@@ -249,21 +168,10 @@ function buildHandlers(deps: PhaseCellDeps): HandlerRegistry {
 			});
 
 			if (stillActive.length === 0) {
-				// All dispatched leads are done.
-				// Full tier always has architect → needs post-merge architecture review.
-				if (mission.tier === "full") {
-					return { trigger: "all_done_tdd" };
-				}
 				return { trigger: "all_done" };
 			}
 
 			return { trigger: "waiting" };
-		},
-
-		"check-refactor": async (ctx) => {
-			const data = ctx.checkpoint as { hasRefactorSpecs?: boolean } | null;
-			if (data?.hasRefactorSpecs) return { trigger: "refactor_needed" };
-			return { trigger: "no_refactor" };
 		},
 	};
 }
