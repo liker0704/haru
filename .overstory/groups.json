@@ -1951,5 +1951,15 @@
 		"status": "active",
 		"createdAt": "2026-05-16T02:51:29.545Z",
 		"completedAt": null
+	},
+	{
+		"id": "group-a05bd7da",
+		"name": "docs-stage-e-batch",
+		"memberIssueIds": [
+			"haru-ecf3"
+		],
+		"status": "active",
+		"createdAt": "2026-05-16T06:31:02.349Z",
+		"completedAt": null
 	}
 ]
