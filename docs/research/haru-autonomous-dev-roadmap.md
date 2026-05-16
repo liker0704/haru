@@ -157,6 +157,8 @@ Done/deploy
 
 Критерий готовности: Haru сам открывает PR, пишет description с evidence, ingest-ит CI checks и реагирует на review comments.
 
+- Stage E PR lifecycle shipped 2026-05-16 (#344)
+
 ### Stage F: Budget Enforcement & Hard Permission Gates
 
 Цель: сделать unattended mode безопасным. В текущем Haru есть cost tracking, но нет hard kill-switch. Для autonomous режима это критично, потому что runaway loop быстро превращается в cost amplification.
