@@ -18,6 +18,9 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { type MergeReadinessPack, renderMrpMarkdown } from "../../merge/mrp-renderer.ts";
 import type { Mission, MissionStore } from "../../types.ts";
 import type { GhBudget, GhInvocationResult } from "../gh-budget.ts";
 import { getGhBudget, setGhBudget } from "../gh-budget.ts";
@@ -1266,4 +1269,281 @@ test("T-w3-305: 10 sequential dispatch events with cap=3 yield exactly 3 spawns 
 	} finally {
 		realStore.close();
 	}
+});
+
+// =============================================================================
+// MRP body rendering: T-w3-mrp-1 .. T-w3-mrp-5
+// =============================================================================
+
+function buildSampleMrp(overrides: Partial<MergeReadinessPack> = {}): MergeReadinessPack {
+	return {
+		schema_version: 1,
+		mission: {
+			id: "mission-test",
+			slug: "test-mission",
+			tier: "full",
+			autonomy: "supervised",
+			intent_summary: "Test mission for pr-phase body rendering",
+			parent_mission_id: null,
+		},
+		duration: {
+			started_at: "2026-05-01T00:00:00.000Z",
+			finished_at: "2026-05-01T01:00:00.000Z",
+			wall_clock_seconds: 3600,
+		},
+		diff: {
+			files_changed: 2,
+			additions: 100,
+			deletions: 10,
+			by_workstream: [],
+		},
+		tests: { total: 50, passed: 50, failed: 0, skipped: 0, new_tests: [] },
+		quality_gates: { bun_test: "pass", biome: "pass", tsc: "pass" },
+		compat: { breaking_changes: [], checked_branches: ["main"] },
+		risk_signals: {},
+		workstreams: [
+			{ ws_id: "w1", objective: "Test workstream", files_touched: [], task_id: "haru-test" },
+		],
+		acceptance_criteria: [{ text: "It works", status: "pass" }],
+		linked_issues: [{ ref: "#348" }],
+		debug_iterations: [],
+		agent_trail: [{ commit: "abc1234", author_agent: "builder-test", capability: "builder" }],
+		cost: { tokens_total: 1000, usd_total: 0.01 },
+		...overrides,
+	};
+}
+
+describe("prPhaseCell create handler — MRP body rendering", () => {
+	let savedBudget: GhBudget | null;
+	let artifactDir: string;
+
+	beforeEach(() => {
+		savedBudget = null;
+		try {
+			savedBudget = getGhBudget();
+		} catch {
+			savedBudget = null;
+		}
+		artifactDir = mkdtempSync("/tmp/pr-phase-mrp-test-");
+	});
+
+	afterEach(() => {
+		setGhBudget(savedBudget);
+		rmSync(artifactDir, { recursive: true, force: true });
+	});
+
+	test("T-w3-mrp-1: MRP present, showCost=false → --body-file used, no --body, content equals renderMrpMarkdown", async () => {
+		const mrp = buildSampleMrp();
+		writeFileSync(join(artifactDir, "merge-readiness-pack.json"), JSON.stringify(mrp));
+
+		const { budget, calls } = makeFakeGhBudget(({ args }) => {
+			if (args[0] === "pr" && args[1] === "create") {
+				return { exitCode: 0, stdout: "https://github.com/x/y/pull/10" };
+			}
+			return { exitCode: 0 };
+		});
+		setGhBudget(budget);
+
+		const handlers = prPhaseCell.buildHandlers(makeBaseDeps(), makeConfig());
+		const create = handlers.create;
+		expect(create).toBeDefined();
+		if (!create) return;
+
+		await create(
+			makeCtx({
+				missionId: "m-mrp-1",
+				mission: makeMission({
+					slug: "test-mrp",
+					featureBranch: "feature/mrp-test",
+					artifactRoot: artifactDir,
+				}) as unknown as Mission,
+			}),
+		);
+
+		const prCreateCall = calls.find((c) => c.args[0] === "pr" && c.args[1] === "create");
+		expect(prCreateCall).toBeDefined();
+		const ghArgs = Array.from(prCreateCall?.args ?? []);
+
+		const bodyFileIdx = ghArgs.indexOf("--body-file");
+		expect(bodyFileIdx).toBeGreaterThanOrEqual(0);
+		const bodyFilePath = bodyFileIdx >= 0 ? ghArgs[bodyFileIdx + 1] : undefined;
+		expect(bodyFilePath).toBeDefined();
+		expect(ghArgs.includes("--body")).toBe(false);
+
+		if (!bodyFilePath) return;
+		const actualBody = await Bun.file(bodyFilePath).text();
+		const expectedBody = renderMrpMarkdown(mrp, { showCost: false });
+		expect(actualBody).toBe(expectedBody);
+	});
+
+	test("T-w3-mrp-2: MRP present, showCost=true → body file contains ## Cost section", async () => {
+		const mrp = buildSampleMrp();
+		writeFileSync(join(artifactDir, "merge-readiness-pack.json"), JSON.stringify(mrp));
+
+		const { budget, calls } = makeFakeGhBudget(({ args }) => {
+			if (args[0] === "pr" && args[1] === "create") {
+				return { exitCode: 0, stdout: "https://github.com/x/y/pull/11" };
+			}
+			return { exitCode: 0 };
+		});
+		setGhBudget(budget);
+
+		const config = makeConfig({ pr: { showCost: true } });
+		const handlers = prPhaseCell.buildHandlers(makeBaseDeps(), config);
+		const create = handlers.create;
+		expect(create).toBeDefined();
+		if (!create) return;
+
+		await create(
+			makeCtx({
+				missionId: "m-mrp-2",
+				mission: makeMission({
+					slug: "test-mrp-cost",
+					featureBranch: "feature/mrp-cost",
+					artifactRoot: artifactDir,
+				}) as unknown as Mission,
+			}),
+		);
+
+		const prCreateCall = calls.find((c) => c.args[0] === "pr" && c.args[1] === "create");
+		expect(prCreateCall).toBeDefined();
+		const ghArgs = Array.from(prCreateCall?.args ?? []);
+		const bodyFileIdx = ghArgs.indexOf("--body-file");
+		const bodyFilePath = bodyFileIdx >= 0 ? ghArgs[bodyFileIdx + 1] : undefined;
+		expect(bodyFilePath).toBeDefined();
+		if (!bodyFilePath) return;
+
+		const actualBody = await Bun.file(bodyFilePath).text();
+		expect(actualBody).toContain("## Cost");
+	});
+
+	test("T-w3-mrp-3: MRP missing (ENOENT) → fallback body used, --body-file still used, returns pr_created", async () => {
+		const { budget, calls } = makeFakeGhBudget(({ args }) => {
+			if (args[0] === "pr" && args[1] === "create") {
+				return { exitCode: 0, stdout: "https://github.com/x/y/pull/12" };
+			}
+			return { exitCode: 0 };
+		});
+		setGhBudget(budget);
+
+		const handlers = prPhaseCell.buildHandlers(makeBaseDeps(), makeConfig());
+		const create = handlers.create;
+		expect(create).toBeDefined();
+		if (!create) return;
+
+		const result = await create(
+			makeCtx({
+				missionId: "m-mrp-3",
+				mission: makeMission({
+					slug: "test-mrp-missing",
+					featureBranch: "feature/mrp-missing",
+					artifactRoot: artifactDir,
+				}) as unknown as Mission,
+			}),
+		);
+
+		expect(result.trigger).toBe("pr_created");
+
+		const prCreateCall = calls.find((c) => c.args[0] === "pr" && c.args[1] === "create");
+		expect(prCreateCall).toBeDefined();
+		const ghArgs = Array.from(prCreateCall?.args ?? []);
+		const bodyFileIdx = ghArgs.indexOf("--body-file");
+		expect(bodyFileIdx).toBeGreaterThanOrEqual(0);
+		const bodyFilePath = bodyFileIdx >= 0 ? ghArgs[bodyFileIdx + 1] : undefined;
+		expect(bodyFilePath).toBeDefined();
+		if (!bodyFilePath) return;
+
+		const actualBody = await Bun.file(bodyFilePath).text();
+		expect(actualBody).toContain("Automated PR for mission: test-mrp-missing");
+		expect(actualBody).toContain("(MRP unavailable — pre-pr-phase may have failed to write it)");
+	});
+
+	test("T-w3-mrp-4: MRP corrupt JSON → same fallback body as ENOENT", async () => {
+		writeFileSync(join(artifactDir, "merge-readiness-pack.json"), "not-json");
+
+		const { budget, calls } = makeFakeGhBudget(({ args }) => {
+			if (args[0] === "pr" && args[1] === "create") {
+				return { exitCode: 0, stdout: "https://github.com/x/y/pull/13" };
+			}
+			return { exitCode: 0 };
+		});
+		setGhBudget(budget);
+
+		const handlers = prPhaseCell.buildHandlers(makeBaseDeps(), makeConfig());
+		const create = handlers.create;
+		expect(create).toBeDefined();
+		if (!create) return;
+
+		await create(
+			makeCtx({
+				missionId: "m-mrp-4",
+				mission: makeMission({
+					slug: "test-mrp-corrupt",
+					featureBranch: "feature/mrp-corrupt",
+					artifactRoot: artifactDir,
+				}) as unknown as Mission,
+			}),
+		);
+
+		const prCreateCall = calls.find((c) => c.args[0] === "pr" && c.args[1] === "create");
+		const ghArgs = Array.from(prCreateCall?.args ?? []);
+		const bodyFileIdx = ghArgs.indexOf("--body-file");
+		const bodyFilePath = bodyFileIdx >= 0 ? ghArgs[bodyFileIdx + 1] : undefined;
+		expect(bodyFilePath).toBeDefined();
+		if (!bodyFilePath) return;
+
+		const actualBody = await Bun.file(bodyFilePath).text();
+		expect(actualBody).toContain("Automated PR for mission: test-mrp-corrupt");
+		expect(actualBody).toContain("(MRP unavailable — pre-pr-phase may have failed to write it)");
+	});
+
+	test("T-w3-mrp-5: large body (200 workstreams) → body file equals full rendered output, no truncation", async () => {
+		const longObjective = "workstream-objective-".repeat(14);
+		const mrp = buildSampleMrp({
+			workstreams: Array.from({ length: 200 }, (_, i) => ({
+				ws_id: `ws-${i}`,
+				objective: longObjective,
+				files_touched: [],
+				task_id: `task-${i}`,
+			})),
+		});
+		writeFileSync(join(artifactDir, "merge-readiness-pack.json"), JSON.stringify(mrp));
+
+		const { budget, calls } = makeFakeGhBudget(({ args }) => {
+			if (args[0] === "pr" && args[1] === "create") {
+				return { exitCode: 0, stdout: "https://github.com/x/y/pull/14" };
+			}
+			return { exitCode: 0 };
+		});
+		setGhBudget(budget);
+
+		const handlers = prPhaseCell.buildHandlers(makeBaseDeps(), makeConfig());
+		const create = handlers.create;
+		expect(create).toBeDefined();
+		if (!create) return;
+
+		await create(
+			makeCtx({
+				missionId: "m-mrp-5",
+				mission: makeMission({
+					slug: "test-mrp-large",
+					featureBranch: "feature/mrp-large",
+					artifactRoot: artifactDir,
+				}) as unknown as Mission,
+			}),
+		);
+
+		const prCreateCall = calls.find((c) => c.args[0] === "pr" && c.args[1] === "create");
+		const ghArgs = Array.from(prCreateCall?.args ?? []);
+		const bodyFileIdx = ghArgs.indexOf("--body-file");
+		const bodyFilePath = bodyFileIdx >= 0 ? ghArgs[bodyFileIdx + 1] : undefined;
+		expect(bodyFilePath).toBeDefined();
+		if (!bodyFilePath) return;
+
+		const actualBody = await Bun.file(bodyFilePath).text();
+		const expectedBody = renderMrpMarkdown(mrp);
+		expect(actualBody.length).toBeGreaterThan(50_000);
+		expect(actualBody.length).toBe(expectedBody.length);
+		expect(actualBody).toBe(expectedBody);
+	});
 });

@@ -5,7 +5,9 @@
  * Shares the debug-loop handler factory with done-phase for CI failure recovery.
  */
 
+import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { type MergeReadinessPack, renderMrpMarkdown } from "../../merge/mrp-renderer.ts";
 import type { MissionGraph } from "../../types.ts";
 import { getGhBudget } from "../gh-budget.ts";
 import type { HandlerRegistry } from "../types.ts";
@@ -202,15 +204,26 @@ function buildHandlers(deps: PhaseCellDeps, config?: PhaseCellConfig): HandlerRe
 			}
 
 			const title = mission?.slug ?? featureBranch;
-			const body = `Automated PR for mission: ${title}`;
+			const mrpPath = join(mission?.artifactRoot ?? "", "merge-readiness-pack.json");
+			let body: string;
+			try {
+				const mrpText = await Bun.file(mrpPath).text();
+				const mrp = JSON.parse(mrpText) as MergeReadinessPack;
+				body = renderMrpMarkdown(mrp, { showCost: prCfg?.showCost ?? false });
+			} catch {
+				console.warn(`[pr-phase] MRP unavailable at ${mrpPath}, using fallback body`);
+				body = `Automated PR for mission: ${title}\n\n(MRP unavailable — pre-pr-phase may have failed to write it)`;
+			}
+			const bodyTmpPath = join(tmpdir(), `pr-body-${ctx.missionId}.md`);
+			await Bun.write(bodyTmpPath, body);
 
 			const createResult = await getGhBudget().runGh([
 				"pr",
 				"create",
 				"--title",
 				title,
-				"--body",
-				body,
+				"--body-file",
+				bodyTmpPath,
 				"--head",
 				featureBranch,
 				"--base",
