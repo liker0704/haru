@@ -159,6 +159,7 @@ Done/deploy
 
 - Stage E PR lifecycle shipped 2026-05-16 (#344)
 - Stage E direct-tier pipeline retried and verified shipped 2026-05-16 (#361 + #363)
+- Stage E direct-tier pipeline E2E verified after watchdog daemon restart shipped 2026-05-16 (#361 + #363 + daemon restart)
 
 ### Stage F: Budget Enforcement & Hard Permission Gates
 
