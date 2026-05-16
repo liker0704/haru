@@ -11,6 +11,7 @@ Quick read:
 - [workflows.md](./workflows.md) — end-to-end workflows, sequence diagrams, and how the command families fit together.
 - [review.md](./review.md) — architectural review, strengths, risks, and refactor priorities.
 - [adr-graph-engine-lifecycle.md](./adr-graph-engine-lifecycle.md) — graph execution engine design: lifecycle controller, gate evaluators, dead agent recovery.
+- [adr-stage-e-lifecycle-refactor.md](./adr-stage-e-lifecycle-refactor.md) — Stage E lifecycle refactor: extract arch-review phase, introduce pre-pr, render MRP as PR body.
 
 Current architectural summary:
 
