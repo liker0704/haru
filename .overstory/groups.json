@@ -1928,5 +1928,15 @@
 		"status": "active",
 		"createdAt": "2026-05-15T23:11:01.540Z",
 		"completedAt": null
+	},
+	{
+		"id": "group-3e5eaeea",
+		"name": "arch-review-phase-extraction-batch1",
+		"memberIssueIds": [
+			"haru-48d7"
+		],
+		"status": "active",
+		"createdAt": "2026-05-16T01:38:11.547Z",
+		"completedAt": null
 	}
 ]
