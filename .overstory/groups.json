@@ -1981,5 +1981,15 @@
 		"status": "active",
 		"createdAt": "2026-05-16T14:16:44.970Z",
 		"completedAt": null
+	},
+	{
+		"id": "group-9ed3c13d",
+		"name": "e2e-retry-after-361-363-double-fix",
+		"memberIssueIds": [
+			"haru-a3ff"
+		],
+		"status": "active",
+		"createdAt": "2026-05-16T16:26:32.314Z",
+		"completedAt": null
 	}
 ]
