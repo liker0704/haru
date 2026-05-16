@@ -820,7 +820,7 @@ async function processMission(mission: Mission, opts: MissionTickOpts): Promise<
 							`Gate "${currentNodeId}" is stalled: no architect dispatch mail was observed after ${gateState.max_nudges} nudges.`,
 							"",
 							"To resolve, do one of the following:",
-							"(a) Check that coordinator-mission.md handler for arch-review-dispatch is being followed by the coordinator agent.",
+							"(a) Check that coordinator-mission.md handler for dispatch-architect is being followed by the coordinator agent.",
 							`(b) Manually dispatch the architect: ha mail send --to architect-${mission.slug ?? "<slug>"} --type dispatch --subject 'Architecture Review: post-merge reconciliation'`,
 						].join("\n");
 

@@ -1054,7 +1054,7 @@ describe("runMissionTick", () => {
 			const mailStore = createMailStore(join(overstoryDir, "mail-arch-stall.db"));
 			const slug = "arch-stall";
 			const missionId = "m-arch-stall";
-			const nodeId = "execute-phase:arch-review-dispatch";
+			const nodeId = "arch-review-phase:dispatch-architect";
 
 			missionStore.create({ id: missionId, slug, objective: "test" });
 			missionStore.updateCurrentNode(missionId, nodeId);
@@ -1074,7 +1074,7 @@ describe("runMissionTick", () => {
 			const coordMails = mailStore.getAll({ to: `coordinator-${slug}` });
 			const findingMail = coordMails.find((m) => m.type === "mission_finding");
 			expect(findingMail).toBeDefined();
-			expect(findingMail?.subject).toContain("arch-review-dispatch");
+			expect(findingMail?.subject).toContain("dispatch-architect");
 
 			// Second tick — ceiling_emitted_at is now set; must NOT re-emit.
 			await runMissionTick(

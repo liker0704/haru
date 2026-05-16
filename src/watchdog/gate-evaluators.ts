@@ -1297,9 +1297,9 @@ export async function evaluateGate(
 				stores.missionStore ?? null,
 				gateEnteredAt,
 			);
-		case "arch-review-dispatch":
+		case "dispatch-architect":
 			return evaluateArchReviewDispatch(mission, stores.mailStore, gateEnteredAt);
-		case "arch-review":
+		case "await-arch-review":
 			return evaluateArchReviewComplete(mission, stores.mailStore, gateEnteredAt);
 		case "await-refactor":
 			return evaluateRefactorCompletion(mission, stores.mailStore, gateEnteredAt);
