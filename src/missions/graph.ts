@@ -51,6 +51,7 @@ function buildDefaultGraph(): MissionGraph {
 		"decide",
 		"plan",
 		"execute",
+		"arch-review",
 		"pre-pr",
 		"pr",
 	];

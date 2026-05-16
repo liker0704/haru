@@ -49,7 +49,7 @@ describe("DEFAULT_MISSION_GRAPH", () => {
 	});
 
 	test("has nodes for all working phases", () => {
-		const phases = ["understand", "align", "decide", "plan", "execute", "pre-pr"];
+		const phases = ["understand", "align", "decide", "plan", "execute", "arch-review", "pre-pr"];
 		for (const phase of phases) {
 			expect(DEFAULT_MISSION_GRAPH.nodes.find((n) => n.id === `${phase}:active`)).toBeDefined();
 			expect(DEFAULT_MISSION_GRAPH.nodes.find((n) => n.id === `${phase}:frozen`)).toBeDefined();
@@ -63,10 +63,23 @@ describe("DEFAULT_MISSION_GRAPH", () => {
 		expect(DEFAULT_MISSION_GRAPH.nodes.find((n) => n.id === "pre-pr:suspended")).toBeDefined();
 	});
 
-	test("execute:active --phase_advance--> pre-pr:active edge exists with weight 11", () => {
+	test("execute:active --phase_advance--> arch-review:active edge exists with weight 11", () => {
 		const edge = DEFAULT_MISSION_GRAPH.edges.find(
 			(e) =>
-				e.from === "execute:active" && e.to === "pre-pr:active" && e.trigger === "phase_advance",
+				e.from === "execute:active" &&
+				e.to === "arch-review:active" &&
+				e.trigger === "phase_advance",
+		);
+		expect(edge).toBeDefined();
+		expect(edge?.weight).toBe(11);
+	});
+
+	test("arch-review:active --phase_advance--> pre-pr:active edge exists with weight 11", () => {
+		const edge = DEFAULT_MISSION_GRAPH.edges.find(
+			(e) =>
+				e.from === "arch-review:active" &&
+				e.to === "pre-pr:active" &&
+				e.trigger === "phase_advance",
 		);
 		expect(edge).toBeDefined();
 		expect(edge?.weight).toBe(11);

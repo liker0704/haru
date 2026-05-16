@@ -213,8 +213,9 @@ describe("PHASE_CELL_REGISTRY", () => {
 		expect(PHASE_CELL_REGISTRY["pre-pr-phase"]?.cellType).toBe("pre-pr-phase");
 	});
 
-	test("T-w4-1: contains all seven phase cells", () => {
+	test("T-w4-1: contains all eight phase cells", () => {
 		expect(Object.keys(PHASE_CELL_REGISTRY).sort()).toEqual([
+			"arch-review-phase",
 			"done-phase",
 			"execute-phase",
 			"intake-phase",
@@ -243,10 +244,27 @@ describe("getTierPhases", () => {
 			"decide",
 			"plan",
 			"execute",
+			"arch-review",
 			"pre-pr",
 			"pr",
 			"done",
 		]);
+	});
+
+	test("T-w4-3b: planned tier unchanged by arch-review insertion", () => {
+		expect(TIER_PHASES.planned).toEqual([
+			"intake",
+			"understand",
+			"plan",
+			"execute",
+			"pre-pr",
+			"pr",
+			"done",
+		]);
+	});
+
+	test("T-w4-3c: direct tier unchanged by arch-review insertion", () => {
+		expect(TIER_PHASES.direct).toEqual(["intake", "execute", "pre-pr", "done"]);
 	});
 
 	test("T-w4-4: direct tier with default config does NOT include pr (da-01 default)", () => {
@@ -309,6 +327,7 @@ describe("TIER_PHASES (frozen defaults)", () => {
 			"decide",
 			"plan",
 			"execute",
+			"arch-review",
 			"pre-pr",
 			"pr",
 			"done",
@@ -551,7 +570,7 @@ describe("tier-aware graph construction", () => {
 		expect(phases.has("decide")).toBe(false);
 	});
 
-	test('buildLifecycleGraph with tier="full" includes all 9 phases', () => {
+	test('buildLifecycleGraph with tier="full" includes all 10 phases', () => {
 		const mission = makeMission({ tier: "full" });
 		const graph = buildLifecycleGraph(mission);
 
@@ -566,6 +585,7 @@ describe("tier-aware graph construction", () => {
 				"decide",
 				"plan",
 				"execute",
+				"arch-review",
 				"pre-pr",
 				"pr",
 				"done",

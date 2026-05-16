@@ -20,6 +20,7 @@ import type {
 	MissionStore,
 	MissionTier,
 } from "../types.ts";
+import { archReviewPhaseCell } from "./cells/arch-review-phase.ts";
 import { architectureReviewCell } from "./cells/architecture-review.ts";
 import { donePhaseCell } from "./cells/done-phase.ts";
 import { executeDirectPhaseCell } from "./cells/execute-direct-phase.ts";
@@ -77,12 +78,13 @@ export const CELL_REGISTRY: Record<string, ReviewCellDefinition> = {
 	"architecture-review": architectureReviewCell,
 };
 
-/** Phase cell registry (intake, understand, plan, execute, pre-pr, pr, done). Used by startLifecycleEngine(). */
+/** Phase cell registry (intake, understand, plan, execute, arch-review, pre-pr, pr, done). Used by startLifecycleEngine(). */
 export const PHASE_CELL_REGISTRY: Record<string, PhaseCellDefinition> = {
 	"intake-phase": intakePhaseCell,
 	"understand-phase": understandPhaseCell,
 	"plan-phase": planPhaseCell,
 	"execute-phase": executePhaseCell,
+	"arch-review-phase": archReviewPhaseCell,
 	"pre-pr-phase": prePrPhaseCell,
 	"pr-phase": prPhaseCell,
 	"done-phase": donePhaseCell,
@@ -100,7 +102,18 @@ export const PHASE_CELL_REGISTRY: Record<string, PhaseCellDefinition> = {
 export const TIER_PHASES: Record<MissionTier, readonly string[]> = {
 	direct: ["intake", "execute", "pre-pr", "done"],
 	planned: ["intake", "understand", "plan", "execute", "pre-pr", "pr", "done"],
-	full: ["intake", "understand", "align", "decide", "plan", "execute", "pre-pr", "pr", "done"],
+	full: [
+		"intake",
+		"understand",
+		"align",
+		"decide",
+		"plan",
+		"execute",
+		"arch-review",
+		"pre-pr",
+		"pr",
+		"done",
+	],
 };
 
 /**
@@ -121,7 +134,17 @@ export const TIER_PHASES: Record<MissionTier, readonly string[]> = {
 export function getTierPhases(tier: MissionTier, config: OverstoryConfig): readonly string[] {
 	const baseDirect = ["intake", "execute", "pre-pr", "done"];
 	const basePlanned = ["intake", "understand", "plan", "execute", "pre-pr", "done"];
-	const baseFull = ["intake", "understand", "align", "decide", "plan", "execute", "pre-pr", "done"];
+	const baseFull = [
+		"intake",
+		"understand",
+		"align",
+		"decide",
+		"plan",
+		"execute",
+		"arch-review",
+		"pre-pr",
+		"done",
+	];
 
 	const prEnabled = config.pr?.enabled !== false;
 	const prRequiresLogin = !!config.pr?.operatorGithubLogin;
