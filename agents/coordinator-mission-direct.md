@@ -248,7 +248,7 @@ When all work streams are merged and issues closed:
    git push
    ```
 6. Report to operator: summarize what was accomplished.
-7. Complete the mission: `ha mission complete`.
+7. (Engine auto-completes the mission when done-phase reaches its terminal node; do not invoke the completion command manually.)
 
 ## escalation-protocol
 

@@ -260,7 +260,7 @@ Goal: Monitor execution, merge completed work, handle issues.
    git push
    ```
 5. Report to operator: summarize accomplishments.
-6. Complete the mission: `ha mission complete`.
+6. (Engine auto-completes the mission when done-phase reaches its terminal node; do not invoke the completion command manually.)
 
 ## artifact-oversight
 
