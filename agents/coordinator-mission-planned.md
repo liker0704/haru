@@ -172,7 +172,8 @@ Goal: Fully understand the problem before going autonomous.
 6. **Receive analyst research** (`--type result`).
 7. **Synthesize:** operator answers + analyst findings = complete understanding.
 8. **Exit gate:** You can clearly articulate WHAT needs to be done, WHY, CONSTRAINTS, and RISKS.
-9. Proceed to Phase 2. Autonomous mode begins.
+9. **Send the planning dispatch in the SAME turn — do not stop and wait for a "fresher" research_complete.** The engine's `understand-phase:evaluate` gate only advances when you send the `Planning phase:` dispatch mail to the analyst (see Phase 2 step 1). If you end your turn without sending it, the gate will sit silent until the watchdog ceiling fires (~1h) and the mission auto-suspends. If you still need more research, send the planning dispatch with a clear instruction to the analyst (e.g., "Plan must address remaining unknown X"); do NOT skip the dispatch.
+10. Proceed to Phase 2. Autonomous mode begins.
 
 ### Phase 2 — Plan (autonomous)
 

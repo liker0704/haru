@@ -774,6 +774,58 @@ async function processMission(mission: Mission, opts: MissionTickOpts): Promise<
 
 			if (sinceLastNudge >= gateState.nudge_interval_ms) {
 				if (gateState.nudge_count < gateState.max_nudges) {
+					// Detect "alive but mute" target before sending another nudge.
+					// If we've already sent ≥1 nudge AND the target session's
+					// lastActivity didn't advance since the last nudge AND its tmux
+					// is still alive — Claude Code is sitting at end_turn ignoring
+					// keystrokes. nudgeAgent() will be useless; force-respawn via
+					// the existing dead-agent recovery path. See haru-6357.
+					if (gateState.nudge_count >= 1 && gateState.last_nudge_at) {
+						const targetSession = opts.sessionStore
+							.getAll()
+							.find((s) => s.agentName === evalResult.nudgeTarget);
+						if (
+							targetSession &&
+							new Date(targetSession.lastActivity).getTime() < lastNudge
+						) {
+							const tmuxSessions = await (opts._listTmuxSessions ?? listTmuxSessions)();
+							const tmuxAlive = tmuxSessions.some((s) => s.name === targetSession.tmuxSession);
+							if (tmuxAlive) {
+								try {
+									const config = await loadConfig(opts.projectRoot);
+									await (opts._resumeAgent ?? resumeAgent)(
+										targetSession,
+										config,
+										opts.projectRoot,
+									);
+									if (opts.eventStore) {
+										opts.eventStore.insert({
+											runId: mission.runId,
+											agentName: "engine",
+											sessionId: targetSession.id,
+											eventType: "engine_agent_respawned",
+											toolName: null,
+											toolArgs: null,
+											toolDurationMs: null,
+											level: "warn",
+											data: JSON.stringify({
+												kind: "mute_agent_respawned",
+												missionId: mission.id,
+												nodeId: currentNodeId,
+												agentName: targetSession.agentName,
+												lastActivity: targetSession.lastActivity,
+												lastNudgeAt: gateState.last_nudge_at,
+												nudgeCount: gateState.nudge_count,
+											}),
+										});
+									}
+								} catch {
+									// Non-fatal: respawn failure falls through to normal nudge
+								}
+							}
+						}
+					}
+
 					missionStore.incrementNudgeCount(mission.id, currentNodeId);
 
 					// Send actual tmux nudge to the agent
