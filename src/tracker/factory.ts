@@ -42,7 +42,9 @@ export async function resolveBackend(
 	if (configBackend === "beads") return "beads";
 	if (configBackend === "seeds") return "seeds";
 	if (configBackend === "github") return "github";
-	// "auto" detection: check for .seeds/ directory first (newer tool), then .beads/
+	// "auto" detection: check for .suji/ (current name post-rebrand), then .seeds/
+	// (legacy name pre-rebrand), then .beads/. Both .suji and .seeds map to the
+	// "seeds" backend because the on-disk format is unchanged across the rename.
 	const dirExists = async (path: string): Promise<boolean> => {
 		try {
 			const s = await stat(path);
@@ -51,6 +53,7 @@ export async function resolveBackend(
 			return false;
 		}
 	};
+	if (await dirExists(join(cwd, ".suji"))) return "seeds";
 	if (await dirExists(join(cwd, ".seeds"))) return "seeds";
 	if (await dirExists(join(cwd, ".beads"))) return "beads";
 	// Check if the repo has a github.com remote (for auto-detection)

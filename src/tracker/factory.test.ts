@@ -61,6 +61,15 @@ describe("resolveBackend", () => {
 			await rm(tempDir, { recursive: true });
 		}
 	});
+	test("returns seeds for auto when .suji/ exists (post-rebrand) — haru-b001", async () => {
+		const tempDir = await mkdtemp(join(tmpdir(), "tracker-test-"));
+		try {
+			await mkdir(join(tempDir, ".suji"));
+			expect(await resolveBackend("auto", tempDir)).toBe("seeds");
+		} finally {
+			await rm(tempDir, { recursive: true });
+		}
+	});
 	test("returns beads for auto when .beads/ exists", async () => {
 		const tempDir = await mkdtemp(join(tmpdir(), "tracker-test-"));
 		try {
