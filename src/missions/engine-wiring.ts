@@ -393,15 +393,35 @@ export function buildLifecycleHandlers(
 			});
 		},
 	};
+	// Namespace each cell's handlers by cellType to prevent collisions across
+	// phase cells (e.g., both intake-phase and done-phase register "escalate";
+	// without namespacing the later registration silently shadows the earlier
+	// one and intake's escalate node ends up running done-phase's debug-loop
+	// escalate). See haru-0f81. Keys are stored as `${cellType}:${handlerName}`
+	// (e.g., "intake-phase:escalate") and the engine resolves cell nodes via
+	// `${node.cellType}:${node.handler}` first, falling back to the bare name
+	// for lifecycle nodes (auto-advance handlers, which have no cellType).
 	const phaseHandlers: HandlerRegistry = {};
+	const registerNamespaced = (cellType: string, handlers: HandlerRegistry): void => {
+		for (const [name, fn] of Object.entries(handlers)) {
+			phaseHandlers[`${cellType}:${name}`] = fn;
+			// Keep bare name registered as a fallback for nodes that don't carry
+			// cellType (lifecycle :active handlers). Last writer wins here — same
+			// collision risk as before, but cell nodes now hit the namespaced
+			// key first and are immune.
+			phaseHandlers[name] = fn;
+		}
+	};
 	for (const [key, cell] of Object.entries(PHASE_CELL_REGISTRY)) {
 		// Skip standard execute cell if direct tier (use direct cell instead)
 		if (tier === "direct" && key === "execute-phase") continue;
-		Object.assign(phaseHandlers, cell.buildHandlers(cellDeps));
+		registerNamespaced(key, cell.buildHandlers(cellDeps));
 	}
-	// Add direct execute handlers if direct tier
+	// Add direct execute handlers if direct tier. NOTE: executeDirectPhaseCell
+	// uses cellType="execute-phase" on its nodes (mirrors the standard execute
+	// cell's namespace), so its handlers must register under the same prefix.
 	if (tier === "direct") {
-		Object.assign(phaseHandlers, executeDirectPhaseCell.buildHandlers(cellDeps));
+		registerNamespaced("execute-phase", executeDirectPhaseCell.buildHandlers(cellDeps));
 	}
 	return createHandlerRegistry({ ...autoAdvanceHandlers, ...phaseHandlers });
 }

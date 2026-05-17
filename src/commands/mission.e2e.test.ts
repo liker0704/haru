@@ -1022,8 +1022,10 @@ describe("mission command e2e", () => {
 		const edges = getAvailableTransitions(DEFAULT_MISSION_GRAPH, "execute", "active");
 		const triggers = edges.map((e) => e.trigger);
 
-		// execute:active should have: complete, freeze, suspend, stop, fail
-		expect(triggers).toContain("complete");
+		// execute:active should have: phase_advance (→ next phase), freeze, suspend, stop, fail.
+		// The legacy "complete" trigger was removed by fix #361 (no more hardcoded
+		// execute → done edge); intermediate phases now advance via phase_advance.
+		expect(triggers).toContain("phase_advance");
 		expect(triggers).toContain("freeze");
 		expect(triggers).toContain("suspend");
 		expect(triggers).toContain("stop");

@@ -237,7 +237,15 @@ export function createGraphEngine(opts: GraphEngineOpts): GraphEngine {
 				// Replay-safe: fall through; pending marker will be overwritten by confirm in performAdvance.
 			}
 
-			const handler = opts.handlers[node.handler];
+			// Resolve handler: cell nodes prefer cellType-qualified key
+			// (`${cellType}:${handlerName}`) to avoid collisions between phase
+			// cells that register the same handler name (e.g. "escalate" in both
+			// intake-phase and done-phase). Fall back to bare name for lifecycle
+			// nodes (auto-advance) or legacy cell handlers not yet namespaced.
+			// See haru-0f81.
+			const handlerKey =
+				node.kind === "cell" ? `${node.cellType}:${node.handler}` : node.handler;
+			const handler = opts.handlers[handlerKey] ?? opts.handlers[node.handler];
 			if (!handler) {
 				const err = `Handler '${node.handler}' not registered`;
 				return { status: "error", fromNodeId: nodeId, toNodeId: nodeId, trigger: null, error: err };

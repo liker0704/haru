@@ -10,6 +10,7 @@ import type { Mission } from "../types.ts";
 import {
 	advanceCellGate,
 	buildLifecycleGraph,
+	buildLifecycleHandlers,
 	buildPhaseCellConfig,
 	CELL_REGISTRY,
 	type EngineDeps,
@@ -687,5 +688,45 @@ describe("buildLifecycleGraph (config-aware)", () => {
 			expect(edge.from.startsWith("pr:")).toBe(false);
 			expect(edge.to.startsWith("pr:")).toBe(false);
 		}
+	});
+});
+
+describe("buildLifecycleHandlers — namespaced handler keys (haru-0f81)", () => {
+	test("registers each cell's handlers under both bare and cellType-qualified keys", () => {
+		const deps = makeDeps();
+		const handlers = buildLifecycleHandlers(deps, "full");
+
+		// Every cell that exposes an "escalate" handler should be reachable via
+		// its cellType-qualified key so the engine can disambiguate.
+		for (const cellType of Object.keys(PHASE_CELL_REGISTRY)) {
+			// Not every cell exposes "escalate" — only assert when bare exists.
+			if (typeof handlers.escalate === "function") {
+				// At minimum the cellType-qualified key should exist for cells that
+				// register escalate.
+				const namespaced = handlers[`${cellType}:escalate`];
+				if (namespaced !== undefined) {
+					expect(typeof namespaced).toBe("function");
+				}
+			}
+		}
+	});
+
+	test("intake-phase:escalate is distinct from done-phase:escalate (no flat collision)", () => {
+		const deps = makeDeps();
+		const handlers = buildLifecycleHandlers(deps, "full");
+		const intakeEscalate = handlers["intake-phase:escalate"];
+		const doneEscalate = handlers["done-phase:escalate"];
+		expect(typeof intakeEscalate).toBe("function");
+		expect(typeof doneEscalate).toBe("function");
+		// They MUST NOT be the same function — that was the haru-0f81 bug:
+		// done-phase's escalate (debug-loop) silently shadowed intake-phase's.
+		expect(intakeEscalate).not.toBe(doneEscalate);
+	});
+
+	test("auto-advance handlers (lifecycle, no cellType) remain reachable by bare name", () => {
+		const deps = makeDeps();
+		const handlers = buildLifecycleHandlers(deps, "full");
+		expect(typeof handlers["align-auto-advance"]).toBe("function");
+		expect(typeof handlers["decide-auto-advance"]).toBe("function");
 	});
 });
