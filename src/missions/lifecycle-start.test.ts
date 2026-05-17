@@ -320,6 +320,79 @@ describe("missionResumeAll", () => {
 		// Reset so subsequent tests are unaffected
 		process.exitCode = 0;
 	});
+
+	test("resets mission_gate_state for current_node so watchdog ceiling restarts (haru-a3e9)", async () => {
+		// Seed a suspended mission whose gate state holds a stale entered_at —
+		// this is the post-auto-suspend shape produced by max_total_wait_exceeded.
+		const store = createMissionStore(join(overstoryDir, "sessions.db"));
+		try {
+			store.create({
+				id: "mission-gate-reset-test",
+				slug: "gate-reset-test",
+				objective: "verify resume clears stale gate row",
+				runId: "run-test",
+				artifactRoot: join(overstoryDir, "missions", "mission-gate-reset-test"),
+				autonomy: "auto-all",
+			} as never);
+			// Mutate post-create into the post-auto-suspend shape
+			store.updateState("mission-gate-reset-test", "suspended");
+			store.updatePhase("mission-gate-reset-test", "understand");
+			store.updateCurrentNode("mission-gate-reset-test", "understand-phase:evaluate");
+		} finally {
+			store.close();
+		}
+
+		// Insert stale gate row via raw SQL (store has no setter)
+		const { Database } = await import("bun:sqlite");
+		const rawDb = new Database(join(overstoryDir, "sessions.db"));
+		try {
+			const stale = new Date(Date.now() - 3900_000).toISOString();
+			rawDb.run(
+				"INSERT INTO mission_gate_state (mission_id, node_id, entered_at, nudge_count, last_nudge_at, respawn_count, last_respawn_at, grace_ms, nudge_interval_ms, max_nudges, max_total_wait_ms, resolved_at, resolved_trigger, ceiling_emitted_at) VALUES (?, ?, ?, 0, NULL, 0, NULL, 120000, 60000, 3, 3600000, NULL, NULL, ?)",
+				[
+					"mission-gate-reset-test",
+					"understand-phase:evaluate",
+					stale,
+					stale,
+				],
+			);
+		} finally {
+			rawDb.close();
+		}
+
+		// Call resume — should set state=active AND delete the stale gate row.
+		// The subsequent restart-roles step needs tmux/spawn and may throw in
+		// this test env; the gate reset is what we're asserting and it happens
+		// before that step. Swallow the late-stage error.
+		await missionResumeAll(
+			overstoryDir,
+			projectRoot,
+			true /* json */,
+			"mission-gate-reset-test",
+		).catch(() => {});
+
+		// Verify the gate row was reset (deleted; watchdog will re-insert fresh)
+		const verifyDb = new Database(join(overstoryDir, "sessions.db"), { readonly: true });
+		try {
+			const row = verifyDb
+				.query<{ count: number }, [string, string]>(
+					"SELECT COUNT(*) as count FROM mission_gate_state WHERE mission_id=? AND node_id=?",
+				)
+				.get("mission-gate-reset-test", "understand-phase:evaluate");
+			expect(row?.count).toBe(0);
+		} finally {
+			verifyDb.close();
+		}
+
+		// Verify mission state flipped to active
+		const verifyStore = createMissionStore(join(overstoryDir, "sessions.db"));
+		try {
+			const m = verifyStore.getById("mission-gate-reset-test");
+			expect(m?.state).toBe("active");
+		} finally {
+			verifyStore.close();
+		}
+	});
 });
 
 describe("validateRequiredCapabilities", () => {

@@ -637,6 +637,14 @@ export async function missionResumeAll(
 			data: { kind: "state_change", from: "suspended", to: "active" },
 		});
 
+		// Reset gate state for the current node so the watchdog's ceiling timer
+		// restarts from now. Without this, a mission auto-suspended via
+		// max_total_wait_exceeded would re-suspend on the next tick because the
+		// stale entered_at still exceeds the ceiling. See haru-a3e9.
+		if (mission.currentNode) {
+			missionStore.resetGateState(mission.id, mission.currentNode);
+		}
+
 		// Reactivate the run if it was stopped/completed by a prior kill
 		if (mission.runId) {
 			const runStore = createRunStore(join(overstoryDir, "sessions.db"));
