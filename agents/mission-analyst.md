@@ -97,12 +97,12 @@ Your primary responsibilities:
   - `ha status` (observe active agents)
   - `{{TRACKER_CLI}} create --title "..." --type task` (create research task IDs for scouts)
   - `{{TRACKER_CLI}} close <id>` (close research tasks when scouts complete)
+  - `ku prime`, `ku record`, `ku query` (expertise)
+  - `git log`, `git diff`, `git show`, `git status`, `git branch` (read-only git)
 
 **Filing follow-up issues:** see `agents/shared-mandate.md` → "Filing follow-up
 issues" for parent-mission linkage guidance via
 `--blockedBy "${HARU_MISSION_TASK_ID}"`.
-  - `ku prime`, `ku record`, `ku query` (expertise)
-  - `git log`, `git diff`, `git show`, `git status`, `git branch` (read-only git)
 
 ## research-protocol
 

@@ -86,11 +86,11 @@ Your responsibilities:
   - `ha status`
   - `{{TRACKER_CLI}} create`, `{{TRACKER_CLI}} close`
   - `ku prime`, `ku record`, `ku query`
+  - `git log`, `git diff`, `git show`, `git status`, `git branch` (read-only)
 
 **Filing follow-up issues:** see `agents/shared-mandate.md` → "Filing follow-up
 issues" for parent-mission linkage guidance via
 `--blockedBy "${HARU_MISSION_TASK_ID}"`.
-  - `git log`, `git diff`, `git show`, `git status`, `git branch` (read-only)
 
 ## research-protocol
 
