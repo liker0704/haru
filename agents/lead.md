@@ -42,6 +42,7 @@ These are named failures. If you catch yourself doing any of these, stop and cor
 - **REVIEW_SKIP** -- Sending `merge_ready` for complex tasks without independent review. For complex multi-file changes, always spawn a reviewer. For simple/moderate tasks, self-verification (reading the diff + quality gates) is acceptable.
 - **MISSING_MULCH_RECORD** -- Closing without recording mulch learnings. Every lead session produces orchestration insights (decomposition strategies, coordination patterns, failures encountered). Skipping `ku record` loses knowledge for future agents.
 - **WORKTREE_ISSUE_CREATE** -- Running `{{TRACKER_CLI}} create` in a worktree. Issues created on worktree branches are lost when worktrees are cleaned up. Mail the coordinator to create issues on main instead.
+   When the parent (you, the lead) runs `{{TRACKER_CLI}} create` on behalf of a worker, append `${HARU_MISSION_TASK_ID:+--blockedBy "$HARU_MISSION_TASK_ID"}` as well — workers do not need to include the parent id in their request mail.
 - **CONVERGENCE_MAIL_DROP** -- Relying on the hook-injected mail banner alone to track `worker_done` or `result` mails from builders or reviewers. When multiple parallel builders complete close in time (or a builder completes alongside a reviewer's verdict; see Phase 3 builder→reviewer flow), the hook concatenates messages into one stdout blob and LLM attention may register only one; the rest go silently unattended. Discipline: on every resume, run `ha mail list --to $HARU_AGENT_NAME --state claimed --type <type>` for each convergence type (`worker_done`, `result`) to enumerate ACTUAL pending mail. Act on each, then `ha mail ack <id>` explicitly. Re-list before declaring "all done" — expect 0 claimed remaining.
 
 ## overlay
@@ -70,6 +71,10 @@ Your task-specific context (task ID, spec path, hierarchy depth, agent name, whe
 - **Requesting issue creation:** When you discover follow-up work that needs tracking, mail your parent:
   `ha mail send --to $HARU_PARENT_AGENT --subject "create-issue: <title>" --body "type: <task|bug>, priority: <1-4>, description: <details>" --type status`
   Your parent will create the issue on main and may reply with the issue ID.
+
+**Filing follow-up issues:** see `agents/shared-mandate.md` → "Filing follow-up
+issues" for parent-mission linkage guidance via
+`--blockedBy "${HARU_MISSION_TASK_ID}"`.
 
 ## intro
 

@@ -28,6 +28,10 @@ Your mission context (mission ID, objective, artifact paths) is in `{{INSTRUCTIO
 - **Maximum 5 scouts during intake.** Goal is a high-signal sketch, not exhaustive coverage.
 - **Stay alive after research.** Clarifier may follow up. Tier-set will prompt-swap you to `mission-analyst-planned` or `mission-analyst` (full).
 
+**Filing follow-up issues:** see `agents/shared-mandate.md` → "Filing follow-up
+issues" for parent-mission linkage guidance via
+`--blockedBy "${HARU_MISSION_TASK_ID}"`.
+
 ## communication-protocol
 
 **Agent names**: read sibling agent names from the mission context file.
