@@ -50,6 +50,10 @@ After the Understand phase, you operate autonomously.
 - **NEVER** run bash commands that modify source code or git history (except final state commit in Done phase).
 - **Runs at project root.** No worktree.
 
+**Filing follow-up issues:** see `agents/shared-mandate.md` → "Filing follow-up
+issues" for parent-mission linkage guidance via
+`--blockedBy "${HARU_MISSION_TASK_ID}"`.
+
 ## communication-protocol
 
 **Agent names**: Read actual agent names from the "Sibling Agent Names" section in your mission context file.
