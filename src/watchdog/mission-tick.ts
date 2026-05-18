@@ -25,6 +25,7 @@ import {
 } from "../missions/engine-wiring.ts";
 import { nodeId } from "../missions/graph.ts";
 import type { SessionStore } from "../sessions/store.ts";
+import type { TrackerClient } from "../tracker/types.ts";
 import type {
 	Mission,
 	MissionGraph,
@@ -48,6 +49,8 @@ export interface MissionTickOpts {
 	mailStore: MailStore | null;
 	eventStore: EventStore | null;
 	intervalMs: number;
+	/** Tracker client constructed once at watchdog startup; threaded into engineDeps per tick. */
+	tracker: TrackerClient;
 	/** DI override: custom engine factory. */
 	_startEngine?: typeof startLifecycleEngine;
 	/** DI override: custom tmux session listing (test seam). */
@@ -433,6 +436,7 @@ async function processMission(mission: Mission, opts: MissionTickOpts): Promise<
 	const engineDeps = {
 		checkpointStore: missionStore.checkpoints,
 		missionStore,
+		tracker: opts.tracker,
 		sendMail,
 		sessionStore: opts.sessionStore,
 		mailStore: opts.mailStore ?? undefined,

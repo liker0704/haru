@@ -137,6 +137,7 @@ function makeOpts(
 		mailStore: null,
 		eventStore: null,
 		intervalMs: 30_000,
+		tracker: makeStubTracker(),
 		_startEngine: engineFactory,
 		...extras,
 	};

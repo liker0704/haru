@@ -2,16 +2,31 @@ import { describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { TrackerClient } from "../../tracker/types.ts";
 import type { makeMission } from "../test-mocks.ts";
 import type { HandlerContext } from "../types.ts";
 import { intakePhaseCell } from "./intake-phase.ts";
 import type { PhaseCellDeps } from "./types.ts";
+
+function makeStubTracker(): TrackerClient {
+	return {
+		ready: async () => [],
+		show: async () => ({ id: "", title: "", status: "", priority: 0, type: "" }),
+		create: async () => "",
+		claim: async () => {},
+		close: async () => {},
+		comment: async () => {},
+		list: async () => [],
+		sync: async () => {},
+	};
+}
 
 function makeDeps(overrides?: Partial<PhaseCellDeps>): PhaseCellDeps {
 	return {
 		mailSend: async () => {},
 		checkpointStore: {} as unknown as PhaseCellDeps["checkpointStore"],
 		missionStore: {} as unknown as PhaseCellDeps["missionStore"],
+		tracker: makeStubTracker(),
 		...overrides,
 	};
 }

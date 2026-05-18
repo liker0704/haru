@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createSessionStore } from "../../sessions/store.ts";
 import { cleanupTempDir, createTempGitRepo, getDefaultBranch } from "../../test-helpers.ts";
+import type { TrackerClient } from "../../tracker/types.ts";
 import type { AgentSession, Mission } from "../../types.ts";
 import { createWorktree } from "../../worktree/manager.ts";
 import { createGraphEngine } from "../engine.ts";
@@ -13,6 +14,19 @@ import { createMockCheckpointStore } from "../test-mocks.ts";
 import type { HandlerContext } from "../types.ts";
 import { donePhaseCell } from "./done-phase.ts";
 import type { PhaseCellConfig, PhaseCellDeps } from "./types.ts";
+
+function makeStubTracker(): TrackerClient {
+	return {
+		ready: async () => [],
+		show: async () => ({ id: "", title: "", status: "", priority: 0, type: "" }),
+		create: async () => "",
+		claim: async () => {},
+		close: async () => {},
+		comment: async () => {},
+		list: async () => [],
+		sync: async () => {},
+	};
+}
 
 const config: PhaseCellConfig = {
 	missionId: "m1",
@@ -185,6 +199,7 @@ describe("donePhaseCell dispatch-debugger preflight", () => {
 					getCheckpoint: () => null,
 				},
 			} as unknown as PhaseCellDeps["missionStore"],
+			tracker: makeStubTracker(),
 			overstoryDir: tempDir,
 			projectRoot: "/tmp/project-not-used",
 		};
@@ -384,6 +399,7 @@ describe("donePhaseCell dispatch-debugger worktree probe", () => {
 					getCheckpoint: () => null,
 				},
 			} as unknown as PhaseCellDeps["missionStore"],
+			tracker: makeStubTracker(),
 			overstoryDir: tempDir,
 			projectRoot: "/tmp/worktree-probe-test",
 		};
@@ -496,6 +512,7 @@ describe("donePhaseCell escalate placeholder-checkpoint", () => {
 				freeze: () => {},
 				updatePauseReason: () => {},
 			} as unknown as PhaseCellDeps["missionStore"],
+			tracker: makeStubTracker(),
 			mailStore: mailStore as unknown as PhaseCellDeps["mailStore"],
 		};
 
@@ -535,6 +552,7 @@ describe("donePhaseCell escalate placeholder-checkpoint", () => {
 				},
 				updatePauseReason: () => {},
 			} as unknown as PhaseCellDeps["missionStore"],
+			tracker: makeStubTracker(),
 			mailStore: mailStore as unknown as PhaseCellDeps["mailStore"],
 		};
 
@@ -565,6 +583,7 @@ describe("donePhaseCell escalate placeholder-checkpoint", () => {
 				freeze: () => {},
 				updatePauseReason: () => {},
 			} as unknown as PhaseCellDeps["missionStore"],
+			tracker: makeStubTracker(),
 			mailStore: mailStore as unknown as PhaseCellDeps["mailStore"],
 		};
 
@@ -660,6 +679,7 @@ describe("donePhaseCell summary handler", () => {
 					getCheckpoint: () => null,
 				},
 			} as unknown as PhaseCellDeps["missionStore"],
+			tracker: makeStubTracker(),
 		};
 	}
 
@@ -695,6 +715,7 @@ describe("donePhaseCell summary handler", () => {
 			mailSend: async () => {},
 			checkpointStore: {} as PhaseCellDeps["checkpointStore"],
 			missionStore: fakeMissionStore,
+			tracker: makeStubTracker(),
 		};
 		const handlers = donePhaseCell.buildHandlers(deps);
 		const checkpointStore = createMockCheckpointStore();
@@ -880,6 +901,7 @@ describe("donePhaseCell cleanup handler (issue #322)", () => {
 						getCheckpoint: () => null,
 					},
 				} as unknown as PhaseCellDeps["missionStore"],
+				tracker: makeStubTracker(),
 				sessionStore,
 				overstoryDir,
 				projectRoot,
@@ -943,6 +965,7 @@ describe("donePhaseCell cleanup handler (issue #322)", () => {
 				missionStore: {
 					checkpoints: { saveCheckpoint: () => {}, getCheckpoint: () => null },
 				} as unknown as PhaseCellDeps["missionStore"],
+				tracker: makeStubTracker(),
 				sessionStore,
 				overstoryDir: "/tmp/does-not-matter",
 				projectRoot: "/tmp/does-not-matter",

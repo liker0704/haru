@@ -10,6 +10,7 @@ import type {
 	MissionTier,
 	PlanReviewTier,
 } from "../../types.ts";
+import type { TrackerClient } from "../../tracker/types.ts";
 import type { HandlerRegistry } from "../types.ts";
 
 // === Review cell types (plan-review, architecture-review) ===
@@ -67,6 +68,8 @@ export interface PhaseCellDeps {
 	mailSend: (to: string, subject: string, body: string, type: string) => Promise<void>;
 	checkpointStore: CheckpointStore;
 	missionStore: MissionStore;
+	/** REQUIRED: tracker client constructed once at watchdog startup (D-1). */
+	tracker: TrackerClient;
 	sessionStore?: SessionStore;
 	/** Optional: needed by check-remaining handler to disambiguate "waiting" lead state. */
 	mailStore?: import("../../mail/store.ts").MailStore;

@@ -5,8 +5,16 @@
  * via Bun.spawn. Seeds uses a { success, command, ...data } JSON envelope.
  */
 
-import { AgentError } from "../errors.ts";
+import { AgentError, OverstoryError } from "../errors.ts";
 import type { TrackerClient, TrackerIssue } from "./types.ts";
+
+/** Thrown when an sd subprocess is killed by the Bun.spawn timeout option. */
+export class TrackerTimeoutError extends OverstoryError {
+	constructor(context: string, timeoutMs: number) {
+		super(`sd ${context} timed out after ${timeoutMs}ms`, "TRACKER_TIMEOUT");
+		this.name = "TrackerTimeoutError";
+	}
+}
 
 /**
  * Run an sd command and return its output.
@@ -15,11 +23,22 @@ async function runSd(
 	args: string[],
 	cwd: string,
 	context: string,
+	opts?: { timeoutMs?: number },
 ): Promise<{ stdout: string; stderr: string }> {
-	const proc = Bun.spawn(["su", ...args], { cwd, stdout: "pipe", stderr: "pipe" });
+	const timeoutMs = opts?.timeoutMs ?? 30_000;
+	const proc = Bun.spawn(["su", ...args], {
+		cwd,
+		stdout: "pipe",
+		stderr: "pipe",
+		timeout: timeoutMs,
+		killSignal: "SIGKILL",
+	});
 	const stdout = await new Response(proc.stdout).text();
 	const stderr = await new Response(proc.stderr).text();
 	const exitCode = await proc.exited;
+	if (proc.exitCode === null) {
+		throw new TrackerTimeoutError(context, timeoutMs);
+	}
 	if (exitCode !== 0) {
 		let detail = stderr.trim();
 		if (!detail) {
@@ -191,5 +210,19 @@ export function createSeedsTracker(cwd: string): TrackerClient {
 		async sync() {
 			await runSd(["sync"], cwd, "sync");
 		},
+	};
+}
+
+/** No-op tracker for CLI paths that trigger graph transitions without a real tracker. */
+export function createNoopTracker(): TrackerClient {
+	return {
+		ready: async () => [],
+		show: async () => ({ id: "", title: "", status: "", priority: 0, type: "" }),
+		create: async () => "",
+		claim: async () => {},
+		close: async () => {},
+		comment: async () => {},
+		list: async () => [],
+		sync: async () => {},
 	};
 }

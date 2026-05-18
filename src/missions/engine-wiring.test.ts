@@ -30,6 +30,7 @@ function makeDeps(overrides?: Partial<EngineDeps>): EngineDeps {
 	return {
 		checkpointStore: createMockCheckpointStore(),
 		missionStore: createMockMissionStore(),
+		tracker: makeStubTracker(),
 		...overrides,
 	};
 }
@@ -446,7 +447,7 @@ describe("startCellEngine", () => {
 	test("idempotent: calling startCellEngine again resumes from checkpoint, not re-dispatch", async () => {
 		const checkpointStore = createMockCheckpointStore();
 		const missionStore = createMockMissionStore();
-		const deps: EngineDeps = { checkpointStore, missionStore };
+		const deps = makeDeps({ checkpointStore, missionStore });
 
 		// First call: runs from dispatch-critics → collect-verdicts (gate)
 		const first = await startCellEngine(baseMission, "plan-review", deps);
@@ -473,7 +474,7 @@ describe("advanceCellGate", () => {
 	test("advances gate and continues execution", async () => {
 		const checkpointStore = createMockCheckpointStore();
 		const missionStore = createMockMissionStore();
-		const deps: EngineDeps = { checkpointStore, missionStore };
+		const deps = makeDeps({ checkpointStore, missionStore });
 
 		// Start engine — stops at collect-verdicts gate
 		await startCellEngine(baseMission, "plan-review", deps);
@@ -487,7 +488,7 @@ describe("advanceCellGate", () => {
 	test("errors when current node is not a gate node", async () => {
 		const checkpointStore = createMockCheckpointStore();
 		const missionStore = createMockMissionStore();
-		const deps: EngineDeps = { checkpointStore, missionStore };
+		const deps = makeDeps({ checkpointStore, missionStore });
 
 		// Place checkpoint at convergence (not a gate node)
 		checkpointStore.saveCheckpoint(baseMission.id, "plan-review:convergence", null);
@@ -511,7 +512,7 @@ describe("getCellEngineStatus", () => {
 	test("returns status when checkpoint exists", async () => {
 		const checkpointStore = createMockCheckpointStore();
 		const missionStore = createMockMissionStore();
-		const deps: EngineDeps = { checkpointStore, missionStore };
+		const deps = makeDeps({ checkpointStore, missionStore });
 
 		await startCellEngine(baseMission, "plan-review", deps);
 
@@ -526,7 +527,7 @@ describe("getCellEngineStatus", () => {
 	test("transitions are recorded in status", async () => {
 		const checkpointStore = createMockCheckpointStore();
 		const missionStore = createMockMissionStore();
-		const deps: EngineDeps = { checkpointStore, missionStore };
+		const deps = makeDeps({ checkpointStore, missionStore });
 
 		await startCellEngine(baseMission, "plan-review", deps);
 

@@ -21,6 +21,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { type MergeReadinessPack, renderMrpMarkdown } from "../../merge/mrp-renderer.ts";
+import type { TrackerClient } from "../../tracker/types.ts";
 import type { Mission, MissionStore } from "../../types.ts";
 import type { GhBudget, GhInvocationResult } from "../gh-budget.ts";
 import { getGhBudget, setGhBudget } from "../gh-budget.ts";
@@ -28,6 +29,19 @@ import { createMockMissionStore, makeMission } from "../test-mocks.ts";
 import type { HandlerContext } from "../types.ts";
 import { prPhaseCell } from "./pr-phase.ts";
 import type { PhaseCellConfig, PhaseCellDeps } from "./types.ts";
+
+function makeStubTracker(): TrackerClient {
+	return {
+		ready: async () => [],
+		show: async () => ({ id: "", title: "", status: "", priority: 0, type: "" }),
+		create: async () => "",
+		claim: async () => {},
+		close: async () => {},
+		comment: async () => {},
+		list: async () => [],
+		sync: async () => {},
+	};
+}
 
 // FIXME(w3-builder): drop the cast once PhaseCellConfig has a `pr` field.
 type ConfigOverrides = Partial<PhaseCellConfig> & { pr?: Record<string, unknown> };
@@ -63,6 +77,7 @@ function makeBaseDeps(overrides?: Partial<PhaseCellDeps>): PhaseCellDeps {
 		mailSend: async () => {},
 		checkpointStore: {} as PhaseCellDeps["checkpointStore"],
 		missionStore: createMockMissionStore() as unknown as PhaseCellDeps["missionStore"],
+		tracker: makeStubTracker(),
 		overstoryDir: "/tmp/overstory",
 		projectRoot: "/tmp/p",
 		...(overrides ?? {}),
