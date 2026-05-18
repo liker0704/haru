@@ -2001,5 +2001,15 @@
 		"status": "active",
 		"createdAt": "2026-05-16T17:17:36.746Z",
 		"completedAt": null
+	},
+	{
+		"id": "group-b84f1f37",
+		"name": "haru-leakage-v2-batch1",
+		"memberIssueIds": [
+			"haru-a633"
+		],
+		"status": "active",
+		"createdAt": "2026-05-18T09:59:23.861Z",
+		"completedAt": null
 	}
 ]

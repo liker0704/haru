@@ -1,5 +1,5 @@
 # Overstory configuration
-# See: https://github.com/overstory/overstory
+# See: https://github.com/haru/haru
 
 project:
   name: overstory
@@ -86,3 +86,7 @@ rateLimit:
   pollIntervalMs: 30000
   notifyCoordinator: true
   swapRuntime: null
+pr:
+  enabled: true
+  operatorGithubLogin: liker0704
+  directTierIncludesPr: true
