@@ -291,6 +291,45 @@ describe("evaluateUnderstandReady", () => {
 		const result = evaluateUnderstandReady(mission, mailStore, "2026-04-01T00:00:00.000Z");
 		expect(result.met).toBe(false);
 	});
+
+	it("accepts planning dispatch within 60s grace window before gateEnteredAt", () => {
+		// Race: coordinator sends planning dispatch in the same turn it evaluates
+		// research; the mail can land a few hundred ms BEFORE engine writes
+		// gateEnteredAt for understand-phase:evaluate. A 60s grace window covers
+		// this without permitting arbitrarily stale dispatches to re-trigger.
+		const mission = makeMission({ state: "active", phase: "understand", slug: "test" });
+		const mailStore = createTestMailStore([
+			{
+				from: "coordinator-test",
+				to: "mission-analyst-test",
+				type: "dispatch",
+				subject: "Planning phase: create workstream plan",
+				createdAt: "2026-04-01T00:00:00.000Z",
+			},
+		]);
+		// gateEnteredAt is 19 seconds AFTER the dispatch — within the 60s grace window.
+		const result = evaluateUnderstandReady(mission, mailStore, "2026-04-01T00:00:19.000Z");
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("ready");
+	});
+
+	it("accepts variant subject 'Planning:' (not exactly 'Planning phase')", () => {
+		// Coordinators in the wild send variants like "Planning: baseline gates
+		// already failing" — these should still advance.
+		const mission = makeMission({ state: "active", phase: "understand", slug: "test" });
+		const mailStore = createTestMailStore([
+			{
+				from: "coordinator-test",
+				to: "mission-analyst-test",
+				type: "dispatch",
+				subject: "Planning: baseline gates already failing — scope guidance",
+				createdAt: "2026-04-01T00:01:00.000Z",
+			},
+		]);
+		const result = evaluateUnderstandReady(mission, mailStore, "2026-04-01T00:00:00.000Z");
+		expect(result.met).toBe(true);
+		expect(result.trigger).toBe("ready");
+	});
 });
 
 describe("evaluateArchitectDesign", () => {

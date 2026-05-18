@@ -456,10 +456,27 @@ export function evaluateUnderstandReady(
 
 		// If analyst has been dispatched for planning, understand phase is complete — advance.
 		// The coordinator dispatching planning IS the signal that research has been evaluated.
+		//
+		// Apply a 60s grace window BEFORE gateEnteredAt: the coordinator often sends
+		// the planning dispatch in the same Claude turn as research evaluation, and
+		// that mail can land a few hundred ms BEFORE the engine officially writes
+		// gateEnteredAt for understand-phase:evaluate. Hard-cutoff filtering misses
+		// the dispatch and the gate sits until ceiling. The grace window covers the
+		// race without permitting arbitrarily stale dispatches from previous freeze
+		// cycles to re-trigger advance.
 		const analystName = mission.slug ? `mission-analyst-${mission.slug}` : "mission-analyst";
-		const allMsgs = filterMailSinceGate(mailStore.getAll({ to: analystName }), gateEnteredAt);
+		const graceWindowMs = 60_000;
+		const cutoffMs = gateEnteredAt
+			? new Date(gateEnteredAt).getTime() - graceWindowMs
+			: Number.NEGATIVE_INFINITY;
+		const allMsgs = mailStore
+			.getAll({ to: analystName })
+			.filter((m) => new Date(m.createdAt).getTime() >= cutoffMs);
 		const planningDispatched = allMsgs.find(
-			(m) => m.type === "dispatch" && m.subject?.toLowerCase().includes("planning phase"),
+			(m) =>
+				m.type === "dispatch" &&
+				(m.subject?.toLowerCase().includes("planning phase") ||
+					m.subject?.toLowerCase().startsWith("planning:")),
 		);
 		if (planningDispatched) {
 			return { met: true, trigger: "ready" };
