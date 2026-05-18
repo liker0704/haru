@@ -26,7 +26,6 @@ import {
 import { nodeId } from "../missions/graph.ts";
 import type { SessionStore } from "../sessions/store.ts";
 import type {
-	AgentSession,
 	Mission,
 	MissionGraph,
 	MissionGraphEdge,
@@ -294,10 +293,7 @@ async function checkAndRecoverDeadAgents(mission: Mission, opts: MissionTickOpts
 	for (const { role, sessionId } of getMissionRoleSessions(mission)) {
 		if (!sessionId) continue;
 
-		// Get session from store
-		let session: AgentSession | undefined;
-		const allSessions = sessionStore.getAll();
-		session = allSessions.find((s) => s.id === sessionId);
+		const session = sessionStore.getById(sessionId);
 		if (!session) continue;
 		if (session.state === "completed" || session.state === "zombie" || session.state === "waiting")
 			continue;
@@ -784,20 +780,13 @@ async function processMission(mission: Mission, opts: MissionTickOpts): Promise<
 						const targetSession = opts.sessionStore
 							.getAll()
 							.find((s) => s.agentName === evalResult.nudgeTarget);
-						if (
-							targetSession &&
-							new Date(targetSession.lastActivity).getTime() < lastNudge
-						) {
+						if (targetSession && new Date(targetSession.lastActivity).getTime() < lastNudge) {
 							const tmuxSessions = await (opts._listTmuxSessions ?? listTmuxSessions)();
 							const tmuxAlive = tmuxSessions.some((s) => s.name === targetSession.tmuxSession);
 							if (tmuxAlive) {
 								try {
 									const config = await loadConfig(opts.projectRoot);
-									await (opts._resumeAgent ?? resumeAgent)(
-										targetSession,
-										config,
-										opts.projectRoot,
-									);
+									await (opts._resumeAgent ?? resumeAgent)(targetSession, config, opts.projectRoot);
 									if (opts.eventStore) {
 										opts.eventStore.insert({
 											runId: mission.runId,
