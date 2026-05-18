@@ -356,6 +356,7 @@ describe("SQL schema consistency", () => {
 				"slug",
 				"started_at",
 				"state",
+				"task_id",
 				"tier",
 				"updated_at",
 			].sort();

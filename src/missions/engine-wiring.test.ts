@@ -730,3 +730,147 @@ describe("buildLifecycleHandlers — namespaced handler keys (haru-0f81)", () =>
 		expect(typeof handlers["decide-auto-advance"]).toBe("function");
 	});
 });
+
+// === ws-store-types (haru-2061): resolveBackend DI + startup-cached tracker ===
+
+import type { TrackerClient } from "../tracker/types.ts";
+
+/**
+ * Dynamic-import helper so a missing export (RED phase) only fails the tests
+ * that need it, not the whole file. Static `import { resolveBackend }` would
+ * crash module load and mask every other passing engine-wiring test as a
+ * regression.
+ *
+ * Builder will re-export `resolveBackend` from engine-wiring.ts per the brief
+ * ("engine-wiring.ts ... add resolveBackend(configuredBackend)").
+ */
+type ResolveBackendFn = (
+	backend: "auto" | "seeds" | "beads" | "github",
+	cwd: string,
+	detector?: {
+		hasSujiDir?: (path: string) => Promise<boolean>;
+		hasSeedsDir?: (path: string) => Promise<boolean>;
+		hasBeadsDir?: (path: string) => Promise<boolean>;
+		hasGithubRemote?: (cwd: string) => Promise<boolean>;
+	},
+) => Promise<"seeds" | "beads" | "github">;
+
+async function loadResolveBackend(): Promise<ResolveBackendFn> {
+	const mod = (await import("./engine-wiring.ts")) as unknown as {
+		resolveBackend?: ResolveBackendFn;
+	};
+	if (typeof mod.resolveBackend !== "function") {
+		throw new Error(
+			"resolveBackend is not exported from engine-wiring.ts — RED phase, builder must add it.",
+		);
+	}
+	return mod.resolveBackend;
+}
+
+/**
+ * Local extension shape for the new EngineDeps.tracker field that ws-store-types
+ * adds. The cast keeps this test file compiling against the un-widened
+ * EngineDeps interface during the RED phase. The builder will widen EngineDeps
+ * in engine-wiring.ts.
+ */
+type TrackerExt = { tracker: TrackerClient };
+const withTracker = (d: EngineDeps, t: TrackerClient): EngineDeps & TrackerExt =>
+	({ ...d, tracker: t }) as EngineDeps & TrackerExt;
+
+/** Minimal TrackerClient stub for identity checks. */
+function makeStubTracker(label = ""): TrackerClient {
+	return {
+		ready: async () => [],
+		show: async () => ({ id: label, title: "", status: "", priority: 0, type: "" }),
+		create: async () => "",
+		claim: async () => {},
+		close: async () => {},
+		comment: async () => {},
+		list: async () => [],
+		sync: async () => {},
+	};
+}
+
+describe("resolveBackend — DI test seam (ws-store-types)", () => {
+	test("T-resolve-1: 'auto' resolves to 'seeds' when the injected detector reports a seeds-style dir", async () => {
+		const resolveBackend = await loadResolveBackend();
+		const detector = {
+			hasSujiDir: async () => true,
+			hasSeedsDir: async () => false,
+			hasBeadsDir: async () => false,
+			hasGithubRemote: async () => false,
+		};
+		const backend = await resolveBackend("auto", "/proj", detector);
+		expect(backend).toBe("seeds");
+	});
+
+	test("T-resolve-2: 'auto' resolves to 'beads' when only .beads is present", async () => {
+		const resolveBackend = await loadResolveBackend();
+		const detector = {
+			hasSujiDir: async () => false,
+			hasSeedsDir: async () => false,
+			hasBeadsDir: async () => true,
+			hasGithubRemote: async () => false,
+		};
+		const backend = await resolveBackend("auto", "/proj", detector);
+		expect(backend).toBe("beads");
+	});
+
+	test("T-resolve-3: 'auto' resolves to 'github' when no tracker dir but a github remote exists", async () => {
+		const resolveBackend = await loadResolveBackend();
+		const detector = {
+			hasSujiDir: async () => false,
+			hasSeedsDir: async () => false,
+			hasBeadsDir: async () => false,
+			hasGithubRemote: async () => true,
+		};
+		const backend = await resolveBackend("auto", "/proj", detector);
+		expect(backend).toBe("github");
+	});
+
+	test("T-resolve-4: explicit backend values bypass the detector (pass-through)", async () => {
+		const resolveBackend = await loadResolveBackend();
+		const detector = {
+			hasSujiDir: async () => false,
+			hasSeedsDir: async () => false,
+			hasBeadsDir: async () => false,
+			hasGithubRemote: async () => false,
+		};
+		expect(await resolveBackend("seeds", "/proj", detector)).toBe("seeds");
+		expect(await resolveBackend("beads", "/proj", detector)).toBe("beads");
+		expect(await resolveBackend("github", "/proj", detector)).toBe("github");
+	});
+});
+
+describe("EngineDeps.tracker — startup-cached identity (ws-store-types)", () => {
+	test("T-tracker-1: when EngineDeps.tracker is populated, callers receive that exact instance", () => {
+		const stub = makeStubTracker("startup-singleton");
+		const deps = withTracker(makeDeps(), stub);
+		expect(deps.tracker).toBe(stub);
+	});
+
+	test("T-tracker-2: tracker instance is preserved across reads (no per-read reconstruction)", () => {
+		const stub = makeStubTracker("singleton");
+		const deps = withTracker(makeDeps(), stub);
+		const read1 = deps.tracker;
+		const read2 = deps.tracker;
+		expect(read1).toBe(read2);
+		expect(read1).toBe(stub);
+	});
+
+	test("T-tracker-3: EngineDeps interface declares tracker: TrackerClient (ws-store-types brief item 8)", async () => {
+		// Static-source guard: the builder must widen EngineDeps with a
+		// REQUIRED `tracker: TrackerClient` field. Until that lands, the
+		// engine-wiring.ts source will not contain that declaration.
+		// Using a source-text scan keeps this test stable regardless of how
+		// the builder formats the field (single-line / multi-line / commented).
+		const source = await Bun.file("src/missions/engine-wiring.ts").text();
+		// Anchor inside the EngineDeps interface body to avoid false matches on
+		// the import alias.
+		const ifaceStart = source.indexOf("interface EngineDeps");
+		expect(ifaceStart).toBeGreaterThan(-1);
+		const ifaceEnd = source.indexOf("}", ifaceStart);
+		const ifaceBody = source.slice(ifaceStart, ifaceEnd);
+		expect(ifaceBody).toMatch(/tracker\s*:\s*TrackerClient/);
+	});
+});

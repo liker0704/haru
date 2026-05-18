@@ -518,3 +518,131 @@ describe("createSeedsTracker — edge cases", () => {
 		expect(opts.cwd).toBe(customCwd);
 	});
 });
+
+// === ws-store-types (haru-2061): subprocess timeout owned by adapter (D-11) ===
+
+/**
+ * The builder will:
+ *   1. Add `TrackerTimeoutError` (extends OverstoryError, code === "TRACKER_TIMEOUT")
+ *      as a named export from `src/tracker/seeds.ts`.
+ *   2. Add a `timeoutMs?: number` (default 30_000) parameter to the internal
+ *      `runSd` helper. Inside, pass `{ timeout: timeoutMs, killSignal: "SIGKILL" }`
+ *      into `Bun.spawn`.
+ *   3. On timeout (`proc.exitCode === null` after `await proc.exited`), throw
+ *      `TrackerTimeoutError` instead of the generic `AgentError`.
+ *
+ * Dynamic import so a missing export only fails ws-store-types tests, not the
+ * whole seeds.test.ts file (a static `import { TrackerTimeoutError }` would
+ * crash module load and mark every existing seeds test as broken).
+ */
+import { OverstoryError } from "../errors.ts";
+
+type TrackerTimeoutErrorCtor = new (message: string) => Error & { code: string };
+
+async function loadTrackerTimeoutError(): Promise<TrackerTimeoutErrorCtor> {
+	const mod = (await import("./seeds.ts")) as unknown as {
+		TrackerTimeoutError?: TrackerTimeoutErrorCtor;
+	};
+	if (typeof mod.TrackerTimeoutError !== "function") {
+		throw new Error(
+			"TrackerTimeoutError is not exported from src/tracker/seeds.ts — RED phase, builder must add it.",
+		);
+	}
+	return mod.TrackerTimeoutError;
+}
+
+describe("TrackerTimeoutError (ws-store-types — D-11)", () => {
+	test("T-tte-1: is exported from src/tracker/seeds.ts", async () => {
+		const TrackerTimeoutError = await loadTrackerTimeoutError();
+		expect(TrackerTimeoutError).toBeDefined();
+		expect(typeof TrackerTimeoutError).toBe("function");
+	});
+
+	test("T-tte-2: extends OverstoryError with code === 'TRACKER_TIMEOUT'", async () => {
+		const TrackerTimeoutError = await loadTrackerTimeoutError();
+		const err = new TrackerTimeoutError("timed out");
+		expect(err).toBeInstanceOf(OverstoryError);
+		expect(err).toBeInstanceOf(Error);
+		expect(err.code).toBe("TRACKER_TIMEOUT");
+	});
+});
+
+describe("runSd timeout (ws-store-types — D-11)", () => {
+	let spawnSpy: ReturnType<typeof spyOn>;
+
+	beforeEach(() => {
+		spawnSpy = spyOn(Bun, "spawn");
+	});
+
+	afterEach(() => {
+		spawnSpy.mockRestore();
+	});
+
+	/**
+	 * Simulate Bun.spawn's timeout behavior: when a process is killed because
+	 * its timeout option expired, `proc.exitCode` is null (it never exited
+	 * normally) and `proc.signalCode` is set. We model that here by resolving
+	 * `exited` with a non-zero code AND producing the captured spawn options
+	 * so the test can inspect `{ timeout, killSignal }`.
+	 */
+	function mockTimedOutSpawn(): {
+		stdout: ReadableStream<Uint8Array>;
+		stderr: ReadableStream<Uint8Array>;
+		exited: Promise<number>;
+		pid: number;
+		exitCode: number | null;
+		signalCode: string | null;
+		kill: () => void;
+	} {
+		return {
+			stdout: new Response("").body as ReadableStream<Uint8Array>,
+			stderr: new Response("").body as ReadableStream<Uint8Array>,
+			// Bun.spawn with timeout sets exitCode=null + signalCode="SIGKILL"
+			// after killing the child. We surface that state via the awaited
+			// value so the wrapper can detect "killed by timeout".
+			exited: Promise.resolve(143), // 128 + 15 (SIGTERM-ish) — irrelevant; gate is exitCode === null
+			pid: 99999,
+			exitCode: null,
+			signalCode: "SIGKILL",
+			kill: () => {},
+		};
+	}
+
+	test("T-runSd-1: timeoutMs option is forwarded into Bun.spawn as {timeout, killSignal:'SIGKILL'}", async () => {
+		// Capture the spawn options. We don't need the call to succeed — only
+		// to be invoked with the right shape.
+		const envelope = { success: true, command: "ready", issues: [] };
+		spawnSpy.mockImplementation(() => mockSpawnResult(JSON.stringify(envelope), "", 0));
+
+		// Builder will route options through the public seeds API. The contract
+		// under test is: when an adapter call is made, Bun.spawn receives a
+		// timeout + killSignal in its second argument.
+		const tracker = createSeedsTracker(TEST_CWD);
+		await tracker.ready();
+
+		const callArgs = spawnSpy.mock.calls[0] as unknown[];
+		const opts = callArgs[1] as { timeout?: number; killSignal?: string };
+		// Default timeout is 30s per spec line 96 of the workstream brief.
+		expect(typeof opts.timeout).toBe("number");
+		expect(opts.timeout).toBeGreaterThan(0);
+		expect(opts.killSignal).toBe("SIGKILL");
+	});
+
+	test("T-runSd-2: when subprocess is killed by timeout, the call rejects with TrackerTimeoutError", async () => {
+		const TrackerTimeoutError = await loadTrackerTimeoutError();
+		// Simulate a subprocess that gets killed by Bun's timeout option.
+		// biome-ignore lint/suspicious/noExplicitAny: shape mismatch fine for mock
+		spawnSpy.mockImplementation(() => mockTimedOutSpawn() as any);
+
+		const tracker = createSeedsTracker(TEST_CWD);
+		await expect(tracker.ready()).rejects.toBeInstanceOf(TrackerTimeoutError);
+	});
+
+	test("T-runSd-3: normal completion is unchanged when no timeout fires", async () => {
+		const envelope = { success: true, command: "ready", issues: [] };
+		spawnSpy.mockImplementation(() => mockSpawnResult(JSON.stringify(envelope), "", 0));
+
+		const tracker = createSeedsTracker(TEST_CWD);
+		await expect(tracker.ready()).resolves.toEqual([]);
+	});
+});

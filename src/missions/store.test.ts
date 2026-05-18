@@ -1526,3 +1526,205 @@ describe("MissionStore parent-mission accessors (w8)", () => {
 		expect(m?.state).toBe("superseded" as never);
 	});
 });
+
+// === ws-store-types (haru-2061): migration v17 task_id column + setTaskId ===
+
+/**
+ * Local extension shape for the setTaskId accessor that ws-store-types adds.
+ * The cast keeps this test compiling against the un-widened MissionStore
+ * interface during the RED phase. Builder widens MissionStore in
+ * src/missions/types.ts and the projection in src/missions/store.ts:rowToMission.
+ */
+type TaskIdExt = {
+	setTaskId(missionId: string, taskId: string | null): void;
+};
+const tidExt = (s: MissionStore): MissionStore & TaskIdExt => s as MissionStore & TaskIdExt;
+
+describe("migration v17: task_id column on missions", () => {
+	test("T-v17-1: task_id column exists after migration", () => {
+		const probe = new Database(dbPath);
+		const cols = probe.prepare("PRAGMA table_info(missions)").all() as Array<{
+			name: string;
+			type: string;
+			notnull: number;
+			dflt_value: string | null;
+		}>;
+		const taskIdCol = cols.find((c) => c.name === "task_id");
+		expect(taskIdCol).toBeDefined();
+		// Spec: nullable TEXT, no NOT NULL — sentinel handling lives in app code.
+		expect(taskIdCol?.notnull).toBe(0);
+		expect(taskIdCol?.type.toUpperCase()).toBe("TEXT");
+		probe.close();
+	});
+
+	test("T-v17-2: CHECK rejects task_id length > 64", () => {
+		// Guard: this test is meaningless unless the column actually exists.
+		// Pre-asserting column presence makes the test RED on the missing-column
+		// path (which would otherwise false-green via "no such column" throw)
+		// and meaningful once the builder adds the column WITHOUT a CHECK.
+		const probe = new Database(dbPath);
+		const cols = probe.prepare("PRAGMA table_info(missions)").all() as Array<{
+			name: string;
+		}>;
+		probe.close();
+		expect(cols.find((c) => c.name === "task_id")).toBeDefined();
+
+		store.create(makeMission());
+		const raw = new Database(dbPath);
+		try {
+			const tooLong = "x".repeat(65);
+			expect(() =>
+				raw.exec(`UPDATE missions SET task_id = '${tooLong}' WHERE id = 'mission-001'`),
+			).toThrow();
+		} finally {
+			raw.close();
+		}
+	});
+
+	test("T-v17-3: CHECK accepts task_id length <= 64", () => {
+		store.create(makeMission());
+		const raw = new Database(dbPath);
+		try {
+			const justRight = "x".repeat(64);
+			expect(() =>
+				raw.exec(`UPDATE missions SET task_id = '${justRight}' WHERE id = 'mission-001'`),
+			).not.toThrow();
+		} finally {
+			raw.close();
+		}
+	});
+
+	test("T-v17-4: CHECK accepts task_id NULL (column is nullable)", () => {
+		store.create(makeMission());
+		const raw = new Database(dbPath);
+		try {
+			expect(() =>
+				raw.exec("UPDATE missions SET task_id = NULL WHERE id = 'mission-001'"),
+			).not.toThrow();
+		} finally {
+			raw.close();
+		}
+	});
+
+	test("T-v17-5: migration v17 is idempotent — re-running on an up-to-date DB is a no-op", () => {
+		// Sanity check: the column is already present after beforeEach setup.
+		const beforeCols = new Database(dbPath).prepare("PRAGMA table_info(missions)").all() as Array<{
+			name: string;
+		}>;
+		expect(beforeCols.find((c) => c.name === "task_id")).toBeDefined();
+
+		// Close + re-open the store, which re-runs ensureMigrations against an
+		// already-migrated DB. v17's `up` is guarded by `hasColumn` + the
+		// migration framework's `detect`, so this must not throw and must not
+		// duplicate the column.
+		store.close();
+		expect(() => {
+			store = createMissionStore(dbPath);
+		}).not.toThrow();
+
+		const afterCols = new Database(dbPath).prepare("PRAGMA table_info(missions)").all() as Array<{
+			name: string;
+		}>;
+		const taskIdCols = afterCols.filter((c) => c.name === "task_id");
+		expect(taskIdCols).toHaveLength(1);
+	});
+});
+
+describe("setTaskId round-trip (ws-store-types)", () => {
+	test("T-setTaskId-1: setTaskId persists task_id; mission.taskId reads back the same value", () => {
+		store.create(makeMission({ id: "mission-tid", slug: "tid-slug" }));
+
+		tidExt(store).setTaskId("mission-tid", "haru-db98");
+
+		const m = store.getById("mission-tid") as unknown as {
+			taskId: string | null;
+		} | null;
+		expect(m).not.toBeNull();
+		expect(m?.taskId).toBe("haru-db98");
+	});
+
+	test("T-setTaskId-2: Mission.taskId is null by default (when never set)", () => {
+		store.create(makeMission({ id: "mission-tid-null", slug: "tid-null" }));
+		const m = store.getById("mission-tid-null") as unknown as {
+			taskId: string | null;
+		} | null;
+		expect(m?.taskId).toBeNull();
+	});
+
+	test("T-setTaskId-3: setTaskId(id, null) clears task_id", () => {
+		store.create(makeMission({ id: "mission-tid-clear", slug: "tid-clear" }));
+		tidExt(store).setTaskId("mission-tid-clear", "haru-db98");
+		tidExt(store).setTaskId("mission-tid-clear", null);
+
+		const m = store.getById("mission-tid-clear") as unknown as {
+			taskId: string | null;
+		} | null;
+		expect(m?.taskId).toBeNull();
+	});
+});
+
+describe("v14 / v16 rebuild column-list literals — da-risk-11 regression guard", () => {
+	test("T-da-risk-11-1: v14 rebuildTable columns array does NOT contain 'task_id' (would brick legacy DBs)", async () => {
+		// Static-string scan: walk the on-disk source of store.ts and find the
+		// v14 rebuildTable column-list literal. If the builder accidentally adds
+		// "task_id" to it, the SELECT inside rebuildTable on a user_version < 14
+		// database (where the column does not exist yet) aborts the entire
+		// migration chain. da-risk-11 documents the failure mode.
+		const source = await Bun.file("src/missions/store.ts").text();
+
+		// Anchor on the version: 14 marker, then capture the next rebuildTable
+		// columns array.
+		const v14Idx = source.indexOf("version: 14");
+		expect(v14Idx).toBeGreaterThan(-1);
+		const v15Idx = source.indexOf("version: 15", v14Idx);
+		expect(v15Idx).toBeGreaterThan(v14Idx);
+
+		const v14Body = source.slice(v14Idx, v15Idx);
+		// Extract just the columns array of any rebuildTable inside v14's body.
+		const columnsMatch = v14Body.match(/columns:\s*\[[\s\S]*?\]/);
+		expect(columnsMatch).not.toBeNull();
+		const columnsLiteral = columnsMatch?.[0] ?? "";
+		expect(columnsLiteral).not.toContain('"task_id"');
+		expect(columnsLiteral).not.toContain("'task_id'");
+	});
+
+	test("T-da-risk-11-2: v16 rebuildTable columns array does NOT contain 'task_id' (would brick legacy DBs)", async () => {
+		const source = await Bun.file("src/missions/store.ts").text();
+
+		const v16Idx = source.indexOf("version: 16");
+		expect(v16Idx).toBeGreaterThan(-1);
+		// v17 should land after v16 once the builder adds it; anchor on
+		// MISSION_MIGRATIONS terminator if v17 marker isn't present yet to
+		// keep this test stable across the builder's incremental commits.
+		let endIdx = source.indexOf("version: 17", v16Idx);
+		if (endIdx === -1) endIdx = source.length;
+
+		const v16Body = source.slice(v16Idx, endIdx);
+		const columnsMatch = v16Body.match(/columns:\s*\[[\s\S]*?\]/);
+		expect(columnsMatch).not.toBeNull();
+		const columnsLiteral = columnsMatch?.[0] ?? "";
+		expect(columnsLiteral).not.toContain('"task_id"');
+		expect(columnsLiteral).not.toContain("'task_id'");
+	});
+});
+
+describe("REQUIRED_MISSION_COLUMNS regression guard (ws-store-types)", () => {
+	test("T-RMC-1: REQUIRED_MISSION_COLUMNS includes 'task_id'", async () => {
+		// REQUIRED_MISSION_COLUMNS is a private const inside store.ts; the
+		// builder either exports it or leaves it private. Either way, the
+		// canonical source of truth is the source file, so we scan it.
+		const source = await Bun.file("src/missions/store.ts").text();
+
+		const declIdx = source.indexOf("REQUIRED_MISSION_COLUMNS");
+		expect(declIdx).toBeGreaterThan(-1);
+
+		// Find the array literal opening bracket after the declaration.
+		const arrStart = source.indexOf("[", declIdx);
+		const arrEnd = source.indexOf("]", arrStart);
+		expect(arrStart).toBeGreaterThan(-1);
+		expect(arrEnd).toBeGreaterThan(arrStart);
+
+		const arrLiteral = source.slice(arrStart, arrEnd + 1);
+		expect(arrLiteral).toContain('"task_id"');
+	});
+});
