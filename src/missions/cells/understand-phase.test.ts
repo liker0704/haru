@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import type { TrackerClient } from "../../tracker/types.ts";
 import { validateGraph } from "../graph.ts";
 import { createMockCheckpointStore, createMockMissionStore } from "../test-mocks.ts";
 import type { PhaseCellConfig, PhaseCellDeps } from "./types.ts";
@@ -10,11 +11,26 @@ const config: PhaseCellConfig = {
 	projectRoot: "/tmp/project",
 };
 
+/** No-op TrackerClient stub — REQUIRED on PhaseCellDeps after ws-store-types lands. */
+function makeStubTracker(): TrackerClient {
+	return {
+		ready: async () => [],
+		show: async () => ({ id: "", title: "", status: "", priority: 0, type: "" }),
+		create: async () => "",
+		claim: async () => {},
+		close: async () => {},
+		comment: async () => {},
+		list: async () => [],
+		sync: async () => {},
+	};
+}
+
 function makeDeps(): PhaseCellDeps {
 	return {
 		mailSend: async () => {},
 		checkpointStore: createMockCheckpointStore(),
 		missionStore: createMockMissionStore(),
+		tracker: makeStubTracker(),
 	};
 }
 

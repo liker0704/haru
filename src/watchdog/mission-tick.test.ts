@@ -1250,3 +1250,142 @@ describe("runMissionTick", () => {
 		});
 	});
 });
+
+// === ws-store-types (haru-2061): tracker threading + sync execution ===
+
+import type { EngineDeps } from "../missions/engine-wiring.ts";
+import type { TrackerClient } from "../tracker/types.ts";
+
+/**
+ * Local extension shape for the new EngineDeps.tracker field that ws-store-types
+ * adds. RED until the builder widens EngineDeps and runMissionTick passes the
+ * startup tracker through the cell-deps factory.
+ */
+type EngineDepsWithTracker = EngineDeps & { tracker: TrackerClient };
+
+function makeStubTracker(label = "stub"): TrackerClient {
+	return {
+		ready: async () => [],
+		show: async () => ({ id: label, title: "", status: "", priority: 0, type: "" }),
+		create: async () => "",
+		claim: async () => {},
+		close: async () => {},
+		comment: async () => {},
+		list: async () => [],
+		sync: async () => {},
+	};
+}
+
+describe("runMissionTick — engineDeps.tracker threading (ws-store-types)", () => {
+	test("T-tick-tracker-1: engineDeps.tracker is forwarded unchanged into the engine factory deps", async () => {
+		missionStore.create({
+			id: "m-thread",
+			slug: "thread-mission",
+			objective: "test",
+			tier: "full",
+		});
+		missionStore.updateCurrentNode("m-thread", "understand:active");
+
+		const injected = makeStubTracker("injected-singleton");
+		const capturedDeps: EngineDepsWithTracker[] = [];
+		const engineFactory: MissionTickOpts["_startEngine"] = (_mission, deps, _opts) => {
+			// Cast through unknown for the RED phase — builder widens EngineDeps.
+			capturedDeps.push(deps as unknown as EngineDepsWithTracker);
+			return {
+				currentNodeId: () => "understand:active",
+				step: async () => ({
+					status: "terminal" as const,
+					fromNodeId: "understand:active",
+					toNodeId: "done:completed",
+					trigger: "complete",
+				}),
+				run: async () => ({
+					status: "completed" as const,
+					steps: [],
+					currentNodeId: "done:completed",
+				}),
+				advanceNode: async () => ({
+					status: "completed" as const,
+					steps: [],
+					currentNodeId: "done:completed",
+				}),
+				forceAdvance: async () => ({
+					status: "terminal" as const,
+					fromNodeId: "understand:active",
+					toNodeId: "done:completed",
+					trigger: "complete",
+				}),
+			};
+		};
+
+		// Inject the tracker via the new MissionTickOpts seam the builder adds.
+		// Until then this property is unknown to TS — cast through unknown.
+		const opts = {
+			...makeOpts(overstoryDir, missionStore, sessionStore, engineFactory),
+			tracker: injected,
+		} as unknown as MissionTickOpts;
+
+		await runMissionTick(opts);
+
+		expect(capturedDeps).toHaveLength(1);
+		// Identity check — must be the SAME instance, not a re-construction.
+		expect(capturedDeps[0]?.tracker).toBe(injected);
+	});
+
+	test("T-tick-tracker-2: tracker instance identity is preserved across multiple ticks (no per-tick reconstruction)", async () => {
+		missionStore.create({
+			id: "m-thread-2",
+			slug: "thread-mission-2",
+			objective: "test",
+			tier: "full",
+		});
+		missionStore.updateCurrentNode("m-thread-2", "understand:active");
+
+		const injected = makeStubTracker("singleton-across-ticks");
+		const capturedDeps: EngineDepsWithTracker[] = [];
+		const engineFactory: MissionTickOpts["_startEngine"] = (_m, deps, _o) => {
+			capturedDeps.push(deps as unknown as EngineDepsWithTracker);
+			return makeEngineReturning({
+				status: "gate",
+				fromNodeId: "understand:active",
+				toNodeId: "understand:active",
+				trigger: null,
+			});
+		};
+
+		const opts = {
+			...makeOpts(overstoryDir, missionStore, sessionStore, engineFactory),
+			tracker: injected,
+		} as unknown as MissionTickOpts;
+
+		await runMissionTick(opts);
+		// Release the lock so the second tick can also exercise the path.
+		missionStore.releaseTickLock("m-thread-2");
+		await runMissionTick(opts);
+
+		expect(capturedDeps.length).toBeGreaterThanOrEqual(2);
+		// Each captured deps.tracker is the same instance — not reconstructed
+		// per tick.
+		for (const deps of capturedDeps) {
+			expect(deps.tracker).toBe(injected);
+		}
+	});
+});
+
+describe("runMissionTick — buildLifecycleHandlers stays synchronous (ws-store-types D-1)", () => {
+	test("T-tick-sync-1: tick path does not introduce an await around buildLifecycleHandlers (sync signature preserved)", async () => {
+		// Source-text static check — the simplest way to prevent a regression
+		// where someone makes buildLifecycleHandlers async. Per D-1, it MUST
+		// remain a synchronous call inside the tick path so the tick budget
+		// is not blown by per-tick I/O.
+		const source = await Bun.file("src/watchdog/mission-tick.ts").text();
+
+		// All call sites of buildLifecycleHandlers inside mission-tick.ts must
+		// be synchronous (no `await buildLifecycleHandlers(...)`).
+		expect(source).not.toMatch(/await\s+buildLifecycleHandlers\s*\(/);
+
+		// Sanity: the call site itself still exists (we are looking at the
+		// right symbol).
+		expect(source).toContain("buildLifecycleHandlers(");
+	});
+});
