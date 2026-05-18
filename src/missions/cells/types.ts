@@ -3,6 +3,7 @@
  */
 
 import type { SessionStore } from "../../sessions/store.ts";
+import type { TrackerClient } from "../../tracker/types.ts";
 import type {
 	CheckpointStore,
 	MissionGraph,
@@ -10,7 +11,6 @@ import type {
 	MissionTier,
 	PlanReviewTier,
 } from "../../types.ts";
-import type { TrackerClient } from "../../tracker/types.ts";
 import type { HandlerRegistry } from "../types.ts";
 
 // === Review cell types (plan-review, architecture-review) ===
