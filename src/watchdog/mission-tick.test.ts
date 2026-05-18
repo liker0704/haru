@@ -1168,4 +1168,85 @@ describe("runMissionTick", () => {
 		// No nudge should fire while within grace.
 		expect(nudgeCalls).toHaveLength(0);
 	});
+
+	describe("checkAndRecoverDeadAgents — query pattern", () => {
+		function makeGateEngine(): MissionTickOpts["_startEngine"] {
+			return () =>
+				makeEngineReturning({
+					status: "gate",
+					fromNodeId: "understand:await-plan",
+					toNodeId: "understand:await-plan",
+					trigger: null,
+				});
+		}
+
+		test("uses getById per non-null role session, getAll not called from dead-agent path", async () => {
+			// All 4 role sessions bound; state "waiting" so dead-agent path calls getById then
+			// short-circuits at the state filter without invoking health eval or tmux.
+			// Worktrees deliberately absent: resume path also exits at existsSync check.
+			sessionStore.upsert(
+				makeSession({
+					id: "sess-qp-1",
+					agentName: "coord-qp",
+					worktreePath: join(overstoryDir, "no-wt"),
+				}),
+			);
+			sessionStore.upsert(
+				makeSession({
+					id: "sess-qp-2",
+					agentName: "analyst-qp",
+					worktreePath: join(overstoryDir, "no-wt"),
+				}),
+			);
+			sessionStore.upsert(
+				makeSession({
+					id: "sess-qp-3",
+					agentName: "execdir-qp",
+					worktreePath: join(overstoryDir, "no-wt"),
+				}),
+			);
+			sessionStore.upsert(
+				makeSession({
+					id: "sess-qp-4",
+					agentName: "arch-qp",
+					worktreePath: join(overstoryDir, "no-wt"),
+				}),
+			);
+
+			missionStore.create({ id: "m-qp", slug: "qp-mission", objective: "test" });
+			missionStore.updateCurrentNode("m-qp", "understand:await-plan");
+			missionStore.bindSessions("m-qp", {
+				coordinatorSessionId: "sess-qp-1",
+				analystSessionId: "sess-qp-2",
+				executionDirectorSessionId: "sess-qp-3",
+				architectSessionId: "sess-qp-4",
+			});
+
+			let getAllCount = 0;
+			let getByIdCount = 0;
+			const wrapped: SessionStore = {
+				...sessionStore,
+				getAll: () => {
+					getAllCount++;
+					return sessionStore.getAll();
+				},
+				getById: (id: string) => {
+					getByIdCount++;
+					return sessionStore.getById(id);
+				},
+			};
+
+			await runMissionTick(
+				makeOpts(overstoryDir, missionStore, wrapped, makeGateEngine(), {
+					_listTmuxSessions: async () => [],
+				}),
+			);
+
+			// checkAndResumeWaitingAgents (not yet fixed, still uses getAll) calls it once per
+			// non-null session ID — 4 calls total. The dead-agent path must add 0 more.
+			expect(getAllCount).toBe(4);
+			// checkAndRecoverDeadAgents must call getById exactly once per non-null role session.
+			expect(getByIdCount).toBe(4);
+		});
+	});
 });
