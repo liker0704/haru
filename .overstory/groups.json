@@ -2021,5 +2021,16 @@
 		"status": "active",
 		"createdAt": "2026-05-18T10:37:18.236Z",
 		"completedAt": null
+	},
+	{
+		"id": "group-c59d73f7",
+		"name": "db98-batch-1-foundation",
+		"memberIssueIds": [
+			"haru-2061",
+			"haru-17be"
+		],
+		"status": "active",
+		"createdAt": "2026-05-18T17:42:23.394Z",
+		"completedAt": null
 	}
 ]
