@@ -439,7 +439,10 @@ async function processMission(mission: Mission, opts: MissionTickOpts): Promise<
 		overstoryDir: opts.overstoryDir,
 		projectRoot: opts.projectRoot,
 	};
-	const tickGraph = buildLifecycleGraph(mission);
+	// Pass config so getTierPhases honors pr.enabled / pr.directTierIncludesPr.
+	// Without this the graph falls back to deprecated TIER_PHASES and direct-tier
+	// missions skip pr-phase even when the operator opted in via config.
+	const tickGraph = buildLifecycleGraph(mission, opts.config);
 	const tickHandlers = buildLifecycleHandlers(engineDeps, tier);
 
 	// Read mission once — reused for subgraph detection and later as freshMission
