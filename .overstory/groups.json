@@ -2011,5 +2011,15 @@
 		"status": "active",
 		"createdAt": "2026-05-18T09:59:23.861Z",
 		"completedAt": null
+	},
+	{
+		"id": "group-7a79c705",
+		"name": "fix-e0d6-perf-batch",
+		"memberIssueIds": [
+			"overstory-e0d6"
+		],
+		"status": "active",
+		"createdAt": "2026-05-18T10:37:18.236Z",
+		"completedAt": null
 	}
 ]
