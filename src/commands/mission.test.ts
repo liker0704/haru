@@ -266,6 +266,7 @@ describe("missionStart concurrency guard", () => {
 	let guardOverstoryDir: string;
 	let originalStdout: typeof process.stdout.write;
 	let originalStderr: typeof process.stderr.write;
+	let originalDisableWatchdog: string | undefined;
 
 	beforeEach(async () => {
 		guardDir = await mkdtemp(join(tmpdir(), "mission-guard-test-"));
@@ -280,12 +281,21 @@ describe("missionStart concurrency guard", () => {
 		originalStderr = process.stderr.write;
 		process.stdout.write = (() => true) as typeof process.stdout.write;
 		process.stderr.write = (() => true) as typeof process.stderr.write;
+		// Prevent missionStart auto-spawning watchdog daemons that leak past
+		// cleanupTempDir (detached children get reparented to systemd).
+		originalDisableWatchdog = process.env.HARU_DISABLE_WATCHDOG_AUTO_START;
+		process.env.HARU_DISABLE_WATCHDOG_AUTO_START = "1";
 	});
 
 	afterEach(async () => {
 		process.exitCode = 0;
 		process.stdout.write = originalStdout;
 		process.stderr.write = originalStderr;
+		if (originalDisableWatchdog === undefined) {
+			delete process.env.HARU_DISABLE_WATCHDOG_AUTO_START;
+		} else {
+			process.env.HARU_DISABLE_WATCHDOG_AUTO_START = originalDisableWatchdog;
+		}
 		await cleanupTempDir(guardDir);
 	});
 

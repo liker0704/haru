@@ -221,6 +221,15 @@ export function createWatchdogControl(
 
 	return {
 		async start(): Promise<{ pid: number } | null> {
+			// Test-isolation guard: callers that don't want auto-spawn (notably tests
+			// transitively invoking missionStart/coordinator/sling, whose detached
+			// daemon child gets reparented to systemd and survives `cleanupTempDir`,
+			// accumulating leaked `bun run … watch` processes) opt out by setting
+			// HARU_DISABLE_WATCHDOG_AUTO_START=1.
+			if (process.env.HARU_DISABLE_WATCHDOG_AUTO_START === "1") {
+				return null;
+			}
+
 			// Ensure state/ exists before we try to open the stderr log
 			mkdirSync(stateDir, { recursive: true });
 
