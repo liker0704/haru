@@ -17,6 +17,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { StartPersistentAgentResult } from "../agents/persistent-root.ts";
 import { buildAgentManifest } from "../commands/init.ts";
+import { openSessionStore } from "../sessions/compat.ts";
 import { missionResumeAll, missionStart } from "./lifecycle-start.ts";
 import type { MissionCommandDeps } from "./lifecycle-types.ts";
 import { createMissionStore } from "./store.ts";
@@ -349,12 +350,7 @@ describe("missionResumeAll", () => {
 			const stale = new Date(Date.now() - 3900_000).toISOString();
 			rawDb.run(
 				"INSERT INTO mission_gate_state (mission_id, node_id, entered_at, nudge_count, last_nudge_at, respawn_count, last_respawn_at, grace_ms, nudge_interval_ms, max_nudges, max_total_wait_ms, resolved_at, resolved_trigger, ceiling_emitted_at) VALUES (?, ?, ?, 0, NULL, 0, NULL, 120000, 60000, 3, 3600000, NULL, NULL, ?)",
-				[
-					"mission-gate-reset-test",
-					"understand-phase:evaluate",
-					stale,
-					stale,
-				],
+				["mission-gate-reset-test", "understand-phase:evaluate", stale, stale],
 			);
 		} finally {
 			rawDb.close();
@@ -392,6 +388,283 @@ describe("missionResumeAll", () => {
 		} finally {
 			verifyStore.close();
 		}
+	});
+
+	test("OOM recovery — all sessions completed → resume restarts all 3 roles and warns OOM", async () => {
+		const missionId = "mission-oom-test";
+		const runId = "run-oom-test";
+		const now = new Date().toISOString();
+
+		// Seed a suspended full-tier execute-phase mission
+		const store = createMissionStore(join(overstoryDir, "sessions.db"));
+		try {
+			store.create({
+				id: missionId,
+				slug: "oom-test",
+				objective: "verify OOM recovery",
+				runId,
+				artifactRoot: join(overstoryDir, "missions", missionId),
+				tier: "full",
+			});
+			store.updateState(missionId, "suspended");
+			store.updatePhase(missionId, "execute");
+		} finally {
+			store.close();
+		}
+
+		// Insert 3 completed sessions (simulates post-OOM state)
+		const { store: sessionStore } = openSessionStore(overstoryDir);
+		try {
+			const base = {
+				capability: "test",
+				runtime: "claude",
+				worktreePath: "/tmp",
+				branchName: "main",
+				taskId: "",
+				tmuxSession: "ha-oom",
+				pid: null,
+				parentAgent: null,
+				depth: 0,
+				runId,
+				startedAt: now,
+				lastActivity: now,
+				escalationLevel: 0,
+				stalledSince: null,
+				rateLimitedSince: null,
+				runtimeSessionId: null,
+				transcriptPath: null,
+				originalRuntime: null,
+				statusLine: null,
+			};
+			sessionStore.upsert({
+				...base,
+				id: "sess-coord-oom",
+				agentName: "coordinator-oom-test",
+				state: "completed",
+				tmuxSession: "ha-coord-oom",
+			});
+			sessionStore.upsert({
+				...base,
+				id: "sess-analyst-oom",
+				agentName: "mission-analyst-oom-test",
+				state: "completed",
+				tmuxSession: "ha-analyst-oom",
+			});
+			sessionStore.upsert({
+				...base,
+				id: "sess-ed-oom",
+				agentName: "execution-director-oom-test",
+				state: "completed",
+				tmuxSession: "ha-ed-oom",
+			});
+		} finally {
+			sessionStore.close();
+		}
+
+		let coordCalled = 0;
+		let analystCalled = 0;
+		let edCalled = 0;
+		const deps = {
+			startMissionCoordinator: async (_opts: unknown) => {
+				coordCalled++;
+				return makeRoleStub("coord-new")(_opts);
+			},
+			startMissionAnalyst: async (_opts: unknown) => {
+				analystCalled++;
+				return makeRoleStub("analyst-new")(_opts);
+			},
+			startExecutionDirector: async (_opts: unknown) => {
+				edCalled++;
+				return makeRoleStub("ed-new")(_opts);
+			},
+		} as unknown as MissionCommandDeps;
+
+		let captured = "";
+		const origWrite = process.stdout.write;
+		process.stdout.write = ((chunk: string | Uint8Array) => {
+			captured += typeof chunk === "string" ? chunk : new TextDecoder().decode(chunk);
+			return true;
+		}) as typeof process.stdout.write;
+
+		process.exitCode = 0;
+		try {
+			await missionResumeAll(overstoryDir, projectRoot, false, missionId, deps);
+		} finally {
+			process.stdout.write = origWrite;
+		}
+
+		expect(process.exitCode).toBe(0);
+		expect(captured).toMatch(/OOM|all.*completed|completed.*OOM/i);
+		expect(coordCalled).toBe(1);
+		expect(analystCalled).toBe(1);
+		expect(edCalled).toBe(1);
+
+		// Verify ED session was bound on the mission
+		const verify = createMissionStore(join(overstoryDir, "sessions.db"));
+		try {
+			const m = verify.getById(missionId);
+			expect(m?.executionDirectorSessionId).toBe("ed-new");
+		} finally {
+			verify.close();
+		}
+
+		process.exitCode = 0;
+	});
+
+	test("ED restart for execute phase — full tier + execute phase → startExecutionDirector invoked", async () => {
+		const missionId = "mission-ed-execute";
+		const runId = "run-ed-execute";
+
+		const store = createMissionStore(join(overstoryDir, "sessions.db"));
+		try {
+			store.create({
+				id: missionId,
+				slug: "ed-execute",
+				objective: "verify ED restart for execute",
+				runId,
+				artifactRoot: join(overstoryDir, "missions", missionId),
+				tier: "full",
+			});
+			store.updateState(missionId, "suspended");
+			store.updatePhase(missionId, "execute");
+		} finally {
+			store.close();
+		}
+
+		let edCalled = 0;
+		const deps = {
+			startMissionCoordinator: makeRoleStub(
+				"coord-ed",
+			) as unknown as MissionCommandDeps["startMissionCoordinator"],
+			startMissionAnalyst: makeRoleStub(
+				"analyst-ed",
+			) as unknown as MissionCommandDeps["startMissionAnalyst"],
+			startExecutionDirector: async (_opts: unknown) => {
+				edCalled++;
+				return makeRoleStub("ed-exec")(_opts);
+			},
+		} as unknown as MissionCommandDeps;
+
+		process.exitCode = 0;
+		await missionResumeAll(overstoryDir, projectRoot, true, missionId, deps);
+
+		expect(process.exitCode).toBe(0);
+		expect(edCalled).toBe(1);
+
+		// Verify ED session was bound
+		const verify = createMissionStore(join(overstoryDir, "sessions.db"));
+		try {
+			const m = verify.getById(missionId);
+			expect(m?.executionDirectorSessionId).toBe("ed-exec");
+		} finally {
+			verify.close();
+		}
+
+		process.exitCode = 0;
+	});
+
+	test("No ED restart for non-execute phases — full tier + understand phase → startExecutionDirector NOT invoked", async () => {
+		const missionId = "mission-no-ed-understand";
+		const runId = "run-no-ed-understand";
+
+		const store = createMissionStore(join(overstoryDir, "sessions.db"));
+		try {
+			store.create({
+				id: missionId,
+				slug: "no-ed-understand",
+				objective: "verify no ED for understand phase",
+				runId,
+				artifactRoot: join(overstoryDir, "missions", missionId),
+				tier: "full",
+			});
+			store.updateState(missionId, "suspended");
+			store.updatePhase(missionId, "understand");
+		} finally {
+			store.close();
+		}
+
+		let edCalled = 0;
+		const deps = {
+			startMissionCoordinator: makeRoleStub(
+				"coord-no-ed",
+			) as unknown as MissionCommandDeps["startMissionCoordinator"],
+			startMissionAnalyst: makeRoleStub(
+				"analyst-no-ed",
+			) as unknown as MissionCommandDeps["startMissionAnalyst"],
+			startExecutionDirector: async (_opts: unknown) => {
+				edCalled++;
+				return makeRoleStub("ed-no-exec")(_opts);
+			},
+		} as unknown as MissionCommandDeps;
+
+		process.exitCode = 0;
+		await missionResumeAll(overstoryDir, projectRoot, true, missionId, deps);
+
+		expect(process.exitCode).toBe(0);
+		expect(edCalled).toBe(0);
+
+		process.exitCode = 0;
+	});
+
+	test("Direct tier — only coordinator restarted, analyst and ED skipped, message omits mission-analyst", async () => {
+		const missionId = "mission-direct-tier";
+		const runId = "run-direct-tier";
+
+		const store = createMissionStore(join(overstoryDir, "sessions.db"));
+		try {
+			store.create({
+				id: missionId,
+				slug: "direct-tier",
+				objective: "verify direct tier restart",
+				runId,
+				artifactRoot: join(overstoryDir, "missions", missionId),
+				tier: "direct",
+			});
+			store.updateState(missionId, "suspended");
+			store.updatePhase(missionId, "execute");
+		} finally {
+			store.close();
+		}
+
+		let coordCalled = 0;
+		let analystCalled = 0;
+		let edCalled = 0;
+		const deps = {
+			startMissionCoordinator: async (_opts: unknown) => {
+				coordCalled++;
+				return makeRoleStub("coord-direct")(_opts);
+			},
+			startMissionAnalyst: async (_opts: unknown) => {
+				analystCalled++;
+				return makeRoleStub("analyst-direct")(_opts);
+			},
+			startExecutionDirector: async (_opts: unknown) => {
+				edCalled++;
+				return makeRoleStub("ed-direct")(_opts);
+			},
+		} as unknown as MissionCommandDeps;
+
+		let captured = "";
+		const origWrite = process.stdout.write;
+		process.stdout.write = ((chunk: string | Uint8Array) => {
+			captured += typeof chunk === "string" ? chunk : new TextDecoder().decode(chunk);
+			return true;
+		}) as typeof process.stdout.write;
+
+		process.exitCode = 0;
+		try {
+			await missionResumeAll(overstoryDir, projectRoot, false, missionId, deps);
+		} finally {
+			process.stdout.write = origWrite;
+		}
+
+		expect(process.exitCode).toBe(0);
+		expect(coordCalled).toBe(1);
+		expect(analystCalled).toBe(0);
+		expect(edCalled).toBe(0);
+		expect(captured).not.toMatch(/mission-analyst/i);
+
+		process.exitCode = 0;
 	});
 });
 
