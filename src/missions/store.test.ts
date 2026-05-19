@@ -1663,6 +1663,42 @@ describe("setTaskId round-trip (ws-store-types)", () => {
 	});
 });
 
+describe("migration v18: arch-review phase CHECK", () => {
+	test("T-v18-1: INSERT with phase='arch-review' succeeds after migration", () => {
+		const raw = new Database(dbPath);
+		try {
+			const now = new Date().toISOString();
+			expect(() =>
+				raw.exec(
+					`INSERT INTO missions (id, slug, objective, phase, state, created_at, updated_at, paused_workstream_ids, paused_lead_names, pending_user_input, reopen_count, learnings_extracted, has_emitted_ws_producer_write, autonomy)
+					 VALUES ('mission-ar-1', 'ar-slug-1', 'obj', 'arch-review', 'active', '${now}', '${now}', '[]', '[]', 0, 0, 0, 0, 'supervised')`,
+				),
+			).not.toThrow();
+		} finally {
+			raw.close();
+		}
+	});
+
+	test("T-v18-2: migration v18 is idempotent — re-opening store is a no-op", () => {
+		store.close();
+		expect(() => {
+			store = createMissionStore(dbPath);
+		}).not.toThrow();
+
+		const raw = new Database(dbPath);
+		try {
+			const schema = raw
+				.prepare<{ sql: string }, []>(
+					"SELECT sql FROM sqlite_master WHERE type='table' AND name='missions'",
+				)
+				.get();
+			expect(schema?.sql).toContain("'arch-review'");
+		} finally {
+			raw.close();
+		}
+	});
+});
+
 describe("v14 / v16 rebuild column-list literals — da-risk-11 regression guard", () => {
 	test("T-da-risk-11-1: v14 rebuildTable columns array does NOT contain 'task_id' (would brick legacy DBs)", async () => {
 		// Static-string scan: walk the on-disk source of store.ts and find the
