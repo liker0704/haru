@@ -204,6 +204,21 @@ function buildHandlers(deps: PhaseCellDeps, config?: PhaseCellConfig): HandlerRe
 				return { trigger: "pr_no_commits" };
 			}
 
+			const spawnFn = deps.spawn ?? Bun.spawn;
+			const pushProc = spawnFn(["git", "push", "-u", "origin", featureBranch], {
+				cwd: deps.projectRoot,
+				stdout: "pipe",
+				stderr: "pipe",
+			});
+			const pushExit = await pushProc.exited;
+			if (pushExit !== 0) {
+				const pushStderr = pushProc.stderr ? await new Response(pushProc.stderr).text() : "";
+				if (/protected branch/i.test(pushStderr) || /pre-receive hook declined/i.test(pushStderr)) {
+					return { trigger: "pr_branch_protected" };
+				}
+				return { trigger: "pr_create_network_fail" };
+			}
+
 			const title = mission?.slug ?? featureBranch;
 			const mrpPath = join(mission?.artifactRoot ?? "", "merge-readiness-pack.json");
 			const taskIdForFooter = mission && isRealTaskId(mission.taskId) ? mission.taskId : undefined;
