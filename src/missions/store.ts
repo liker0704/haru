@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS missions (
   state TEXT NOT NULL DEFAULT 'active'
     CHECK(state IN ('active','frozen','completed','failed','stopped','suspended','superseded','pr-phase')),
   phase TEXT NOT NULL DEFAULT 'intake'
-    CHECK(phase IN ('intake','understand','align','decide','plan','execute','pr','pre-pr','done')),
+    CHECK(phase IN ('intake','understand','align','decide','plan','execute','arch-review','pr','pre-pr','done')),
   first_freeze_at TEXT,
   frozen_at TEXT,
   pending_user_input INTEGER NOT NULL DEFAULT 0,
@@ -977,6 +977,68 @@ const MISSION_MIGRATIONS: Migration[] = [
 			}
 		},
 		detect: (db) => hasColumn(db, "missions", "task_id"),
+	},
+	{
+		version: 18,
+		description: "Extend missions.phase CHECK to allow 'arch-review' phase",
+		up: (db) => {
+			const schemaRow = db
+				.prepare<{ sql: string }, []>(
+					"SELECT sql FROM sqlite_master WHERE type='table' AND name='missions'",
+				)
+				.get();
+			if (!schemaRow || schemaRow.sql.includes("'arch-review'")) {
+				return;
+			}
+			rebuildTable({
+				db,
+				table: "missions",
+				createSql: CREATE_TABLE.replace("CREATE TABLE IF NOT EXISTS", "CREATE TABLE"),
+				columns: [
+					"id",
+					"slug",
+					"objective",
+					"run_id",
+					"state",
+					"phase",
+					"first_freeze_at",
+					"frozen_at",
+					"pending_user_input",
+					"pending_input_kind",
+					"pending_input_thread_id",
+					"reopen_count",
+					"artifact_root",
+					"paused_workstream_ids",
+					"analyst_session_id",
+					"execution_director_session_id",
+					"coordinator_session_id",
+					"architect_session_id",
+					"paused_lead_names",
+					"pause_reason",
+					"current_node",
+					"started_at",
+					"completed_at",
+					"created_at",
+					"updated_at",
+					"learnings_extracted",
+					"tier",
+					"has_emitted_ws_producer_write",
+					"autonomy",
+					"feature_branch",
+					"parent_mission_id",
+					"learnings_extracted_at",
+					"task_id",
+				],
+			});
+		},
+		detect: (db) => {
+			const schemaRow = db
+				.prepare<{ sql: string }, []>(
+					"SELECT sql FROM sqlite_master WHERE type='table' AND name='missions'",
+				)
+				.get();
+			return !!schemaRow && schemaRow.sql.includes("'arch-review'");
+		},
 	},
 ];
 
