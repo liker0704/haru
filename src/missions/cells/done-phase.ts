@@ -27,15 +27,19 @@
 import { join } from "node:path";
 import type { SessionStore } from "../../sessions/store.ts";
 import type { AgentSession, Mission, MissionGraph, MissionState } from "../../types.ts";
-import type { HandlerRegistry } from "../types.ts";
 import { isRealTaskId } from "../task-id.ts";
+import type { HandlerRegistry } from "../types.ts";
 import { makeDebugLoopHandlers } from "./debug-loop-handlers.ts";
 import type { PhaseCellConfig, PhaseCellDefinition, PhaseCellDeps } from "./types.ts";
 
 const CELL_TYPE = "done-phase";
 const MAX_DEBUG_ATTEMPTS = 3;
 
-function buildCloseReason(slug: string | null | undefined, state: MissionState, isoNow: string): string {
+function buildCloseReason(
+	slug: string | null | undefined,
+	state: MissionState,
+	isoNow: string,
+): string {
 	const displaySlug = slug ?? "<unknown>";
 	switch (state) {
 		case "completed":
