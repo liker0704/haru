@@ -26,13 +26,44 @@
 
 import { join } from "node:path";
 import type { SessionStore } from "../../sessions/store.ts";
-import type { AgentSession, Mission, MissionGraph } from "../../types.ts";
+import type { AgentSession, Mission, MissionGraph, MissionState } from "../../types.ts";
+import { isRealTaskId } from "../task-id.ts";
 import type { HandlerRegistry } from "../types.ts";
 import { makeDebugLoopHandlers } from "./debug-loop-handlers.ts";
 import type { PhaseCellConfig, PhaseCellDefinition, PhaseCellDeps } from "./types.ts";
 
 const CELL_TYPE = "done-phase";
 const MAX_DEBUG_ATTEMPTS = 3;
+
+function buildCloseReason(
+	slug: string | null | undefined,
+	state: MissionState,
+	isoNow: string,
+): string {
+	const displaySlug = slug ?? "<unknown>";
+	switch (state) {
+		case "completed":
+			return `Mission ${displaySlug} completed at ${isoNow}`;
+		case "failed":
+			return `Mission ${displaySlug} failed at ${isoNow}`;
+		case "stopped":
+			return `Mission ${displaySlug} stopped at ${isoNow}`;
+		case "suspended":
+			return `Mission ${displaySlug} suspended at ${isoNow}`;
+		case "superseded":
+			return `Mission ${displaySlug} superseded at ${isoNow}`;
+		case "frozen":
+			return `Mission ${displaySlug} frozen at ${isoNow}`;
+		case "active":
+			return `Mission ${displaySlug} done-phase cleanup at ${isoNow}`;
+		default: {
+			// Exhaustive guard. If MissionState gains a new variant, this branch surfaces it.
+			const _exhaustive: never = state;
+			void _exhaustive;
+			return `Mission ${displaySlug} done-phase cleanup at ${isoNow}`;
+		}
+	}
+}
 
 function buildSubgraph(_config: PhaseCellConfig): MissionGraph {
 	return {
@@ -240,6 +271,18 @@ function buildHandlers(deps: PhaseCellDeps): HandlerRegistry {
 		},
 		cleanup: async (ctx) => {
 			const mission = ctx.getMission();
+			if (mission && isRealTaskId(mission.taskId)) {
+				const reason = buildCloseReason(mission.slug, mission.state, new Date().toISOString());
+				try {
+					await deps.tracker.close(mission.taskId, reason);
+				} catch (err) {
+					console.warn(
+						`[done-phase:cleanup] tracker.close failed (best-effort, mission proceeds): ${
+							err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200)
+						}`,
+					);
+				}
+			}
 			// Stage C: clean up debug worktrees on success path.
 			// Escalation path leaves them in place for operator inspection.
 			if (mission && deps.projectRoot) {
