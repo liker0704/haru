@@ -69,6 +69,7 @@ interface MissionRow {
 	feature_branch: string | null;
 	parent_mission_id: string | null;
 	learnings_extracted_at: string | null;
+	task_id: string | null;
 }
 
 const CREATE_TABLE = `
@@ -107,7 +108,8 @@ CREATE TABLE IF NOT EXISTS missions (
     CHECK(autonomy IN ('supervised','auto-spec','auto-all')),
   feature_branch TEXT,
   parent_mission_id TEXT REFERENCES missions(id),
-  learnings_extracted_at TEXT
+  learnings_extracted_at TEXT,
+  task_id TEXT CHECK (task_id IS NULL OR length(task_id) <= 64)
 )`;
 
 const CREATE_INDEXES = `
@@ -145,6 +147,7 @@ const REQUIRED_MISSION_COLUMNS = [
 	"has_emitted_ws_producer_write",
 	"autonomy",
 	"feature_branch",
+	"task_id",
 ] as const;
 
 function getMissionColumns(db: Database): Set<string> {
@@ -825,6 +828,9 @@ const MISSION_MIGRATIONS: Migration[] = [
 			}
 			// Rebuild the table with the widened state CHECK.
 			// Column list must match what exists after v13 (includes parent_mission_id + learnings_extracted_at).
+			// FUTURE: v18+ rebuilds MUST include task_id (added by v17 ALTER).
+			// Do NOT add task_id here — would brick legacy DBs at user_version < 14
+			// (rebuild SELECT references column not yet added). See da-risk-11.
 			rebuildTable({
 				db,
 				table: "missions",
@@ -908,6 +914,9 @@ const MISSION_MIGRATIONS: Migration[] = [
 			if (!schemaRow || schemaRow.sql.includes("'pre-pr'")) {
 				return;
 			}
+			// FUTURE: v18+ rebuilds MUST include task_id (added by v17 ALTER).
+			// Do NOT add task_id here — would brick legacy DBs at user_version < 14
+			// (rebuild SELECT references column not yet added). See da-risk-11.
 			rebuildTable({
 				db,
 				table: "missions",
@@ -957,6 +966,18 @@ const MISSION_MIGRATIONS: Migration[] = [
 			return !!schemaRow && schemaRow.sql.includes("'pre-pr'");
 		},
 	},
+	{
+		version: 17,
+		description: "Add task_id column to missions (auto-issue-link foundation)",
+		up: (db) => {
+			if (!hasColumn(db, "missions", "task_id")) {
+				db.exec(
+					"ALTER TABLE missions ADD COLUMN task_id TEXT CHECK (task_id IS NULL OR length(task_id) <= 64)",
+				);
+			}
+		},
+		detect: (db) => hasColumn(db, "missions", "task_id"),
+	},
 ];
 
 /** Convert a database row (snake_case) to a Mission object (camelCase). */
@@ -992,6 +1013,7 @@ function rowToMission(row: MissionRow): Mission {
 		autonomy: (row.autonomy as MissionAutonomy | null) ?? "supervised",
 		featureBranch: row.feature_branch ?? null,
 		parentMissionId: row.parent_mission_id ?? null,
+		taskId: row.task_id ?? null,
 	};
 }
 
@@ -1916,6 +1938,15 @@ export function createMissionStore(dbPath: string): MissionStore {
 			);
 			return (missionId: string, parentMissionId: string): void => {
 				stmt.run({ $id: missionId, $pmid: parentMissionId, $updated_at: new Date().toISOString() });
+			};
+		})(),
+
+		setTaskId: (() => {
+			const stmt = db.prepare<void, { $id: string; $task_id: string | null; $updated_at: string }>(
+				"UPDATE missions SET task_id = $task_id, updated_at = $updated_at WHERE id = $id",
+			);
+			return (missionId: string, taskId: string | null): void => {
+				stmt.run({ $id: missionId, $task_id: taskId, $updated_at: new Date().toISOString() });
 			};
 		})(),
 

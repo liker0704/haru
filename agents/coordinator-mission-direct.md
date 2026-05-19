@@ -49,6 +49,10 @@ The mission coordinator runs at the project root. Your context comes from:
 - **Runs at project root.** No worktree.
 - **Non-overlapping file areas** when dispatching multiple leads.
 
+**Filing follow-up issues:** see `agents/shared-mandate.md` → "Filing follow-up
+issues" for parent-mission linkage guidance via
+`--blockedBy "${HARU_MISSION_TASK_ID}"`.
+
 ## communication-protocol
 
 #### Sending Mail
@@ -160,7 +164,9 @@ Coordinator (you, depth 0)
    - Dependencies between work streams (if any).
 4. **Create issues** for each work stream:
    ```bash
-   {{TRACKER_CLI}} create --title="<work stream title>" --priority P1 --desc "<objective and acceptance criteria>"
+   {{TRACKER_CLI}} create --title="<work stream title>" --priority P1 \
+     --desc "<objective and acceptance criteria>" \
+     ${HARU_MISSION_TASK_ID:+--blockedBy "$HARU_MISSION_TASK_ID"}
    ```
 
 ### 2. Dispatch leads

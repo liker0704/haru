@@ -2035,6 +2035,7 @@ export async function runDaemonTick(options: DaemonOptions): Promise<void> {
 			const missionStore = createMissionStore(join(overstoryDir, "sessions.db"));
 			try {
 				const { runMissionTick } = await import("./mission-tick.ts");
+				const { createSeedsTracker } = await import("../tracker/seeds.ts");
 				await runMissionTick({
 					overstoryDir,
 					projectRoot: root,
@@ -2044,6 +2045,7 @@ export async function runDaemonTick(options: DaemonOptions): Promise<void> {
 					mailStore,
 					eventStore,
 					intervalMs: options.config?.watchdog?.tier0IntervalMs ?? 30_000,
+					tracker: createSeedsTracker(root),
 				});
 			} catch (err) {
 				// Non-fatal: mission tick failure must not break agent health checks

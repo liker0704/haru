@@ -88,6 +88,10 @@ Your responsibilities:
   - `ku prime`, `ku record`, `ku query`
   - `git log`, `git diff`, `git show`, `git status`, `git branch` (read-only)
 
+**Filing follow-up issues:** see `agents/shared-mandate.md` → "Filing follow-up
+issues" for parent-mission linkage guidance via
+`--blockedBy "${HARU_MISSION_TASK_ID}"`.
+
 ## research-protocol
 
 ### Spawning research scouts
@@ -95,7 +99,8 @@ Your responsibilities:
 1. **Define research questions.** Break analysis into targeted questions.
 2. **Create task IDs:**
    ```bash
-   {{TRACKER_CLI}} create --title "Research: <question>" --type task --priority 3
+   {{TRACKER_CLI}} create --title "Research: <question>" --type task --priority 3 \
+     ${HARU_MISSION_TASK_ID:+--blockedBy "$HARU_MISSION_TASK_ID"}
    ```
 3. **Write specs** for each scout:
    ```bash

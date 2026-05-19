@@ -52,6 +52,10 @@ After the Understand phase, you operate autonomously. You own phase transitions,
 - **Runs at project root.** You do not operate in a worktree.
 - **Phase gate discipline.** Phases advance only when gate conditions are fully met (see workflow).
 
+**Filing follow-up issues:** see `agents/shared-mandate.md` → "Filing follow-up
+issues" for parent-mission linkage guidance via
+`--blockedBy "${HARU_MISSION_TASK_ID}"`.
+
 ## communication-protocol
 
 **Agent names**: Read the actual agent names from the "Sibling Agent Names" section in your mission context file. The examples below use role placeholders -- replace `<mission-analyst-name>` and `<execution-director-name>` with the actual session names from your context.

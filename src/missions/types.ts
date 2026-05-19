@@ -228,6 +228,8 @@ export interface Mission {
 	featureBranch?: string | null;
 	/** ID of the predecessor mission this mission continues from, or null. Set by applyContinueFrom. */
 	parentMissionId?: string | null;
+	/** Linked tracker issue ID (e.g. "haru-db98"), or null if not yet created. Set by ws-auto-issue-link. */
+	taskId?: string | null;
 }
 
 export type InsertMission = Pick<Mission, "id" | "slug" | "objective"> & {
@@ -237,6 +239,7 @@ export type InsertMission = Pick<Mission, "id" | "slug" | "objective"> & {
 	tier?: MissionTier | null;
 	autonomy?: MissionAutonomy;
 	featureBranch?: string | null;
+	taskId?: string | null;
 };
 
 export interface MissionSummary {
@@ -614,6 +617,8 @@ export interface MissionStore {
 
 	/** Set the predecessor mission ID on a mission (links child → parent). */
 	setParentMissionId(missionId: string, parentMissionId: string): void;
+	/** Set or clear the linked tracker issue ID. */
+	setTaskId(missionId: string, taskId: string | null): void;
 	/** Atomically mark a mission as superseded: state='superseded', current_node='done:superseded', phase='done'. */
 	setSuperseded(missionId: string): void;
 

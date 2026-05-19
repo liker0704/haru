@@ -5,14 +5,29 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createSessionStore } from "../../sessions/store.ts";
 import { cleanupTempDir, createTempGitRepo, getDefaultBranch } from "../../test-helpers.ts";
-import type { AgentSession, Mission } from "../../types.ts";
+import type { TrackerClient } from "../../tracker/types.ts";
+import type { AgentSession, Mission, MissionState } from "../../types.ts";
 import { createWorktree } from "../../worktree/manager.ts";
 import { createGraphEngine } from "../engine.ts";
 import { validateGraph } from "../graph.ts";
+import { PENDING_SENTINEL } from "../task-id.ts";
 import { createMockCheckpointStore } from "../test-mocks.ts";
 import type { HandlerContext } from "../types.ts";
 import { donePhaseCell } from "./done-phase.ts";
 import type { PhaseCellConfig, PhaseCellDeps } from "./types.ts";
+
+function makeStubTracker(): TrackerClient {
+	return {
+		ready: async () => [],
+		show: async () => ({ id: "", title: "", status: "", priority: 0, type: "" }),
+		create: async () => "",
+		claim: async () => {},
+		close: async () => {},
+		comment: async () => {},
+		list: async () => [],
+		sync: async () => {},
+	};
+}
 
 const config: PhaseCellConfig = {
 	missionId: "m1",
@@ -185,6 +200,7 @@ describe("donePhaseCell dispatch-debugger preflight", () => {
 					getCheckpoint: () => null,
 				},
 			} as unknown as PhaseCellDeps["missionStore"],
+			tracker: makeStubTracker(),
 			overstoryDir: tempDir,
 			projectRoot: "/tmp/project-not-used",
 		};
@@ -384,6 +400,7 @@ describe("donePhaseCell dispatch-debugger worktree probe", () => {
 					getCheckpoint: () => null,
 				},
 			} as unknown as PhaseCellDeps["missionStore"],
+			tracker: makeStubTracker(),
 			overstoryDir: tempDir,
 			projectRoot: "/tmp/worktree-probe-test",
 		};
@@ -496,6 +513,7 @@ describe("donePhaseCell escalate placeholder-checkpoint", () => {
 				freeze: () => {},
 				updatePauseReason: () => {},
 			} as unknown as PhaseCellDeps["missionStore"],
+			tracker: makeStubTracker(),
 			mailStore: mailStore as unknown as PhaseCellDeps["mailStore"],
 		};
 
@@ -535,6 +553,7 @@ describe("donePhaseCell escalate placeholder-checkpoint", () => {
 				},
 				updatePauseReason: () => {},
 			} as unknown as PhaseCellDeps["missionStore"],
+			tracker: makeStubTracker(),
 			mailStore: mailStore as unknown as PhaseCellDeps["mailStore"],
 		};
 
@@ -565,6 +584,7 @@ describe("donePhaseCell escalate placeholder-checkpoint", () => {
 				freeze: () => {},
 				updatePauseReason: () => {},
 			} as unknown as PhaseCellDeps["missionStore"],
+			tracker: makeStubTracker(),
 			mailStore: mailStore as unknown as PhaseCellDeps["mailStore"],
 		};
 
@@ -660,6 +680,7 @@ describe("donePhaseCell summary handler", () => {
 					getCheckpoint: () => null,
 				},
 			} as unknown as PhaseCellDeps["missionStore"],
+			tracker: makeStubTracker(),
 		};
 	}
 
@@ -695,6 +716,7 @@ describe("donePhaseCell summary handler", () => {
 			mailSend: async () => {},
 			checkpointStore: {} as PhaseCellDeps["checkpointStore"],
 			missionStore: fakeMissionStore,
+			tracker: makeStubTracker(),
 		};
 		const handlers = donePhaseCell.buildHandlers(deps);
 		const checkpointStore = createMockCheckpointStore();
@@ -880,6 +902,7 @@ describe("donePhaseCell cleanup handler (issue #322)", () => {
 						getCheckpoint: () => null,
 					},
 				} as unknown as PhaseCellDeps["missionStore"],
+				tracker: makeStubTracker(),
 				sessionStore,
 				overstoryDir,
 				projectRoot,
@@ -943,6 +966,7 @@ describe("donePhaseCell cleanup handler (issue #322)", () => {
 				missionStore: {
 					checkpoints: { saveCheckpoint: () => {}, getCheckpoint: () => null },
 				} as unknown as PhaseCellDeps["missionStore"],
+				tracker: makeStubTracker(),
 				sessionStore,
 				overstoryDir: "/tmp/does-not-matter",
 				projectRoot: "/tmp/does-not-matter",
@@ -973,6 +997,307 @@ describe("donePhaseCell cleanup handler (issue #322)", () => {
 			expect(sessionStore.getByName("some-agent")?.state).toBe("waiting");
 		} finally {
 			sessionStore.close();
+		}
+	});
+});
+
+// === ws-done-close-issue: state-aware tracker.close in cleanup ===
+
+describe("donePhaseCell cleanup tracker.close behavior", () => {
+	type CloseCall = { id: string; reason: string | undefined };
+
+	function makeRecordingTracker(opts: { rejectWith?: Error; log?: string[] } = {}): {
+		tracker: TrackerClient;
+		closeCalls: CloseCall[];
+	} {
+		const closeCalls: CloseCall[] = [];
+		const tracker: TrackerClient = {
+			...makeStubTracker(),
+			close: async (id: string, reason?: string) => {
+				opts.log?.push("tracker.close");
+				closeCalls.push({ id, reason });
+				if (opts.rejectWith) throw opts.rejectWith;
+			},
+		};
+		return { tracker, closeCalls };
+	}
+
+	function makeCleanupDeps(tracker: TrackerClient): PhaseCellDeps {
+		return {
+			mailSend: async () => {},
+			checkpointStore: {} as PhaseCellDeps["checkpointStore"],
+			missionStore: {
+				checkpoints: { saveCheckpoint: () => {}, getCheckpoint: () => null },
+			} as unknown as PhaseCellDeps["missionStore"],
+			tracker,
+		};
+	}
+
+	function makeMission(opts: {
+		taskId: string | null;
+		state: MissionState;
+		slug?: string;
+	}): Mission {
+		return {
+			id: "m1",
+			slug: opts.slug ?? "test-mission",
+			taskId: opts.taskId,
+			state: opts.state,
+			phase: "done",
+		} as unknown as Mission;
+	}
+
+	function makeCleanupCtx(mission: Mission | null): HandlerContext {
+		return {
+			missionId: "m1",
+			nodeId: "done-phase:cleanup",
+			checkpoint: null,
+			saveCheckpoint: async () => {},
+			sendMail: async () => {},
+			getMission: () => mission,
+		} as HandlerContext;
+	}
+
+	test("T-1: happy close (state=completed) calls tracker.close once with completed reason", async () => {
+		const { tracker, closeCalls } = makeRecordingTracker();
+		const deps = makeCleanupDeps(tracker);
+		const ctx = makeCleanupCtx(makeMission({ taskId: "haru-1234", state: "completed" }));
+
+		const handlers = donePhaseCell.buildHandlers(deps);
+		// biome-ignore lint/style/noNonNullAssertion: cleanup handler is registered
+		const result = await handlers.cleanup!(ctx);
+
+		expect(result.trigger).toBe("cleanup_done");
+		expect(closeCalls).toHaveLength(1);
+		expect(closeCalls[0]?.id).toBe("haru-1234");
+		expect(closeCalls[0]?.reason).toMatch(/Mission .* completed at .*/);
+	});
+
+	test("T-2: state=active uses neutral 'done-phase cleanup' phrasing (no false completed)", async () => {
+		const { tracker, closeCalls } = makeRecordingTracker();
+		const deps = makeCleanupDeps(tracker);
+		const ctx = makeCleanupCtx(makeMission({ taskId: "haru-1234", state: "active" }));
+
+		const handlers = donePhaseCell.buildHandlers(deps);
+		// biome-ignore lint/style/noNonNullAssertion: cleanup handler is registered
+		const result = await handlers.cleanup!(ctx);
+
+		expect(result.trigger).toBe("cleanup_done");
+		expect(closeCalls).toHaveLength(1);
+		expect(closeCalls[0]?.reason).toMatch(/Mission .* done-phase cleanup at .*/);
+		expect(closeCalls[0]?.reason).not.toContain("completed");
+	});
+
+	test("T-3: state=failed uses 'failed' reason", async () => {
+		const { tracker, closeCalls } = makeRecordingTracker();
+		const deps = makeCleanupDeps(tracker);
+		const ctx = makeCleanupCtx(makeMission({ taskId: "haru-1234", state: "failed" }));
+
+		const handlers = donePhaseCell.buildHandlers(deps);
+		// biome-ignore lint/style/noNonNullAssertion: cleanup handler is registered
+		const result = await handlers.cleanup!(ctx);
+
+		expect(result.trigger).toBe("cleanup_done");
+		expect(closeCalls).toHaveLength(1);
+		expect(closeCalls[0]?.reason).toMatch(/Mission .* failed at .*/);
+	});
+
+	test("T-4: state=stopped uses 'stopped' reason", async () => {
+		const { tracker, closeCalls } = makeRecordingTracker();
+		const deps = makeCleanupDeps(tracker);
+		const ctx = makeCleanupCtx(makeMission({ taskId: "haru-1234", state: "stopped" }));
+
+		const handlers = donePhaseCell.buildHandlers(deps);
+		// biome-ignore lint/style/noNonNullAssertion: cleanup handler is registered
+		const result = await handlers.cleanup!(ctx);
+
+		expect(result.trigger).toBe("cleanup_done");
+		expect(closeCalls).toHaveLength(1);
+		expect(closeCalls[0]?.reason).toMatch(/Mission .* stopped at .*/);
+	});
+
+	test("T-5: state=superseded uses 'superseded' reason", async () => {
+		const { tracker, closeCalls } = makeRecordingTracker();
+		const deps = makeCleanupDeps(tracker);
+		const ctx = makeCleanupCtx(makeMission({ taskId: "haru-1234", state: "superseded" }));
+
+		const handlers = donePhaseCell.buildHandlers(deps);
+		// biome-ignore lint/style/noNonNullAssertion: cleanup handler is registered
+		const result = await handlers.cleanup!(ctx);
+
+		expect(result.trigger).toBe("cleanup_done");
+		expect(closeCalls).toHaveLength(1);
+		expect(closeCalls[0]?.reason).toMatch(/Mission .* superseded at .*/);
+	});
+
+	test("T-6: state=suspended uses 'suspended' reason", async () => {
+		const { tracker, closeCalls } = makeRecordingTracker();
+		const deps = makeCleanupDeps(tracker);
+		const ctx = makeCleanupCtx(makeMission({ taskId: "haru-1234", state: "suspended" }));
+
+		const handlers = donePhaseCell.buildHandlers(deps);
+		// biome-ignore lint/style/noNonNullAssertion: cleanup handler is registered
+		const result = await handlers.cleanup!(ctx);
+
+		expect(result.trigger).toBe("cleanup_done");
+		expect(closeCalls).toHaveLength(1);
+		expect(closeCalls[0]?.reason).toMatch(/Mission .* suspended at .*/);
+	});
+
+	test("T-7: state=frozen uses 'frozen' reason", async () => {
+		const { tracker, closeCalls } = makeRecordingTracker();
+		const deps = makeCleanupDeps(tracker);
+		const ctx = makeCleanupCtx(makeMission({ taskId: "haru-1234", state: "frozen" }));
+
+		const handlers = donePhaseCell.buildHandlers(deps);
+		// biome-ignore lint/style/noNonNullAssertion: cleanup handler is registered
+		const result = await handlers.cleanup!(ctx);
+
+		expect(result.trigger).toBe("cleanup_done");
+		expect(closeCalls).toHaveLength(1);
+		expect(closeCalls[0]?.reason).toMatch(/Mission .* frozen at .*/);
+	});
+
+	test("T-8: idempotent — null taskId does NOT call tracker.close", async () => {
+		const { tracker, closeCalls } = makeRecordingTracker();
+		const deps = makeCleanupDeps(tracker);
+		const ctx = makeCleanupCtx(makeMission({ taskId: null, state: "completed" }));
+
+		const handlers = donePhaseCell.buildHandlers(deps);
+		// biome-ignore lint/style/noNonNullAssertion: cleanup handler is registered
+		const result = await handlers.cleanup!(ctx);
+
+		expect(result.trigger).toBe("cleanup_done");
+		expect(closeCalls).toHaveLength(0);
+	});
+
+	test("T-9: sentinel taskId is filtered — tracker.close NOT called", async () => {
+		const { tracker, closeCalls } = makeRecordingTracker();
+		const deps = makeCleanupDeps(tracker);
+		const ctx = makeCleanupCtx(makeMission({ taskId: PENDING_SENTINEL, state: "completed" }));
+
+		const handlers = donePhaseCell.buildHandlers(deps);
+		// biome-ignore lint/style/noNonNullAssertion: cleanup handler is registered
+		const result = await handlers.cleanup!(ctx);
+
+		expect(result.trigger).toBe("cleanup_done");
+		expect(closeCalls).toHaveLength(0);
+	});
+
+	test("T-10: best-effort — tracker.close rejection does NOT throw, warning logged", async () => {
+		const origWarn = console.warn;
+		const warnCalls: string[] = [];
+		console.warn = (msg: unknown) => {
+			warnCalls.push(typeof msg === "string" ? msg : String(msg));
+		};
+		try {
+			const rejectError = new Error("issue already closed");
+			const { tracker, closeCalls } = makeRecordingTracker({ rejectWith: rejectError });
+			const deps = makeCleanupDeps(tracker);
+			const ctx = makeCleanupCtx(makeMission({ taskId: "haru-1234", state: "completed" }));
+
+			const handlers = donePhaseCell.buildHandlers(deps);
+			// biome-ignore lint/style/noNonNullAssertion: cleanup handler is registered
+			const result = await handlers.cleanup!(ctx);
+
+			expect(result.trigger).toBe("cleanup_done");
+			// close was attempted before throwing
+			expect(closeCalls).toHaveLength(1);
+			// A warning was logged containing "tracker.close failed" + the error message
+			const matched = warnCalls.find(
+				(m) => m.includes("tracker.close failed") && m.includes("issue already closed"),
+			);
+			expect(matched).toBeDefined();
+		} finally {
+			console.warn = origWarn;
+		}
+	});
+
+	test("T-11: getMission returns null — tracker.close NOT called", async () => {
+		const { tracker, closeCalls } = makeRecordingTracker();
+		const deps = makeCleanupDeps(tracker);
+		const ctx = makeCleanupCtx(null);
+
+		const handlers = donePhaseCell.buildHandlers(deps);
+		// biome-ignore lint/style/noNonNullAssertion: cleanup handler is registered
+		const result = await handlers.cleanup!(ctx);
+
+		expect(result.trigger).toBe("cleanup_done");
+		expect(closeCalls).toHaveLength(0);
+	});
+
+	test("T-12: order invariant — tracker.close awaits BEFORE worktree teardown", async () => {
+		const projectRoot = await createTempGitRepo();
+		const overstoryDir = join(projectRoot, ".overstory");
+		const slug = "order-mission";
+		await mkdir(join(overstoryDir, "worktrees", slug), { recursive: true });
+
+		const sessionStore = createSessionStore(":memory:");
+		try {
+			sessionStore.upsert(
+				makeMissionOwnedSession({
+					id: "s-order",
+					agentName: `builder-${slug}`,
+					capability: "builder",
+					worktreePath: join(overstoryDir, "worktrees", slug, "builder"),
+					branchName: `haru/builder/${slug}`,
+					taskId: "tx",
+					runId: "run-order",
+					state: "waiting",
+				}),
+			);
+
+			const log: string[] = [];
+			const { tracker } = makeRecordingTracker({ log });
+
+			// Wrap updateState so it appends to the shared log before delegating.
+			const origUpdateState = sessionStore.updateState.bind(sessionStore);
+			sessionStore.updateState = (agentName, state) => {
+				log.push("session.updateState");
+				origUpdateState(agentName, state);
+			};
+
+			const deps: PhaseCellDeps = {
+				mailSend: async () => {},
+				checkpointStore: {} as PhaseCellDeps["checkpointStore"],
+				missionStore: {
+					checkpoints: { saveCheckpoint: () => {}, getCheckpoint: () => null },
+				} as unknown as PhaseCellDeps["missionStore"],
+				tracker,
+				sessionStore,
+				overstoryDir,
+				projectRoot,
+			};
+
+			const ctx: HandlerContext = {
+				missionId: "m1",
+				nodeId: "done-phase:cleanup",
+				checkpoint: null,
+				saveCheckpoint: async () => {},
+				sendMail: async () => {},
+				getMission: () =>
+					({
+						id: "m1",
+						slug,
+						taskId: "haru-1234",
+						state: "completed",
+						phase: "done",
+						runId: "run-order",
+					}) as unknown as Mission,
+			} as HandlerContext;
+
+			const handlers = donePhaseCell.buildHandlers(deps);
+			// biome-ignore lint/style/noNonNullAssertion: cleanup handler is registered
+			const result = await handlers.cleanup!(ctx);
+
+			expect(result.trigger).toBe("cleanup_done");
+			expect(log[0]).toBe("tracker.close");
+			const firstUpdateIdx = log.indexOf("session.updateState");
+			expect(firstUpdateIdx).toBeGreaterThan(-1);
+			expect(log.indexOf("tracker.close")).toBeLessThan(firstUpdateIdx);
+		} finally {
+			sessionStore.close();
+			await cleanupTempDir(projectRoot);
 		}
 	});
 });

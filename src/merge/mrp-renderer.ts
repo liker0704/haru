@@ -70,7 +70,19 @@ function criterionIcon(status: "pass" | "fail" | "unknown"): string {
 	return "❓";
 }
 
-export function renderMrpMarkdown(mrp: MergeReadinessPack, opts?: { showCost?: boolean }): string {
+/**
+ * Render a MergeReadinessPack as GitHub-flavoured markdown.
+ *
+ * opts.taskId — when set to a non-empty string, appends "\n\nCloses <taskId>" to the
+ * rendered output. The caller is responsible for filtering null / PENDING_SENTINEL / invalid
+ * ids via isRealTaskId — the renderer treats taskId as opaque and trusts the caller.
+ * Pre-pr-phase also calls this function (for the MRP-on-disk artifact); the new opt is
+ * optional and binary-compatible, so that call site is unaffected.
+ */
+export function renderMrpMarkdown(
+	mrp: MergeReadinessPack,
+	opts?: { showCost?: boolean; taskId?: string },
+): string {
 	const lines: string[] = [];
 
 	lines.push(`# Merge Readiness Pack — ${mrp.mission.slug}`);
@@ -157,5 +169,9 @@ export function renderMrpMarkdown(mrp: MergeReadinessPack, opts?: { showCost?: b
 		lines.push("");
 	}
 
-	return lines.join("\n");
+	let result = lines.join("\n");
+	if (opts?.taskId) {
+		result += `\nCloses ${opts.taskId}`;
+	}
+	return result;
 }

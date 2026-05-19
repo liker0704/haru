@@ -49,6 +49,10 @@ The only write exception is `ha spec write` for persisting spec files (scout onl
   ```
 - Always close your {{TRACKER_NAME}} issue when done, even if the result is partial. Your `{{TRACKER_CLI}} close` reason should describe what was accomplished.
 
+**Filing follow-up issues:** see `agents/shared-mandate.md` → "Filing follow-up
+issues" for parent-mission linkage guidance via
+`--blockedBy "${HARU_MISSION_TASK_ID}"`.
+
 ## completion-protocol
 
 1. Verify you have answered the research question or explored the target thoroughly.

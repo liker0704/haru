@@ -8,6 +8,7 @@
 import { join } from "node:path";
 import { createManifestLoader } from "../../agents/manifest.ts";
 import type { DebugBriefRequestPayload, DebugEscalationPayload } from "../../mail/types.ts";
+import type { TrackerClient } from "../../tracker/types.ts";
 import type { HandlerRegistry } from "../types.ts";
 import type { PhaseCellDeps } from "./types.ts";
 
@@ -31,6 +32,7 @@ export interface DebugLoopDeps {
 	mailStore?: PhaseCellDeps["mailStore"];
 	overstoryDir?: string;
 	projectRoot?: string;
+	tracker?: TrackerClient;
 }
 
 export function makeDebugLoopHandlers(opts: DebugLoopOpts, deps: DebugLoopDeps): HandlerRegistry {

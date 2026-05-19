@@ -265,6 +265,7 @@ export function createMockMissionStore(): MissionStore & { currentNode: string |
 
 		setParentMissionId: noop,
 		setSuperseded: noop,
+		setTaskId: noop,
 
 		close: noop,
 	};

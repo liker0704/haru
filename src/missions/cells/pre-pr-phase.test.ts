@@ -3,16 +3,32 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { MergeReadinessPack } from "../../merge/mrp-renderer.ts";
+import type { TrackerClient } from "../../tracker/types.ts";
 import type { Mission } from "../../types.ts";
 import type { HandlerContext } from "../types.ts";
 import { prePrPhaseCell } from "./pre-pr-phase.ts";
 import type { PhaseCellDeps } from "./types.ts";
+
+/** No-op TrackerClient stub — REQUIRED on PhaseCellDeps after ws-store-types lands. */
+function makeStubTracker(): TrackerClient {
+	return {
+		ready: async () => [],
+		show: async () => ({ id: "", title: "", status: "", priority: 0, type: "" }),
+		create: async () => "",
+		claim: async () => {},
+		close: async () => {},
+		comment: async () => {},
+		list: async () => [],
+		sync: async () => {},
+	};
+}
 
 function makeDeps(overrides?: Partial<PhaseCellDeps>): PhaseCellDeps {
 	return {
 		mailSend: async () => {},
 		checkpointStore: {} as unknown as PhaseCellDeps["checkpointStore"],
 		missionStore: {} as unknown as PhaseCellDeps["missionStore"],
+		tracker: makeStubTracker(),
 		...overrides,
 	};
 }

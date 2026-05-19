@@ -100,6 +100,10 @@ Your primary responsibilities:
   - `ku prime`, `ku record`, `ku query` (expertise)
   - `git log`, `git diff`, `git show`, `git status`, `git branch` (read-only git)
 
+**Filing follow-up issues:** see `agents/shared-mandate.md` → "Filing follow-up
+issues" for parent-mission linkage guidance via
+`--blockedBy "${HARU_MISSION_TASK_ID}"`.
+
 ## research-protocol
 
 When you need to understand the codebase during the research phase, delegate to scouts instead of reading everything yourself.
@@ -109,7 +113,8 @@ When you need to understand the codebase during the research phase, delegate to 
 1. **Define research questions.** Break your analysis into targeted questions (e.g., "What patterns does the auth subsystem use?", "How are database migrations structured?").
 2. **Create task IDs** for each research question:
    ```bash
-   {{TRACKER_CLI}} create --title "Research: <specific question>" --type task --priority 3
+   {{TRACKER_CLI}} create --title "Research: <specific question>" --type task --priority 3 \
+     ${HARU_MISSION_TASK_ID:+--blockedBy "$HARU_MISSION_TASK_ID"}
    ```
 3. **Write a spec** for each scout with the research question and target area:
    ```bash

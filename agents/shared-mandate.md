@@ -12,6 +12,32 @@ If you dispatch work to another agent (via `ha sling`, `ha mail send --type disp
 
 - **MAIL_POLLING** -- Calling `ha mail check` in a loop while waiting for sub-agent results. This wastes tokens. Stop instead. You will be woken by tmux nudge.
 
+## Filing follow-up issues
+
+When filing a follow-up issue for work spawned by this mission, link it to
+the parent mission's tracker issue with `--blockedBy "${HARU_MISSION_TASK_ID}"`.
+
+Always quote `"${HARU_MISSION_TASK_ID}"` in shell commands — leave shell
+expansion to the runtime, do not hard-code or substitute literal IDs.
+
+If `HARU_MISSION_TASK_ID` is unset (mission has no auto-linked tracker
+issue, OR you are an intake-phase agent spawned BEFORE the issue is
+created, OR the mission is running standalone), OMIT the flag — do NOT
+fabricate or guess an id.
+
+Example using the safe shell pattern (emits the flag only when set):
+
+```bash
+{{TRACKER_CLI}} create --title "Follow-up: ..." --type task \
+  ${HARU_MISSION_TASK_ID:+--blockedBy "$HARU_MISSION_TASK_ID"}
+```
+
+**Temporal availability:** agents spawned during the intake phase (analyst,
+clarifier, tier-classifier) typically see `HARU_MISSION_TASK_ID` UNSET
+because the parent issue is created later in the phase. Agents spawned for
+execute/PR/done phases see it set. The `${VAR:+...}` defensive pattern
+above covers both cases.
+
 ## debug-brief-protocol
 
 Applies when you receive mail with `--type debug_brief_request` (Stage C/E debug-loop). The request payload (`DebugBriefRequestPayload`) is a **discriminated union on `failureSource`** — either `'holdout'` (post-merge integration gate failure) or `'ci'` (PR CI check failure). Your job is to package a `debug-brief.md` for the debugger so it can apply a surgical fix without re-deriving the whole mission context.

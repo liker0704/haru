@@ -3,11 +3,26 @@ import { mkdir, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { cleanupTempDir } from "../../test-helpers.ts";
+import type { TrackerClient } from "../../tracker/types.ts";
 import type { Mission } from "../../types.ts";
 import type { HandlerContext } from "../types.ts";
 import type { DebugLoopDeps } from "./debug-loop-handlers.ts";
 import { makeDebugLoopHandlers } from "./debug-loop-handlers.ts";
 import type { PhaseCellDeps } from "./types.ts";
+
+/** No-op TrackerClient stub — REQUIRED on PhaseCellDeps after ws-store-types lands. */
+function makeStubTracker(): TrackerClient {
+	return {
+		ready: async () => [],
+		show: async () => ({ id: "", title: "", status: "", priority: 0, type: "" }),
+		create: async () => "",
+		claim: async () => {},
+		close: async () => {},
+		comment: async () => {},
+		list: async () => [],
+		sync: async () => {},
+	};
+}
 
 // Shared fake checkpoint store backed by a Map.
 function makeCheckpointStore(initial: Record<string, unknown> = {}) {
@@ -220,6 +235,7 @@ describe("makeDebugLoopHandlers checkpoint namespacing", () => {
 						getCheckpoint: () => null,
 					},
 				} as unknown as PhaseCellDeps["missionStore"],
+				tracker: makeStubTracker(),
 				overstoryDir: tempDir,
 				projectRoot: "/tmp/ns-test",
 			};
@@ -292,6 +308,7 @@ describe("makeDebugLoopHandlers dispatch-debugger preflight", () => {
 					getCheckpoint: () => null,
 				},
 			} as unknown as PhaseCellDeps["missionStore"],
+			tracker: makeStubTracker(),
 			overstoryDir: tempDir,
 			projectRoot: "/tmp/project-not-used",
 		};
@@ -480,6 +497,7 @@ describe("makeDebugLoopHandlers worktree probe", () => {
 					getCheckpoint: () => null,
 				},
 			} as unknown as PhaseCellDeps["missionStore"],
+			tracker: makeStubTracker(),
 			overstoryDir: tempDir,
 			projectRoot: "/tmp/wt-probe-test",
 		};
@@ -613,6 +631,7 @@ describe("makeDebugLoopHandlers sling spawn args (issue #337)", () => {
 					getCheckpoint: () => null,
 				},
 			} as unknown as PhaseCellDeps["missionStore"],
+			tracker: makeStubTracker(),
 			overstoryDir: tempDir,
 			projectRoot: "/tmp/sling-args-test",
 		};
@@ -674,6 +693,7 @@ describe("makeDebugLoopHandlers check-debug-attempts", () => {
 					},
 				},
 			} as unknown as PhaseCellDeps["missionStore"],
+			tracker: makeStubTracker(),
 		};
 	}
 
@@ -766,6 +786,7 @@ describe("makeDebugLoopHandlers escalate placeholder-checkpoint", () => {
 				updatePauseReason: () => {},
 				transaction: <T>(fn: () => T): T => fn(),
 			} as unknown as PhaseCellDeps["missionStore"],
+			tracker: makeStubTracker(),
 			mailStore: mailStore as unknown as PhaseCellDeps["mailStore"],
 		};
 
@@ -809,6 +830,7 @@ describe("makeDebugLoopHandlers escalate placeholder-checkpoint", () => {
 				updatePauseReason: () => {},
 				transaction: <T>(fn: () => T): T => fn(),
 			} as unknown as PhaseCellDeps["missionStore"],
+			tracker: makeStubTracker(),
 			mailStore: mailStore as unknown as PhaseCellDeps["mailStore"],
 		};
 
@@ -842,6 +864,7 @@ describe("makeDebugLoopHandlers escalate placeholder-checkpoint", () => {
 				updatePauseReason: () => {},
 				transaction: <T>(fn: () => T): T => fn(),
 			} as unknown as PhaseCellDeps["missionStore"],
+			tracker: makeStubTracker(),
 			mailStore: mailStore as unknown as PhaseCellDeps["mailStore"],
 		};
 

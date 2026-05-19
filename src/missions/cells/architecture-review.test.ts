@@ -260,6 +260,7 @@ function createMockMissionStore(): MissionStore {
 
 		setParentMissionId: noop,
 		setSuperseded: noop,
+		setTaskId: noop,
 
 		close: noop,
 	};

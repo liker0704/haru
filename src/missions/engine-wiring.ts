@@ -13,6 +13,8 @@ import type { OverstoryConfig } from "../config-types.ts";
 import { assembleMrp as runAssembleMrp } from "../merge/mrp-assembler.ts";
 import { createMetricsStore } from "../metrics/store.ts";
 import type { SessionStore } from "../sessions/store.ts";
+import { createNoopTracker } from "../tracker/seeds.ts";
+import type { TrackerBackend, TrackerClient } from "../tracker/types.ts";
 import type {
 	CheckpointStore,
 	Mission,
@@ -51,6 +53,8 @@ export type { StepResult } from "./engine.ts";
 export interface EngineDeps {
 	checkpointStore: CheckpointStore;
 	missionStore: MissionStore;
+	/** Tracker client constructed once at watchdog startup (D-1). */
+	tracker: TrackerClient;
 	sendMail?: (to: string, subject: string, body: string, type: string) => Promise<void>;
 	sessionStore?: SessionStore;
 	/** Optional mail store for handlers that need inbox/outbox inspection
@@ -68,6 +72,66 @@ export interface EngineStatus {
 	cellType: string;
 	currentNodeId: string;
 	transitions: Array<{ fromNode: string; toNode: string; trigger: string; createdAt: string }>;
+}
+
+// === Tracker backend resolution ===
+
+/**
+ * Resolve "auto" to a concrete backend via injected DI predicates.
+ * Resolution order: suji dir → seeds dir → beads dir → github remote → "seeds" fallback.
+ * Explicit backend values pass through unchanged.
+ * Designed to run ONCE at watchdog startup, never per-tick.
+ */
+export async function resolveBackend(
+	configured: TrackerBackend | "auto",
+	projectRoot: string,
+	deps?: {
+		hasSujiDir?: (root: string) => boolean | Promise<boolean>;
+		hasSeedsDir?: (root: string) => boolean | Promise<boolean>;
+		hasBeadsDir?: (root: string) => boolean | Promise<boolean>;
+		hasGithubRemote?: (root: string) => boolean | Promise<boolean>;
+	},
+): Promise<TrackerBackend> {
+	if (configured !== "auto") return configured;
+
+	const { stat } = await import("node:fs/promises");
+	const { join: pathJoin } = await import("node:path");
+
+	const defaultDirCheck = async (dir: string): Promise<boolean> => {
+		try {
+			const s = await stat(dir);
+			return s.isDirectory();
+		} catch {
+			return false;
+		}
+	};
+
+	const hasSuji = deps?.hasSujiDir ?? ((root) => defaultDirCheck(pathJoin(root, ".suji")));
+	const hasSeeds = deps?.hasSeedsDir ?? ((root) => defaultDirCheck(pathJoin(root, ".seeds")));
+	const hasBeads = deps?.hasBeadsDir ?? ((root) => defaultDirCheck(pathJoin(root, ".beads")));
+	const hasGithub =
+		deps?.hasGithubRemote ??
+		(async (root) => {
+			try {
+				const proc = Bun.spawn(["git", "remote", "get-url", "origin"], {
+					cwd: root,
+					stdout: "pipe",
+					stderr: "pipe",
+				});
+				const exitCode = await proc.exited;
+				if (exitCode !== 0) return false;
+				const url = await new Response(proc.stdout).text();
+				return url.trim().includes("github.com");
+			} catch {
+				return false;
+			}
+		});
+
+	if (await hasSuji(projectRoot)) return "seeds";
+	if (await hasSeeds(projectRoot)) return "seeds";
+	if (await hasBeads(projectRoot)) return "beads";
+	if (await hasGithub(projectRoot)) return "github";
+	return "seeds";
 }
 
 // === Cell registries ===
@@ -332,7 +396,10 @@ export async function advanceCellGate(
 /**
  * Get the current engine status for a mission, or null if no checkpoint exists.
  */
-export function getCellEngineStatus(mission: Mission, deps: EngineDeps): EngineStatus | null {
+export function getCellEngineStatus(
+	mission: Mission,
+	deps: Pick<EngineDeps, "checkpointStore" | "missionStore">,
+): EngineStatus | null {
 	const latest = deps.checkpointStore.getLatestCheckpoint(mission.id);
 	if (!latest) return null;
 
@@ -371,6 +438,7 @@ export function buildLifecycleHandlers(
 		mailSend: deps.sendMail ?? (async () => {}),
 		checkpointStore: deps.checkpointStore,
 		missionStore,
+		tracker: deps.tracker,
 		sessionStore: deps.sessionStore,
 		mailStore: deps.mailStore,
 		overstoryDir,
@@ -529,7 +597,7 @@ export function resolveCompletionTrigger(mission: Mission): string | null {
 export async function transitionMissionViaEngine(
 	missionId: string,
 	trigger: string,
-	deps: EngineDeps,
+	deps: Pick<EngineDeps, "checkpointStore" | "missionStore"> & { tracker?: TrackerClient },
 ): Promise<StepResult> {
 	const mission = deps.missionStore.getById(missionId);
 	if (!mission) {
@@ -562,10 +630,14 @@ export async function transitionMissionViaEngine(
 		}
 	}
 
+	const engineDeps: EngineDeps = {
+		...deps,
+		tracker: deps.tracker ?? createNoopTracker(),
+	};
 	const tier: MissionTier = mission.tier ?? "full";
 	const graph = buildLifecycleGraph(mission);
-	const handlers = buildLifecycleHandlers(deps, tier);
-	const engine = startLifecycleEngine(mission, deps, {
+	const handlers = buildLifecycleHandlers(engineDeps, tier);
+	const engine = startLifecycleEngine(mission, engineDeps, {
 		startNodeId,
 		graph,
 		handlers,
