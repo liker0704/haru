@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { PENDING_SENTINEL } from "../missions/task-id.ts";
 import { type MergeReadinessPack, renderMrpMarkdown } from "./mrp-renderer.ts";
 
 function buildSampleMrp(overrides: Partial<MergeReadinessPack> = {}): MergeReadinessPack {
@@ -189,5 +190,48 @@ describe("renderMrpMarkdown", () => {
 		expect(output).toContain("## Workstreams");
 		expect(output).toContain("## Linked issues");
 		expect(output).toContain("## Agent trail");
+	});
+});
+
+describe("renderMrpMarkdown — taskId Closes-footer (T-w162-r1..r5)", () => {
+	// FIXME(w162-builder): drop cast once renderMrpMarkdown opts type includes taskId.
+	const renderWithTaskId = renderMrpMarkdown as unknown as (
+		mrp: MergeReadinessPack,
+		opts?: { showCost?: boolean; taskId?: string },
+	) => string;
+
+	test('T-w162-r1: taskId real string → output ends with "\\n\\nCloses haru-1234"', () => {
+		const mrp = buildSampleMrp();
+		const output = renderWithTaskId(mrp, { taskId: "haru-1234" });
+		expect(output.endsWith("\n\nCloses haru-1234")).toBe(true);
+	});
+
+	test("T-w162-r2: taskId undefined → output is byte-identical to baseline", () => {
+		const mrp = buildSampleMrp();
+		const baseline = renderMrpMarkdown(mrp);
+		const explicit = renderWithTaskId(mrp, { taskId: undefined });
+		expect(explicit).toBe(baseline);
+		expect(explicit).not.toContain("Closes");
+	});
+
+	test("T-w162-r3: taskId empty string → no footer appended", () => {
+		const mrp = buildSampleMrp();
+		const baseline = renderMrpMarkdown(mrp);
+		const empty = renderWithTaskId(mrp, { taskId: "" });
+		expect(empty).toBe(baseline);
+		expect(empty).not.toContain("Closes");
+	});
+
+	test("T-w162-r4: renderer is dumb — PENDING_SENTINEL emitted verbatim (caller filters)", () => {
+		const mrp = buildSampleMrp();
+		const output = renderWithTaskId(mrp, { taskId: PENDING_SENTINEL });
+		expect(output.endsWith(`\n\nCloses ${PENDING_SENTINEL}`)).toBe(true);
+	});
+
+	test("T-w162-r5: showCost + taskId compose — both Cost section AND Closes footer appear", () => {
+		const mrp = buildSampleMrp();
+		const output = renderWithTaskId(mrp, { showCost: true, taskId: "haru-9999" });
+		expect(output).toContain("## Cost");
+		expect(output.endsWith("\n\nCloses haru-9999")).toBe(true);
 	});
 });
