@@ -346,10 +346,14 @@ export async function missionStart(
 			const config = await loadConfig(projectRoot);
 			if (config.watchdog.tier0Enabled) {
 				const watchdog = createWatchdogControl(projectRoot);
-				const watchdogResult = await watchdog.start();
+				// Idempotency guard (haru-9da0): skip spawn entirely when a live,
+				// fresh daemon already owns the PID file. Prevents lifecycle-command
+				// churn from accumulating redundant `bun run ... watch` processes.
+				const alreadyRunning = await watchdog.isRunning();
+				const watchdogResult = alreadyRunning ? null : await watchdog.start();
 				if (watchdogResult && !opts.json) {
 					printHint("Watchdog started");
-				} else if (!opts.json) {
+				} else if (!alreadyRunning && !opts.json) {
 					const err = await getLastStartError(projectRoot).catch(() => null);
 					if (err) printWarning(`Watchdog failed to start: ${err.split("\n")[0]}`);
 				}
@@ -713,10 +717,14 @@ export async function missionResumeAll(
 			try {
 				if (config.watchdog.tier0Enabled) {
 					const watchdog = createWatchdogControl(projectRoot);
-					const watchdogResult = await watchdog.start();
+					// Idempotency guard (haru-9da0): skip spawn entirely when a live,
+					// fresh daemon already owns the PID file. Prevents lifecycle-command
+					// churn from accumulating redundant `bun run ... watch` processes.
+					const alreadyRunning = await watchdog.isRunning();
+					const watchdogResult = alreadyRunning ? null : await watchdog.start();
 					if (watchdogResult && !json) {
 						printHint("Watchdog started");
-					} else if (!json) {
+					} else if (!alreadyRunning && !json) {
 						const err = await getLastStartError(projectRoot).catch(() => null);
 						if (err) printWarning(`Watchdog failed to start: ${err.split("\n")[0]}`);
 					}
