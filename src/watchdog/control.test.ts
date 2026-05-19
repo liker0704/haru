@@ -428,6 +428,176 @@ test("real-process race: concurrent 'watch --background' → exactly one daemon 
 	}
 }, 30_000);
 
+// ── Stress test: in-process control.start() (haru-orphan-fix) ───────────────
+
+test("stress: 10 concurrent in-process control.start() → at most one daemon (haru-orphan-fix)", async () => {
+	if (process.platform !== "linux") return;
+
+	const tempRoot = createTempProject();
+	try {
+		// Simulate the real-world failure mode: many lifecycle hooks
+		// (`ha mission stop`, `ha sling`, etc.) calling createWatchdogControl().start()
+		// from the same process within milliseconds of each other.
+		const PARALLEL = 10;
+		const ctrls = Array.from({ length: PARALLEL }, () =>
+			createWatchdogControl(tempRoot, { resolveBin: worktreeBinResolver }),
+		);
+		const results = await Promise.all(ctrls.map((c) => c.start()));
+
+		// Allow daemons to settle: lock timeout (5s) + brief buffer.
+		await Bun.sleep(1_000);
+
+		// At most one start() should have returned a non-null pid; others
+		// should have observed the live healthy daemon and short-circuited.
+		const nonNull = results.filter((r) => r !== null);
+		expect(nonNull.length).toBeLessThanOrEqual(1);
+
+		// /proc walk: count surviving watch processes under tempRoot.
+		let watchCount = 0;
+		const survivors: number[] = [];
+		try {
+			const { readdirSync, readFileSync } = await import("node:fs");
+			for (const entry of readdirSync("/proc")) {
+				if (!/^\d+$/.test(entry)) continue;
+				try {
+					const cmdline = readFileSync(`/proc/${entry}/cmdline`, "utf8");
+					const cwdLink = readFileSync(`/proc/${entry}/cwd`, "utf8").trim();
+					if (
+						cmdline.includes("watch") &&
+						cmdline.includes("--background") &&
+						cwdLink === tempRoot
+					) {
+						watchCount++;
+						survivors.push(Number.parseInt(entry, 10));
+					}
+				} catch {
+					// process may have exited
+				}
+			}
+		} catch {
+			return; // /proc not available
+		}
+
+		expect(watchCount).toBeLessThanOrEqual(1);
+
+		const pidFromFile = await readWatchdogPid(tempRoot);
+		if (watchCount === 1) {
+			expect(pidFromFile).not.toBeNull();
+			expect(isProcessRunning(pidFromFile as number)).toBe(true);
+		}
+	} finally {
+		const pid = await readWatchdogPid(tempRoot);
+		if (pid !== null) {
+			try {
+				process.kill(pid, "SIGKILL");
+			} catch {}
+		}
+		try {
+			const { readdirSync, readFileSync } = await import("node:fs");
+			for (const entry of readdirSync("/proc")) {
+				if (!/^\d+$/.test(entry)) continue;
+				try {
+					const cmdline = readFileSync(`/proc/${entry}/cmdline`, "utf8");
+					const cwdLink = readFileSync(`/proc/${entry}/cwd`, "utf8").trim();
+					if (cmdline.includes("watch") && cwdLink === tempRoot) {
+						try {
+							process.kill(Number.parseInt(entry, 10), "SIGKILL");
+						} catch {}
+					}
+				} catch {}
+			}
+		} catch {}
+		cleanupProject(tempRoot);
+	}
+}, 60_000);
+
+// ── Stress test: concurrent control.start() calls (haru-orphan-fix) ──────────
+
+test("stress: 10 concurrent control.start() calls → at most one daemon survives (haru-orphan-fix)", async () => {
+	if (process.platform !== "linux") return;
+
+	const tempRoot = createTempProject();
+	try {
+		// Launch 10 outer `watch --background` processes in parallel. This mirrors
+		// what happens when many mission lifecycle calls (`ha mission stop/resume`,
+		// `ha sling`) hit createWatchdogControl().start() in quick succession.
+		const overstoryBin = await resolveOverstoryBin();
+		const PARALLEL = 10;
+		const spawns = Array.from({ length: PARALLEL }, () =>
+			Bun.spawn(["bun", "run", overstoryBin, "watch", "--background"], {
+				cwd: tempRoot,
+				stdout: "ignore",
+				stderr: "ignore",
+				stdin: "ignore",
+			}),
+		);
+
+		await Promise.all(spawns.map((s) => s.exited));
+		// Allow all losing inner daemons to self-exit. Total wait: lock timeout (5s)
+		// plus a small buffer for kernel-level process teardown.
+		await Bun.sleep(6_000);
+
+		// Walk /proc to count surviving processes whose cmdline includes our
+		// bin path + "watch". Must be at most 1 (the winning daemon).
+		let watchCount = 0;
+		const survivors: number[] = [];
+		try {
+			const { readdirSync, readFileSync } = await import("node:fs");
+			for (const entry of readdirSync("/proc")) {
+				if (!/^\d+$/.test(entry)) continue;
+				try {
+					const cmdline = readFileSync(`/proc/${entry}/cmdline`, "utf8");
+					if (cmdline.includes(overstoryBin) && cmdline.includes("watch")) {
+						watchCount++;
+						survivors.push(Number.parseInt(entry, 10));
+					}
+				} catch {
+					// Process may have exited between readdir and read
+				}
+			}
+		} catch {
+			// /proc not available — skip count check
+			return;
+		}
+
+		expect(watchCount).toBeLessThanOrEqual(1);
+
+		// The single surviving daemon (if any) must match the PID file.
+		const pidFromFile = await readWatchdogPid(tempRoot);
+		if (watchCount === 1) {
+			expect(pidFromFile).toBe(survivors[0] ?? null);
+			expect(isProcessRunning(pidFromFile as number)).toBe(true);
+		}
+	} finally {
+		// Kill any surviving watchdog daemons under the temp root cwd.
+		const pid = await readWatchdogPid(tempRoot);
+		if (pid !== null) {
+			try {
+				process.kill(pid, "SIGKILL");
+			} catch {}
+		}
+		// Sweep /proc for stragglers that may not be in the PID file
+		try {
+			const { readdirSync, readFileSync } = await import("node:fs");
+			for (const entry of readdirSync("/proc")) {
+				if (!/^\d+$/.test(entry)) continue;
+				try {
+					const cmdline = readFileSync(`/proc/${entry}/cmdline`, "utf8");
+					const cwdLink = readFileSync(`/proc/${entry}/cwd`, "utf8").trim();
+					if (cmdline.includes("watch") && cwdLink === tempRoot) {
+						try {
+							process.kill(Number.parseInt(entry, 10), "SIGKILL");
+						} catch {}
+					}
+				} catch {
+					// ignore
+				}
+			}
+		} catch {}
+		cleanupProject(tempRoot);
+	}
+}, 60_000);
+
 // ── getLastStartError ─────────────────────────────────────────────────────────
 
 describe("getLastStartError()", () => {
