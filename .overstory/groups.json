@@ -2032,5 +2032,31 @@
 		"status": "active",
 		"createdAt": "2026-05-18T17:42:23.394Z",
 		"completedAt": null
+	},
+	{
+		"id": "group-ea8cd206",
+		"name": "db98-batch-2-handlers",
+		"memberIssueIds": [
+			"haru-8bc6",
+			"haru-c82d",
+			"haru-2484",
+			"haru-2fb5"
+		],
+		"status": "active",
+		"createdAt": "2026-05-18T19:44:56.737Z",
+		"completedAt": null
+	},
+	{
+		"id": "group-48328484",
+		"name": "fix-db98-v2-batch",
+		"memberIssueIds": [
+			"haru-751d",
+			"haru-162d",
+			"haru-808d",
+			"haru-990e"
+		],
+		"status": "active",
+		"createdAt": "2026-05-19T10:08:23.357Z",
+		"completedAt": null
 	}
 ]
