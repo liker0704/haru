@@ -356,8 +356,8 @@ When all workstream branches are merged (Full tier always has architect):
 ### Phase 4 -- Done
 
 1. Instruct analyst to produce final summary artifacts.
-2. Clean up: `ha worktree clean --completed`.
-3. Record learnings: `ku record <domain> --type <type> --description "<insight>"`.
+2. Record learnings FIRST (before cleanup, so any uncommitted `.mulch/` state in agent worktrees is preserved): `ku record <domain> --type <type> --description "<insight>"`.
+3. Clean up ONLY AFTER learnings are recorded: `ha worktree clean --completed`.
 4. Commit state:
    ```bash
    {{TRACKER_CLI}} sync
