@@ -73,6 +73,14 @@ function makeConfig(overrides?: ConfigOverrides): PhaseCellConfig {
 }
 
 function makeBaseDeps(overrides?: Partial<PhaseCellDeps>): PhaseCellDeps {
+	const defaultSpawn = ((_args: string[], _opts?: unknown) => {
+		return {
+			exited: Promise.resolve(0),
+			stdout: null,
+			stderr: null,
+			unref: () => {},
+		} as unknown as ReturnType<typeof Bun.spawn>;
+	}) as unknown as typeof Bun.spawn;
 	return {
 		mailSend: async () => {},
 		checkpointStore: {} as PhaseCellDeps["checkpointStore"],
@@ -80,6 +88,7 @@ function makeBaseDeps(overrides?: Partial<PhaseCellDeps>): PhaseCellDeps {
 		tracker: makeStubTracker(),
 		overstoryDir: "/tmp/overstory",
 		projectRoot: "/tmp/p",
+		spawn: defaultSpawn,
 		...(overrides ?? {}),
 	};
 }
@@ -1746,5 +1755,169 @@ describe("prPhaseCell create handler — MRP body rendering", () => {
 		);
 		expect(result.trigger).toBe("pr_already_exists");
 		expect(upsertCalls).toHaveLength(1);
+	});
+});
+
+// =============================================================================
+// push-before-create: T-w3-push-1 .. T-w3-push-5 + T-w3-push-4b
+// =============================================================================
+
+function makeStderrStream(text: string): ReadableStream {
+	return new ReadableStream({
+		start(c) {
+			c.enqueue(new TextEncoder().encode(text));
+			c.close();
+		},
+	});
+}
+
+describe("prPhaseCell create — push before gh pr create", () => {
+	let savedBudget: GhBudget | null;
+
+	beforeEach(() => {
+		savedBudget = null;
+		try {
+			savedBudget = getGhBudget();
+		} catch {
+			savedBudget = null;
+		}
+	});
+
+	afterEach(() => {
+		setGhBudget(savedBudget);
+	});
+
+	test("T-w3-push-1: git push is invoked before gh pr create", async () => {
+		const callOrder: string[] = [];
+		const fakeSpawn = ((args: readonly string[]) => {
+			callOrder.push(`spawn:${args.join(" ")}`);
+			return {
+				exited: Promise.resolve(0),
+				stdout: null,
+				stderr: null,
+				unref: () => {},
+			} as unknown as ReturnType<typeof Bun.spawn>;
+		}) as unknown as typeof Bun.spawn;
+		const { budget } = makeFakeGhBudget(({ args }) => {
+			if (args[0] === "pr" && args[1] === "create") {
+				callOrder.push("gh:pr-create");
+				return { exitCode: 0, stdout: "https://github.com/x/y/pull/1" };
+			}
+			return { exitCode: 0 };
+		});
+		setGhBudget(budget);
+		const handlers = prPhaseCell.buildHandlers(makeBaseDeps({ spawn: fakeSpawn }));
+		await handlers.create!(
+			makeCtx({ mission: makeMission({ featureBranch: "feature/x" }) as unknown as Mission }),
+		);
+		const pushIdx = callOrder.findIndex((c) => c.startsWith("spawn:git push"));
+		const ghIdx = callOrder.indexOf("gh:pr-create");
+		expect(pushIdx).toBeGreaterThanOrEqual(0);
+		expect(ghIdx).toBeGreaterThan(pushIdx);
+	});
+
+	test("T-w3-push-2: push exit 0, gh pr create success → pr_created", async () => {
+		const fakeSpawn = ((_args: string[], _opts?: unknown) => {
+			return {
+				exited: Promise.resolve(0),
+				stdout: null,
+				stderr: null,
+				unref: () => {},
+			} as unknown as ReturnType<typeof Bun.spawn>;
+		}) as unknown as typeof Bun.spawn;
+		const { budget } = makeFakeGhBudget(({ args }) => {
+			if (args[0] === "pr" && args[1] === "create")
+				return { exitCode: 0, stdout: "https://github.com/x/y/pull/2" };
+			return { exitCode: 0 };
+		});
+		setGhBudget(budget);
+		const handlers = prPhaseCell.buildHandlers(makeBaseDeps({ spawn: fakeSpawn }));
+		const result = await handlers.create!(
+			makeCtx({ mission: makeMission({ featureBranch: "feature/x" }) as unknown as Mission }),
+		);
+		expect(result.trigger).toBe("pr_created");
+	});
+
+	test("T-w3-push-3: push fails (network) → pr_create_network_fail, gh pr create NOT called", async () => {
+		const calls: Array<{ args: readonly string[] }> = [];
+		const fakeSpawn = ((args: readonly string[], _opts?: unknown) => {
+			calls.push({ args });
+			return {
+				exited: Promise.resolve(1),
+				stdout: null,
+				stderr: makeStderrStream("fatal: could not read from remote repository\n"),
+				unref: () => {},
+			} as unknown as ReturnType<typeof Bun.spawn>;
+		}) as unknown as typeof Bun.spawn;
+		const { budget, calls: ghCalls } = makeFakeGhBudget(() => ({ exitCode: 0 }));
+		setGhBudget(budget);
+		const handlers = prPhaseCell.buildHandlers(makeBaseDeps({ spawn: fakeSpawn }));
+		const result = await handlers.create!(
+			makeCtx({ mission: makeMission({ featureBranch: "feature/x" }) as unknown as Mission }),
+		);
+		expect(result.trigger).toBe("pr_create_network_fail");
+		expect(ghCalls.some((c) => c.args[0] === "pr" && c.args[1] === "create")).toBe(false);
+	});
+
+	test("T-w3-push-4: protected branch → pr_branch_protected, gh pr create NOT called", async () => {
+		const fakeSpawn = ((_args: string[], _opts?: unknown) => {
+			return {
+				exited: Promise.resolve(1),
+				stdout: null,
+				stderr: makeStderrStream(
+					"remote: error: GH006: Protected branch update failed for refs/heads/feature/x.\n",
+				),
+				unref: () => {},
+			} as unknown as ReturnType<typeof Bun.spawn>;
+		}) as unknown as typeof Bun.spawn;
+		const { budget, calls: ghCalls } = makeFakeGhBudget(() => ({ exitCode: 0 }));
+		setGhBudget(budget);
+		const handlers = prPhaseCell.buildHandlers(makeBaseDeps({ spawn: fakeSpawn }));
+		const result = await handlers.create!(
+			makeCtx({ mission: makeMission({ featureBranch: "feature/x" }) as unknown as Mission }),
+		);
+		expect(result.trigger).toBe("pr_branch_protected");
+		expect(ghCalls.some((c) => c.args[0] === "pr" && c.args[1] === "create")).toBe(false);
+	});
+
+	test("T-w3-push-4b: pre-receive hook declined → pr_branch_protected, gh pr create NOT called", async () => {
+		const fakeSpawn = ((_args: string[], _opts?: unknown) => {
+			return {
+				exited: Promise.resolve(1),
+				stdout: null,
+				stderr: makeStderrStream("remote: pre-receive hook declined\n"),
+				unref: () => {},
+			} as unknown as ReturnType<typeof Bun.spawn>;
+		}) as unknown as typeof Bun.spawn;
+		const { budget, calls: ghCalls } = makeFakeGhBudget(() => ({ exitCode: 0 }));
+		setGhBudget(budget);
+		const handlers = prPhaseCell.buildHandlers(makeBaseDeps({ spawn: fakeSpawn }));
+		const result = await handlers.create!(
+			makeCtx({ mission: makeMission({ featureBranch: "feature/x" }) as unknown as Mission }),
+		);
+		expect(result.trigger).toBe("pr_branch_protected");
+		expect(ghCalls.some((c) => c.args[0] === "pr" && c.args[1] === "create")).toBe(false);
+	});
+
+	test("T-w3-push-5: Everything up-to-date (exit 0) → pr_created", async () => {
+		const fakeSpawn = ((_args: string[], _opts?: unknown) => {
+			return {
+				exited: Promise.resolve(0),
+				stdout: null,
+				stderr: makeStderrStream("Everything up-to-date\n"),
+				unref: () => {},
+			} as unknown as ReturnType<typeof Bun.spawn>;
+		}) as unknown as typeof Bun.spawn;
+		const { budget } = makeFakeGhBudget(({ args }) => {
+			if (args[0] === "pr" && args[1] === "create")
+				return { exitCode: 0, stdout: "https://github.com/x/y/pull/5" };
+			return { exitCode: 0 };
+		});
+		setGhBudget(budget);
+		const handlers = prPhaseCell.buildHandlers(makeBaseDeps({ spawn: fakeSpawn }));
+		const result = await handlers.create!(
+			makeCtx({ mission: makeMission({ featureBranch: "feature/x" }) as unknown as Mission }),
+		);
+		expect(result.trigger).toBe("pr_created");
 	});
 });
