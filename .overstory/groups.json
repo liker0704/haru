@@ -2058,5 +2058,15 @@
 		"status": "active",
 		"createdAt": "2026-05-19T10:08:23.357Z",
 		"completedAt": null
+	},
+	{
+		"id": "group-57fa2f33",
+		"name": "fix-pr-phase-push-batch",
+		"memberIssueIds": [
+			"haru-b3df"
+		],
+		"status": "active",
+		"createdAt": "2026-05-19T13:17:36.509Z",
+		"completedAt": null
 	}
 ]
