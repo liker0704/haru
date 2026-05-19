@@ -76,8 +76,23 @@ async function isHeartbeatFresh(
 ): Promise<boolean> {
 	const file = Bun.file(heartbeatPath);
 	if (!(await file.exists())) return false;
+	const threshold = now() - 2 * intervalMs;
+	// Prefer the heartbeat file contents (ms-since-epoch integer the daemon
+	// writes every tick). Fall back to mtime when contents are absent or
+	// unparseable so older daemons without content writes still report fresh.
+	try {
+		const text = (await file.text()).trim();
+		if (text.length > 0) {
+			const hb = Number.parseInt(text, 10);
+			if (!Number.isNaN(hb) && hb > 0) {
+				return hb >= threshold;
+			}
+		}
+	} catch {
+		// Fall through to mtime check
+	}
 	const stat = await file.stat();
-	return stat.mtimeMs >= now() - 2 * intervalMs;
+	return stat.mtimeMs >= threshold;
 }
 
 async function truncateStderrLog(stderrLogPath: string): Promise<void> {
