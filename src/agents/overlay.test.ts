@@ -1040,6 +1040,17 @@ describe("projectContext in overlay", () => {
 	});
 });
 
+describe("HARU_MISSION_TASK_ID documentation", () => {
+	test("rendered overlay contains the HARU_MISSION_TASK_ID docs block", async () => {
+		const config = makeConfig();
+		const output = await generateOverlay(config);
+
+		expect(output).toContain("HARU_MISSION_TASK_ID");
+		expect(output).toContain("Not a template placeholder");
+		expect(output).toContain("follow-up");
+	});
+});
+
 describe("buildTemplateReplacements MISSION_AUTONOMY", () => {
 	test("defaults to supervised when missionAutonomy is undefined", () => {
 		const result = buildTemplateReplacements({});

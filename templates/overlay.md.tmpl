@@ -80,6 +80,29 @@ ha mail send --to {{PARENT_AGENT}} --subject "done" \
 ha mail reply <message-id> --body "Your reply" --agent {{AGENT_NAME}}
 ```
 
+## Environment Variable: `HARU_MISSION_TASK_ID`
+
+When this agent is spawned as part of a haru mission, the shell environment
+**may** include `HARU_MISSION_TASK_ID` — the tracker issue id (e.g. `haru-1234`)
+for the parent mission.
+
+- **Availability:** set only when the mission has an associated tracker issue
+  (auto-created during intake by `ws-intake-create-issue`). May be unset for
+  missions started before the auto-link feature landed or for ad-hoc spawns
+  outside of a mission.
+- **Usage in agent prompts:** prompts use
+  `${HARU_MISSION_TASK_ID:+--blockedBy "$HARU_MISSION_TASK_ID"}` so they
+  gracefully no-op when the variable is unset.
+- **Not a template placeholder.** The overlay renderer does **not** substitute
+  a `HARU_MISSION_TASK_ID` placeholder — the value lives in the shell env of
+  the spawned agent, not in this file.
+- **Status:** spawn-time env-var injection in `src/agents/spawn.ts` is tracked
+  as a separate follow-up (see Decision D-1 in mission `fix-db98-v2`'s
+  `decisions.md`, and the follow-up issue filed against haru-db98). Until that
+  lands, the `:+` shell expansion will no-op and sub-issue parent linkage is
+  not actually wired. This documentation block intentionally ships ahead of the
+  wiring so the contract is discoverable.
+
 ## Spawning Sub-Workers
 
 {{CAN_SPAWN}}
