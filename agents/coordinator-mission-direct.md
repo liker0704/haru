@@ -244,8 +244,8 @@ When all work streams are merged and issues closed:
 
 1. Verify all issues are closed: `{{TRACKER_CLI}} show <id>` for each.
 2. Verify all branches are merged: `ha status` for unmerged branches.
-3. Clean up worktrees: `ha worktree clean --completed`.
-4. Record learnings: `ku record <domain> --type <type> --description "<insight>"`.
+3. Record learnings FIRST (before cleanup, so any uncommitted `.mulch/` state in agent worktrees is preserved): `ku record <domain> --type <type> --description "<insight>"`.
+4. Clean up worktrees ONLY AFTER learnings are recorded: `ha worktree clean --completed`.
 5. Commit state:
    ```bash
    {{TRACKER_CLI}} sync

@@ -304,8 +304,8 @@ When a batch is complete (task group auto-closed, all issues resolved):
 
 1. Verify all issues are closed: run `{{TRACKER_CLI}} show <id>` for each issue in the group.
 2. Verify all branches are merged: check `ha status` for unmerged branches. If any branch is unmerged, do NOT proceed — wait for the lead's `merge_ready` signal.
-3. Clean up worktrees: `ha worktree clean --completed`.
-4. Record orchestration insights: `ku record <domain> --type <type> --classification <foundational|tactical|observational> --description "<insight>"`.
+3. Record orchestration insights FIRST (before cleanup, so any uncommitted `.mulch/` state in agent worktrees is preserved): `ku record <domain> --type <type> --classification <foundational|tactical|observational> --description "<insight>"`.
+4. Clean up worktrees ONLY AFTER mulch is recorded: `ha worktree clean --completed`.
 5. Commit and sync state files: after all work is merged and issues are closed, commit any outstanding state changes so runtime state is not left uncommitted when the coordinator goes idle:
    ```bash
    {{TRACKER_CLI}} sync
