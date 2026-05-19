@@ -34,8 +34,11 @@
  * escalate rather than silently returning the success trigger.
  */
 
+import { join } from "node:path";
 import type { MissionGraph } from "../../types.ts";
+import { PENDING_SENTINEL, isRealTaskId } from "../task-id.ts";
 import type { HandlerRegistry } from "../types.ts";
+import { extractSpecTitle } from "./spec-title.ts";
 import { spawnEphemeralAgent } from "./spawn-helpers.ts";
 import type { PhaseCellConfig, PhaseCellDefinition, PhaseCellDeps } from "./types.ts";
 
@@ -114,6 +117,12 @@ function buildSubgraph(_config: PhaseCellConfig): MissionGraph {
 			},
 			{
 				kind: "cell",
+				id: `${CELL_TYPE}:create-tracker-issue`,
+				cellType: CELL_TYPE,
+				handler: "create-tracker-issue",
+			},
+			{
+				kind: "cell",
 				id: `${CELL_TYPE}:dispatch-tier-classifier`,
 				cellType: CELL_TYPE,
 				handler: "dispatch-tier-classifier",
@@ -176,11 +185,31 @@ function buildSubgraph(_config: PhaseCellConfig): MissionGraph {
 				to: `${CELL_TYPE}:human-spec-review`,
 				trigger: "spec_ready",
 			},
-			// Approval — proceed to tier classification
+			// Approval — create tracker issue, then proceed to tier classification
 			{
 				from: `${CELL_TYPE}:human-spec-review`,
-				to: `${CELL_TYPE}:dispatch-tier-classifier`,
+				to: `${CELL_TYPE}:create-tracker-issue`,
 				trigger: "approved",
+			},
+			{
+				from: `${CELL_TYPE}:create-tracker-issue`,
+				to: `${CELL_TYPE}:dispatch-tier-classifier`,
+				trigger: "issue_created",
+			},
+			{
+				from: `${CELL_TYPE}:create-tracker-issue`,
+				to: `${CELL_TYPE}:dispatch-tier-classifier`,
+				trigger: "issue_already_set",
+			},
+			{
+				from: `${CELL_TYPE}:create-tracker-issue`,
+				to: `${CELL_TYPE}:dispatch-tier-classifier`,
+				trigger: "spec_missing",
+			},
+			{
+				from: `${CELL_TYPE}:create-tracker-issue`,
+				to: `${CELL_TYPE}:dispatch-tier-classifier`,
+				trigger: "issue_create_failed",
 			},
 			// Rejection — capture reason, retry or escalate
 			{
@@ -243,6 +272,16 @@ function buildSubgraph(_config: PhaseCellConfig): MissionGraph {
 interface IntakeCheckpoint {
 	rejectionCount?: number;
 	rejectionReason?: string;
+}
+
+function isValidTrackerId(id: unknown): id is string {
+	return (
+		typeof id === "string" &&
+		id.length > 0 &&
+		id.length <= 64 &&
+		/^[A-Za-z0-9_-]+$/.test(id) &&
+		id !== PENDING_SENTINEL
+	);
 }
 
 function buildHandlers(deps: PhaseCellDeps): HandlerRegistry {
@@ -354,6 +393,55 @@ function buildHandlers(deps: PhaseCellDeps): HandlerRegistry {
 			// switches this node from `gate:"human"` to a non-gate node still has
 			// safe behavior.
 			return { trigger: "approved" };
+		},
+
+		"create-tracker-issue": async (ctx) => {
+			const mission = ctx.getMission();
+			if (!mission) return { trigger: "issue_create_failed" };
+
+			if (isRealTaskId(mission.taskId)) return { trigger: "issue_already_set" };
+
+			if (!mission.artifactRoot) return { trigger: "spec_missing" };
+			const specPath = join(mission.artifactRoot, "product-spec.md");
+			const specFile = Bun.file(specPath);
+			if (!(await specFile.exists())) return { trigger: "spec_missing" };
+
+			const rawSpec = await specFile.text();
+			const title = extractSpecTitle(rawSpec) ?? mission.objective.slice(0, 80);
+
+			const SPEC_DESCRIPTION_CAP = 32 * 1024;
+			const description =
+				rawSpec.length > SPEC_DESCRIPTION_CAP
+					? `${rawSpec.slice(0, SPEC_DESCRIPTION_CAP)}\n\n[truncated at 32 KiB — see <artifactRoot>/product-spec.md for full content]`
+					: rawSpec;
+
+			let issueId: string;
+			try {
+				issueId = await deps.tracker.create(title, { type: "task", description });
+			} catch (err) {
+				console.warn(
+					`[intake-phase:create-tracker-issue] tracker.create failed: ${err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200)}`,
+				);
+				return { trigger: "issue_create_failed" };
+			}
+
+			if (!isValidTrackerId(issueId as unknown)) {
+				console.warn(
+					`[intake-phase:create-tracker-issue] tracker.create returned invalid id (length=${issueId.length}); skipping setTaskId`,
+				);
+				return { trigger: "issue_create_failed" };
+			}
+
+			try {
+				deps.missionStore.setTaskId(mission.id, issueId);
+			} catch (err) {
+				console.error(
+					`[intake-phase:create-tracker-issue] setTaskId failed AFTER tracker.create succeeded (issueId=${issueId}, missionId=${mission.id}): ${err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200)}. Orphan tracker issue exists; manual reconciliation required.`,
+				);
+				return { trigger: "issue_create_failed" };
+			}
+
+			return { trigger: "issue_created" };
 		},
 
 		"spec-rejected": async (ctx) => {
