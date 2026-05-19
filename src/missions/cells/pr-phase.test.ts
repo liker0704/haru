@@ -1561,4 +1561,190 @@ describe("prPhaseCell create handler — MRP body rendering", () => {
 		expect(actualBody.length).toBe(expectedBody.length);
 		expect(actualBody).toBe(expectedBody);
 	});
+
+	// ===========================================================================
+	// taskId Closes-footer (T-w162-p1..p5)
+	// ===========================================================================
+
+	test("T-w162-p1: mission.taskId real → body file ends with Closes haru-1234", async () => {
+		const mrp = buildSampleMrp();
+		writeFileSync(join(artifactDir, "merge-readiness-pack.json"), JSON.stringify(mrp));
+		const { budget, calls } = makeFakeGhBudget(({ args }) => {
+			if (args[0] === "pr" && args[1] === "create") {
+				return { exitCode: 0, stdout: "https://github.com/x/y/pull/162" };
+			}
+			return { exitCode: 0 };
+		});
+		setGhBudget(budget);
+		const handlers = prPhaseCell.buildHandlers(makeBaseDeps(), makeConfig());
+		const create = handlers.create;
+		expect(create).toBeDefined();
+		if (!create) return;
+		await create(
+			makeCtx({
+				missionId: "m-162-p1",
+				mission: makeMission({
+					slug: "test-closes-real",
+					featureBranch: "feature/closes-real",
+					artifactRoot: artifactDir,
+					taskId: "haru-1234",
+				}) as unknown as Mission,
+			}),
+		);
+		const prCreateCall = calls.find((c) => c.args[0] === "pr" && c.args[1] === "create");
+		const ghArgs = Array.from(prCreateCall?.args ?? []);
+		const bodyFileIdx = ghArgs.indexOf("--body-file");
+		const bodyFilePath = bodyFileIdx >= 0 ? ghArgs[bodyFileIdx + 1] : undefined;
+		expect(bodyFilePath).toBeDefined();
+		if (!bodyFilePath) return;
+		const actualBody = await Bun.file(bodyFilePath).text();
+		expect(actualBody.endsWith("\n\nCloses haru-1234")).toBe(true);
+	});
+
+	test("T-w162-p2: mission.taskId null → body has no Closes footer", async () => {
+		const mrp = buildSampleMrp();
+		writeFileSync(join(artifactDir, "merge-readiness-pack.json"), JSON.stringify(mrp));
+		const { budget, calls } = makeFakeGhBudget(({ args }) => {
+			if (args[0] === "pr" && args[1] === "create") {
+				return { exitCode: 0, stdout: "https://github.com/x/y/pull/163" };
+			}
+			return { exitCode: 0 };
+		});
+		setGhBudget(budget);
+		const handlers = prPhaseCell.buildHandlers(makeBaseDeps(), makeConfig());
+		const create = handlers.create;
+		if (!create) return;
+		await create(
+			makeCtx({
+				missionId: "m-162-p2",
+				mission: makeMission({
+					slug: "test-closes-null",
+					featureBranch: "feature/closes-null",
+					artifactRoot: artifactDir,
+					taskId: null,
+				}) as unknown as Mission,
+			}),
+		);
+		const prCreateCall = calls.find((c) => c.args[0] === "pr" && c.args[1] === "create");
+		const ghArgs = Array.from(prCreateCall?.args ?? []);
+		const bodyFilePath = ghArgs[ghArgs.indexOf("--body-file") + 1];
+		if (!bodyFilePath) return;
+		const actualBody = await Bun.file(bodyFilePath).text();
+		expect(actualBody).not.toContain("Closes");
+	});
+
+	test("T-w162-p3: mission.taskId === PENDING_SENTINEL → caller filters, no footer", async () => {
+		const { PENDING_SENTINEL } = await import("../task-id.ts");
+		const mrp = buildSampleMrp();
+		writeFileSync(join(artifactDir, "merge-readiness-pack.json"), JSON.stringify(mrp));
+		const { budget, calls } = makeFakeGhBudget(({ args }) => {
+			if (args[0] === "pr" && args[1] === "create") {
+				return { exitCode: 0, stdout: "https://github.com/x/y/pull/164" };
+			}
+			return { exitCode: 0 };
+		});
+		setGhBudget(budget);
+		const handlers = prPhaseCell.buildHandlers(makeBaseDeps(), makeConfig());
+		const create = handlers.create;
+		if (!create) return;
+		await create(
+			makeCtx({
+				missionId: "m-162-p3",
+				mission: makeMission({
+					slug: "test-closes-pending",
+					featureBranch: "feature/closes-pending",
+					artifactRoot: artifactDir,
+					taskId: PENDING_SENTINEL,
+				}) as unknown as Mission,
+			}),
+		);
+		const prCreateCall = calls.find((c) => c.args[0] === "pr" && c.args[1] === "create");
+		const ghArgs = Array.from(prCreateCall?.args ?? []);
+		const bodyFilePath = ghArgs[ghArgs.indexOf("--body-file") + 1];
+		if (!bodyFilePath) return;
+		const actualBody = await Bun.file(bodyFilePath).text();
+		expect(actualBody).not.toContain("Closes");
+		expect(actualBody).not.toContain(PENDING_SENTINEL);
+	});
+
+	test("T-w162-p4: MRP unavailable + taskId real → fallback body still gets Closes haru-5678", async () => {
+		const { budget, calls } = makeFakeGhBudget(({ args }) => {
+			if (args[0] === "pr" && args[1] === "create") {
+				return { exitCode: 0, stdout: "https://github.com/x/y/pull/165" };
+			}
+			return { exitCode: 0 };
+		});
+		setGhBudget(budget);
+		const handlers = prPhaseCell.buildHandlers(makeBaseDeps(), makeConfig());
+		const create = handlers.create;
+		if (!create) return;
+		await create(
+			makeCtx({
+				missionId: "m-162-p4",
+				mission: makeMission({
+					slug: "test-closes-fallback",
+					featureBranch: "feature/closes-fallback",
+					artifactRoot: artifactDir,
+					taskId: "haru-5678",
+				}) as unknown as Mission,
+			}),
+		);
+		const prCreateCall = calls.find((c) => c.args[0] === "pr" && c.args[1] === "create");
+		const ghArgs = Array.from(prCreateCall?.args ?? []);
+		const bodyFilePath = ghArgs[ghArgs.indexOf("--body-file") + 1];
+		if (!bodyFilePath) return;
+		const actualBody = await Bun.file(bodyFilePath).text();
+		expect(actualBody).toContain("Automated PR for mission: test-closes-fallback");
+		expect(actualBody).toContain("Closes haru-5678");
+		expect(actualBody).toContain("(MRP unavailable");
+	});
+
+	test("T-w162-p5: pr_already_exists branch — footer only fires on fresh create", async () => {
+		const upsertCalls: Array<{ missionId: string }> = [];
+		const missionStore = createMockMissionStore();
+		missionStore.upsertPrState = (row) => {
+			upsertCalls.push({ missionId: row.missionId });
+		};
+		const { budget } = makeFakeGhBudget(({ args }) => {
+			if (args[0] === "pr" && args[1] === "create") {
+				return {
+					exitCode: 1,
+					stderr: "a pull request for branch 'x' into 'main' already exists: #99",
+				};
+			}
+			if (args[0] === "pr" && args[1] === "view") {
+				return {
+					exitCode: 0,
+					stdout: JSON.stringify({
+						number: 99,
+						url: "https://github.com/x/y/pull/99",
+						headRefOid: "abc",
+					}),
+				};
+			}
+			return { exitCode: 0 };
+		});
+		setGhBudget(budget);
+		const mrp = buildSampleMrp();
+		writeFileSync(join(artifactDir, "merge-readiness-pack.json"), JSON.stringify(mrp));
+		const handlers = prPhaseCell.buildHandlers(
+			makeBaseDeps({ missionStore: missionStore as unknown as PhaseCellDeps["missionStore"] }),
+			makeConfig(),
+		);
+		const create = handlers.create;
+		if (!create) return;
+		const result = await create(
+			makeCtx({
+				missionId: "m-162-p5",
+				mission: makeMission({
+					slug: "test-pr-exists",
+					featureBranch: "feature/pr-exists",
+					artifactRoot: artifactDir,
+					taskId: "haru-9999",
+				}) as unknown as Mission,
+			}),
+		);
+		expect(result.trigger).toBe("pr_already_exists");
+		expect(upsertCalls).toHaveLength(1);
+	});
 });
