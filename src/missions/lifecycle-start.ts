@@ -30,7 +30,12 @@ import {
 	sendMissionDispatchMail,
 } from "./messaging.ts";
 import { applyContinueFrom } from "./predecessor.ts";
-import { startMissionAnalyst, startMissionCoordinator, stopMissionRole } from "./roles.ts";
+import {
+	startExecutionDirector,
+	startMissionAnalyst,
+	startMissionCoordinator,
+	stopMissionRole,
+} from "./roles.ts";
 import { removeActiveMission, writeMissionRuntimePointers } from "./runtime-context.ts";
 import { generateSlugFromIntent } from "./slug.ts";
 import { createMissionStore } from "./store.ts";
@@ -432,27 +437,34 @@ export async function missionStart(
 }
 
 /**
- * Restart coordinator and mission-analyst from scratch against an existing mission.
- * Used by resume when prior sessions are gone (e.g. after --kill).
+ * Restart coordinator and mission roles from scratch against an existing mission.
+ * Used by resume when prior sessions are gone (e.g. after --kill or OOM).
+ * Returns per-role results for accurate status reporting in the caller.
  */
 async function restartMissionRoles(
 	overstoryDir: string,
 	projectRoot: string,
 	mission: import("../types.ts").Mission,
-): Promise<void> {
+	deps?: MissionCommandDeps,
+): Promise<Array<{ agentName: string; success: boolean; error?: string }>> {
 	if (!mission.runId) {
 		throw new Error(`Mission ${mission.id} has no runId — cannot restart roles`);
 	}
 	const runId = mission.runId;
 	const tier = mission.tier;
+	const startCoord = deps?.startMissionCoordinator ?? startMissionCoordinator;
+	const startAnalyst = deps?.startMissionAnalyst ?? startMissionAnalyst;
+	const startEd = deps?.startExecutionDirector ?? startExecutionDirector;
 
 	// Stage A: tier=null means mission is still in intake phase — there are no
 	// persistent roles to restart. The intake-phase subgraph (driven by the
 	// watchdog tick) re-spawns ephemeral clarifier/analyst-intake/tier-classifier
 	// agents on the next tick if needed.
 	if (tier === null) {
-		return;
+		return [];
 	}
+
+	const results: Array<{ agentName: string; success: boolean; error?: string }> = [];
 
 	// Slug-scoped agent names (mirrors missionStart pattern)
 	const coordAgentName = mission.slug ? `coordinator-${mission.slug}` : "coordinator";
@@ -484,7 +496,7 @@ async function restartMissionRoles(
 	});
 	drainAgentInbox(overstoryDir, coordAgentName);
 
-	const coordResult = await startMissionCoordinator({
+	const coordResult = await startCoord({
 		missionId: mission.id,
 		missionSlug: mission.slug,
 		agentName: coordAgentName,
@@ -505,6 +517,7 @@ async function restartMissionRoles(
 	} finally {
 		missionStore.close();
 	}
+	results.push({ agentName: coordAgentName, success: true });
 
 	// Conditionally spawn analyst — only for planned/full tiers
 	if (tier === "planned" || tier === "full") {
@@ -521,7 +534,7 @@ async function restartMissionRoles(
 		});
 		drainAgentInbox(overstoryDir, analystAgentName);
 
-		const analystResult = await startMissionAnalyst({
+		const analystResult = await startAnalyst({
 			missionId: mission.id,
 			missionSlug: mission.slug,
 			agentName: analystAgentName,
@@ -543,6 +556,7 @@ async function restartMissionRoles(
 		} finally {
 			missionStore2.close();
 		}
+		results.push({ agentName: analystAgentName, success: true });
 
 		// Notify analyst of resumed mission
 		await sendMissionControlMail({
@@ -563,6 +577,72 @@ async function restartMissionRoles(
 		await nudgeMissionRoleBestEffort(
 			projectRoot,
 			analystAgentName,
+			`Mission resumed: ${mission.slug}. Check mail and review prior work.`,
+		);
+	}
+
+	// Conditionally spawn execution-director — only for full tier in execute-tier phases
+	if (
+		tier === "full" &&
+		(mission.phase === "execute" ||
+			mission.phase === "arch-review" ||
+			mission.phase === "pre-pr" ||
+			mission.phase === "pr")
+	) {
+		const edPrompt = await materializeMissionRolePrompt({
+			overstoryDir,
+			agentName: edAgentName,
+			capability: "execution-director",
+			roleLabel: "Execution Director",
+			mission,
+			siblingNames: {
+				"Coordinator agent": coordAgentName,
+				"Mission Analyst agent": analystAgentName,
+			},
+		});
+		drainAgentInbox(overstoryDir, edAgentName);
+
+		const edResult = await startEd({
+			missionId: mission.id,
+			missionSlug: mission.slug,
+			agentName: edAgentName,
+			projectRoot,
+			overstoryDir,
+			existingRunId: runId,
+			appendSystemPromptFile: edPrompt.promptPath,
+			beacon: buildMissionRoleBeacon({
+				agentName: edAgentName,
+				missionId: mission.id,
+				contextPath: edPrompt.contextPath,
+			}),
+		});
+
+		const edStore = createMissionStore(join(overstoryDir, "sessions.db"));
+		try {
+			edStore.bindSessions(mission.id, { executionDirectorSessionId: edResult.session.id });
+		} finally {
+			edStore.close();
+		}
+		results.push({ agentName: edAgentName, success: true });
+
+		await sendMissionControlMail({
+			overstoryDir,
+			to: edAgentName,
+			subject: `Mission resumed: ${mission.slug}`,
+			body: [
+				`Mission ID: ${mission.id}`,
+				`Objective: ${mission.objective}`,
+				`Artifact root: ${mission.artifactRoot ?? "none"}`,
+				`Context file: ${edPrompt.contextPath}`,
+				"",
+				"This mission is being RESUMED. Check artifacts for prior execution state.",
+				"Report findings to coordinator via mail.",
+			].join("\n"),
+			type: "dispatch",
+		});
+		await nudgeMissionRoleBestEffort(
+			projectRoot,
+			edAgentName,
 			`Mission resumed: ${mission.slug}. Check mail and review prior work.`,
 		);
 	}
@@ -594,6 +674,8 @@ async function restartMissionRoles(
 		coordAgentName,
 		`Mission resumed: ${mission.slug}. Check mail and review prior artifacts.`,
 	);
+
+	return results;
 }
 
 export async function missionResumeAll(
@@ -601,6 +683,7 @@ export async function missionResumeAll(
 	projectRoot: string,
 	json: boolean,
 	missionId?: string,
+	deps?: MissionCommandDeps,
 ): Promise<void> {
 	// Find suspended mission
 	const resolvedMissionId = missionId ?? (await resolveCurrentMissionId(overstoryDir));
@@ -688,12 +771,55 @@ export async function missionResumeAll(
 			const results: Array<{ agentName: string; success: boolean; error?: string }> = [];
 
 			if (ordered.length === 0) {
-				// No resumable sessions — restart roles fresh against existing mission
-				await restartMissionRoles(overstoryDir, projectRoot, mission);
-				results.push({ agentName: "coordinator", success: true });
-				results.push({ agentName: "mission-analyst", success: true });
+				// No resumable sessions — restart roles fresh against existing mission.
+				// Distinguish OOM (all prior sessions completed) from a clean first-run.
+				const isOom = allSessions.length > 0 && allSessions.every((s) => s.state === "completed");
+				let restartResults: Array<{ agentName: string; success: boolean; error?: string }>;
+				try {
+					restartResults = await restartMissionRoles(overstoryDir, projectRoot, mission, deps);
+				} catch (err) {
+					const msg = err instanceof Error ? err.message : String(err);
+					if (json) {
+						jsonError("mission resume", msg);
+					} else {
+						printError("Resume failed", msg);
+					}
+					process.exitCode = 1;
+					return;
+				}
+				results.push(...restartResults);
 				if (!json) {
-					printSuccess("Restarted coordinator and mission-analyst (no prior sessions to resume)");
+					const mTier = mission.tier;
+					const edRestarted = restartResults.some((r) =>
+						r.agentName.startsWith("execution-director"),
+					);
+					if (isOom) {
+						const parts: string[] = ["coordinator"];
+						if (mTier === "planned" || mTier === "full") parts.push("mission-analyst");
+						if (edRestarted) parts.push("execution-director");
+						let rolesStr: string;
+						if (parts.length === 1) {
+							rolesStr = parts[0] ?? "coordinator";
+						} else if (parts.length === 2) {
+							rolesStr = `${parts[0] ?? ""} and ${parts[1] ?? ""}`;
+						} else {
+							const last = parts[parts.length - 1] ?? "";
+							rolesStr = `${parts.slice(0, -1).join(", ")} and ${last}`;
+						}
+						printWarning(
+							`Restarted ${rolesStr} (prior sessions were all marked completed — recovering from likely OOM)`,
+						);
+					} else {
+						const freshParts: string[] = ["coordinator"];
+						if (mTier === "planned" || mTier === "full") freshParts.push("mission-analyst");
+						let freshRolesStr: string;
+						if (freshParts.length === 1) {
+							freshRolesStr = freshParts[0] ?? "coordinator";
+						} else {
+							freshRolesStr = `${freshParts[0] ?? ""} and ${freshParts[1] ?? ""}`;
+						}
+						printSuccess(`Restarted ${freshRolesStr} (fresh mission run had no prior sessions)`);
+					}
 				}
 			} else {
 				for (const session of ordered) {
