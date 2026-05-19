@@ -5,7 +5,7 @@
  * and `ha mission start` (and resume) can share the same logic.
  */
 
-import { closeSync, mkdirSync, openSync } from "node:fs";
+import { closeSync, mkdirSync, openSync, readFileSync, unlinkSync, writeSync } from "node:fs";
 import { unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { resolveOverstoryBin } from "../commands/watch.ts";
@@ -101,6 +101,77 @@ async function pollForPid(
 	return null;
 }
 
+// ── Lock file (haru-orphan-fix) ─────────────────────────────────────────────
+//
+// Without serialization, multiple in-process `start()` callers (e.g. parallel
+// `ha mission stop`/`ha sling` lifecycle hooks) all read the PID file BEFORE
+// any one of them spawns + writes, so all see "no daemon" / "stale heartbeat"
+// and all spawn. The daemon-side `claimPidFile()` resolves the inner race for
+// the PID file but only after the outer process has already exited, by which
+// point N+1 outer spawns are already in flight. We serialize `start()` here
+// with an advisory lock file so only one caller runs the read-then-spawn
+// critical section at a time.
+const LOCK_FILENAME = "watchdog.lock";
+const LOCK_TIMEOUT_MS = 5_000;
+const LOCK_POLL_INTERVAL_MS = 50;
+// Treat an existing lock file as stale if its owner PID is dead or unreadable.
+function isLockStale(lockFilePath: string, isRunningFn: (pid: number) => boolean): boolean {
+	try {
+		const text = readFileSync(lockFilePath, "utf8").trim();
+		const pid = Number.parseInt(text, 10);
+		if (Number.isNaN(pid) || pid <= 0) return true;
+		return !isRunningFn(pid);
+	} catch {
+		// File vanished between exists check and read — treat as stale (retry will recreate).
+		return true;
+	}
+}
+
+/**
+ * Acquire an advisory lock by atomically creating the lock file with O_EXCL.
+ * Writes the caller's PID so peers can detect a stale lock from a crashed holder.
+ * Returns a release function that unlinks the lock file. On timeout, throws.
+ */
+async function acquireStartLock(
+	lockFilePath: string,
+	isRunningFn: (pid: number) => boolean,
+	timeoutMs: number = LOCK_TIMEOUT_MS,
+): Promise<() => void> {
+	const deadline = Date.now() + timeoutMs;
+	while (true) {
+		try {
+			const fd = openSync(lockFilePath, "wx");
+			writeSync(fd, String(process.pid));
+			closeSync(fd);
+			let released = false;
+			return () => {
+				if (released) return;
+				released = true;
+				try {
+					unlinkSync(lockFilePath);
+				} catch {
+					// Already gone — fine
+				}
+			};
+		} catch (err) {
+			if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
+			// Lock held — check staleness so a crashed holder can't deadlock us.
+			if (isLockStale(lockFilePath, isRunningFn)) {
+				try {
+					unlinkSync(lockFilePath);
+				} catch {
+					// Someone else beat us to it — fine, fall through to retry.
+				}
+				continue;
+			}
+			if (Date.now() >= deadline) {
+				throw new Error(`watchdog start lock timeout after ${timeoutMs}ms (${lockFilePath})`);
+			}
+			await Bun.sleep(LOCK_POLL_INTERVAL_MS);
+		}
+	}
+}
+
 // ── Factory ─────────────────────────────────────────────────────────────────
 
 const DEFAULT_INTERVAL_MS = 30_000;
@@ -131,45 +202,54 @@ export function createWatchdogControl(
 	const stateDir = join(haruDir, "state");
 	const heartbeatPath = join(stateDir, "watchdog.heartbeat");
 	const stderrLogPath = join(stateDir, "watchdog.stderr.log");
+	const lockFilePath = join(haruDir, LOCK_FILENAME);
 
 	return {
 		async start(): Promise<{ pid: number } | null> {
 			// Ensure state/ exists before we try to open the stderr log
 			mkdirSync(stateDir, { recursive: true });
 
-			// Truncate the stderr log so getLastStartError() reflects only this attempt
-			await truncateStderrLog(stderrLogPath);
+			// Serialize the entire read-then-spawn critical section so concurrent
+			// callers can't all see "no daemon" and all spawn. See acquireStartLock
+			// for the race rationale (haru-orphan-fix).
+			const release = await acquireStartLock(lockFilePath, isRunningFn);
+			try {
+				// Truncate the stderr log so getLastStartError() reflects only this attempt
+				await truncateStderrLog(stderrLogPath);
 
-			const existingPid = await readWatchdogPid(projectRoot);
-			if (existingPid !== null) {
-				if (isRunningFn(existingPid)) {
-					const fresh = await isHeartbeatFresh(heartbeatPath, DEFAULT_INTERVAL_MS, nowFn);
-					if (fresh) return null; // Already healthy
-					// Wedged daemon: stop it before respawning
-					await this.stop();
-				} else {
-					await removeWatchdogPid(projectRoot);
+				const existingPid = await readWatchdogPid(projectRoot);
+				if (existingPid !== null) {
+					if (isRunningFn(existingPid)) {
+						const fresh = await isHeartbeatFresh(heartbeatPath, DEFAULT_INTERVAL_MS, nowFn);
+						if (fresh) return null; // Already healthy
+						// Wedged daemon: stop it before respawning
+						await this.stop();
+					} else {
+						await removeWatchdogPid(projectRoot);
+					}
 				}
+
+				const overstoryBin = await resolveBinFn();
+				const stderrFd = openSync(stderrLogPath, "w");
+				const proc = Bun.spawn(["bun", "run", overstoryBin, "watch", "--background"], {
+					cwd: projectRoot,
+					detached: true,
+					stdout: "ignore",
+					stderr: stderrFd,
+					stdin: "ignore",
+				});
+				proc.unref();
+				const exitCode = await proc.exited;
+				closeSync(stderrFd);
+
+				if (exitCode !== 0) return null;
+
+				// Daemon self-claims the PID file; poll until it appears
+				const pid = await pollForPid(projectRoot, { timeoutMs: 3000, intervalMs: 50 });
+				return pid !== null ? { pid } : null;
+			} finally {
+				release();
 			}
-
-			const overstoryBin = await resolveBinFn();
-			const stderrFd = openSync(stderrLogPath, "w");
-			const proc = Bun.spawn(["bun", "run", overstoryBin, "watch", "--background"], {
-				cwd: projectRoot,
-				detached: true,
-				stdout: "ignore",
-				stderr: stderrFd,
-				stdin: "ignore",
-			});
-			proc.unref();
-			const exitCode = await proc.exited;
-			closeSync(stderrFd);
-
-			if (exitCode !== 0) return null;
-
-			// Daemon self-claims the PID file; poll until it appears
-			const pid = await pollForPid(projectRoot, { timeoutMs: 3000, intervalMs: 50 });
-			return pid !== null ? { pid } : null;
 		},
 
 		async stop(): Promise<boolean> {
