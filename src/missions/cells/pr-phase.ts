@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { type MergeReadinessPack, renderMrpMarkdown } from "../../merge/mrp-renderer.ts";
 import type { MissionGraph } from "../../types.ts";
 import { getGhBudget } from "../gh-budget.ts";
+import { isRealTaskId } from "../task-id.ts";
 import type { HandlerRegistry } from "../types.ts";
 import { makeDebugLoopHandlers } from "./debug-loop-handlers.ts";
 import type { PrPhaseTrigger } from "./pr-phase-triggers.ts";
@@ -205,14 +206,20 @@ function buildHandlers(deps: PhaseCellDeps, config?: PhaseCellConfig): HandlerRe
 
 			const title = mission?.slug ?? featureBranch;
 			const mrpPath = join(mission?.artifactRoot ?? "", "merge-readiness-pack.json");
+			const taskIdForFooter = mission && isRealTaskId(mission.taskId) ? mission.taskId : undefined;
 			let body: string;
 			try {
 				const mrpText = await Bun.file(mrpPath).text();
 				const mrp = JSON.parse(mrpText) as MergeReadinessPack;
-				body = renderMrpMarkdown(mrp, { showCost: prCfg?.showCost ?? false });
+				body = renderMrpMarkdown(mrp, {
+					showCost: prCfg?.showCost ?? false,
+					taskId: taskIdForFooter,
+				});
 			} catch {
 				console.warn(`[pr-phase] MRP unavailable at ${mrpPath}, using fallback body`);
-				body = `Automated PR for mission: ${title}\n\n(MRP unavailable — pre-pr-phase may have failed to write it)`;
+				body = `Automated PR for mission: ${title}`;
+				if (taskIdForFooter) body += `\n\nCloses ${taskIdForFooter}`;
+				body += `\n\n(MRP unavailable — pre-pr-phase may have failed to write it)`;
 			}
 			const bodyTmpPath = join(tmpdir(), `pr-body-${ctx.missionId}.md`);
 			await Bun.write(bodyTmpPath, body);
