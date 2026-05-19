@@ -36,10 +36,10 @@
 
 import { join } from "node:path";
 import type { MissionGraph } from "../../types.ts";
-import { PENDING_SENTINEL, isRealTaskId } from "../task-id.ts";
+import { isRealTaskId, PENDING_SENTINEL } from "../task-id.ts";
 import type { HandlerRegistry } from "../types.ts";
-import { extractSpecTitle } from "./spec-title.ts";
 import { spawnEphemeralAgent } from "./spawn-helpers.ts";
+import { extractSpecTitle } from "./spec-title.ts";
 import type { PhaseCellConfig, PhaseCellDefinition, PhaseCellDeps } from "./types.ts";
 
 const CELL_TYPE = "intake-phase";
