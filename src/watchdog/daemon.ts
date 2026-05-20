@@ -80,8 +80,18 @@ import { evaluateHealth, transitionState } from "./health.ts";
 import { swapRuntime } from "./swap.ts";
 import { triageAgent } from "./triage.ts";
 
-/** Maximum escalation level (terminate). */
-const MAX_ESCALATION_LEVEL = 3;
+/**
+ * Default maximum escalation level (terminate). Overridable via
+ * config.watchdog.maxEscalationLevel (#382).
+ */
+const DEFAULT_MAX_ESCALATION_LEVEL = 3;
+
+/**
+ * Default concurrency cap for Tier 1 triage Claude spawns per tick (#384).
+ * If N agents hit level 2 simultaneously, N Claude processes would otherwise
+ * spawn in parallel and exhaust memory.
+ */
+const DEFAULT_TRIAGE_MAX_CONCURRENT = 2;
 
 import { isPersistentCapability, PERSISTENT_CAPABILITIES } from "../agents/capabilities.ts";
 import { createRunStore } from "../sessions/store.ts";
@@ -1105,6 +1115,9 @@ export async function runDaemonTick(options: DaemonOptions): Promise<void> {
 		// Use the outer mailStore (opened at line 675) for session processing.
 		// Do NOT re-open — the outer handle is shared with runMissionTick later.
 
+		// #384: per-tick shared counter for Tier 1 triage concurrency cap.
+		const triageInFlightRef = { current: 0 };
+
 		for (const session of sessions) {
 			// Fast-path for non-waiting agents with auto-complete signals (result).
 			// Waiting agents are handled by shouldCompleteAgent() below.
@@ -1737,10 +1750,11 @@ export async function runDaemonTick(options: DaemonOptions): Promise<void> {
 
 				// Check if enough time has passed to advance to the next escalation level
 				const stalledMs = Date.now() - new Date(session.stalledSince).getTime();
-				const expectedLevel = Math.min(
-					Math.floor(stalledMs / nudgeIntervalMs),
-					MAX_ESCALATION_LEVEL,
+				const maxEscalationLevel = Math.max(
+					1,
+					Math.min(5, options.config?.watchdog?.maxEscalationLevel ?? DEFAULT_MAX_ESCALATION_LEVEL),
 				);
+				const expectedLevel = Math.min(Math.floor(stalledMs / nudgeIntervalMs), maxEscalationLevel);
 
 				if (expectedLevel > session.escalationLevel) {
 					session.escalationLevel = expectedLevel;
@@ -1764,6 +1778,7 @@ export async function runDaemonTick(options: DaemonOptions): Promise<void> {
 					resilienceStore,
 					resilienceConfig,
 					config: options.config,
+					triageInFlightRef,
 				});
 
 				if (actionResult.terminated) {
@@ -2164,7 +2179,16 @@ async function executeEscalationAction(ctx: {
 		agentName: string;
 		root: string;
 		lastActivity: string;
+		timeoutMs?: number;
+		config?: OverstoryConfig;
 	}) => Promise<"retry" | "terminate" | "extend">;
+	/**
+	 * Shared mutable in-flight counter for Tier 1 triage concurrency limiting
+	 * (#384). The caller (daemon tick) creates one counter per tick and threads
+	 * it here; nested escalation calls share the same ref so the cap applies
+	 * across all agents handled in a single tick.
+	 */
+	triageInFlightRef: { current: number };
 	nudge: (
 		projectRoot: string,
 		agentName: string,
@@ -2199,6 +2223,8 @@ async function executeEscalationAction(ctx: {
 		recordFailure,
 		resilienceStore,
 		resilienceConfig,
+		triageInFlightRef,
+		config,
 	} = ctx;
 
 	switch (session.escalationLevel) {
@@ -2245,11 +2271,37 @@ async function executeEscalationAction(ctx: {
 				return { terminated: false, stateChanged: false };
 			}
 
-			const verdict = await triage({
-				agentName: session.agentName,
-				root,
-				lastActivity: session.lastActivity,
-			});
+			// #384: cap concurrent triage Claude spawns per tick to avoid spawning
+			// N parallel Claude processes when N agents hit level 2 simultaneously.
+			const cap = Math.max(
+				1,
+				Math.min(10, config?.watchdog?.triageMaxConcurrent ?? DEFAULT_TRIAGE_MAX_CONCURRENT),
+			);
+			if (triageInFlightRef.current >= cap) {
+				// At capacity — defer this triage to a future tick; progressive
+				// nudging continues at the current level.
+				return { terminated: false, stateChanged: false };
+			}
+			triageInFlightRef.current++;
+			let verdict: "retry" | "terminate" | "extend";
+			try {
+				// #381: clamp triage timeout to < tier0IntervalMs so a hung Claude
+				// process can't block the daemon for multiple tick cycles. Leave
+				// 1s headroom so the tick finishes before the next one fires.
+				const tickInterval = config?.watchdog?.tier0IntervalMs ?? 30_000;
+				const ceiling = Math.max(1_000, tickInterval - 1_000);
+				const configured = config?.watchdog?.triageTimeoutMs ?? 30_000;
+				const effectiveTimeoutMs = Math.min(configured, ceiling);
+				verdict = await triage({
+					agentName: session.agentName,
+					root,
+					lastActivity: session.lastActivity,
+					timeoutMs: effectiveTimeoutMs,
+					config,
+				});
+			} finally {
+				triageInFlightRef.current--;
+			}
 
 			recordEvent(eventStore, {
 				runId,

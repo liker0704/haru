@@ -33,18 +33,29 @@ export function createTrackerClient(backend: TrackerBackend, cwd: string): Track
 
 /**
  * Resolve "auto" to a concrete backend by probing the filesystem.
- * Explicit "beads" or "seeds" values pass through unchanged.
+ * Explicit "beads"/"seeds"/"github" values pass through unchanged.
+ *
+ * Resolution order for "auto": .suji/ → .seeds/ → .beads/ → github remote → "seeds" fallback.
+ * Both .suji/ and .seeds/ map to the "seeds" backend (on-disk format unchanged across rename).
+ *
+ * Optional DI seams (#410): callers in tests can inject deterministic predicates;
+ * production callers omit them and get the filesystem-probe defaults. Replaces
+ * the duplicate implementation that previously lived in engine-wiring.ts.
  */
 export async function resolveBackend(
 	configBackend: TaskTrackerBackend,
 	cwd: string,
+	deps?: {
+		hasSujiDir?: (root: string) => boolean | Promise<boolean>;
+		hasSeedsDir?: (root: string) => boolean | Promise<boolean>;
+		hasBeadsDir?: (root: string) => boolean | Promise<boolean>;
+		hasGithubRemote?: (root: string) => boolean | Promise<boolean>;
+	},
 ): Promise<TrackerBackend> {
 	if (configBackend === "beads") return "beads";
 	if (configBackend === "seeds") return "seeds";
 	if (configBackend === "github") return "github";
-	// "auto" detection: check for .suji/ (current name post-rebrand), then .seeds/
-	// (legacy name pre-rebrand), then .beads/. Both .suji and .seeds map to the
-	// "seeds" backend because the on-disk format is unchanged across the rename.
+
 	const dirExists = async (path: string): Promise<boolean> => {
 		try {
 			const s = await stat(path);
@@ -53,27 +64,31 @@ export async function resolveBackend(
 			return false;
 		}
 	};
-	if (await dirExists(join(cwd, ".suji"))) return "seeds";
-	if (await dirExists(join(cwd, ".seeds"))) return "seeds";
-	if (await dirExists(join(cwd, ".beads"))) return "beads";
-	// Check if the repo has a github.com remote (for auto-detection)
-	try {
-		const proc = Bun.spawn(["git", "remote", "get-url", "origin"], {
-			cwd,
-			stdout: "pipe",
-			stderr: "pipe",
-		});
-		const exitCode = await proc.exited;
-		if (exitCode === 0) {
-			const remoteUrl = await new Response(proc.stdout).text();
-			if (remoteUrl.trim().includes("github.com")) {
-				return "github";
+	const hasSuji = deps?.hasSujiDir ?? ((root) => dirExists(join(root, ".suji")));
+	const hasSeeds = deps?.hasSeedsDir ?? ((root) => dirExists(join(root, ".seeds")));
+	const hasBeads = deps?.hasBeadsDir ?? ((root) => dirExists(join(root, ".beads")));
+	const hasGithub =
+		deps?.hasGithubRemote ??
+		(async (root) => {
+			try {
+				const proc = Bun.spawn(["git", "remote", "get-url", "origin"], {
+					cwd: root,
+					stdout: "pipe",
+					stderr: "pipe",
+				});
+				const exitCode = await proc.exited;
+				if (exitCode !== 0) return false;
+				const url = await new Response(proc.stdout).text();
+				return url.trim().includes("github.com");
+			} catch {
+				return false;
 			}
-		}
-	} catch {
-		// git not available, fall through to default
-	}
-	// Default fallback — seeds is the preferred tracker
+		});
+
+	if (await hasSuji(cwd)) return "seeds";
+	if (await hasSeeds(cwd)) return "seeds";
+	if (await hasBeads(cwd)) return "beads";
+	if (await hasGithub(cwd)) return "github";
 	return "seeds";
 }
 

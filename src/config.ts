@@ -109,6 +109,9 @@ export const DEFAULT_CONFIG: OverstoryConfig = {
 		zombieThresholdMs: 600_000, // 10 minutes
 		nudgeIntervalMs: 60_000, // 1 minute between progressive nudge stages
 		rpcTimeoutMs: 5_000, // Per-call headless RPC getState() timeout (#380)
+		triageTimeoutMs: 30_000, // Tier 1 AI triage Claude-spawn timeout (#381)
+		maxEscalationLevel: 3, // Escalation ladder ceiling (#382)
+		triageMaxConcurrent: 2, // Concurrent Tier 1 triage spawns per tick (#384)
 	},
 	mission: {
 		planReview: {
@@ -347,6 +350,34 @@ function validateConfig(config: OverstoryConfig): void {
 			field: "watchdog.nudgeIntervalMs",
 			value: config.watchdog.nudgeIntervalMs,
 		});
+	}
+
+	// #381: triageTimeoutMs should be less than tier0IntervalMs when Tier 1
+	// triage is enabled — otherwise a slow Claude triage call blocks the daemon
+	// for multiple tick cycles. The runtime caller in daemon.ts clamps the
+	// effective timeout to `tier0IntervalMs - 1000` so config values that
+	// violate this are downgraded gracefully rather than failing startup.
+
+	// #382: maxEscalationLevel must be in [1, 5] when set.
+	if (config.watchdog.maxEscalationLevel !== undefined) {
+		const lvl = config.watchdog.maxEscalationLevel;
+		if (!Number.isInteger(lvl) || lvl < 1 || lvl > 5) {
+			throw new ValidationError("watchdog.maxEscalationLevel must be an integer in [1, 5]", {
+				field: "watchdog.maxEscalationLevel",
+				value: lvl,
+			});
+		}
+	}
+
+	// #384: triageMaxConcurrent must be in [1, 10] when set.
+	if (config.watchdog.triageMaxConcurrent !== undefined) {
+		const n = config.watchdog.triageMaxConcurrent;
+		if (!Number.isInteger(n) || n < 1 || n > 10) {
+			throw new ValidationError("watchdog.triageMaxConcurrent must be an integer in [1, 10]", {
+				field: "watchdog.triageMaxConcurrent",
+				value: n,
+			});
+		}
 	}
 
 	if (config.watchdog.staleThresholdMs <= 0) {
