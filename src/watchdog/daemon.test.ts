@@ -20,10 +20,10 @@ import { mkdir, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createEventStore } from "../events/store.ts";
+import type { TailerHandle } from "../events/tailer.ts";
 import { createMailStore } from "../mail/store.ts";
 import { createSessionStore } from "../sessions/store.ts";
 import { cleanupTempDir } from "../test-helpers.ts";
-import type { TailerHandle } from "../events/tailer.ts";
 import type { AgentSession, HealthCheck, OverstoryConfig, StoredEvent } from "../types.ts";
 import {
 	_resetSourceFreshnessForTests,
