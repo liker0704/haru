@@ -81,6 +81,10 @@ export interface EngineStatus {
  * Resolution order: suji dir → seeds dir → beads dir → github remote → "seeds" fallback.
  * Explicit backend values pass through unchanged.
  * Designed to run ONCE at watchdog startup, never per-tick.
+ *
+ * #410: delegated to tracker/factory.ts:resolveBackend (which gained the same
+ * DI deps signature) to eliminate the duplicate implementation. Kept this
+ * re-export so existing callers compile without churn.
  */
 export async function resolveBackend(
 	configured: TrackerBackend | "auto",
@@ -92,46 +96,8 @@ export async function resolveBackend(
 		hasGithubRemote?: (root: string) => boolean | Promise<boolean>;
 	},
 ): Promise<TrackerBackend> {
-	if (configured !== "auto") return configured;
-
-	const { stat } = await import("node:fs/promises");
-	const { join: pathJoin } = await import("node:path");
-
-	const defaultDirCheck = async (dir: string): Promise<boolean> => {
-		try {
-			const s = await stat(dir);
-			return s.isDirectory();
-		} catch {
-			return false;
-		}
-	};
-
-	const hasSuji = deps?.hasSujiDir ?? ((root) => defaultDirCheck(pathJoin(root, ".suji")));
-	const hasSeeds = deps?.hasSeedsDir ?? ((root) => defaultDirCheck(pathJoin(root, ".seeds")));
-	const hasBeads = deps?.hasBeadsDir ?? ((root) => defaultDirCheck(pathJoin(root, ".beads")));
-	const hasGithub =
-		deps?.hasGithubRemote ??
-		(async (root) => {
-			try {
-				const proc = Bun.spawn(["git", "remote", "get-url", "origin"], {
-					cwd: root,
-					stdout: "pipe",
-					stderr: "pipe",
-				});
-				const exitCode = await proc.exited;
-				if (exitCode !== 0) return false;
-				const url = await new Response(proc.stdout).text();
-				return url.trim().includes("github.com");
-			} catch {
-				return false;
-			}
-		});
-
-	if (await hasSuji(projectRoot)) return "seeds";
-	if (await hasSeeds(projectRoot)) return "seeds";
-	if (await hasBeads(projectRoot)) return "beads";
-	if (await hasGithub(projectRoot)) return "github";
-	return "seeds";
+	const { resolveBackend: factoryResolveBackend } = await import("../tracker/factory.ts");
+	return factoryResolveBackend(configured, projectRoot, deps);
 }
 
 // === Cell registries ===

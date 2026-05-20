@@ -118,7 +118,11 @@ function buildSubgraph(config: PhaseCellConfig): MissionGraph {
 			edge("create", "paused", "pr_create_network_fail"),
 			edge("create", "paused", "pr_rate_limited"),
 			edge("create", "paused", "pr_branch_protected"),
-			edge("create", "paused", "pr_no_commits"),
+			// #398: when the mission produced no commits, that's a clean
+			// no-op outcome (audit/verification missions); route to the success
+			// terminal rather than paused so the mission completes normally
+			// without operator escalation.
+			edge("create", "done", "pr_no_commits"),
 			// await-ci
 			edge("await-ci", "classify-ci-red", "ci_failed"),
 			edge("await-ci", "await-comments", "ci_passed"),
@@ -216,6 +220,24 @@ function buildHandlers(deps: PhaseCellDeps, config?: PhaseCellConfig): HandlerRe
 				stderr: "pipe",
 			});
 			await resetProc.exited;
+
+			// Bug fix #398: pre-flight check whether main has any commits ahead of
+			// origin/main. If 0, the mission produced no diff (audit/verification
+			// missions, scope=0). Emit a clean pr_no_commits trigger rather than
+			// pushing an empty branch and getting a misleading pr_create_network_fail.
+			const countProc = spawnFn(["git", "rev-list", "--count", "origin/main..main"], {
+				cwd: deps.projectRoot,
+				stdout: "pipe",
+				stderr: "pipe",
+			});
+			const countExit = await countProc.exited;
+			if (countExit === 0) {
+				const countStdout = countProc.stdout ? await new Response(countProc.stdout).text() : "0";
+				const ahead = Number.parseInt(countStdout.trim(), 10);
+				if (Number.isFinite(ahead) && ahead === 0) {
+					return { trigger: "pr_no_commits" };
+				}
+			}
 
 			// Use --force-with-lease so the local update is reflected on origin
 			// without clobbering unrelated remote work; the remote ref was
