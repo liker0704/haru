@@ -346,6 +346,32 @@ export async function missionStart(
 			},
 		});
 
+		// Bug fix #351: when `--spec --tier` skips intake-phase, the
+		// dispatch-tier-classifier handler that normally spawns the operational
+		// coordinator never runs. Without a coordinator, direct-tier missions stay
+		// at `execute-phase:await-leads-done` forever and planned/full miss
+		// analyst+ED too. Reuse restartMissionRoles (same wiring as resume) to
+		// spawn the tier-appropriate roles right after mission_started.
+		if (opts.specFile && opts.tier) {
+			try {
+				const roleResults = await restartMissionRoles(overstoryDir, projectRoot, mission, deps);
+				for (const r of roleResults) {
+					if (!r.success && !opts.json) {
+						printWarning(
+							`Role start failed for ${r.agentName}: ${r.error?.slice(0, 200) ?? "unknown"}`,
+						);
+					}
+				}
+			} catch (err) {
+				// Best-effort: mission row exists; operator can ha mission resume to retry.
+				if (!opts.json) {
+					printWarning(
+						`Persistent-role spawn failed: ${err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200)}`,
+					);
+				}
+			}
+		}
+
 		// Auto-start watchdog for rate-limit detection and health monitoring
 		try {
 			const config = await loadConfig(projectRoot);
