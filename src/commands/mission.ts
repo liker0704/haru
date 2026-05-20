@@ -355,6 +355,28 @@ export function createMissionCommand(): Command {
 		});
 
 	cmd
+		.command("override")
+		.description(
+			"Force-fire a trigger from a stuck mission node (e.g. plan-phase:review-stuck override). #352",
+		)
+		.requiredOption("--node <node-id>", "Mission node the mission is currently at")
+		.requiredOption("--trigger <name>", "Edge trigger name to fire from that node")
+		.option("--mission <id-or-slug>", "Target a specific mission (default: active)")
+		.option("--json", "Output as JSON")
+		.action(async (opts: { node: string; trigger: string; mission?: string; json?: boolean }) => {
+			const cwd = process.cwd();
+			const config = await loadConfig(cwd);
+			const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
+			const { missionOverride } = await import("./mission-override.ts");
+			await missionOverride(overstoryDir, {
+				missionId: opts.mission,
+				node: opts.node,
+				trigger: opts.trigger,
+				json: opts.json ?? false,
+			});
+		});
+
+	cmd
 		.command("stop")
 		.description("Suspend the active mission (preserves state for resume)")
 		.option("--kill", "Full teardown — no resume possible")

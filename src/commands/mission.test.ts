@@ -52,7 +52,21 @@ describe("createMissionCommand", () => {
 		expect(names).toContain("tier");
 		expect(names).toContain("spec");
 		expect(names).toContain("debug");
-		expect(names).toHaveLength(22);
+		expect(names).toContain("override");
+		expect(names).toHaveLength(23);
+	});
+
+	test("override subcommand requires --node and --trigger (#352)", () => {
+		const cmd = createMissionCommand();
+		const override = cmd.commands.find((command) => command.name() === "override");
+		expect(override).toBeDefined();
+		const options = override?.options ?? [];
+		const nodeOpt = options.find((o) => o.long === "--node");
+		const triggerOpt = options.find((o) => o.long === "--trigger");
+		expect(nodeOpt?.required).toBe(true);
+		expect(triggerOpt?.required).toBe(true);
+		expect(options.find((o) => o.long === "--mission")).toBeDefined();
+		expect(options.find((o) => o.long === "--json")).toBeDefined();
 	});
 
 	test("answer subcommand supports --body and --file", () => {
