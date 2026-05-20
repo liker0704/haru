@@ -743,6 +743,7 @@ export async function slingCommand(
 	let missionSlug: string | undefined;
 	let missionArtifactRoot: string | undefined;
 	let missionTier: import("../missions/types.ts").MissionTier | null = null;
+	let missionTaskId: string | undefined;
 	if (missionContext) {
 		const missionStore = createMissionStore(join(overstoryDir, "sessions.db"));
 		try {
@@ -750,6 +751,13 @@ export async function slingCommand(
 			missionSlug = mission?.slug;
 			missionArtifactRoot = mission?.artifactRoot ?? undefined;
 			missionTier = mission?.tier ?? null;
+			// Inject the parent mission's tracker task id into agent env as
+			// HARU_MISSION_TASK_ID (#407, #413). Guard with isRealTaskId so the
+			// PENDING_SENTINEL placeholder never reaches the agent.
+			if (mission?.taskId) {
+				const { isRealTaskId } = await import("../missions/task-id.ts");
+				if (isRealTaskId(mission.taskId)) missionTaskId = mission.taskId;
+			}
 		} finally {
 			missionStore.close();
 		}
@@ -1138,6 +1146,7 @@ export async function slingCommand(
 			architecturePath: resolvedArchitecturePath,
 			testPlanPath: resolvedTestPlanPath,
 			workstreamId,
+			missionTaskId,
 		});
 
 		// Auto-start watchdog so every sling keeps the Tier 0 daemon alive

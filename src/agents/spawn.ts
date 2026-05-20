@@ -105,6 +105,14 @@ export interface SpawnOptions {
 	testPlanPath?: string;
 	/** Mission workstream id propagated into agent env as HARU_WORKSTREAM_ID. */
 	workstreamId?: string;
+	/**
+	 * Mission tracker task id (e.g. `haru-1234`) for the parent mission, when this
+	 * spawn is part of a mission. Injected into agent env as HARU_MISSION_TASK_ID
+	 * so child agents can file follow-up issues with `--blockedBy "$HARU_MISSION_TASK_ID"`.
+	 * Caller MUST pre-guard with isRealTaskId() so the PENDING_SENTINEL never reaches
+	 * the agent env (#407, #413).
+	 */
+	missionTaskId?: string;
 }
 
 /** Result of a successful spawn. */
@@ -528,6 +536,7 @@ export function buildHaruAgentEnvForTest(
 	worktreePath: string,
 	taskId: string,
 	workstreamId: string | undefined,
+	missionTaskId?: string,
 ): Record<string, string> {
 	return {
 		...base,
@@ -536,6 +545,7 @@ export function buildHaruAgentEnvForTest(
 		HARU_WORKTREE_PATH: worktreePath,
 		HARU_TASK_ID: taskId,
 		...(workstreamId ? { HARU_WORKSTREAM_ID: workstreamId } : {}),
+		...(missionTaskId ? { HARU_MISSION_TASK_ID: missionTaskId } : {}),
 	};
 }
 
@@ -551,7 +561,8 @@ async function spawnHeadless(
 	overstoryDir: string,
 ): Promise<SpawnResult> {
 	const { sessionStore: store } = deps;
-	const { name, capability, taskId, parentAgent, depth, runId, workstreamId } = opts;
+	const { name, capability, taskId, parentAgent, depth, runId, workstreamId, missionTaskId } =
+		opts;
 
 	const directEnv = buildHaruAgentEnvForTest(
 		runtime.buildEnv(resolvedModel),
@@ -560,6 +571,7 @@ async function spawnHeadless(
 		worktreePath,
 		taskId,
 		workstreamId,
+		missionTaskId,
 	);
 
 	if (!runtime.buildDirectSpawn) {
@@ -642,7 +654,8 @@ async function spawnInteractive(
 	overstoryDir: string,
 ): Promise<SpawnResult> {
 	const { sessionStore: store, config, tmux } = deps;
-	const { name, capability, taskId, parentAgent, depth, runId, workstreamId } = opts;
+	const { name, capability, taskId, parentAgent, depth, runId, workstreamId, missionTaskId } =
+		opts;
 
 	// 11c. Preflight: verify tmux is available
 	await tmux.ensureTmuxAvailable();
@@ -658,6 +671,7 @@ async function spawnInteractive(
 		worktreePath,
 		taskId,
 		workstreamId,
+		missionTaskId,
 	);
 	const spawnCmd = runtime.buildSpawnCommand({
 		model: resolvedModel.model,
