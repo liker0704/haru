@@ -23,6 +23,7 @@ import { createEventStore } from "../events/store.ts";
 import { createMailStore } from "../mail/store.ts";
 import { createSessionStore } from "../sessions/store.ts";
 import { cleanupTempDir } from "../test-helpers.ts";
+import type { TailerHandle } from "../events/tailer.ts";
 import type { AgentSession, HealthCheck, OverstoryConfig, StoredEvent } from "../types.ts";
 import {
 	_resetSourceFreshnessForTests,
@@ -3742,6 +3743,100 @@ describe("heartbeat at tick start", () => {
 });
 
 // ============================================================
+// Tailer drain tests (startDaemon().stop() registry cleanup)
+// ============================================================
+
+describe("startDaemon stop() tailer drain", () => {
+	beforeEach(() => {
+		_resetSourceFreshnessForTests();
+		_resetStateDirForTests();
+	});
+
+	function mockHandle(name: string, stopped: Set<string>): TailerHandle {
+		return {
+			agentName: name,
+			logPath: `/tmp/${name}.log`,
+			stop() {
+				stopped.add(name);
+			},
+		};
+	}
+
+	test("invokes handle.stop() on every registered tailer and clears the map", () => {
+		const stopped = new Set<string>();
+		const registry = new Map<string, TailerHandle>([
+			["agent-a", mockHandle("agent-a", stopped)],
+			["agent-b", mockHandle("agent-b", stopped)],
+			["agent-c", mockHandle("agent-c", stopped)],
+		]);
+
+		const daemon = startDaemon({
+			root: tempRoot,
+			staleThresholdMs: 300_000,
+			zombieThresholdMs: 600_000,
+			intervalMs: 100_000,
+			_tailerRegistry: registry,
+			_tmux: { isSessionAlive: async () => false, killSession: async () => {} },
+			_triage: async () => "extend",
+		});
+
+		daemon.stop();
+
+		expect(stopped).toContain("agent-a");
+		expect(stopped).toContain("agent-b");
+		expect(stopped).toContain("agent-c");
+		expect(registry.size).toBe(0);
+	});
+
+	test("with empty registry is a no-op", () => {
+		const registry = new Map<string, TailerHandle>();
+
+		const daemon = startDaemon({
+			root: tempRoot,
+			staleThresholdMs: 300_000,
+			zombieThresholdMs: 600_000,
+			intervalMs: 100_000,
+			_tailerRegistry: registry,
+			_tmux: { isSessionAlive: async () => false, killSession: async () => {} },
+			_triage: async () => "extend",
+		});
+
+		expect(() => daemon.stop()).not.toThrow();
+		expect(registry.size).toBe(0);
+	});
+
+	test("continues draining if one handle's stop() throws", () => {
+		const stopped = new Set<string>();
+		const throwing: TailerHandle = {
+			agentName: "thrower",
+			logPath: "/tmp/thrower.log",
+			stop() {
+				throw new Error("stop failed");
+			},
+		};
+		const registry = new Map<string, TailerHandle>([
+			["before", mockHandle("before", stopped)],
+			["thrower", throwing],
+			["after", mockHandle("after", stopped)],
+		]);
+
+		const daemon = startDaemon({
+			root: tempRoot,
+			staleThresholdMs: 300_000,
+			zombieThresholdMs: 600_000,
+			intervalMs: 100_000,
+			_tailerRegistry: registry,
+			_tmux: { isSessionAlive: async () => false, killSession: async () => {} },
+			_triage: async () => "extend",
+		});
+
+		expect(() => daemon.stop()).not.toThrow();
+		expect(stopped).toContain("before");
+		expect(stopped).toContain("after");
+		expect(registry.size).toBe(0);
+	});
+});
+
 // Gap detection tests (startDaemon + _now injection)
 // ============================================================
 
