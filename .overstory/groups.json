@@ -2068,5 +2068,15 @@
 		"status": "active",
 		"createdAt": "2026-05-19T13:17:36.509Z",
 		"completedAt": null
+	},
+	{
+		"id": "group-e65a09ea",
+		"name": "core-fix-batch",
+		"memberIssueIds": [
+			"overstory-9da0"
+		],
+		"status": "active",
+		"createdAt": "2026-05-20T09:48:30.517Z",
+		"completedAt": null
 	}
 ]
