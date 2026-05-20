@@ -283,6 +283,37 @@ function buildHandlers(deps: PhaseCellDeps): HandlerRegistry {
 					);
 				}
 			}
+			// Bug fix #430: extract mulch learnings BEFORE worktree teardown.
+			// terminateMissionOwnedAgents + cleanupMissionWorktrees below remove
+			// scout/builder worktrees that may carry uncommitted `.mulch/` state.
+			// Generate the bundle (summary/sessions/metrics JSON) then run the
+			// extractor. Both steps are best-effort: failure logs + mission
+			// proceeds to teardown so operators can still close the run.
+			if (mission && deps.projectRoot && deps.overstoryDir && mission.artifactRoot) {
+				try {
+					const { exportBundle } = await import("../bundle.ts");
+					const { extractMissionLearnings } = await import("../learnings.ts");
+					const dbPath = join(deps.overstoryDir, "sessions.db");
+					await exportBundle({
+						overstoryDir: deps.overstoryDir,
+						dbPath,
+						missionId: mission.id,
+						force: false,
+					});
+					await extractMissionLearnings({
+						bundlePath: join(mission.artifactRoot, "results"),
+						artifactRoot: mission.artifactRoot,
+						projectRoot: deps.projectRoot,
+						missionSlug: mission.slug ?? mission.id,
+					});
+				} catch (err) {
+					console.warn(
+						`[done-phase:cleanup] learnings extraction failed (best-effort): ${
+							err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200)
+						}`,
+					);
+				}
+			}
 			// Stage C: clean up debug worktrees on success path.
 			// Escalation path leaves them in place for operator inspection.
 			if (mission && deps.projectRoot) {

@@ -221,6 +221,7 @@ function createMockMissionStore(): MissionStore {
 		checkpoints: createMockCheckpointStore(),
 		acquireTickLock: () => true,
 		releaseTickLock: noop,
+		withTickLock: async <T>(_id: string, fn: () => Promise<T>): Promise<T> => fn(),
 		ensureGateState: () => ({
 			entered_at: new Date().toISOString(),
 			nudge_count: 0,

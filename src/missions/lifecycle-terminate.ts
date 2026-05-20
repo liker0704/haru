@@ -284,49 +284,63 @@ async function terminalizeMission(opts: {
 		const beforeState = mission.state;
 		const beforePhase = mission.phase;
 		const engineDeps = { checkpointStore: missionStore.checkpoints, missionStore };
-		if (targetState === "completed") {
-			// Graph-aware: there is no single `complete` edge from execute/pr → done
-			// anymore. Inspect the current node and fire the next-step trigger
-			// (phase_advance or handoff). When already on done:active (or no edge
-			// exists), skip the graph transition — the explicit completeMission()
-			// below still finalizes the mission record.
-			const completionTrigger = resolveCompletionTrigger(mission);
-			if (completionTrigger) {
-				const result = await transitionMissionViaEngine(mission.id, completionTrigger, engineDeps);
+		// Bug fix #431: serialize against in-flight mission ticks. Without the
+		// tick lock, the watchdog tick may read mission state, decide to advance,
+		// then write a new currentNode AFTER our stop/complete state mutation
+		// lands — leaving the mission in an inconsistent stopped+advancing state.
+		const earlyReturn = await missionStore.withTickLock(mission.id, async () => {
+			if (targetState === "completed") {
+				// Graph-aware: there is no single `complete` edge from execute/pr → done
+				// anymore. Inspect the current node and fire the next-step trigger
+				// (phase_advance or handoff). When already on done:active (or no edge
+				// exists), skip the graph transition — the explicit completeMission()
+				// below still finalizes the mission record.
+				const completionTrigger = resolveCompletionTrigger(mission);
+				if (completionTrigger) {
+					const result = await transitionMissionViaEngine(
+						mission.id,
+						completionTrigger,
+						engineDeps,
+					);
+					if (result.status === "error") {
+						printWarning("Graph transition failed", result.error ?? "unknown");
+						return { earlyReturn: true } as const;
+					}
+					// If advance moved to intermediate phase (not done), let engine tick run it
+					const advancedMission = missionStore.getById(mission.id);
+					if (advancedMission?.phase !== "done") {
+						printSuccess(
+							"Mission advanced to intermediate phase",
+							`Current phase: ${advancedMission?.phase}. Engine will progress through remaining phases on next ticks.`,
+						);
+						return { earlyReturn: true } as const;
+					}
+				}
+				missionStore.transaction(() => {
+					if (mission.phase !== "done") {
+						missionStore.updatePhase(mission.id, "done");
+					}
+					missionStore.completeMission(mission.id);
+				});
+				if (mission.phase !== "done") {
+					recordMissionEvent({
+						overstoryDir,
+						mission,
+						agentName: "operator",
+						data: { kind: "phase_change", from: beforePhase, to: "done" },
+					});
+				}
+			} else {
+				const result = await transitionMissionViaEngine(mission.id, "stop", engineDeps);
 				if (result.status === "error") {
 					printWarning("Graph transition failed", result.error ?? "unknown");
-					return { bundlePath: null, reviewId: null, deferredSelfSession: selfTmuxSession };
 				}
-				// If advance moved to intermediate phase (not done), let engine tick run it
-				const advancedMission = missionStore.getById(mission.id);
-				if (advancedMission?.phase !== "done") {
-					printSuccess(
-						"Mission advanced to intermediate phase",
-						`Current phase: ${advancedMission?.phase}. Engine will progress through remaining phases on next ticks.`,
-					);
-					return { bundlePath: null, reviewId: null, deferredSelfSession: selfTmuxSession };
-				}
+				missionStore.updateState(mission.id, "stopped");
 			}
-			missionStore.transaction(() => {
-				if (mission.phase !== "done") {
-					missionStore.updatePhase(mission.id, "done");
-				}
-				missionStore.completeMission(mission.id);
-			});
-			if (mission.phase !== "done") {
-				recordMissionEvent({
-					overstoryDir,
-					mission,
-					agentName: "operator",
-					data: { kind: "phase_change", from: beforePhase, to: "done" },
-				});
-			}
-		} else {
-			const result = await transitionMissionViaEngine(mission.id, "stop", engineDeps);
-			if (result.status === "error") {
-				printWarning("Graph transition failed", result.error ?? "unknown");
-			}
-			missionStore.updateState(mission.id, "stopped");
+			return { earlyReturn: false } as const;
+		});
+		if (earlyReturn.earlyReturn) {
+			return { bundlePath: null, reviewId: null, deferredSelfSession: selfTmuxSession };
 		}
 
 		recordMissionEvent({

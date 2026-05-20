@@ -566,6 +566,19 @@ export interface MissionStore {
 	// === Gate state operations (for mission engine tick) ===
 	acquireTickLock(missionId: string, intervalMs: number): boolean;
 	releaseTickLock(missionId: string): void;
+	/**
+	 * Run `fn` while holding the per-mission tick lock so CLI mutations
+	 * (ha mission stop/pause/resume) serialize against in-flight ticks.
+	 * Polls acquireTickLock with backoff up to `maxWaitMs` (default 5000ms);
+	 * returns the result of `fn`. If the lock can't be acquired within the
+	 * deadline, `fn` runs anyway (best-effort serialization, no deadlock).
+	 * See overstory-#431.
+	 */
+	withTickLock<T>(
+		missionId: string,
+		fn: () => Promise<T>,
+		opts?: { maxWaitMs?: number; intervalMs?: number },
+	): Promise<T>;
 	ensureGateState(
 		missionId: string,
 		nodeId: string,
