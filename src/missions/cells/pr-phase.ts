@@ -205,11 +205,29 @@ function buildHandlers(deps: PhaseCellDeps, config?: PhaseCellConfig): HandlerRe
 			}
 
 			const spawnFn = deps.spawn ?? Bun.spawn;
-			const pushProc = spawnFn(["git", "push", "-u", "origin", featureBranch], {
+			// The local feature_branch was created at mission start pointing to
+			// origin/main, but builder merges land on local `main`, leaving
+			// feature_branch stale. Reset it to local main HEAD so the push
+			// carries the merged work; without this, gh pr create sees no diff
+			// between head and base and fails silently into pr_create_network_fail.
+			const resetProc = spawnFn(["git", "branch", "-f", featureBranch, "main"], {
 				cwd: deps.projectRoot,
 				stdout: "pipe",
 				stderr: "pipe",
 			});
+			await resetProc.exited;
+
+			// Use --force-with-lease so the local update is reflected on origin
+			// without clobbering unrelated remote work; the remote ref was
+			// previously the stale origin/main, so this is the legitimate update.
+			const pushProc = spawnFn(
+				["git", "push", "--force-with-lease", "-u", "origin", featureBranch],
+				{
+					cwd: deps.projectRoot,
+					stdout: "pipe",
+					stderr: "pipe",
+				},
+			);
 			const pushExit = await pushProc.exited;
 			if (pushExit !== 0) {
 				const pushStderr = pushProc.stderr ? await new Response(pushProc.stderr).text() : "";
