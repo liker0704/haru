@@ -932,6 +932,28 @@ project:
 `);
 		await expect(loadConfig(tempDir)).rejects.toThrow(ValidationError);
 	});
+
+	test("rejects watchdog.maxEscalationLevel out of [1,5] or non-integer", async () => {
+		await writeConfig("watchdog:\n  maxEscalationLevel: 0\n");
+		await expect(loadConfig(tempDir)).rejects.toThrow(ValidationError);
+
+		await writeConfig("watchdog:\n  maxEscalationLevel: 6\n");
+		await expect(loadConfig(tempDir)).rejects.toThrow(ValidationError);
+
+		await writeConfig("watchdog:\n  maxEscalationLevel: 2.5\n");
+		await expect(loadConfig(tempDir)).rejects.toThrow(ValidationError);
+	});
+
+	test("rejects watchdog.triageMaxConcurrent out of [1,10] or non-integer", async () => {
+		await writeConfig("watchdog:\n  triageMaxConcurrent: 0\n");
+		await expect(loadConfig(tempDir)).rejects.toThrow(ValidationError);
+
+		await writeConfig("watchdog:\n  triageMaxConcurrent: 11\n");
+		await expect(loadConfig(tempDir)).rejects.toThrow(ValidationError);
+
+		await writeConfig("watchdog:\n  triageMaxConcurrent: 1.5\n");
+		await expect(loadConfig(tempDir)).rejects.toThrow(ValidationError);
+	});
 });
 
 describe("resolveProjectRoot", () => {
@@ -1292,6 +1314,13 @@ describe("DEFAULT_CONFIG", () => {
 		expect(DEFAULT_CONFIG.watchdog.tier0IntervalMs).toBe(30_000);
 		expect(DEFAULT_CONFIG.watchdog.staleThresholdMs).toBe(300_000);
 		expect(DEFAULT_CONFIG.watchdog.zombieThresholdMs).toBe(600_000);
+	});
+
+	test("has correct defaults for new watchdog knobs (#380, #381, #382, #384)", () => {
+		expect(DEFAULT_CONFIG.watchdog.rpcTimeoutMs).toBe(5_000);
+		expect(DEFAULT_CONFIG.watchdog.triageTimeoutMs).toBe(30_000);
+		expect(DEFAULT_CONFIG.watchdog.maxEscalationLevel).toBe(3);
+		expect(DEFAULT_CONFIG.watchdog.triageMaxConcurrent).toBe(2);
 	});
 
 	test("includes default qualityGates", () => {

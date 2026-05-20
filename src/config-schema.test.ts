@@ -60,6 +60,13 @@ describe("config-schema constants", () => {
 		expect(KNOWN_FIELDS.watchdog.has("tier1IntervalMs")).toBe(false);
 	});
 
+	test("KNOWN_FIELDS.watchdog includes all 4 new configurable timeout/cap keys", () => {
+		expect(KNOWN_FIELDS.watchdog.has("rpcTimeoutMs")).toBe(true);
+		expect(KNOWN_FIELDS.watchdog.has("triageTimeoutMs")).toBe(true);
+		expect(KNOWN_FIELDS.watchdog.has("maxEscalationLevel")).toBe(true);
+		expect(KNOWN_FIELDS.watchdog.has("triageMaxConcurrent")).toBe(true);
+	});
+
 	test("KNOWN_FIELDS.providerItem covers all provider fields", () => {
 		expect(KNOWN_FIELDS.providerItem.has("type")).toBe(true);
 		expect(KNOWN_FIELDS.providerItem.has("baseUrl")).toBe(true);
