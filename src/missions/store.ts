@@ -1642,6 +1642,30 @@ export function createMissionStore(dbPath: string): MissionStore {
 			};
 		})(),
 
+		async withTickLock<T>(
+			missionId: string,
+			fn: () => Promise<T>,
+			opts?: { maxWaitMs?: number; intervalMs?: number },
+		): Promise<T> {
+			const maxWaitMs = opts?.maxWaitMs ?? 5_000;
+			const intervalMs = opts?.intervalMs ?? 100;
+			const deadline = Date.now() + maxWaitMs;
+			let held = false;
+			while (Date.now() < deadline) {
+				if (this.acquireTickLock(missionId, maxWaitMs)) {
+					held = true;
+					break;
+				}
+				await Bun.sleep(intervalMs);
+			}
+			try {
+				return await fn();
+			} finally {
+				// Best-effort release; safe even if we never acquired (DELETE is a no-op).
+				if (held) this.releaseTickLock(missionId);
+			}
+		},
+
 		ensureGateState: (() => {
 			const insertStmt = db.prepare(
 				`INSERT OR IGNORE INTO mission_gate_state

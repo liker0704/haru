@@ -93,17 +93,21 @@ export async function suspendMission(opts: {
 			}
 		}
 
-		// Set mission state to suspended (preserves runtime pointers, mail, run)
-		const result = await transitionMissionViaEngine(mission.id, "suspend", {
-			checkpointStore: missionStore.checkpoints,
-			missionStore,
-		});
-		if (result.status === "error") {
-			const { printWarning } = await import("../logging/color.ts");
-			printWarning("Graph transition failed", result.error ?? "unknown");
-		}
+		// Set mission state to suspended (preserves runtime pointers, mail, run).
+		// Bug fix #431: hold the tick lock so an in-flight engine tick can't
+		// advance currentNode after we mark the mission suspended.
 		const beforeState = mission.state;
-		missionStore.updateState(mission.id, "suspended");
+		await missionStore.withTickLock(mission.id, async () => {
+			const result = await transitionMissionViaEngine(mission.id, "suspend", {
+				checkpointStore: missionStore.checkpoints,
+				missionStore,
+			});
+			if (result.status === "error") {
+				const { printWarning } = await import("../logging/color.ts");
+				printWarning("Graph transition failed", result.error ?? "unknown");
+			}
+			missionStore.updateState(mission.id, "suspended");
+		});
 		recordMissionEvent({
 			overstoryDir,
 			mission,
