@@ -6,7 +6,7 @@
  * and optionally a nudge target/message if the condition is not met.
  */
 
-import { statSync as statSyncFn } from "node:fs";
+import { copyFileSync, existsSync, statSync as statSyncFn } from "node:fs";
 import { join as joinPath } from "node:path";
 import { detectHaruDir } from "../config.ts";
 import type { MailStore } from "../mail/store.ts";
@@ -933,6 +933,7 @@ export function evaluateAwaitSpecReady(
 	mission: Mission,
 	mailStore: MailStore | null,
 	gateEnteredAt?: string,
+	projectRoot?: string,
 ): GateEvalResult {
 	if (!mailStore) return { met: false };
 
@@ -942,6 +943,33 @@ export function evaluateAwaitSpecReady(
 		(m) => m.type === "spec_ready",
 	);
 	if (ready) {
+		// Bug fix (overstory-#401): the clarifier writes product-spec.md inside
+		// its worktree (`<artifactRoot>/product-spec.md` interpreted relative to
+		// worktree root, not canonical), so downstream handlers like
+		// create-tracker-issue can't find it. Detect + copy from the predictable
+		// worktree path before signalling the gate is met. Best-effort: missing
+		// worktree copy just leaves the canonical path empty for the operator.
+		if (projectRoot && mission.artifactRoot && mission.slug) {
+			const canonicalSpec = joinPath(mission.artifactRoot, "product-spec.md");
+			if (!existsSync(canonicalSpec)) {
+				const worktreeSpec = joinPath(
+					projectRoot,
+					".overstory",
+					"worktrees",
+					mission.slug,
+					`product-clarifier-${mission.slug}`,
+					"product-spec.md",
+				);
+				if (existsSync(worktreeSpec)) {
+					try {
+						copyFileSync(worktreeSpec, canonicalSpec);
+					} catch {
+						// Non-fatal: human-spec-review or create-tracker-issue will
+						// surface the missing-spec error if the copy fails.
+					}
+				}
+			}
+		}
 		return { met: true, trigger: "spec_ready" };
 	}
 
@@ -1339,7 +1367,7 @@ export async function evaluateGate(
 		case "await-research-complete":
 			return evaluateAwaitResearchComplete(mission, stores.mailStore, gateEnteredAt);
 		case "await-spec-ready":
-			return evaluateAwaitSpecReady(mission, stores.mailStore, gateEnteredAt);
+			return evaluateAwaitSpecReady(mission, stores.mailStore, gateEnteredAt, projectRoot);
 		case "await-tier-set":
 			return evaluateAwaitTierSet(mission);
 		case "await-context":
