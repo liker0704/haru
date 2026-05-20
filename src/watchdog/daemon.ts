@@ -784,6 +784,8 @@ export function startDaemon(options: DaemonOptions & { intervalMs: number }): { 
 		}
 	}
 
+	const tailerRegistry = options._tailerRegistry ?? _defaultTailerRegistry;
+
 	// Run the first tick immediately, then on interval
 	runDaemonTick(options).catch(onTickError);
 
@@ -821,6 +823,14 @@ export function startDaemon(options: DaemonOptions & { intervalMs: number }): { 
 	return {
 		stop(): void {
 			clearInterval(interval);
+			for (const [name, handle] of tailerRegistry) {
+				try {
+					handle.stop();
+				} catch {
+					// Non-fatal
+				}
+				tailerRegistry.delete(name);
+			}
 			if (ownGapEventStore && gapEventStore) {
 				try {
 					gapEventStore.close();
