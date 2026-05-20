@@ -108,6 +108,7 @@ export const DEFAULT_CONFIG: OverstoryConfig = {
 		staleThresholdMs: 300_000, // 5 minutes
 		zombieThresholdMs: 600_000, // 10 minutes
 		nudgeIntervalMs: 60_000, // 1 minute between progressive nudge stages
+		rpcTimeoutMs: 5_000, // Per-call headless RPC getState() timeout (#380)
 	},
 	mission: {
 		planReview: {

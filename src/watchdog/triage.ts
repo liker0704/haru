@@ -43,7 +43,12 @@ export async function triageAgent(options: {
 	try {
 		logContent = await readRecentLog(logsDir);
 	} catch {
-		// No logs available — assume long-running operation
+		// No logs available — assume long-running operation.
+		// Bug fix #378: surface the fallback so operators don't confuse it
+		// with a successful triage verdict.
+		console.warn(
+			`[triage:${agentName}] no logs at ${logsDir}; defaulting to "extend" without AI analysis`,
+		);
 		return "extend";
 	}
 
@@ -52,8 +57,14 @@ export async function triageAgent(options: {
 	try {
 		const response = await spawnClaude(prompt, timeoutMs, config);
 		return classifyResponse(response);
-	} catch {
-		// Claude not available — default to extend (safe fallback)
+	} catch (err) {
+		// Claude not available — default to extend (safe fallback).
+		// Bug fix #378: log + propagate so daemon caller can mark triageFailed.
+		console.warn(
+			`[triage:${agentName}] Claude unavailable, defaulting to "extend": ${
+				err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200)
+			}`,
+		);
 		return "extend";
 	}
 }

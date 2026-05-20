@@ -145,6 +145,7 @@ export interface OverstoryConfig {
 		staleThresholdMs: number; // When to consider agent stale
 		zombieThresholdMs: number; // When to kill
 		nudgeIntervalMs: number; // Time between progressive nudge stages (default 60_000)
+		rpcTimeoutMs?: number; // Per-call timeout for headless RPC getState() (default 5000, range 1000-30000) — #380
 	};
 	models: Partial<Record<string, ModelRef>>;
 	logging: {

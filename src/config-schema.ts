@@ -83,6 +83,7 @@ export const KNOWN_FIELDS = {
 		"staleThresholdMs",
 		"zombieThresholdMs",
 		"nudgeIntervalMs",
+		"rpcTimeoutMs",
 	]),
 	logging: new Set(["verbose", "redactSecrets"]),
 	coordinator: new Set(["autoPull", "exitTriggers"]),

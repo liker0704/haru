@@ -98,7 +98,12 @@ export function startEventTailer(opts: TailerOptions): TailerHandle {
 			eventStore = createEventStore(eventsDbPath);
 			ownedEventStore = true;
 		} catch {
-			// If we can't open the event store, the tailer becomes a no-op.
+			// Bug fix #383: previously the tailer kept polling indefinitely with a
+			// no-op insert when EventStore creation failed — wasting CPU on file
+			// reads + NDJSON parsing every interval. Return a no-op handle instead
+			// so the caller observes the failure (no events ever appear) and the
+			// tailer doesn't schedule polls.
+			return { stop: () => {} };
 		}
 	}
 

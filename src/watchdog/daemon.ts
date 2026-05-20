@@ -1231,10 +1231,14 @@ export async function runDaemonTick(options: DaemonOptions): Promise<void> {
 				const conn = getConn(session.agentName);
 				if (conn) {
 					try {
+						const rpcTimeoutMs = Math.max(
+							1000,
+							Math.min(30_000, options.config?.watchdog?.rpcTimeoutMs ?? 5_000),
+						);
 						const state = await Promise.race([
 							conn.getState(),
 							new Promise<never>((_, reject) =>
-								setTimeout(() => reject(new Error("getState timed out")), 5000),
+								setTimeout(() => reject(new Error("getState timed out")), rpcTimeoutMs),
 							),
 						]);
 						if (state.status === "idle" || state.status === "working") {
@@ -2045,7 +2049,12 @@ export async function runDaemonTick(options: DaemonOptions): Promise<void> {
 			const missionStore = createMissionStore(join(overstoryDir, "sessions.db"));
 			try {
 				const { runMissionTick } = await import("./mission-tick.ts");
-				const { createSeedsTracker } = await import("../tracker/seeds.ts");
+				// Bug fix #411: honor config.taskTracker.backend rather than
+				// hardcoding seeds. resolveBackend handles the "auto" case by
+				// sniffing .suji/.beads marker files at the project root.
+				const { resolveBackend, createTrackerClient } = await import("../tracker/factory.ts");
+				const backend = await resolveBackend(options.config?.taskTracker?.backend ?? "auto", root);
+				const tracker = createTrackerClient(backend, root);
 				await runMissionTick({
 					overstoryDir,
 					projectRoot: root,
@@ -2055,7 +2064,7 @@ export async function runDaemonTick(options: DaemonOptions): Promise<void> {
 					mailStore,
 					eventStore,
 					intervalMs: options.config?.watchdog?.tier0IntervalMs ?? 30_000,
-					tracker: createSeedsTracker(root),
+					tracker,
 				});
 			} catch (err) {
 				// Non-fatal: mission tick failure must not break agent health checks
