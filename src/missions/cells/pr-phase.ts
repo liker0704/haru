@@ -209,43 +209,80 @@ function buildHandlers(deps: PhaseCellDeps, config?: PhaseCellConfig): HandlerRe
 			}
 
 			const spawnFn = deps.spawn ?? Bun.spawn;
-			// The local feature_branch was created at mission start pointing to
-			// origin/main, but builder merges land on local `main`, leaving
-			// feature_branch stale. Reset it to local main HEAD so the push
-			// carries the merged work; without this, gh pr create sees no diff
-			// between head and base and fails silently into pr_create_network_fail.
-			const resetProc = spawnFn(["git", "branch", "-f", featureBranch, "main"], {
-				cwd: deps.projectRoot,
-				stdout: "pipe",
-				stderr: "pipe",
-			});
-			await resetProc.exited;
+			const cwd = deps.projectRoot;
 
-			// Bug fix #398: pre-flight check whether main has any commits ahead of
-			// origin/main. If 0, the mission produced no diff (audit/verification
-			// missions, scope=0). Emit a clean pr_no_commits trigger rather than
-			// pushing an empty branch and getting a misleading pr_create_network_fail.
-			const countProc = spawnFn(["git", "rev-list", "--count", "origin/main..main"], {
-				cwd: deps.projectRoot,
-				stdout: "pipe",
-				stderr: "pipe",
-			});
-			const countExit = await countProc.exited;
-			if (countExit === 0) {
-				const countStdout = countProc.stdout ? await new Response(countProc.stdout).text() : "0";
-				const ahead = Number.parseInt(countStdout.trim(), 10);
-				if (Number.isFinite(ahead) && ahead === 0) {
-					return { trigger: "pr_no_commits" };
-				}
+			// Bug fix #443: build feature_branch on top of latest origin/main, not
+			// on the operator's local main (which may have diverged with stale
+			// merge commits from squash-merged predecessor PRs). Without this, the
+			// PR comes out CONFLICTING because origin sees the merge-commit form
+			// of files that were squash-merged separately.
+			//
+			// Approach (git plumbing, no checkout side-effects):
+			//   1. Refresh origin/main ref via fetch.
+			//   2. Read tree of local main HEAD (mission's final file state).
+			//   3. Read latest origin/main as parent.
+			//   4. If tree == parent's tree, mission produced no real diff
+			//      (audit/verification cases) -> pr_no_commits.
+			//   5. Otherwise create a synthetic commit (one-line message) with
+			//      tree on top of parent, point feature_branch at it via
+			//      update-ref. Single squash-style commit on top of fresh
+			//      origin/main — clean PR every time.
+			await spawnFn(["git", "fetch", "origin", "main"], { cwd, stdout: "pipe", stderr: "pipe" })
+				.exited;
+
+			const readRef = async (ref: string): Promise<string | null> => {
+				const proc = spawnFn(["git", "rev-parse", ref], {
+					cwd,
+					stdout: "pipe",
+					stderr: "pipe",
+				});
+				const exit = await proc.exited;
+				if (exit !== 0) return null;
+				const out = proc.stdout ? (await new Response(proc.stdout).text()).trim() : "";
+				return out.length > 0 ? out : null;
+			};
+
+			const tree = await readRef("main^{tree}");
+			const parent = await readRef("origin/main");
+			const parentTree = parent ? await readRef(`${parent}^{tree}`) : null;
+			if (!tree || !parent) {
+				return { trigger: "pr_create_network_fail" };
+			}
+			if (parentTree === tree) {
+				// No diff against latest origin/main — audit/verification mission
+				// or stale-only commits. Skip PR creation cleanly.
+				return { trigger: "pr_no_commits" };
 			}
 
-			// Use --force-with-lease so the local update is reflected on origin
-			// without clobbering unrelated remote work; the remote ref was
-			// previously the stale origin/main, so this is the legitimate update.
+			const commitMsg = `Mission ${mission?.slug ?? featureBranch}`;
+			const commitProc = spawnFn(["git", "commit-tree", tree, "-p", parent, "-m", commitMsg], {
+				cwd,
+				stdout: "pipe",
+				stderr: "pipe",
+			});
+			const commitExit = await commitProc.exited;
+			if (commitExit !== 0) {
+				return { trigger: "pr_create_network_fail" };
+			}
+			const newCommit = commitProc.stdout
+				? (await new Response(commitProc.stdout).text()).trim()
+				: "";
+			if (!newCommit) {
+				return { trigger: "pr_create_network_fail" };
+			}
+
+			await spawnFn(["git", "update-ref", `refs/heads/${featureBranch}`, newCommit], {
+				cwd,
+				stdout: "pipe",
+				stderr: "pipe",
+			}).exited;
+
+			// --force-with-lease so any stale push from a previous run is
+			// safely replaced; legitimate concurrent remote work is still protected.
 			const pushProc = spawnFn(
 				["git", "push", "--force-with-lease", "-u", "origin", featureBranch],
 				{
-					cwd: deps.projectRoot,
+					cwd,
 					stdout: "pipe",
 					stderr: "pipe",
 				},
