@@ -21,6 +21,7 @@ import { checkStructure } from "../doctor/structure.ts";
 import type { DoctorCategory, DoctorCheck, DoctorCheckFn } from "../doctor/types.ts";
 import { checkVersion } from "../doctor/version.ts";
 import { checkWatchdog } from "../doctor/watchdog.ts";
+import { checkWatchdogExtras } from "../doctor/watchdog-checks.ts";
 import { ValidationError } from "../errors.ts";
 import { jsonOutput } from "../json.ts";
 import { color } from "../logging/color.ts";
@@ -41,6 +42,7 @@ const ALL_CHECKS: Array<{ category: DoctorCategory; fn: DoctorCheckFn }> = [
 	{ category: "ecosystem", fn: checkEcosystem },
 	{ category: "providers", fn: checkProviders },
 	{ category: "watchdog", fn: checkWatchdog },
+	{ category: "watchdog", fn: checkWatchdogExtras },
 ];
 
 /**
