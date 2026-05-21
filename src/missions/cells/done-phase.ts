@@ -344,6 +344,44 @@ function buildHandlers(deps: PhaseCellDeps): HandlerRegistry {
 					slug: mission.slug,
 				});
 			}
+
+			// Bug fix #445: after PR is merged on origin and our worktrees are
+			// removed, the local feature_branch ref still hangs around. Delete it
+			// + prune remote-tracking refs so accumulation doesn't pollute the
+			// operator's branch list (we saw 22 stale mission/* branches after
+			// one day of mission work).
+			if (mission?.featureBranch && deps.projectRoot) {
+				try {
+					const delProc = Bun.spawn(
+						["git", "-C", deps.projectRoot, "branch", "-D", mission.featureBranch],
+						{ stdout: "pipe", stderr: "pipe" },
+					);
+					await delProc.exited;
+					// Non-fatal if branch already gone (exit != 0) — git prints the
+					// message to stderr but we don't surface it; operator sees only
+					// branches that actually existed.
+				} catch (err) {
+					console.warn(
+						`[done-phase:cleanup] failed to delete local feature_branch ${mission.featureBranch}: ${
+							err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200)
+						}`,
+					);
+				}
+				try {
+					const pruneProc = Bun.spawn(
+						["git", "-C", deps.projectRoot, "fetch", "origin", "--prune"],
+						{ stdout: "pipe", stderr: "pipe" },
+					);
+					await pruneProc.exited;
+				} catch (err) {
+					console.warn(
+						`[done-phase:cleanup] git fetch --prune failed: ${
+							err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200)
+						}`,
+					);
+				}
+			}
+
 			return { trigger: "cleanup_done" };
 		},
 	};
