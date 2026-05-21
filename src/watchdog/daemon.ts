@@ -47,7 +47,7 @@ import { sanitize } from "../logging/sanitizer.ts";
 import { createMailClient } from "../mail/client.ts";
 import { createMailStore, type MailStore } from "../mail/store.ts";
 import { createMergeQueue, type MergeQueue } from "../merge/queue.ts";
-import { createMulchClient } from "../mulch/client.ts";
+import { createMulchClient, type MulchClient } from "../mulch/client.ts";
 import { normalizeSpans } from "../observability/normalize.ts";
 import { createExportPipeline, type ExportPipeline } from "../observability/pipeline.ts";
 import { buildExporters } from "../observability/registry.ts";
@@ -94,6 +94,7 @@ const DEFAULT_MAX_ESCALATION_LEVEL = 3;
 const DEFAULT_TRIAGE_MAX_CONCURRENT = 2;
 
 import { isPersistentCapability, PERSISTENT_CAPABILITIES } from "../agents/capabilities.ts";
+import { recordSessionInsights } from "../agents/insights-recorder.ts";
 import { createRunStore } from "../sessions/store.ts";
 
 /**
@@ -451,6 +452,8 @@ function reconcileSessionToCompleted(params: {
 	runId: string | null;
 	eventStore: EventStore | null;
 	resilienceStore?: ResilienceStore | null;
+	mulchClient?: MulchClient | null;
+	logger?: { warn: (msg: string, meta?: unknown) => void };
 	eventType: string;
 	reason?: string;
 }): void {
@@ -482,6 +485,18 @@ function reconcileSessionToCompleted(params: {
 			reason: reason ?? null,
 		},
 	});
+	if (eventStore && params.mulchClient) {
+		// Fire-and-forget: recorder is best-effort and never throws.
+		void recordSessionInsights({
+			session,
+			eventStore,
+			mulchClient: params.mulchClient,
+			logger: params.logger,
+		}).catch(() => {
+			// Defensive: recorder swallows everything internally, but guard against
+			// future regressions that might let an error escape.
+		});
+	}
 }
 
 function buildRateLimitResumeNudge(session: AgentSession): string {
@@ -723,6 +738,8 @@ export interface DaemonOptions {
 	_logger?: { warn: (msg: string, meta?: unknown) => void };
 	/** DI for resilience store. If not provided, created from resilience.db when config.resilience exists. */
 	_resilienceStore?: ResilienceStore | null;
+	/** DI for mulch client used by session insights recorder. */
+	_mulchClient?: MulchClient | null;
 	/** DI for headroom store. If not provided, created from headroom.db when config.headroom exists. */
 	_headroomStore?: HeadroomStore | null;
 	/** DI for export pipeline. If not provided, built from config.observability when enabled. */
@@ -976,6 +993,8 @@ export async function runDaemonTick(options: DaemonOptions): Promise<void> {
 			}
 		},
 	};
+	const insightsMulchClient: MulchClient | null =
+		options._mulchClient !== undefined ? options._mulchClient : createMulchClient(root);
 
 	if (!startupCaptured) {
 		startupSha = await captureHead(root);
@@ -1535,6 +1554,8 @@ export async function runDaemonTick(options: DaemonOptions): Promise<void> {
 										runId,
 										eventStore,
 										resilienceStore,
+										mulchClient: insightsMulchClient,
+										logger,
 										eventType: "zombie_session_end_reconciled",
 										reason: "tmux alive, ready prompt, no recent rate-limit history",
 									});
@@ -1576,6 +1597,8 @@ export async function runDaemonTick(options: DaemonOptions): Promise<void> {
 						runId,
 						eventStore,
 						resilienceStore,
+						mulchClient: insightsMulchClient,
+						logger,
 						eventType: "watchdog_completion",
 						reason: completion.reason,
 					});
@@ -1645,6 +1668,8 @@ export async function runDaemonTick(options: DaemonOptions): Promise<void> {
 						runId,
 						eventStore,
 						resilienceStore,
+						mulchClient: insightsMulchClient,
+						logger,
 						eventType: recentRateLimitHistory
 							? "rate_limit_session_end_dead_reconciled"
 							: "zombie_session_end_dead_reconciled",

@@ -2068,5 +2068,25 @@
 		"status": "active",
 		"createdAt": "2026-05-21T16:26:12.938Z",
 		"completedAt": null
+	},
+	{
+		"id": "group-55a684d0",
+		"name": "ws-watchdog-doctor-v3",
+		"memberIssueIds": [
+			"overstory-d14f"
+		],
+		"status": "active",
+		"createdAt": "2026-05-21T16:48:56.963Z",
+		"completedAt": null
+	},
+	{
+		"id": "group-cc365aae",
+		"name": "fix-371-insights-v3",
+		"memberIssueIds": [
+			"overstory-vo3e"
+		],
+		"status": "active",
+		"createdAt": "2026-05-21T18:49:19.675Z",
+		"completedAt": null
 	}
 ]
