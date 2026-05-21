@@ -2058,5 +2058,15 @@
 		"status": "active",
 		"createdAt": "2026-05-19T10:08:23.357Z",
 		"completedAt": null
+	},
+	{
+		"id": "group-3a9610ed",
+		"name": "fix-373-smoke-doc-v2",
+		"memberIssueIds": [
+			"overstory-736a"
+		],
+		"status": "active",
+		"createdAt": "2026-05-21T16:26:12.938Z",
+		"completedAt": null
 	}
 ]
