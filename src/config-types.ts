@@ -149,6 +149,7 @@ export interface OverstoryConfig {
 		triageTimeoutMs?: number; // Per-call timeout for Tier 1 AI triage Claude spawn (default 30000, must be < tier0IntervalMs) — #381
 		maxEscalationLevel?: number; // Maximum escalation level the daemon advances through (default 3, range 1-5) — #382
 		triageMaxConcurrent?: number; // Concurrent Tier 1 triage spawns allowed per tick (default 2, range 1-10) — #384
+		idleLoopThresholdMs?: number; // #109: auto-complete agents that sent result mail but loop instead of exiting (default 300_000, range 60_000-3_600_000)
 	};
 	models: Partial<Record<string, ModelRef>>;
 	logging: {

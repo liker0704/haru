@@ -339,6 +339,45 @@ function hasAutoCompleteSignal(
 }
 
 /**
+ * Time (ms) since the agent's most recent `mail_sent` event with `type=result`.
+ * Returns null when no such event is found in the current session window.
+ *
+ * #109: lets the watchdog catch the "result mail sent but agent kept looping" pattern,
+ * where the agent never reaches a ready prompt so `hasAutoCompleteSignal` alone isn't enough.
+ */
+function timeSinceLastResultMail(
+	eventStore: EventStore | null,
+	agentName: string,
+	sessionStartedAt?: string,
+): number | null {
+	if (!eventStore) return null;
+	try {
+		const events = eventStore.getByAgent(agentName);
+		// Walk from newest to oldest. Cap to last 100 events — same short-circuit
+		// rationale as hasAutoCompleteSignal/hasIterationSignal but with a larger
+		// window because the result mail can be older than the 20-event ceiling
+		// those siblings use (we care about "any result mail this session").
+		const scanLimit = Math.max(0, events.length - 100);
+		for (let i = events.length - 1; i >= scanLimit; i--) {
+			const event = events[i];
+			if (!event || event.eventType !== "mail_sent" || !event.data) continue;
+			if (sessionStartedAt && event.createdAt < sessionStartedAt) continue;
+			try {
+				const data = JSON.parse(event.data) as { type?: string };
+				if (data.type === "result") {
+					return Date.now() - new Date(event.createdAt).getTime();
+				}
+			} catch {
+				/* ignore */
+			}
+		}
+	} catch {
+		/* ignore */
+	}
+	return null;
+}
+
+/**
  * Check if agent SENT an iteration signal (worker_done, merge_ready).
  * Queries events.db for mail_sent events sent BY this agent with type in ITERATION_SIGNALS.
  */
@@ -385,6 +424,7 @@ function shouldCompleteAgent(params: {
 	eventStore: EventStore | null;
 	store: { getByName: (name: string) => AgentSession | null; getAll: () => AgentSession[] };
 	overstoryDir: string;
+	idleLoopThresholdMs?: number;
 }): { complete: boolean; reason: string } {
 	const { session, tmuxAlive, atReadyPrompt, eventStore, store, overstoryDir } = params;
 
@@ -413,6 +453,17 @@ function shouldCompleteAgent(params: {
 	// 2. Auto-complete signal (result) + at ready prompt
 	if (atReadyPrompt && hasAutoCompleteSignal(eventStore, session.agentName, session.startedAt)) {
 		return { complete: true, reason: "auto-complete: result signal + at ready prompt" };
+	}
+
+	// #109: catch the "result mail sent but agent kept looping" pattern.
+	// Persistent agents already returned early above.
+	const idleLoopMs = timeSinceLastResultMail(eventStore, session.agentName, session.startedAt);
+	const threshold = params.idleLoopThresholdMs ?? 300_000;
+	if (idleLoopMs !== null && idleLoopMs > threshold) {
+		return {
+			complete: true,
+			reason: `auto-complete: result mail sent ${Math.floor(idleLoopMs / 60_000)}m ago + idle loop`,
+		};
 	}
 
 	// 3. Iteration signal (worker_done / merge_ready) → parent decides
@@ -1589,6 +1640,7 @@ export async function runDaemonTick(options: DaemonOptions): Promise<void> {
 					eventStore,
 					store,
 					overstoryDir,
+					idleLoopThresholdMs: options.config?.watchdog?.idleLoopThresholdMs,
 				});
 				if (completion.complete) {
 					reconcileSessionToCompleted({

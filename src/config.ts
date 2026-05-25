@@ -112,6 +112,7 @@ export const DEFAULT_CONFIG: OverstoryConfig = {
 		triageTimeoutMs: 30_000, // Tier 1 AI triage Claude-spawn timeout (#381)
 		maxEscalationLevel: 3, // Escalation ladder ceiling (#382)
 		triageMaxConcurrent: 2, // Concurrent Tier 1 triage spawns per tick (#384)
+		idleLoopThresholdMs: 300_000, // #109: auto-complete after result mail + idle loop > 5 min
 	},
 	mission: {
 		planReview: {
@@ -377,6 +378,20 @@ function validateConfig(config: OverstoryConfig): void {
 				field: "watchdog.triageMaxConcurrent",
 				value: n,
 			});
+		}
+	}
+
+	// #109: idleLoopThresholdMs must be in [60_000, 3_600_000] when set.
+	if (config.watchdog.idleLoopThresholdMs !== undefined) {
+		const ms = config.watchdog.idleLoopThresholdMs;
+		if (!Number.isFinite(ms) || ms < 60_000 || ms > 3_600_000) {
+			throw new ValidationError(
+				"watchdog.idleLoopThresholdMs must be a number in [60000, 3600000]",
+				{
+					field: "watchdog.idleLoopThresholdMs",
+					value: ms,
+				},
+			);
 		}
 	}
 

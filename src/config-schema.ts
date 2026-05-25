@@ -87,6 +87,7 @@ export const KNOWN_FIELDS = {
 		"triageTimeoutMs",
 		"maxEscalationLevel",
 		"triageMaxConcurrent",
+		"idleLoopThresholdMs",
 	]),
 	logging: new Set(["verbose", "redactSecrets"]),
 	coordinator: new Set(["autoPull", "exitTriggers"]),
