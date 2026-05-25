@@ -14,6 +14,7 @@
  * mx-56558b for background.
  */
 
+import { Database } from "bun:sqlite";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, writeFileSync } from "node:fs";
 import { mkdir, mkdtemp } from "node:fs/promises";
@@ -3978,5 +3979,155 @@ describe("gap detection", () => {
 		expect(stallEvents.length).toBe(0);
 
 		eventStore.close();
+	});
+});
+
+// === #109: idle-loop auto-complete tests ===
+
+describe("idle-loop auto-complete (#109)", () => {
+	/**
+	 * Insert a mail_sent event with a backdated created_at. The default insert
+	 * stamps "now" via SQLite, so we drop down to raw SQL to backdate. Uses
+	 * createEventStore() first to ensure the schema is initialized.
+	 */
+	function insertBackdatedResultMail(dbPath: string, agentName: string, ageMs: number): void {
+		// Ensure schema exists.
+		const init = createEventStore(dbPath);
+		init.close();
+		const db = new Database(dbPath);
+		try {
+			const createdAt = new Date(Date.now() - ageMs).toISOString();
+			db.prepare(
+				`INSERT INTO events
+					(run_id, agent_name, session_id, event_type, tool_name, tool_args,
+					 tool_duration_ms, level, data, created_at)
+				VALUES (NULL, $agent_name, NULL, 'mail_sent', NULL, NULL, NULL, 'info',
+					$data, $created_at)`,
+			).run({
+				$agent_name: agentName,
+				$data: JSON.stringify({ type: "result", subject: "task done" }),
+				$created_at: createdAt,
+			});
+		} finally {
+			db.close();
+		}
+	}
+
+	test("auto-completes waiting agent when result mail sent > idleLoopThresholdMs ago", async () => {
+		const session = makeSession({
+			agentName: "looping-scout",
+			tmuxSession: "haru-looping-scout",
+			capability: "scout",
+			state: "waiting",
+			// startedAt well in the past so the backdated event is in-session.
+			startedAt: new Date(Date.now() - 30 * 60_000).toISOString(),
+			lastActivity: new Date().toISOString(),
+		});
+		writeSessionsToStore(tempRoot, [session]);
+
+		// Result mail sent 10 minutes ago — well past the 5-minute default threshold.
+		insertBackdatedResultMail(
+			join(tempRoot, ".overstory", "events.db"),
+			"looping-scout",
+			10 * 60_000,
+		);
+
+		await runDaemonTick({
+			root: tempRoot,
+			...THRESHOLDS,
+			_tmux: tmuxAllAlive(),
+			_triage: triageAlways("extend"),
+			// Pane does NOT reach ready prompt — this is the looping-scout scenario.
+			_capturePaneContent: async () => "Loop 47 — No change. Awaiting new task assignment.",
+		});
+
+		const reloaded = readSessionsFromStore(tempRoot);
+		expect(reloaded[0]?.state).toBe("completed");
+	});
+
+	test("does NOT auto-complete waiting agent when no result mail was sent", async () => {
+		const session = makeSession({
+			agentName: "no-result-scout",
+			tmuxSession: "haru-no-result-scout",
+			capability: "scout",
+			state: "waiting",
+			startedAt: new Date(Date.now() - 30 * 60_000).toISOString(),
+			lastActivity: new Date().toISOString(),
+		});
+		writeSessionsToStore(tempRoot, [session]);
+
+		// No events at all — guarantees no result mail.
+
+		await runDaemonTick({
+			root: tempRoot,
+			...THRESHOLDS,
+			_tmux: tmuxAllAlive(),
+			_triage: triageAlways("extend"),
+			_capturePaneContent: async () => "Loop 5 — Awaiting new task assignment.",
+		});
+
+		const reloaded = readSessionsFromStore(tempRoot);
+		expect(reloaded[0]?.state).toBe("waiting");
+	});
+
+	test("does NOT auto-complete waiting agent when result mail sent < threshold", async () => {
+		const session = makeSession({
+			agentName: "fresh-result-scout",
+			tmuxSession: "haru-fresh-result-scout",
+			capability: "scout",
+			state: "waiting",
+			startedAt: new Date(Date.now() - 30 * 60_000).toISOString(),
+			lastActivity: new Date().toISOString(),
+		});
+		writeSessionsToStore(tempRoot, [session]);
+
+		// Result mail sent only 1 minute ago — well below the 5-minute default threshold.
+		insertBackdatedResultMail(
+			join(tempRoot, ".overstory", "events.db"),
+			"fresh-result-scout",
+			60_000,
+		);
+
+		await runDaemonTick({
+			root: tempRoot,
+			...THRESHOLDS,
+			_tmux: tmuxAllAlive(),
+			_triage: triageAlways("extend"),
+			_capturePaneContent: async () => "Loop 1 — Awaiting new task assignment.",
+		});
+
+		const reloaded = readSessionsFromStore(tempRoot);
+		expect(reloaded[0]?.state).toBe("waiting");
+	});
+
+	test("does NOT auto-complete persistent agents (coordinator) even when result mail is stale", async () => {
+		const session = makeSession({
+			agentName: "coordinator-99",
+			tmuxSession: "haru-coordinator-99",
+			capability: "coordinator",
+			state: "waiting",
+			startedAt: new Date(Date.now() - 60 * 60_000).toISOString(),
+			lastActivity: new Date().toISOString(),
+		});
+		writeSessionsToStore(tempRoot, [session]);
+
+		// Result mail sent 30 minutes ago — well past the default threshold.
+		insertBackdatedResultMail(
+			join(tempRoot, ".overstory", "events.db"),
+			"coordinator-99",
+			30 * 60_000,
+		);
+
+		await runDaemonTick({
+			root: tempRoot,
+			...THRESHOLDS,
+			_tmux: tmuxAllAlive(),
+			_triage: triageAlways("extend"),
+			_capturePaneContent: async () => "Loop 99 — Awaiting new task assignment.",
+		});
+
+		const reloaded = readSessionsFromStore(tempRoot);
+		// Persistent capability is exempt — must stay waiting.
+		expect(reloaded[0]?.state).toBe("waiting");
 	});
 });
