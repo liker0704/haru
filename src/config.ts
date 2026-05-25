@@ -108,11 +108,11 @@ export const DEFAULT_CONFIG: OverstoryConfig = {
 		staleThresholdMs: 300_000, // 5 minutes
 		zombieThresholdMs: 600_000, // 10 minutes
 		nudgeIntervalMs: 60_000, // 1 minute between progressive nudge stages
+		idleLoopThresholdMs: 300_000, // 5 minutes after result mail before force-completing idle-looping agent
 		rpcTimeoutMs: 5_000, // Per-call headless RPC getState() timeout (#380)
 		triageTimeoutMs: 30_000, // Tier 1 AI triage Claude-spawn timeout (#381)
 		maxEscalationLevel: 3, // Escalation ladder ceiling (#382)
 		triageMaxConcurrent: 2, // Concurrent Tier 1 triage spawns per tick (#384)
-		idleLoopThresholdMs: 300_000, // #109: auto-complete after result mail + idle loop > 5 min
 	},
 	mission: {
 		planReview: {
@@ -381,20 +381,6 @@ function validateConfig(config: OverstoryConfig): void {
 		}
 	}
 
-	// #109: idleLoopThresholdMs must be in [60_000, 3_600_000] when set.
-	if (config.watchdog.idleLoopThresholdMs !== undefined) {
-		const ms = config.watchdog.idleLoopThresholdMs;
-		if (!Number.isFinite(ms) || ms < 60_000 || ms > 3_600_000) {
-			throw new ValidationError(
-				"watchdog.idleLoopThresholdMs must be a number in [60000, 3600000]",
-				{
-					field: "watchdog.idleLoopThresholdMs",
-					value: ms,
-				},
-			);
-		}
-	}
-
 	if (config.watchdog.staleThresholdMs <= 0) {
 		throw new ValidationError("watchdog.staleThresholdMs must be positive", {
 			field: "watchdog.staleThresholdMs",
@@ -407,6 +393,16 @@ function validateConfig(config: OverstoryConfig): void {
 			field: "watchdog.zombieThresholdMs",
 			value: config.watchdog.zombieThresholdMs,
 		});
+	}
+
+	if (config.watchdog.idleLoopThresholdMs !== undefined) {
+		const idleMs = config.watchdog.idleLoopThresholdMs;
+		if (idleMs < 60_000 || idleMs > 3_600_000) {
+			throw new ValidationError("watchdog.idleLoopThresholdMs must be between 60000 and 3600000", {
+				field: "watchdog.idleLoopThresholdMs",
+				value: idleMs,
+			});
+		}
 	}
 
 	// mulch.primeFormat must be one of the valid options

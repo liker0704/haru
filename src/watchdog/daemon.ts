@@ -339,42 +339,38 @@ function hasAutoCompleteSignal(
 }
 
 /**
- * Time (ms) since the agent's most recent `mail_sent` event with `type=result`.
- * Returns null when no such event is found in the current session window.
- *
- * #109: lets the watchdog catch the "result mail sent but agent kept looping" pattern,
- * where the agent never reaches a ready prompt so `hasAutoCompleteSignal` alone isn't enough.
+ * Returns ms since the most recent result-type mail_sent event by this agent (within session),
+ * or null if no such event exists.
  */
 function timeSinceLastResultMail(
-	eventStore: EventStore | null,
+	eventStore: EventStore,
 	agentName: string,
-	sessionStartedAt?: string,
+	sessionStartedAt: string,
 ): number | null {
-	if (!eventStore) return null;
 	try {
 		const events = eventStore.getByAgent(agentName);
-		// Walk from newest to oldest. Cap to last 100 events — same short-circuit
-		// rationale as hasAutoCompleteSignal/hasIterationSignal but with a larger
-		// window because the result mail can be older than the 20-event ceiling
-		// those siblings use (we care about "any result mail this session").
-		const scanLimit = Math.max(0, events.length - 100);
-		for (let i = events.length - 1; i >= scanLimit; i--) {
+		let latestMs: number | null = null;
+		for (let i = events.length - 1; i >= 0 && i >= events.length - 20; i--) {
 			const event = events[i];
 			if (!event || event.eventType !== "mail_sent" || !event.data) continue;
-			if (sessionStartedAt && event.createdAt < sessionStartedAt) continue;
+			if (event.createdAt < sessionStartedAt) continue;
 			try {
 				const data = JSON.parse(event.data) as { type?: string };
-				if (data.type === "result") {
-					return Date.now() - new Date(event.createdAt).getTime();
+				if (data.type && AUTO_COMPLETE_SIGNALS.has(data.type)) {
+					const eventMs = new Date(event.createdAt).getTime();
+					if (latestMs === null || eventMs > latestMs) {
+						latestMs = eventMs;
+					}
 				}
 			} catch {
-				/* ignore */
+				// Ignore malformed payloads
 			}
 		}
+		if (latestMs === null) return null;
+		return Date.now() - latestMs;
 	} catch {
-		/* ignore */
+		return null;
 	}
-	return null;
 }
 
 /**
@@ -424,9 +420,17 @@ function shouldCompleteAgent(params: {
 	eventStore: EventStore | null;
 	store: { getByName: (name: string) => AgentSession | null; getAll: () => AgentSession[] };
 	overstoryDir: string;
-	idleLoopThresholdMs?: number;
+	idleLoopThresholdMs: number;
 }): { complete: boolean; reason: string } {
-	const { session, tmuxAlive, atReadyPrompt, eventStore, store, overstoryDir } = params;
+	const {
+		session,
+		tmuxAlive,
+		atReadyPrompt,
+		eventStore,
+		store,
+		overstoryDir,
+		idleLoopThresholdMs,
+	} = params;
 
 	// 1. Persistent agents are NEVER auto-completed by signals.
 	//    They only complete via run.status or explicit ha stop.
@@ -455,15 +459,12 @@ function shouldCompleteAgent(params: {
 		return { complete: true, reason: "auto-complete: result signal + at ready prompt" };
 	}
 
-	// #109: catch the "result mail sent but agent kept looping" pattern.
-	// Persistent agents already returned early above.
-	const idleLoopMs = timeSinceLastResultMail(eventStore, session.agentName, session.startedAt);
-	const threshold = params.idleLoopThresholdMs ?? 300_000;
-	if (idleLoopMs !== null && idleLoopMs > threshold) {
-		return {
-			complete: true,
-			reason: `auto-complete: result mail sent ${Math.floor(idleLoopMs / 60_000)}m ago + idle loop`,
-		};
+	// 2a. Idle-loop check: result mail sent but agent is still looping (never reaches ready prompt)
+	if (eventStore) {
+		const elapsed = timeSinceLastResultMail(eventStore, session.agentName, session.startedAt);
+		if (elapsed !== null && elapsed > idleLoopThresholdMs) {
+			return { complete: true, reason: "auto-complete: result mail sent + idle loop timeout" };
+		}
 	}
 
 	// 3. Iteration signal (worker_done / merge_ready) → parent decides
@@ -1640,7 +1641,7 @@ export async function runDaemonTick(options: DaemonOptions): Promise<void> {
 					eventStore,
 					store,
 					overstoryDir,
-					idleLoopThresholdMs: options.config?.watchdog?.idleLoopThresholdMs,
+					idleLoopThresholdMs: options.config?.watchdog.idleLoopThresholdMs ?? 300_000,
 				});
 				if (completion.complete) {
 					reconcileSessionToCompleted({
