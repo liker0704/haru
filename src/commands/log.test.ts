@@ -925,6 +925,305 @@ describe("logCommand", () => {
 		expect(nudgePayload.message).toContain("[MAIL] 3 messages");
 	});
 
+	test("session-end skips nudge and marks completed when agent sent result mail (#452)", async () => {
+		// #452: After a scout/builder/reviewer sends their `result` mail, the Stop
+		// hook used to fire checkInboxAndNudge unconditionally. The agent's own
+		// dispatch mail sits in `state=claimed` forever (never explicitly acked),
+		// so getPendingForWaitingAgent > 0 → tmux nudge → new Claude turn →
+		// "Loop N — No change" → Stop hook → infinite loop. With the fix, the
+		// presence of a `result` mail_sent event makes session-end terminal.
+		const sessionStartedAt = new Date(Date.now() - 30_000).toISOString();
+		const dbPath = join(tempDir, ".overstory", "sessions.db");
+		const session: AgentSession = {
+			id: "session-scout-result",
+			agentName: "scout-result",
+			capability: "scout",
+			runtime: "claude",
+			worktreePath: tempDir,
+			branchName: "scout-result-branch",
+			taskId: "bead-scout-001",
+			tmuxSession: "haru-scout-result",
+			state: "working",
+			pid: 77777,
+			parentAgent: "parent-lead",
+			depth: 1,
+			runId: null,
+			startedAt: sessionStartedAt,
+			lastActivity: new Date().toISOString(),
+			escalationLevel: 0,
+			stalledSince: null,
+			rateLimitedSince: null,
+			runtimeSessionId: null,
+			transcriptPath: null,
+			originalRuntime: null,
+			statusLine: null,
+		};
+		const sessionStore = createSessionStore(dbPath);
+		sessionStore.upsert(session);
+		sessionStore.close();
+
+		// Seed mail.db with a pending dispatch message (mimics the original
+		// `dispatch` mail still in state=claimed that triggered the infinite loop).
+		const mailDbPath = join(tempDir, ".overstory", "mail.db");
+		const mailStore = createMailStore(mailDbPath);
+		mailStore.insert({
+			id: "msg-dispatch-stuck",
+			from: "parent-lead",
+			to: "scout-result",
+			subject: "scout the codebase",
+			body: "dispatch payload",
+			type: "dispatch",
+			priority: "normal",
+			threadId: null,
+		});
+		mailStore.close();
+
+		// Seed events.db with a `mail_sent` event from this agent with type=result,
+		// timestamped after sessionStartedAt — mirrors what `ha mail send` records.
+		const eventsDbPath = join(tempDir, ".overstory", "events.db");
+		const eventStore = createEventStore(eventsDbPath);
+		eventStore.insert({
+			runId: null,
+			agentName: "scout-result",
+			sessionId: null,
+			eventType: "mail_sent",
+			toolName: null,
+			toolArgs: null,
+			toolDurationMs: null,
+			level: "info",
+			data: JSON.stringify({
+				to: "parent-lead",
+				subject: "scout findings",
+				type: "result",
+				priority: "normal",
+				messageId: "msg-result-001",
+			}),
+		});
+		eventStore.close();
+
+		await logCommand(["session-end", "--agent", "scout-result"]);
+
+		// Verify: state transitioned directly to `completed` (not `waiting`).
+		const readStore = createSessionStore(dbPath);
+		const updatedSession = readStore.getByName("scout-result");
+		readStore.close();
+		expect(updatedSession).toBeDefined();
+		expect(updatedSession?.state).toBe("completed");
+
+		// Verify: NO nudge event was recorded (checkInboxAndNudge was skipped).
+		const verifyEventStore = createEventStore(eventsDbPath);
+		const allEvents = verifyEventStore.getByAgent("scout-result");
+		verifyEventStore.close();
+		const nudgeEvents = allEvents.filter((ev) => {
+			if (ev.eventType !== "custom" || ev.data === null) return false;
+			try {
+				const payload = JSON.parse(ev.data) as { type?: string };
+				return payload.type === "nudge";
+			} catch {
+				return false;
+			}
+		});
+		expect(nudgeEvents).toHaveLength(0);
+	});
+
+	test("session-end still nudges when agent has NO result mail in events.db (#452 regression guard)", async () => {
+		// Regression guard for #324 behavior: if the agent has NOT sent a `result`
+		// mail this session, the inbox nudge path must still fire normally.
+		const dbPath = join(tempDir, ".overstory", "sessions.db");
+		const session: AgentSession = {
+			id: "session-scout-no-result",
+			agentName: "scout-no-result",
+			capability: "scout",
+			runtime: "claude",
+			worktreePath: tempDir,
+			branchName: "scout-no-result-branch",
+			taskId: "bead-scout-002",
+			tmuxSession: "haru-scout-no-result",
+			state: "working",
+			pid: 88888,
+			parentAgent: "parent-lead",
+			depth: 1,
+			runId: null,
+			startedAt: new Date().toISOString(),
+			lastActivity: new Date().toISOString(),
+			escalationLevel: 0,
+			stalledSince: null,
+			rateLimitedSince: null,
+			runtimeSessionId: null,
+			transcriptPath: null,
+			originalRuntime: null,
+			statusLine: null,
+		};
+		const sessionStore = createSessionStore(dbPath);
+		sessionStore.upsert(session);
+		sessionStore.close();
+
+		// Seed mail.db with one queued message so getPendingForWaitingAgent > 0.
+		const mailDbPath = join(tempDir, ".overstory", "mail.db");
+		const mailStore = createMailStore(mailDbPath);
+		mailStore.insert({
+			id: "msg-queued-no-result",
+			from: "parent-lead",
+			to: "scout-no-result",
+			subject: "follow-up",
+			body: "please continue",
+			type: "result",
+			priority: "normal",
+			threadId: null,
+		});
+		mailStore.close();
+
+		// Seed events.db with a non-result mail_sent event (status, not result)
+		// to confirm the type filter is correct.
+		const eventsDbPath = join(tempDir, ".overstory", "events.db");
+		const eventStore = createEventStore(eventsDbPath);
+		eventStore.insert({
+			runId: null,
+			agentName: "scout-no-result",
+			sessionId: null,
+			eventType: "mail_sent",
+			toolName: null,
+			toolArgs: null,
+			toolDurationMs: null,
+			level: "info",
+			data: JSON.stringify({
+				to: "parent-lead",
+				subject: "status update",
+				type: "status",
+				priority: "normal",
+				messageId: "msg-status-001",
+			}),
+		});
+		eventStore.close();
+
+		await logCommand(["session-end", "--agent", "scout-no-result"]);
+
+		// Verify: state transitioned to `waiting` (NOT `completed`) — no result mail.
+		const readStore = createSessionStore(dbPath);
+		const updatedSession = readStore.getByName("scout-no-result");
+		readStore.close();
+		expect(updatedSession).toBeDefined();
+		expect(updatedSession?.state).toBe("waiting");
+
+		// Verify: exactly one nudge event was recorded (existing #324 behavior).
+		const verifyEventStore = createEventStore(eventsDbPath);
+		const allEvents = verifyEventStore.getByAgent("scout-no-result");
+		verifyEventStore.close();
+		const nudgeEvents = allEvents.filter((ev) => {
+			if (ev.eventType !== "custom" || ev.data === null) return false;
+			try {
+				const payload = JSON.parse(ev.data) as { type?: string };
+				return payload.type === "nudge";
+			} catch {
+				return false;
+			}
+		});
+		expect(nudgeEvents).toHaveLength(1);
+	});
+
+	test("session-end does NOT auto-complete persistent agent (mission-analyst) even when it sent a result mail (#452 persistent-agent guard)", async () => {
+		// Regression guard for #452 persistent-agent exclusion:
+		// Persistent agents (mission-analyst, coordinator-mission*, plan-review-lead,
+		// architecture-review-lead, etc.) also send `result` mail but must stay alive
+		// for review loops, post-merge reconciliation, etc. Without the exclusion,
+		// every result mail would auto-complete them, and the next inbound mail would
+		// respawn them via messaging.ts (which respawns on state=completed) → context
+		// loss + respawn storm. They must follow the normal Stop-hook flow:
+		// state stays `waiting`, watchdog decides termination.
+		const sessionStartedAt = new Date(Date.now() - 30_000).toISOString();
+		const dbPath = join(tempDir, ".overstory", "sessions.db");
+		const session: AgentSession = {
+			id: "session-analyst-result",
+			agentName: "mission-analyst",
+			capability: "mission-analyst",
+			runtime: "claude",
+			worktreePath: tempDir,
+			branchName: "main",
+			taskId: "",
+			tmuxSession: "ov-mission-analyst",
+			state: "working",
+			pid: 99999,
+			parentAgent: null,
+			depth: 0,
+			runId: "run-mission-1",
+			startedAt: sessionStartedAt,
+			lastActivity: new Date().toISOString(),
+			escalationLevel: 0,
+			stalledSince: null,
+			rateLimitedSince: null,
+			runtimeSessionId: null,
+			transcriptPath: null,
+			originalRuntime: null,
+			statusLine: null,
+		};
+		const sessionStore = createSessionStore(dbPath);
+		sessionStore.upsert(session);
+		sessionStore.close();
+
+		// Seed mail.db with a queued message so checkInboxAndNudge has something to
+		// nudge on — confirms the normal #324 nudge path still fires for persistent
+		// agents (they did NOT short-circuit to completed).
+		const mailDbPath = join(tempDir, ".overstory", "mail.db");
+		const mailStore = createMailStore(mailDbPath);
+		mailStore.insert({
+			id: "msg-pending-for-analyst",
+			from: "execution-director",
+			to: "mission-analyst",
+			subject: "follow-up question",
+			body: "please clarify",
+			type: "dispatch",
+			priority: "normal",
+			threadId: null,
+		});
+		mailStore.close();
+
+		// Seed events.db with a `mail_sent` event from this agent with type=result.
+		const eventsDbPath = join(tempDir, ".overstory", "events.db");
+		const eventStore = createEventStore(eventsDbPath);
+		eventStore.insert({
+			runId: null,
+			agentName: "mission-analyst",
+			sessionId: null,
+			eventType: "mail_sent",
+			toolName: null,
+			toolArgs: null,
+			toolDurationMs: null,
+			level: "info",
+			data: JSON.stringify({
+				to: "execution-director",
+				subject: "intake findings",
+				type: "result",
+				priority: "normal",
+				messageId: "msg-result-analyst-001",
+			}),
+		});
+		eventStore.close();
+
+		await logCommand(["session-end", "--agent", "mission-analyst"]);
+
+		// Verify: state stays `waiting`, NOT `completed`.
+		const readStore = createSessionStore(dbPath);
+		const updatedSession = readStore.getByName("mission-analyst");
+		readStore.close();
+		expect(updatedSession).toBeDefined();
+		expect(updatedSession?.state).toBe("waiting");
+
+		// Verify: nudgeAgent was called (persistent agents follow normal Stop-hook flow).
+		const verifyEventStore = createEventStore(eventsDbPath);
+		const allEvents = verifyEventStore.getByAgent("mission-analyst");
+		verifyEventStore.close();
+		const nudgeEvents = allEvents.filter((ev) => {
+			if (ev.eventType !== "custom" || ev.data === null) return false;
+			try {
+				const payload = JSON.parse(ev.data) as { type?: string };
+				return payload.type === "nudge";
+			} catch {
+				return false;
+			}
+		});
+		expect(nudgeEvents).toHaveLength(1);
+	});
+
 	test("session-end does not crash when sessions.db does not exist", async () => {
 		// No sessions.db file exists
 		// session-end should complete without throwing
