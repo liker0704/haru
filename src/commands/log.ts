@@ -93,6 +93,15 @@ function updateLastActivity(projectRoot: string, agentName: string, _event?: str
  * Skip booting agents: Stop hook can fire on the first turn before any tool
  * calls. Leave in booting so tool-start → working transition works.
  *
+ * Exception (#452): when a non-persistent agent has already sent a `result`
+ * mail this session, the Stop hook transitions state directly to `completed`
+ * (bypassing the watchdog's idleLoopThresholdMs path) to prevent the idle-loop
+ * caused by checkInboxAndNudge re-waking the agent on stale claimed dispatch
+ * mail. Persistent agents (coordinator, monitor, mission-analyst,
+ * execution-director, plan-review-lead, architecture-review-lead, etc.) are
+ * excluded — they also send `result` mail but must keep their normal lifecycle
+ * (state stays `waiting`, watchdog decides termination).
+ *
  * Non-fatal: silently ignores errors to avoid breaking hook execution.
  */
 async function handleSessionEnd(projectRoot: string, agentName: string): Promise<void> {
@@ -118,6 +127,28 @@ async function handleSessionEnd(projectRoot: string, agentName: string): Promise
 			}
 			store.updateLastActivity(agentName);
 
+			// #452: if the agent already sent a `result` mail this session, treat it
+			// as terminal. Without this, leaf agents (scout/builder/reviewer) get
+			// re-woken by checkInboxAndNudge because their dispatch mail is still in
+			// `state=claimed` (read-only scouts never explicitly ack; convergence-type
+			// claims are excluded from expire). The nudge → "Loop N — No change" Stop
+			// hook → nudge cycle would otherwise run forever.
+			//
+			// Persistent agents (coordinator, mission-analyst, plan-review-lead, etc.)
+			// also send `result` mail but must stay alive — they may keep working on
+			// review loops, post-merge reconciliation, etc. Without this exclusion,
+			// the next inbound mail would respawn them via the messaging layer
+			// (`state=completed` → respawn) → context loss + respawn storm.
+			if (
+				!PERSISTENT_CAPABILITIES.has(session.capability) &&
+				(await hasSentResultMailThisSession(overstoryDir, agentName, session.startedAt))
+			) {
+				if (session.state !== "completed") {
+					store.updateState(agentName, "completed");
+				}
+				return;
+			}
+
 			// #324: auto-nudge if the inbox has unprocessed mail at the moment we go
 			// to waiting. Sub-agent results that arrived during the working phase sit
 			// in `claimed` state forever — no nudge fires for already-delivered mail.
@@ -132,6 +163,51 @@ async function handleSessionEnd(projectRoot: string, agentName: string): Promise
 	} catch {
 		// Non-fatal: don't break logging if session update fails
 	}
+}
+
+/**
+ * Returns true if the agent has emitted a `mail_sent` event with `type=result`
+ * since `sessionStartedAt`. Best-effort: any error is swallowed (returns false).
+ *
+ * Mirrors `timeSinceLastResultMail` in `src/watchdog/daemon.ts` — scans the
+ * last 100 events newest-to-oldest, parses the JSON `data` payload, and stops
+ * at the first `result` mail. ISO 8601 timestamps are lex-sortable so direct
+ * string comparison against `sessionStartedAt` is correct.
+ */
+async function hasSentResultMailThisSession(
+	overstoryDir: string,
+	agentName: string,
+	sessionStartedAt: string,
+): Promise<boolean> {
+	try {
+		const eventsDbPath = join(overstoryDir, "events.db");
+		// Skip when events.db is absent — opening would create an empty DB file
+		// as a side effect, and there is nothing to find anyway.
+		if (!(await Bun.file(eventsDbPath).exists())) {
+			return false;
+		}
+		const eventStore = createEventStore(eventsDbPath);
+		try {
+			const events = eventStore.getByAgent(agentName);
+			const scanLimit = Math.max(0, events.length - 100);
+			for (let i = events.length - 1; i >= scanLimit; i--) {
+				const event = events[i];
+				if (!event || event.eventType !== "mail_sent" || !event.data) continue;
+				if (event.createdAt < sessionStartedAt) continue;
+				try {
+					const data = JSON.parse(event.data) as { type?: string };
+					if (data.type === "result") return true;
+				} catch {
+					// Ignore malformed payloads
+				}
+			}
+		} finally {
+			eventStore.close();
+		}
+	} catch {
+		// Best-effort: Stop hook must remain unbreakable
+	}
+	return false;
 }
 
 /**
