@@ -121,5 +121,8 @@ MIT
 
 Maintained by [Kyryl Zmiienko](https://www.linkedin.com/in/kyryl-zmiienko/).
 
-Originally forked because of its mail system, but has since diverged
-significantly in scope and direction and is no longer tracked against upstream.
+Part of a personal ecosystem alongside [Kura](https://github.com/liker0704/kura),
+[Suji](https://github.com/liker0704/suji), and
+[Tane](https://github.com/liker0704/tane). Originally forked because of its
+mail system; has since diverged significantly in scope and direction and is no
+longer tracked against upstream.
