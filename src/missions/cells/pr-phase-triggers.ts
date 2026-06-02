@@ -13,6 +13,7 @@ export const PR_PHASE_TRIGGERS = [
 	"pr_rate_limited",
 	"pr_branch_protected",
 	"pr_no_commits",
+	"pr_rebase_conflict",
 	// ci
 	"ci_passed",
 	"ci_failed",
