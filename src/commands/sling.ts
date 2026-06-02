@@ -736,7 +736,15 @@ export async function slingCommand(
 	const config = await loadConfig(cwd);
 	const resolvedBackend = await resolveBackend(config.taskTracker.backend, config.project.root);
 	const overstoryDir = join(config.project.root, detectHaruDir(config.project.root));
-	const missionContext = await resolveActiveMissionContext(overstoryDir);
+	// Prefer env vars when this sling call is initiated by a child agent (#461):
+	// the agent's spawn injected HARU_MISSION_ID/HARU_MISSION_SLUG, which is the
+	// only reliable per-process identifier under parallel missions. The shared
+	// `.overstory/current-mission.txt` pointer can flip to whichever mission
+	// started last and is unsafe for agent self-identification.
+	const envMissionId = process.env.HARU_MISSION_ID;
+	const missionContext = envMissionId
+		? { missionId: envMissionId, runId: process.env.HARU_RUN_ID ?? null }
+		: await resolveActiveMissionContext(overstoryDir);
 	const hasMission = missionContext !== null;
 
 	// Resolve mission slug, artifact root, and tier for resource isolation and capability resolution
@@ -1142,6 +1150,7 @@ export async function slingCommand(
 			skipTaskCheck,
 			json: opts.json ?? false,
 			missionSlug,
+			missionId: missionContext?.missionId,
 			tddMode: resolvedTddMode,
 			architecturePath: resolvedArchitecturePath,
 			testPlanPath: resolvedTestPlanPath,

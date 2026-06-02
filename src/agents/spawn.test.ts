@@ -457,6 +457,68 @@ describe("createSpawnService", () => {
 		});
 	});
 
+	describe("HARU_MISSION_ID / HARU_MISSION_SLUG env propagation (#461)", () => {
+		test("env includes both when missionId and missionSlug are set", () => {
+			const env = buildHaruAgentEnvForTest(
+				{},
+				"builder-test",
+				null,
+				"/tmp/wt",
+				"task-1",
+				undefined,
+				undefined,
+				"mission-1780",
+				"adr-342-pr-default",
+			);
+			expect(env.HARU_MISSION_ID).toBe("mission-1780");
+			expect(env.HARU_MISSION_SLUG).toBe("adr-342-pr-default");
+		});
+
+		test("env omits both when missionId and missionSlug are undefined", () => {
+			const env = buildHaruAgentEnvForTest(
+				{},
+				"builder-test",
+				null,
+				"/tmp/wt",
+				"task-1",
+				undefined,
+				undefined,
+			);
+			expect("HARU_MISSION_ID" in env).toBe(false);
+			expect("HARU_MISSION_SLUG" in env).toBe(false);
+		});
+
+		test("env includes only the set value when one is missing", () => {
+			const envIdOnly = buildHaruAgentEnvForTest(
+				{},
+				"a",
+				null,
+				"/wt",
+				"t",
+				undefined,
+				undefined,
+				"mission-x",
+				undefined,
+			);
+			expect(envIdOnly.HARU_MISSION_ID).toBe("mission-x");
+			expect("HARU_MISSION_SLUG" in envIdOnly).toBe(false);
+
+			const envSlugOnly = buildHaruAgentEnvForTest(
+				{},
+				"a",
+				null,
+				"/wt",
+				"t",
+				undefined,
+				undefined,
+				undefined,
+				"slug-only",
+			);
+			expect("HARU_MISSION_ID" in envSlugOnly).toBe(false);
+			expect(envSlugOnly.HARU_MISSION_SLUG).toBe("slug-only");
+		});
+	});
+
 	describe("project context loading", () => {
 		// These tests verify that context loading is non-fatal.
 		// spawn() always fails at createWorktree in this test context (no real git repo),
