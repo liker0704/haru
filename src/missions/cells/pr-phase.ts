@@ -118,6 +118,7 @@ function buildSubgraph(config: PhaseCellConfig): MissionGraph {
 			edge("create", "paused", "pr_create_network_fail"),
 			edge("create", "paused", "pr_rate_limited"),
 			edge("create", "paused", "pr_branch_protected"),
+			edge("create", "escalate", "pr_rebase_conflict"),
 			// #398: when the mission produced no commits, that's a clean
 			// no-op outcome (audit/verification missions); route to the success
 			// terminal rather than paused so the mission completes normally
@@ -242,34 +243,61 @@ function buildHandlers(deps: PhaseCellDeps, config?: PhaseCellConfig): HandlerRe
 				return out.length > 0 ? out : null;
 			};
 
-			// Bug fix #462: when local `main` is stale relative to origin/main
-			// (e.g. operator's `ha merge` redirected mission commits into a
-			// stale `session-branch.txt` target instead of main), reading
-			// `main^{tree}` produces the PRE-mission tree and the resulting PR
-			// reverts whatever was squash-merged from origin since. Prefer the
-			// mission's featureBranch tree when it exists and is ahead of
-			// origin/main — that ref holds the real mission output even when it
-			// never reached main.
 			const parent = await readRef("origin/main");
 			if (!parent) {
 				return { trigger: "pr_create_network_fail" };
 			}
 			const featureRef = `refs/heads/${featureBranch}`;
-			const featureTree = (await readRef(featureRef))
-				? await readRef(`${featureRef}^{tree}`)
-				: null;
-			const mainCommit = await readRef("main");
-			const mainTree = mainCommit ? await readRef(`${mainCommit}^{tree}`) : null;
-			const parentTree = await readRef(`${parent}^{tree}`);
-
-			// Prefer feature-branch tree when it differs from BOTH origin/main
-			// and from local main — that's the smoking-gun signal the mission
-			// committed to its branch but the local main view is stale.
-			let tree: string | null = mainTree;
-			if (featureTree && featureTree !== parentTree && featureTree !== mainTree) {
-				tree = featureTree;
+			const featureSha = await readRef(featureRef);
+			if (!featureSha) {
+				return { trigger: "pr_create_network_fail" };
 			}
 
+			// Bug fix #471: when featureBranch was created before a sibling
+			// mission's squash-merge advanced origin/main, the featureBranch
+			// tree carries a stale baseline. Naively committing that tree on
+			// top of origin/main makes the PR diff falsely show "removal" of
+			// sibling files. Use `git merge-tree --write-tree` (git 2.38+) to
+			// do a 3-way merge between featureBranch and origin/main against
+			// their merge base — yields a clean tree without touching the
+			// working tree.
+			const mergeBaseProc = spawnFn(["git", "merge-base", featureSha, parent], {
+				cwd,
+				stdout: "pipe",
+				stderr: "pipe",
+			});
+			const mergeBaseExit = await mergeBaseProc.exited;
+			if (mergeBaseExit !== 0) {
+				return { trigger: "pr_create_network_fail" };
+			}
+			const base = mergeBaseProc.stdout
+				? (await new Response(mergeBaseProc.stdout).text()).trim()
+				: "";
+			if (!base) {
+				return { trigger: "pr_create_network_fail" };
+			}
+
+			let tree: string | null;
+			if (base === parent) {
+				// featureBranch already contains origin/main — use its tree directly.
+				tree = await readRef(`${featureSha}^{tree}`);
+			} else {
+				const mergeTreeProc = spawnFn(
+					["git", "merge-tree", "--write-tree", `--merge-base=${base}`, featureSha, parent],
+					{ cwd, stdout: "pipe", stderr: "pipe" },
+				);
+				const mergeTreeExit = await mergeTreeProc.exited;
+				const mergeTreeOut = mergeTreeProc.stdout
+					? (await new Response(mergeTreeProc.stdout).text()).trim()
+					: "";
+				if (mergeTreeExit !== 0) {
+					return { trigger: "pr_rebase_conflict" };
+				}
+				// On a clean merge, stdout is just the tree OID on its own line.
+				tree = mergeTreeOut.split("\n")[0] ?? null;
+			}
+
+			const parentTree = await readRef(`${parent}^{tree}`);
 			if (!tree) {
 				return { trigger: "pr_create_network_fail" };
 			}
