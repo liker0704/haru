@@ -151,9 +151,21 @@ export async function mergeCommand(opts: MergeOptions): Promise<void> {
 	const cwd = process.cwd();
 	const config = await loadConfig(cwd);
 
-	// Resolution chain: --into flag > session-start branch > config canonicalBranch
+	// Resolution chain: --into flag > session-start branch > config canonicalBranch.
+	//
+	// Bug fix #462: when running inside a mission context (HARU_MISSION_TASK_ID
+	// set by the spawn env), bypass `session-branch.txt` and target
+	// `config.project.canonicalBranch` directly. A stale session branch (e.g.
+	// operator's leftover docs branch) would otherwise silently capture mission
+	// merges, producing pr-phase PRs with the wrong diff. Operators running
+	// `ha merge` interactively keep the existing sessionBranch behavior; an
+	// explicit `--into` still wins in both contexts.
+	const inMissionContext =
+		into === undefined &&
+		typeof process.env.HARU_MISSION_TASK_ID === "string" &&
+		process.env.HARU_MISSION_TASK_ID.length > 0;
 	let sessionBranch: string | null = null;
-	if (into === undefined) {
+	if (into === undefined && !inMissionContext) {
 		const sessionBranchPath = join(
 			config.project.root,
 			detectHaruDir(config.project.root),
