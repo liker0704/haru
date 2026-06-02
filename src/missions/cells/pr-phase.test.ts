@@ -1921,3 +1921,159 @@ describe("prPhaseCell create — push before gh pr create", () => {
 		expect(result.trigger).toBe("pr_created");
 	});
 });
+
+// =============================================================================
+// #462: pr-phase trusts featureBranch tree when local main is stale
+// =============================================================================
+
+/**
+ * Build a fake spawn that returns differentiated stdout per git ref. Each
+ * rev-parse call replies with the value the test supplies for that ref. All
+ * other commands (fetch, commit-tree, update-ref, push) succeed with empty
+ * stdout. commit-tree returns a fixed SHA so the create handler proceeds.
+ */
+function makeRefAwareSpawn(refToOid: Record<string, string>): typeof Bun.spawn {
+	const stream = (text: string): ReadableStream =>
+		new ReadableStream({
+			start(c) {
+				c.enqueue(new TextEncoder().encode(text));
+				c.close();
+			},
+		});
+	return ((args: readonly string[]) => {
+		if (args[0] === "git" && args[1] === "rev-parse" && typeof args[2] === "string") {
+			const ref = args[2];
+			const oid = refToOid[ref];
+			if (oid === undefined) {
+				return {
+					exited: Promise.resolve(1),
+					stdout: null,
+					stderr: null,
+					unref: () => {},
+				} as unknown as ReturnType<typeof Bun.spawn>;
+			}
+			return {
+				exited: Promise.resolve(0),
+				stdout: stream(`${oid}\n`),
+				stderr: null,
+				unref: () => {},
+			} as unknown as ReturnType<typeof Bun.spawn>;
+		}
+		if (args[0] === "git" && args[1] === "commit-tree") {
+			return {
+				exited: Promise.resolve(0),
+				stdout: stream("new-commit-sha\n"),
+				stderr: null,
+				unref: () => {},
+			} as unknown as ReturnType<typeof Bun.spawn>;
+		}
+		return {
+			exited: Promise.resolve(0),
+			stdout: null,
+			stderr: null,
+			unref: () => {},
+		} as unknown as ReturnType<typeof Bun.spawn>;
+	}) as unknown as typeof Bun.spawn;
+}
+
+describe("prPhaseCell create — #462 trust feature-branch tree when local main is stale", () => {
+	let savedBudget: GhBudget | null;
+
+	beforeEach(() => {
+		savedBudget = null;
+		try {
+			savedBudget = getGhBudget();
+		} catch {
+			savedBudget = null;
+		}
+	});
+
+	afterEach(() => {
+		setGhBudget(savedBudget);
+	});
+
+	test("#462-A: feature-branch tree differs from BOTH origin/main and stale local main → uses feature tree, pr_created", async () => {
+		// Smoking-gun scenario: mission output committed to featureBranch only,
+		// local main never received the merge (stuck on pre-mission state).
+		const refToOid: Record<string, string> = {
+			"origin/main": "origin-main-sha",
+			"origin-main-sha^{tree}": "origin-main-tree",
+			"refs/heads/feature/x": "feature-sha",
+			"refs/heads/feature/x^{tree}": "feature-tree",
+			main: "stale-main-sha",
+			"stale-main-sha^{tree}": "origin-main-tree", // local main = stale (same tree as origin/main)
+		};
+		const fakeSpawn = makeRefAwareSpawn(refToOid);
+
+		const commitTreeBox: { value: string | null } = { value: null };
+		const wrappedSpawn = ((args: readonly string[], opts?: unknown) => {
+			if (args[0] === "git" && args[1] === "commit-tree" && typeof args[2] === "string") {
+				commitTreeBox.value = args[2];
+			}
+			return (fakeSpawn as unknown as (a: readonly string[], o?: unknown) => unknown)(
+				args,
+				opts,
+			) as ReturnType<typeof Bun.spawn>;
+		}) as unknown as typeof Bun.spawn;
+
+		const { budget } = makeFakeGhBudget(({ args }) => {
+			if (args[0] === "pr" && args[1] === "create") {
+				return { exitCode: 0, stdout: "https://github.com/x/y/pull/462" };
+			}
+			return { exitCode: 0 };
+		});
+		setGhBudget(budget);
+
+		const handlers = prPhaseCell.buildHandlers(makeBaseDeps({ spawn: wrappedSpawn }));
+		const result = await handlers.create!(
+			makeCtx({ mission: makeMission({ featureBranch: "feature/x" }) as unknown as Mission }),
+		);
+
+		expect(result.trigger).toBe("pr_created");
+		// The commit synthesized for the PR MUST use the feature-branch tree
+		// (where the real mission output lives), NOT the stale main tree.
+		expect(commitTreeBox.value).toBe("feature-tree");
+	});
+
+	test("#462-B (no-regression): feature tree absent → falls back to local main tree", async () => {
+		// Pre-#462 baseline behavior: when the mission committed to main (e.g.
+		// `ha merge` already ran into main as expected), feature-branch ref may
+		// not exist locally yet. The handler must still use main^{tree}.
+		const refToOid: Record<string, string> = {
+			"origin/main": "origin-main-sha",
+			"origin-main-sha^{tree}": "origin-main-tree",
+			main: "local-main-sha",
+			"local-main-sha^{tree}": "local-main-tree",
+			// refs/heads/feature/x intentionally absent
+		};
+		const fakeSpawn = makeRefAwareSpawn(refToOid);
+
+		const commitTreeBox: { value: string | null } = { value: null };
+		const wrappedSpawn = ((args: readonly string[], opts?: unknown) => {
+			if (args[0] === "git" && args[1] === "commit-tree" && typeof args[2] === "string") {
+				commitTreeBox.value = args[2];
+			}
+			return (fakeSpawn as unknown as (a: readonly string[], o?: unknown) => unknown)(
+				args,
+				opts,
+			) as ReturnType<typeof Bun.spawn>;
+		}) as unknown as typeof Bun.spawn;
+
+		const { budget } = makeFakeGhBudget(({ args }) => {
+			if (args[0] === "pr" && args[1] === "create") {
+				return { exitCode: 0, stdout: "https://github.com/x/y/pull/2" };
+			}
+			return { exitCode: 0 };
+		});
+		setGhBudget(budget);
+
+		const handlers = prPhaseCell.buildHandlers(makeBaseDeps({ spawn: wrappedSpawn }));
+		const result = await handlers.create!(
+			makeCtx({ mission: makeMission({ featureBranch: "feature/x" }) as unknown as Mission }),
+		);
+
+		expect(result.trigger).toBe("pr_created");
+		// Falls back to local main tree (existing behavior).
+		expect(commitTreeBox.value).toBe("local-main-tree");
+	});
+});

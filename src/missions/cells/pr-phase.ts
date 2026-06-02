@@ -242,10 +242,35 @@ function buildHandlers(deps: PhaseCellDeps, config?: PhaseCellConfig): HandlerRe
 				return out.length > 0 ? out : null;
 			};
 
-			const tree = await readRef("main^{tree}");
+			// Bug fix #462: when local `main` is stale relative to origin/main
+			// (e.g. operator's `ha merge` redirected mission commits into a
+			// stale `session-branch.txt` target instead of main), reading
+			// `main^{tree}` produces the PRE-mission tree and the resulting PR
+			// reverts whatever was squash-merged from origin since. Prefer the
+			// mission's featureBranch tree when it exists and is ahead of
+			// origin/main — that ref holds the real mission output even when it
+			// never reached main.
 			const parent = await readRef("origin/main");
-			const parentTree = parent ? await readRef(`${parent}^{tree}`) : null;
-			if (!tree || !parent) {
+			if (!parent) {
+				return { trigger: "pr_create_network_fail" };
+			}
+			const featureRef = `refs/heads/${featureBranch}`;
+			const featureTree = (await readRef(featureRef))
+				? await readRef(`${featureRef}^{tree}`)
+				: null;
+			const mainCommit = await readRef("main");
+			const mainTree = mainCommit ? await readRef(`${mainCommit}^{tree}`) : null;
+			const parentTree = await readRef(`${parent}^{tree}`);
+
+			// Prefer feature-branch tree when it differs from BOTH origin/main
+			// and from local main — that's the smoking-gun signal the mission
+			// committed to its branch but the local main view is stale.
+			let tree: string | null = mainTree;
+			if (featureTree && featureTree !== parentTree && featureTree !== mainTree) {
+				tree = featureTree;
+			}
+
+			if (!tree) {
 				return { trigger: "pr_create_network_fail" };
 			}
 			if (parentTree === tree) {

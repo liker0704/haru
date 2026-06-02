@@ -661,6 +661,62 @@ merge:
 			const currentBranch = await runGitInDir(repoDir, ["symbolic-ref", "--short", "HEAD"]);
 			expect(currentBranch.trim()).toBe("explicit-target");
 		});
+
+		test("#462: HARU_MISSION_TASK_ID env bypasses stale session-branch.txt → targets canonicalBranch", async () => {
+			await setupProject(repoDir, defaultBranch);
+
+			// Create a stale session branch (simulating operator's leftover docs work)
+			await commitFile(repoDir, "src/base.ts", "base content");
+			await runGitInDir(repoDir, ["checkout", "-b", "fix/stale-operator-branch"]);
+			await commitFile(repoDir, "src/stale-marker.ts", "operator leftover");
+			await runGitInDir(repoDir, ["checkout", defaultBranch]);
+
+			// session-branch.txt points to the stale operator branch
+			await Bun.write(
+				join(repoDir, ".overstory", "session-branch.txt"),
+				"fix/stale-operator-branch\n",
+			);
+
+			// Create mission feature branch
+			const branchName = "haru/mission/builder-ws/bead-462-test";
+			await runGitInDir(repoDir, ["checkout", "-b", branchName]);
+			await commitFile(repoDir, `src/${branchName}.ts`, "mission content");
+			await runGitInDir(repoDir, ["checkout", defaultBranch]);
+
+			let output = "";
+			const originalWrite = process.stdout.write.bind(process.stdout);
+			process.stdout.write = (chunk: unknown): boolean => {
+				output += String(chunk);
+				return true;
+			};
+
+			// Simulate mission-spawned coordinator: HARU_MISSION_TASK_ID is set
+			const savedEnv = process.env.HARU_MISSION_TASK_ID;
+			process.env.HARU_MISSION_TASK_ID = "haru-462";
+			try {
+				await mergeCommand({ branch: branchName, json: true });
+			} finally {
+				process.stdout.write = originalWrite;
+				if (savedEnv === undefined) {
+					delete process.env.HARU_MISSION_TASK_ID;
+				} else {
+					process.env.HARU_MISSION_TASK_ID = savedEnv;
+				}
+			}
+
+			const parsed = JSON.parse(output);
+			expect(parsed.success).toBe(true);
+
+			// Critical: merge MUST land on canonicalBranch (defaultBranch), NOT on the stale
+			// session branch. This is the root-cause fix for #462.
+			const currentBranch = await runGitInDir(repoDir, ["symbolic-ref", "--short", "HEAD"]);
+			expect(currentBranch.trim()).toBe(defaultBranch);
+
+			// Verify the mission's commits did NOT leak into the stale operator branch.
+			await runGitInDir(repoDir, ["checkout", "fix/stale-operator-branch"]);
+			const leaked = await Bun.file(join(repoDir, `src/${branchName}.ts`)).exists();
+			expect(leaked).toBe(false);
+		});
 	});
 
 	describe("conflict handling", () => {
