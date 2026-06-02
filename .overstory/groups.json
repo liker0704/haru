@@ -2088,5 +2088,15 @@
 		"status": "active",
 		"createdAt": "2026-05-21T18:49:19.675Z",
 		"completedAt": null
+	},
+	{
+		"id": "group-2ff75e7c",
+		"name": "adr-312-batch",
+		"memberIssueIds": [
+			"haru-3094"
+		],
+		"status": "active",
+		"createdAt": "2026-06-02T16:34:05.124Z",
+		"completedAt": null
 	}
 ]
